@@ -2,6 +2,25 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.36.0", date = "2026-07-26",
+        sections = {
+            { head = "New Features", items = {
+                "Card layout for the tracker - a new Quest Rows section under /eqs > Appearance switches the tracker from plain rows to a Card layout, which draws every quest, achievement, endeavor, tracked recipe and world quest on its own bordered panel. Background color, border color, border thickness and padding are all adjustable, and cards can optionally be tinted by quest type so campaign, legendary, dungeon and raid quests stand out at a glance. Plain remains the default, so nothing changes until you switch it on.",
+            } },
+            { head = "Bug Fixes", items = {
+                "Profession reagents now count every quality tier. The Profession section only counted the lowest quality of a reagent, so a bag full of rank 2 or rank 3 materials could still read as 0 held; it now sums all qualities the way Blizzard's own tracker does.",
+                "Tracked recrafts are no longer broken. A recraft was never recognized as one, so it was mislabeled, listed the reagents of the normal recipe instead of its own, collapsed into a single row when the same recipe was tracked both ways, and could throw an error when untracked.",
+                "Required modifying slots and currency reagents no longer vanish from the Profession section - both were skipped entirely despite counting toward the craft.",
+                "Variable-quantity reagent slots show a range instead of a count against zero.",
+                "The tracker's content column is now centered. With the tracker background on, rows sat 4 pixels from the left edge but 22 from the right.",
+            } },
+            { head = "Improvements", items = {
+                "The recraft label in the Profession section now follows your language instead of a hardcoded English suffix.",
+                "French and Russian translations updated for the new options. Thanks to Zox (French) and Malevi4 (Russian).",
+            } },
+        },
+    },
+    {
         version = "1.35.0", date = "2026-07-26",
         sections = {
             { head = "New Features", items = {

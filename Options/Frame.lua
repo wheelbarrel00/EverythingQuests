@@ -53,7 +53,7 @@ function Options:Build()
 
     f.version = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.version:SetPoint("TOPRIGHT", -34, -14)
-    f.version:SetText("v" .. (ns.VERSION or "1.35.0"))
+    f.version:SetText("v" .. (ns.VERSION or "1.36.0"))
     f.version:SetTextColor(unpack(YELLOW))
 
     f.discord = CreateFrame("Button", nil, f)
@@ -166,8 +166,7 @@ function Options:SelectTab(id)
             tab.scrollFrame  = scroll
             tab.contentFrame = child
             tab.builder(child)
-            -- Shrink the scroll child to wrap its controls so the scrollbar reflects the
-            -- real content height (measured next frame, once the layout has resolved).
+            -- Measured next frame - the layout has not resolved yet, so the height would be wrong now
             C_Timer.After(0, function()
                 local top = child:GetTop()
                 if not top then return end
@@ -192,8 +191,7 @@ function Options:ApplyWindowScale()
     local DB = ns:GetSubsystem("DB")
     local s = DB and DB.db and DB.db.global and DB.db.global.optionsWindowScale
     if type(s) ~= "number" or s <= 0 then s = 1 end
-    -- SetScale re-reads the frame's anchor offset in the new scale, so a window the
-    -- user has dragged off center would jump on resize. Keep its on-screen center fixed.
+    -- SetScale re-reads anchor offsets in the new scale, so a dragged window jumps unless its center is restored
     local cx, cy = f:GetCenter()
     local oldEff = f:GetEffectiveScale()
     f:SetScale(s)
@@ -310,7 +308,7 @@ function Options:AttachTooltip(frame, title, body)
         if t.EnableMouse then t:EnableMouse(true) end
         t:HookScript("OnEnter", function(s)
             GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
-            -- GameTooltip:SetText arg 5 is alpha, not wrap (wrap is 6th); pass 1 here or the title goes invisible.
+            -- GameTooltip:SetText arg 5 is alpha, not wrap (wrap is 6th) - pass 1 or the title goes invisible
             if title then GameTooltip:SetText(title, YELLOW[1], YELLOW[2], YELLOW[3], 1, true) end
             if body and body ~= "" then GameTooltip:AddLine(body, 0.82, 0.82, 0.82, true) end
             GameTooltip:Show()
@@ -337,10 +335,7 @@ function Options:CreateCheckbox(parent, label, getter, setter, tooltip)
     return cb
 end
 
--- tipTitle/tipBody attach a hover tooltip to each option BUTTON (not the wide
--- container): a container-anchored tooltip only triggers on the sliver not covered
--- by the buttons and anchors ANCHOR_RIGHT off the full width (mid-screen). Per-button
--- hover fixes both the hit area and the anchor.
+-- Tooltips hook each option BUTTON, not the wide container - a container hover only fires on the uncovered sliver and anchors mid-screen
 function Options:CreateRadioGroup(parent, label, options, getter, setter, maxWidth, pad, tipTitle, tipBody)
     local container = CreateFrame("Frame", nil, parent)
 
@@ -800,8 +795,7 @@ function Options:CreateSlider(parent, label, min, max, step, getter, setter)
     return container
 end
 
--- ElvUI adds its own class-color button to the ColorPickerFrame, so EQ only adds
--- one when ElvUI is absent to avoid a duplicate.
+-- Skipped when another UI already adds a class-color button to the picker, to avoid a duplicate
 local function elvUILoaded()
     local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G["IsAddOnLoaded"]
     return (f and f("ElvUI")) and true or false
@@ -819,8 +813,7 @@ local function ensureClassColorButton()
         if not getCC then return end
         local r, g, bl = getCC()
         if not r or not _activeReopen then return end
-        -- SetColorRGB does not reliably move the 10.2.5+ picker, so re-open it seeded
-        -- with the class color (the supported way to set it) then commit to the setting.
+        -- SetColorRGB does not reliably move the 10.2.5+ picker, so re-open it seeded with the class color
         local a = (ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha()) or 1
         _activeReopen(r, g, bl, a)
         if _activeColorApply then _activeColorApply() end
@@ -868,9 +861,7 @@ function Options:CreateColorPicker(parent, label, getter, setter)
 
     btn:SetScript("OnClick", function()
         local c = getter and getter() or { r = 1, g = 1, b = 1, a = 1 }
-        -- Snapshot on open: cancelFunc's `prev` arg changed shape in the 10.2.5
-        -- ColorPickerFrame overhaul (alpha unreliable), so we restore from this
-        -- captured copy instead.
+        -- cancelFunc's prev arg changed shape in the 10.2.5 picker overhaul (alpha unreliable), so restore from this snapshot
         local orig = { r = c.r or 0, g = c.g or 0, b = c.b or 0, a = c.a or 1 }
         local function applyColor(restore)
             local r, g, b, a
@@ -878,7 +869,7 @@ function Options:CreateColorPicker(parent, label, getter, setter)
                 r, g, b, a = restore.r, restore.g, restore.b, restore.a
             elseif ColorPickerFrame and ColorPickerFrame.GetColorRGB then
                 r, g, b = ColorPickerFrame:GetColorRGB()
-                -- GetColorAlpha added in 10.0; OpacitySliderFrame removed at the same time.
+                -- GetColorAlpha arrived in 10.0 and OpacitySliderFrame was removed at the same time
                 if ColorPickerFrame.GetColorAlpha then
                     a = ColorPickerFrame:GetColorAlpha()
                 elseif OpacitySliderFrame then
@@ -959,6 +950,10 @@ local function eqSlashHandler(msg)
     elseif msg == "bonushud test" then
         local Hud = ns:GetSubsystem("TrackerScenarioBonusHUD")
         if Hud and Hud.ToggleTest then Hud:ToggleTest() end
+        return
+    elseif msg == "profdebug" then
+        local Prof = ns:GetSubsystem("TrackerProfession")
+        if Prof and Prof.Dump then Prof:Dump() end
         return
     elseif msg == "trackerdebug" then
         local T = ns:GetSubsystem("Tracker")
@@ -1193,8 +1188,7 @@ local function eqSlashHandler(msg)
     end
 end
 
--- "/eq" is Blizzard's secure /equip; WoW dispatches it before SlashCmdList so
--- a "/eq" handler is unreachable and risks taint. Use "/eqs" only.
+-- "/eq" is Blizzard's secure /equip and is dispatched before SlashCmdList, so an "/eq" handler is unreachable and risks taint
 SLASH_EVERYTHINGQUESTS1 = "/eqs"
 SLASH_EVERYTHINGQUESTS2 = "/everythingquests"
 SlashCmdList["EVERYTHINGQUESTS"] = eqSlashHandler

@@ -10,8 +10,7 @@ end
 local function shouldHide()
     local cfg = getCfg()
     if not cfg then return false end
-    -- PLAYER_REGEN_DISABLED fires just BEFORE InCombatLockdown() reports true,
-    -- so trust our own regen-tracked flag too or the first combat never hides.
+    -- PLAYER_REGEN_DISABLED fires just before InCombatLockdown() reports true, so the regen-tracked flag has to count too
     if cfg.hideInCombat and ((InCombatLockdown and InCombatLockdown()) or V._inCombat) then return true end
     if cfg.hideInInstances and IsInInstance and (IsInInstance()) then return true end
     if cfg.hideInMythicPlus and C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive
@@ -20,10 +19,7 @@ local function shouldHide()
     return false
 end
 
--- frame:Hide()/Show() are PROTECTED (the tracker owns secure item-button
--- descendants) and Midnight silently no-ops them here even OUT of combat, so
--- alpha is the only reliable hide. Drive visibility by alpha in every case;
--- the real Show/Hide is a best-effort extra when out of combat.
+-- Show/Hide is protected here (the tracker owns secure item-button descendants) and silently no-ops even out of combat, so alpha is the only reliable hide
 local function setVisible(frame, visible)
     frame:SetAlpha(visible and 1 or 0)
     frame._eqHidden = (not visible) or nil
@@ -99,18 +95,8 @@ function V:OnEnable()
                 C_QuestLog.RemoveQuestWatch(questID)
             end
         else
-            -- Auto-track ON (default): ensure a MANUAL watch (same as ticking
-            -- the quest-log checkbox). This is the actual fix for "newly
-            -- accepted quests don't always track":
-            --   • AddQuestWatch(questID) with no type adds an AUTOMATIC watch,
-            --     and the engine silently evicts automatic watches once you
-            --     pass its small auto-watch cap — so the Nth accepted quest
-            --     would quietly drop out of the tracker.
-            --   • When Blizzard's own autoQuestWatch CVar already auto-watched
-            --     the quest (as AUTOMATIC), the old `not watched` guard skipped
-            --     it, leaving it evictable.
-            -- Forcing a MANUAL watch every accept is uncapped and stable, and
-            -- still covers campaign quests Blizzard never auto-watches at all.
+            -- AddQuestWatch with no type adds an AUTOMATIC watch, which the engine silently evicts past its small cap.
+            -- Force MANUAL on every accept, including quests the autoQuestWatch CVar already watched automatically.
             if C_QuestLog.AddQuestWatch then
                 local manual = Enum and Enum.QuestWatchType and Enum.QuestWatchType.Manual
                 C_QuestLog.AddQuestWatch(questID, manual)

@@ -145,10 +145,7 @@ function HF:Build()
     local f = CreateFrame("Frame", "EQHistoryFrame", UIParent, "BackdropTemplate")
     f:SetSize(700, 460)
     f:SetPoint("CENTER")
-    -- FULLSCREEN_DIALOG (one above the Options frame's DIALOG strata) so the
-    -- History window pops OVER the Options window when opened from the
-    -- History tab's "Open History" button. Without this, History rendered
-    -- behind Options and was easy to miss entirely.
+    -- One strata above the Options frame so History pops over it when opened from the History tab
     f:SetFrameStrata("FULLSCREEN_DIALOG")
     f:SetMovable(true)
     f:EnableMouse(true)
@@ -488,7 +485,7 @@ function HF:_buildQuestsPane(parent)
     return pane
 end
 
--- Assigns the forward-declared upvalue; do NOT re-`local` this function.
+-- Assigns the forward-declared upvalue - do NOT re-local this function
 function findChainForQuest(questID)
     local Database = ns:GetSubsystem("ChainGuideDatabase")
     local QLS      = ns:GetSubsystem("ChainGuideQuestLineSource")

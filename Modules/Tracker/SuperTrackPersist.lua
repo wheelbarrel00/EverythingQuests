@@ -14,9 +14,7 @@ function STP:OnEnable()
     if not Events then return end
 
     Events:On("PLAYER_ENTERING_WORLD", function(_, isInitialLogin)
-        -- Only a fresh login / client restart. /reload (isInitialLogin
-        -- false) and zone changes must leave the player's current
-        -- super-track untouched.
+        -- Only a fresh login - /reload and zone changes must leave the current super-track untouched
         if not isInitialLogin then return end
         if shouldRestore() then return end
         C_Timer.After(0.5, function()

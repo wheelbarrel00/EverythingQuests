@@ -1,10 +1,5 @@
--- WHY own frame instead of StaticPopup: EQ's StaticPopupDialogs were getting
--- blamed for taint on Blizzard's shared Quit/Logout frames (ADDON_ACTION_BLOCKED
--- on CancelLogout/ForceQuit). The StaticPopup/GameDialog system recycles a small
--- pool of frames; our insecure button handlers could leave taint on one the
--- logout/quit dialog later reused. preferredIndex isn't reliably honored by
--- Midnight's new GameDialog bridge. Our own frame removes EQ from that system
--- entirely so it can't taint those dialogs.
+-- Own frame instead of StaticPopup: that system recycles a small frame pool, so our
+-- insecure button handlers could taint the frame the logout/quit dialog later reuses.
 
 local _, ns = ...
 
@@ -113,8 +108,7 @@ end
 
 function Dialog:Show(opts)
     local f = self:Build()
-    -- Replacing a dialog that is still up: cancel the outgoing one so its
-    -- callbacks are not silently dropped. (_finish nils self.opts.)
+    -- Cancel a dialog that is still up so its callbacks are not silently dropped
     if self.opts then self:_finish(false) end
     self.opts = opts
 

@@ -3,17 +3,13 @@ local L = ns.L
 
 local T = ns:RegisterSubsystem("WQTab", {})
 
--- Native quest-map side-tab dimensions (Blizzard's LargeSideTabButtonTemplate).
+-- Native quest-map side-tab dimensions, from Blizzard's LargeSideTabButtonTemplate
 local TAB_W, TAB_H = 43, 55
--- Sit in the lower-middle of the map's right edge, clear of Blizzard's own
--- button column (filters / tracking / Adventure Guide) which clusters up top.
+-- Lower-middle of the map's right edge, clear of Blizzard's own button column up top
 local TAB_Y = -110
--- Fallback dock if the native quest-map tabs aren't available: lower-right edge.
 local PANEL_EDGE_X = 28
 
--- Line the World Quests tab up as a 4th tab directly under the native quest-map
--- tabs by copying the Map Legend tab's own stacking anchor (so the gap and x match
--- exactly). Anchoring our frame to a Blizzard frame is read-only — no taint.
+-- Copy the Map Legend tab's own stacking anchor so gap and x match exactly - reading a Blizzard frame's point is taint-free
 local function anchorTab(f)
     f:ClearAllPoints()
     local mlt = QuestMapFrame and QuestMapFrame.MapLegendTab
@@ -29,12 +25,7 @@ local function anchorTab(f)
     f:SetPoint("RIGHT", WorldMapFrame, "RIGHT", PANEL_EDGE_X, TAB_Y)
 end
 
--- Match the native quest-map tabs' look. When ElvUI has reskinned them (its
--- backdrop appears on the Map Legend tab), drop our Blizzard atlas chrome and give
--- the tab ElvUI's flat backdrop so the 4th tab matches the other three and follows
--- the user's ElvUI media. Gating on the native tab's actual backdrop (not just
--- "is ElvUI loaded") keeps us Blizzard-styled when ElvUI's quest skin is off.
--- Defensive throughout: any miss leaves the native Blizzard look untouched.
+-- Gate on the native tab's actual backdrop, not just the reskin addon being loaded, so we stay Blizzard-styled when its quest skin is off
 local function applyElvUISkin(f)
     if f._elvui then return true end
     local mlt = QuestMapFrame and QuestMapFrame.MapLegendTab
@@ -67,10 +58,7 @@ function T:Build()
         f:SetFrameLevel(WorldMapFrame:GetFrameLevel() + 100)
     end
 
-    -- Replicate Blizzard's LargeSideTabButtonTemplate art (atlases verified from
-    -- QuestMapFrame's QuestsTab/EventsTab) so the World Quests tab reads as a native
-    -- quest-map side tab. Replicated, not inherited, to avoid the template's
-    -- SidePanelTabButtonMixin (its tab-group coupling) on a map-parented frame.
+    -- Replicate the native side-tab art rather than inherit LargeSideTabButtonTemplate - its SidePanelTabButtonMixin tab-group coupling breaks on a map-parented frame
     f.bg = f:CreateTexture(nil, "BACKGROUND")
     f.bg:SetAtlas("questlog-tab-side", true)
     f.bg:SetPoint("CENTER")
@@ -92,9 +80,7 @@ function T:Build()
     applyElvUISkin(f)
 
     f:SetScript("OnClick", function() T:Toggle() end)
-    -- Private tooltip, not the shared GameTooltip: a map-parented frame drawing on
-    -- the singleton can leave EQ taint that trips the next AreaPOI hover (see
-    -- Util.PinTooltip / ChainGuide QuestMapButton).
+    -- Private tooltip, not the shared GameTooltip: drawing on the singleton from a map-parented frame leaves taint that trips the next AreaPOI hover
     f:SetScript("OnEnter", function(s)
         local tip = ns.Util.PinTooltip()
         tip:SetOwner(s, "ANCHOR_LEFT")
@@ -117,8 +103,6 @@ function T:UpdateVisual()
     local DB = ns:GetSubsystem("DB")
     local open = DB and DB.db.profile.worldQuests.popoutOpen
     if f._elvui and f.backdrop then
-        -- ElvUI mode: mark the active tab by colouring the backdrop border gold,
-        -- otherwise restore ElvUI's own border colour.
         if open then
             f.backdrop:SetBackdropBorderColor(0.92, 0.72, 0.02)
         else
@@ -131,7 +115,6 @@ function T:UpdateVisual()
             end
         end
     elseif f.selected then
-        -- Native: the Blizzard "selected" glow marks the tab active while open.
         f.selected:SetShown(open and true or false)
     end
 end

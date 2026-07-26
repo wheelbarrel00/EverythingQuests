@@ -32,9 +32,7 @@ end
 
 function T:Show(owner, questID)
     if not (owner and questID) then return end
-    -- Use EQ's private tooltip, not the shared GameTooltip: a pin hover drawn
-    -- on the shared tooltip leaves our taint on it, which the next AreaPOI
-    -- tooltip inherits and crashes on (Midnight secret values). See Util.PinTooltip.
+    -- Private tooltip, not the shared GameTooltip: a pin hover leaves taint the next AreaPOI tooltip inherits and crashes on
     local tip = Util.PinTooltip()
     if not tip then return end
 

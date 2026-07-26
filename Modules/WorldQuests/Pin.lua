@@ -24,8 +24,7 @@ function Pin:OnLoad()
     self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 end
 
--- Required empty stub — newer canvas iterates pins and calls this; missing
--- it trips the assertion at MapCanvas.lua:280.
+-- Required empty stub - the canvas calls this on every pin and its absence trips the assert at MapCanvas.lua:280
 function Pin:CheckMouseButtonPassthrough() end
 
 function Pin:OnAcquired(questID, x, y, reward)

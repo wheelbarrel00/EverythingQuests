@@ -128,9 +128,7 @@ function Util.QuestTitle(questID, withNumberFallback)
             local t = C_TaskQuest.GetQuestInfoByQuestID(questID)
             if t and t ~= "" then return t end
         end
-        -- Last resort: a curated name for quests the live API can't title yet
-        -- (e.g. unreleased patch content). Always after the API attempts above,
-        -- so a real (localized) title takes precedence the moment it loads.
+        -- Curated names must stay last so a real localized title wins the moment it loads
         if ns.CURATED_QUEST_NAMES then
             local c = ns.CURATED_QUEST_NAMES[questID]
             if c then return c end
@@ -149,9 +147,7 @@ function Util.AcquirePooled(pool, active, parent, factory)
     return f
 end
 
--- Using a private GameTooltip frame instead of the shared GameTooltip singleton
--- prevents EQ's insecure taint from propagating to Blizzard's AreaPOI tooltip
--- under Midnight's "secret value" system, which would crash on the next AreaPOI hover.
+-- Private tooltip - taint on the shared GameTooltip crashes the next AreaPOI hover under the secret-value system
 local _pinTooltip
 function Util.PinTooltip()
     if not _pinTooltip then

@@ -124,8 +124,7 @@ function H:_ContextMenu()
     end)
 end
 
--- Parented to UIParent (not the tracker) so it stays outside the tracker's secure
--- item-button chain and never needs combat gating.
+-- Parented to UIParent so it stays outside the tracker's secure item-button chain and needs no combat gating
 function H:_AcquireFrame()
     if self.frame then return self.frame end
     local f = CreateFrame("Frame", "EverythingQuestsScenarioBonusHUD", UIParent, "BackdropTemplate")
@@ -183,7 +182,6 @@ local function setReward(row, questID, stepName)
     btn:Show()
 end
 
--- model = array of { name, rewardQuestID, criteria = { { text, completed }, ... } }
 function H:_Render(model)
     if not (model and #model > 0) then
         if self.frame then self.frame:Hide() end
@@ -279,10 +277,7 @@ function H:_GatherScenarioSteps()
     return (#model > 0) and model or nil
 end
 
--- Delve bonus loot. Delves expose no scenario bonus steps, so the two bonus-chest
--- mechanics are read the only way that survives Midnight's combat lockdown / secret
--- unit names: map vignettes (Nemesis packs) + player auras/casts/emotes (Banner).
--- Season-specific IDs, ported from EverythingDelves; expect churn each season.
+-- Delves expose no scenario bonus steps, so these vignette and player-aura IDs stand in - they churn each season
 local NEMESIS_PACK_VIGNETTE = 7531
 local RAGER_NAME_MATCH      = "voidfused"
 local BANNER_INTERACT_SPELLS = { [1269411] = true, [1269412] = true, [1269416] = true }
@@ -397,8 +392,7 @@ local function HandleMessage(event, a1, a2)
     if text:lower():find("sanctified banner", 1, true) then SetBannerState("announced") end
 end
 
--- Forget the run's accumulated state when the delve changes (or on exit), so a
--- fresh run never inherits the previous delve's packs/banner.
+-- Reset per-run state on delve change or exit so a new run never inherits the old packs or banner
 local function CheckRun()
     if not PlayerInDelve() then trackedDelve = nil; return end
     local name = (GetInstanceInfo and GetInstanceInfo()) or "delve"
@@ -500,7 +494,6 @@ function H:SetScale(v)
     self:ApplySettings()
 end
 
--- Debug scaffolding (removed before release): /eqs bonushud, /eqs bonushud test.
 function H:ToggleTest()
     if self._test then
         self._test = false

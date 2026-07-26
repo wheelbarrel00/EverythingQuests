@@ -46,9 +46,7 @@ ns:GetSubsystem("Options"):AddTab("about", L["About"], function(content)
         self:SetVerticalScroll(new)
     end)
 
-    -- Fixed scroll-child width: the live width isn't resolved at build time,
-    -- so we size it (and the text wrap) to a constant that fits the 1020-wide
-    -- window's content area with room for the bar.
+    -- The live width is not resolved at build time, so width and wrap are constants sized to the 1020-wide window
     local SC_W, WRAP, LEFT = 940, 900, 4
     local sc = CreateFrame("Frame", nil, scroll)
     sc:SetSize(SC_W, 1)

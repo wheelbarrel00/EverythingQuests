@@ -8,10 +8,7 @@ local ICON_QUEST_AVAILABLE = "Interface\\GossipFrame\\AvailableQuestIcon"
 local ICON_QUEST_TURNIN    = "Interface\\GossipFrame\\ActiveQuestIcon"
 
 function Pin:OnLoad()
-    -- PIN_FRAME_LEVEL_QUEST_PING is the highest standard pin tier (used by
-    -- the player's own active-quest pings). Sits above Blizzard's quest POI
-    -- pins so ours receive the click. PIN_FRAME_LEVEL_AREA_POI was below
-    -- their pins which made ours invisible to mouse events.
+    -- QUEST_PING is the highest standard pin tier - a lower tier puts our pins under Blizzard's and they never see a click
     self:UseFrameLevelType("PIN_FRAME_LEVEL_QUEST_PING")
     self:SetScalingLimits(1, 0.6, 1.4)
     self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -30,7 +27,7 @@ function Pin:OnAcquired(questID, x, y, isComplete)
     self.icon:SetVertexColor(1, 1, 1, 1)
     self.numberText:SetText("")
 
-    -- AcquirePin doesn't auto-Show — the provider owns visibility.
+    -- AcquirePin does not auto-Show
     self:Show()
 end
 
@@ -46,8 +43,7 @@ function Pin:OnMouseEnter()
     local q = Cache:Get(self.questID)
     if not q then return end
 
-    -- Private tooltip, not GameTooltip: sharing GameTooltip seeds our taint onto it,
-    -- which the next AreaPOI tooltip inherits and crashes under Midnight's secret-value rules.
+    -- Private tooltip, not GameTooltip - sharing GameTooltip seeds our taint onto it and the next AreaPOI tooltip crashes on it
     local tip = ns.Util.PinTooltip()
     tip:SetOwner(self, "ANCHOR_RIGHT")
     tip:SetText(q.title or ("Quest #" .. tostring(self.questID)),
@@ -73,10 +69,7 @@ function Pin:OnMouseLeave()
     ns.Util.PinTooltip():Hide()
 end
 
--- Required empty stub. Newer MapCanvas calls this on every pin during
--- iteration; if the method is missing the canvas asserts at
--- Blizzard_MapCanvas.lua:280. Don't remove this even though it looks
--- pointless — the assertion comes back the moment you do.
+-- Required stub - MapCanvas calls this on every pin and asserts if the method is missing
 function Pin:CheckMouseButtonPassthrough()
 end
 

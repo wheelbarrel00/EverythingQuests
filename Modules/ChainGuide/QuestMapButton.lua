@@ -124,10 +124,7 @@ local function ensureButton()
     b.text:SetTextColor(0.92, 0.72, 0.02)
 
     b:SetScript("OnClick", onClick)
-    -- This button lives on the world map's DetailsFrame, so its hover is a
-    -- map-side draw on the shared GameTooltip — exactly what can leave EQ taint
-    -- on that singleton and trip the next AreaPOI tooltip under Midnight's
-    -- secret-value rules. Use EQ's private tooltip instead (see Util.PinTooltip).
+    -- Hovering from the map's DetailsFrame can leave taint on the shared GameTooltip and trip the next AreaPOI tooltip, so use the private tooltip
     b:SetScript("OnEnter", function(self)
         local tip = ns.Util.PinTooltip()
         tip:SetOwner(self, "ANCHOR_TOPLEFT")
@@ -146,8 +143,6 @@ end
 function QMB:OnEnable()
     if ensureButton() then return end
     if WorldMapFrame and WorldMapFrame.HookScript then
-        -- ensureButton early-returns once the button exists and no-ops while
-        -- DetailsFrame is absent, so it can retry cheaply on every map open.
         WorldMapFrame:HookScript("OnShow", ensureButton)
     end
 end

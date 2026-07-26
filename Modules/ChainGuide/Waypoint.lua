@@ -102,26 +102,13 @@ function W:SetWaypoint(mapID, x, y, title)
         TomTom:AddWaypoint(mapID, x, y, { title = title, from = "Everything Quests" })
         return true
     end
-    -- No TomTom: we deliberately do NOT write Blizzard's user waypoint here.
-    -- C_Map.SetUserWaypoint + C_SuperTrack.SetSuperTrackedUserWaypoint(true)
-    -- seed addon taint into Blizzard's shared super-track/user-waypoint state,
-    -- which the world-map data providers and AreaPOI tooltip widgets read later.
-    -- That is the sticky-taint source behind the "secret value" arithmetic
-    -- crash on an AreaPOI tooltip (textHeight) and contributes to the
-    -- QuestDataProvider SetPassThroughButtons block. Instead, openMap (below)
-    -- takes the player to the right zone and we print the exact coords so they
-    -- can still find the spot. TomTom users keep the navigation arrow above.
+    -- Never write Blizzard's user waypoint here - SetUserWaypoint and SetSuperTrackedUserWaypoint seed sticky taint into shared super-track state that the AreaPOI tooltip and quest data provider read later
     print(("|cffEBB706EQ|r: |cffffffff%s|r is at |cff66ccff%.1f, %.1f|r — opening the map there."):format(
         title or "Quest", (x or 0) * 100, (y or 0) * 100))
     return false
 end
 
--- Retargeting the world map (OpenWorldMap / SetMapID) makes every map data
--- provider re-acquire its pins. When EQ drives that from an insecure click the
--- refresh runs tainted, blowing up AreaPOI "secret value" arithmetic on hover
--- and tripping QuestDataProvider's protected SetPassThroughButtons. C_Timer
--- does NOT launder the taint — a closure from insecure code re-taints its
--- callback. Guard: if the map is already on this mapID, skip the retarget.
+-- Retargeting the world map makes every data provider re-acquire pins, and from an insecure click that refresh runs tainted (C_Timer does not launder it), so openMap skips the retarget when already on this mapID
 local function doOpenMap(mapID)
     if OpenWorldMap then
         OpenWorldMap(mapID)
@@ -136,14 +123,7 @@ local function openMap(mapID)
        and WorldMapFrame.GetMapID and WorldMapFrame:GetMapID() == mapID then
         return
     end
-    -- In COMBAT, retargeting the world map from our (insecure) click taints
-    -- Blizzard's map data providers — FlightPointDataProvider et al. call the
-    -- PROTECTED SetPropagateMouseClicks when they re-acquire pins after SetMapID,
-    -- which throws ADDON_ACTION_BLOCKED during combat lockdown. The quest's
-    -- super-track already ran (it isn't protected), so the on-screen objective
-    -- arrow still guides the player; we only need to hold the map OPEN itself
-    -- until combat ends. Never call doOpenMap while in combat. Fixed key →
-    -- latest target wins if several directions are requested mid-fight.
+    -- Never retarget the map in combat - data providers call the protected SetPropagateMouseClicks when re-acquiring pins after SetMapID, which blocks under lockdown
     if InCombatLockdown() then
         local Events = ns:GetSubsystem("Events")
         if Events then
@@ -190,18 +170,12 @@ end
 
 function W:_goToInLog(questID, title)
     if C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
-        -- Drop any user-waypoint super-track first, but ONLY if one exists — a
-        -- needless SetSuperTrackedUserWaypoint(false) still fires
-        -- SUPER_TRACKING_CHANGED, and each such event makes Blizzard's
-        -- QuestDataProvider re-acquire its pins on our tainted stack. Fewer
-        -- redundant events = fewer tainted refreshes (the real mitigation;
-        -- deferral can't launder the taint).
+        -- Clear the user waypoint only if one exists - a needless call still fires SUPER_TRACKING_CHANGED, and each such event re-acquires quest pins on our tainted stack
         if C_SuperTrack.SetSuperTrackedUserWaypoint
            and C_Map and C_Map.HasUserWaypoint and C_Map.HasUserWaypoint() then
             C_SuperTrack.SetSuperTrackedUserWaypoint(false)
         end
-        -- Skip re-super-tracking a quest we're already tracking — same
-        -- redundant-event reasoning.
+        -- Same redundant-event reasoning - do not re-super-track the quest we already track
         local cur = C_SuperTrack.GetSuperTrackedQuestID
                     and C_SuperTrack.GetSuperTrackedQuestID()
         if cur ~= questID then
@@ -246,13 +220,7 @@ local function nextActionableStep(chain)
     if not items then return nil end
     local char = Database:CurrentCharacter()
 
-    -- Pre-pass: a faction-paired step (e.g. Paved in Ash — 86735 Horde / 86736
-    -- Alliance, both at overlay cell x1,y2) is two items in one cell, and the
-    -- off-faction one can NEVER be completed. A plain "first incomplete item"
-    -- scan would lock onto it forever and stall the chain (the reported "Paved
-    -- in Ash is next" bug). So collapse by cell: a cell is DONE if ANY member is
-    -- completed, and we remember a member that's in the player's log (their own
-    -- accepted quest) so we point at it rather than its off-faction twin.
+    -- Faction-paired steps share one overlay cell and the off-faction twin can never complete, so collapse by cell - done if any member is done, and prefer a member in the player's log
     wipe(_stepCellDone)
     wipe(_stepCellInLog)
     for i = 1, #items do
@@ -398,10 +366,7 @@ function W:OnEnable()
         local Database = ns:GetSubsystem("ChainGuideDatabase")
         if Database then Database:NormalizeChain(chain) end
         if not questBelongsToChain(chain, questID) then return end
-        -- IsQuestFlaggedCompleted can lag one frame behind QUEST_TURNED_IN, so
-        -- defer the next-step recompute a frame for fresh data. The deferred
-        -- work only super-tracks / feeds TomTom (no map retarget, no user
-        -- waypoint), so it carries no new taint despite the timer closure.
+        -- IsQuestFlaggedCompleted can lag one frame behind QUEST_TURNED_IN, so defer the next-step recompute
         C_Timer.After(0, function()
             local step = self:AdvanceWaypoint(chain)
             if not step and chain.items and #chain.items > 0 then

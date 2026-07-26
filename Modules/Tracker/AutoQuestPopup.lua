@@ -7,7 +7,7 @@ local PAD        = 7
 local LINE_GAP   = 2
 local BOX_GAP    = 6
 local ICON_SIZE  = 34
-local BORDER = { 0.82, 0.65, 0.13, 0.55 }     -- soft amber quest accent; neutral so it sits over any tracker style
+local BORDER = { 0.82, 0.65, 0.13, 0.55 }
 local HILITE = { 0.95, 0.78, 0.20, 0.95 }
 
 S.pool   = {}
@@ -68,7 +68,7 @@ local function buildBox()
     box.iconBang:SetSize(30, 30)
     box.iconBang:SetPoint("CENTER")
 
-    -- No "!" bang exists in the atlas set; draw it as a font overlay so it's crisp at any scale and never shows a "?" that reads as turn-in.
+    -- No "!" exists in the atlas set, so it is a font overlay - the atlas fallback renders a "?" that reads as a turn-in
     box.bang = box.iconHolder:CreateFontString(nil, "OVERLAY")
     box.bang:SetPoint("CENTER", box.icon, "CENTER", 0, 0)
     box.bang:SetFont(STANDARD_TEXT_FONT, 22, "OUTLINE")
@@ -128,9 +128,7 @@ function S:Count(wantCampaign)
     return c
 end
 
--- Caller (Tracker:Render) releases all boxes once per pass, then calls Render for
--- the Campaign and Quests sections in turn; each call APPENDS only the popups whose
--- quest matches wantCampaign, so a campaign quest's popup never lands in both.
+-- Appends only - the caller releases every box once per pass, then calls this once per section
 function S:Render(content, contentWidth, yStart, wantCampaign)
     if not content then return 0, 0 end
     local n = getNum()

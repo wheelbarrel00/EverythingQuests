@@ -63,9 +63,7 @@ end
 
 function Profiler:Reset()
     wipe(self.stats)
-    -- Intentionally do NOT wipe _active — an in-flight Start/Stop pair on
-    -- another thread of control would lose its start sample and silently
-    -- be ignored by Stop (the `a.cpu` nil-check).
+    -- Do not wipe _active - an in-flight Start/Stop pair would lose its start sample and be dropped
 end
 
 Profiler._wrapped = {}

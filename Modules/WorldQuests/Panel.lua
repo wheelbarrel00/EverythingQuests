@@ -4,8 +4,7 @@ local L = ns.L
 local P = ns:RegisterSubsystem("WQPanel", {})
 
 local PANEL_W     = 250
--- Offset past the WQ side-tab on the map's right edge (TAB_W ~43) so the docked
--- panel doesn't overlap the tab button.
+-- Clears the WQ side tab on the map's right edge (about 43 wide) so the docked panel does not overlap it
 local LEFT_GAP    = 50
 local TOP_INSET   = 4
 local BOT_INSET   = 4
@@ -16,8 +15,7 @@ local BAR_W       = 18
 local PIN_TEMPLATE = "EQWorldQuestPinTemplate"
 
 local BG_COLOR   = { 0, 0, 0, 0.9 }
--- Gold trim matches the world map's gold chrome so the docked panel reads as part
--- of the map rather than a red-bordered EQ box floating beside it.
+-- Gold, not EQ brand red, so the docked panel reads as part of the map chrome
 local EDGE_COLOR = { 0.85, 0.65, 0.13, 0.95 }
 local GOLD       = { 1.0, 0.82, 0.0 }
 
@@ -95,9 +93,7 @@ function P:Build()
     self.frame = f
 end
 
--- Whether the panel would render anything if opened, honoring the same toggles
--- and zone-map check the sections use. The pull-tab gates on this (not raw pin
--- presence) so the tab can never invite-open onto an empty panel.
+-- The tab gates on this, not raw pin presence, so it can never invite-open onto an empty panel
 function P:HasContent()
     local DB = ns:GetSubsystem("DB")
     if not (DB and DB.db.profile.worldQuests.enabled ~= false) then return false end
@@ -139,8 +135,6 @@ function P:Refresh()
         return
     end
 
-    -- Dock flush to the map's right edge, spanning its full height, so the popout
-    -- reads as a native side-tab of the world map rather than a floating box.
     f:ClearAllPoints()
     f:SetPoint("TOPLEFT",    WorldMapFrame, "TOPRIGHT",    LEFT_GAP, -TOP_INSET)
     f:SetPoint("BOTTOMLEFT", WorldMapFrame, "BOTTOMRIGHT", LEFT_GAP,  BOT_INSET)
@@ -173,8 +167,6 @@ function P:Refresh()
         listH, headerText = Zone:Render(f.list)
     end
 
-    -- The divider only separates two present sections; never let it dangle under a
-    -- lone summary (e.g. a continent map, which has no zone list).
     if summaryH > 0 and headerText then
         f.divider:ClearAllPoints()
         f.divider:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, -y)

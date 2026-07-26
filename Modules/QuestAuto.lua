@@ -83,8 +83,7 @@ local function onQuestComplete()
 
     local n = GetNumQuestChoices and GetNumQuestChoices() or 0
     if n <= 1 then
-        -- 0 choices = no item reward (or fixed reward) — index 0 finishes it.
-        -- 1 choice = take the only option.
+        -- GetQuestReward index 0 finishes a quest with no reward choice, 1 takes the single option
         GetQuestReward(n == 1 and 1 or 0)
     end
 end

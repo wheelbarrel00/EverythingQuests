@@ -19,11 +19,8 @@ local function isWorldQuest(questID)
     return false
 end
 
--- Quests whose POI sits on the player's current map = the authoritative "in this
--- zone" set. The old filter compared the quest-log HEADER string to GetZoneText(),
--- but headers are campaign/category groupings that rarely equal the standing-zone
--- name (esp. in Midnight), so it hid every quest. Returns a reused scratch table,
--- or nil when the map/API is unavailable (callers must then fail open, never hide).
+-- Zone membership comes from map POIs - quest-log headers are campaign groupings that rarely equal GetZoneText(), so comparing them hides everything.
+-- Returns a reused scratch table, or nil when the map or API is unavailable, and callers must then fail open rather than hide.
 local _zoneScratch = {}
 function Filters:CurrentZoneQuests()
     local map = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")

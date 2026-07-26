@@ -70,8 +70,7 @@ local function classifyItem(questID, name, texture, count, quality)
         elseif looksLikeArtifactPower(name) then
             category = R.FILTER.ARTIFACT_POWER
         else
-            -- Guard with an `if`, not `and`: `f and f(x)` truncates a
-            -- multi-return to one value, nil-ing equipLoc/classID.
+            -- Guard with an if, not and: `f and f(x)` truncates the multi-return to one value and nils equipLoc/classID
             local equipLoc, classID
             local instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
             if instant then
@@ -136,9 +135,7 @@ local function classify(questID)
             local count = c.totalRewardAmount
             local label = name
             if count and count > 1 then label = label .. " ×" .. count end
-            -- Faction-granting currencies classify as reputation locale-
-            -- independently; the old English-name heuristics never matched
-            -- on FR/RU/KO.
+            -- Classify off the faction-granting API, not the currency name - name heuristics never matched on non-English clients
             local cat = R.FILTER.RESOURCE
             local grantsFaction = c.currencyID and C_CurrencyInfo
                                   and C_CurrencyInfo.GetFactionGrantedByCurrency
@@ -174,11 +171,7 @@ function R:Classify(questID)
 
     local result = classify(questID)
 
-    -- Only memoize a fully-resolved reward. Before the client has the
-    -- reward data, classify() returns the FALLBACK placeholder (or a
-    -- tag-only stub); caching that would freeze the pin on the yellow
-    -- "!" forever. Re-classifying an un-loaded quest each refresh is
-    -- cheap and self-corrects the instant the data arrives.
+    -- Only memoize a fully-resolved reward - caching the FALLBACK placeholder would freeze the pin on the yellow "!" forever
     if result ~= FALLBACK and rewardDataReady(questID) then
         resultCache[questID] = result
     end
@@ -196,8 +189,7 @@ end
 function R:OnInitialize()
     local Events = ns:GetSubsystem("Events")
     if Events then
-        -- A finished/abandoned quest's ID can be recycled by a future
-        -- quest; clear it so the next quest under that ID re-parses.
+        -- Quest IDs get recycled, so drop the entry or the next quest under that ID inherits this reward
         local function drop(_, questID)
             if questID then resultCache[questID] = nil end
         end

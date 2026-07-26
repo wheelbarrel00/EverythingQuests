@@ -72,7 +72,7 @@ function Pin:OnMouseLeave()
     ns.Util.PinTooltip():Hide()
 end
 
--- Required empty stub — do not remove (see Modules/MapPOI/Pin.lua).
+-- Required empty stub - do not remove (see Modules/MapPOI/Pin.lua)
 function Pin:CheckMouseButtonPassthrough()
 end
 

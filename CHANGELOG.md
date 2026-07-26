@@ -5,6 +5,27 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.0] - 2026-07-26
+
+An optional card layout that gives every tracked row its own bordered panel, plus a rewrite of profession reagent counting that fixes four separate ways it could report the wrong numbers.
+
+### New Features
+
+- **Card layout for the tracker** - a new **Quest Rows** section under `/eqs` > Appearance switches the tracker from plain rows to a **Card** layout, which draws every quest, achievement, endeavor, tracked recipe and world quest on its own bordered panel. Background color, border color, border thickness and padding are all adjustable, and cards can optionally be tinted by quest type so campaign, legendary, dungeon and raid quests stand out at a glance. **Plain** remains the default, so nothing changes until you switch it on.
+
+### Bug Fixes
+
+- **Profession reagents now count every quality tier** - the Profession section only counted the lowest quality of a reagent, so a bag full of rank 2 or rank 3 materials could still read as 0 held. It now sums all qualities the way Blizzard's own tracker does.
+- **Tracked recrafts are no longer broken** - a recraft was never recognized as one, so it was mislabeled, listed the reagents of the normal recipe instead of its own, collapsed into a single row when the same recipe was tracked both ways, and could throw an error when untracked.
+- **Required modifying slots and currency reagents no longer vanish** - both were skipped entirely by the Profession section despite counting toward the craft.
+- **Variable-quantity reagent slots show a range** - a slot that accepts a variable amount used to show a count against zero.
+- **The tracker's content column is now centered** - with the tracker background on, rows sat 4 pixels from the left edge but 22 from the right.
+
+### Improvements
+
+- **The recraft label follows your language** - it previously used a hardcoded English suffix regardless of your game client.
+- **French and Russian translations** updated for the new options. Thanks to Zox (French) and Malevi4 (Russian).
+
 ## [1.35.0] - 2026-07-26
 
 Customize the zone progress bar's texture and color, new Line Spacing and Header Spacing sliders for the tracker, and a Class color button in the color picker for players without ElvUI.

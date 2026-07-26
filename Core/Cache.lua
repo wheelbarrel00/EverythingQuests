@@ -11,19 +11,8 @@ local firstSeen = {}
 
 local baselined = false
 
--- Session "primed" guard for the cold-login empty-cache race. The cache is
--- built lazily on the first Cache:All()/Cache:Get(), which on login happens in
--- the tracker's first render ~0.25s after PLAYER_LOGIN. On a COLD start the
--- server may not have sent quest data yet, so C_QuestLog.GetNumQuestLogEntries()
--- returns 0 and fullRebuild() produces an EMPTY cache. The cheap
--- QUEST_LOG_UPDATE refresh (refreshDynamicFields) only updates quests already
--- in the cache, so it can never ADD the quests that load a moment later — the
--- regular Quests/Campaign sections would then stay empty until a structural
--- quest event or a /reload, while the World Quests section (which rebuilds from
--- scratch every pass) renders normally. Until the cache has captured a
--- populated log this session, QUEST_LOG_UPDATE stays on the FULL-rebuild path
--- so the empty build self-heals the instant quest data arrives; once primed it
--- downgrades to the cheap path — the GC-churn win the two-tier cache exists for.
+-- On a cold login the quest log can still be empty, so the first build is empty.
+-- The cheap refresh only updates cached quests - stay on full rebuild until primed.
 local primed = false
 
 local function deriveIsCampaign(id, info)
@@ -32,6 +21,18 @@ local function deriveIsCampaign(id, info)
         if cid and cid > 0 then return true end
     end
     return (info and info.campaignID and info.campaignID > 0) and true or false
+end
+
+-- Memoize hits only - a miss can mean the quest's static data has not streamed yet,
+-- and a cached miss would never retry.
+local tagIDCache = {}
+local function getTagID(id)
+    local cached = tagIDCache[id]
+    if cached then return cached end
+    local info = C_QuestLog and C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(id)
+    local tagID = info and info.tagID
+    if tagID then tagIDCache[id] = tagID end
+    return tagID
 end
 
 local objTextCache = {}
@@ -46,8 +47,7 @@ local function getObjectivesText(id)
         text = objText or ""
         if saved and saved ~= 0 then C_QuestLog.SetSelectedQuest(saved) end
     end
-    -- Do not memoize "" - on a cold-login race the objective text has not
-    -- streamed yet, and a cached "" would never retry (it is not nil).
+    -- Do not memoize "" - the text may not have streamed yet and a cached "" never retries
     if text ~= "" then objTextCache[id] = text end
     return text
 end
@@ -84,6 +84,7 @@ local function fullRebuild()
                     isAutoComplete = info.isAutoComplete,
                     isWatched      = C_QuestLog.GetQuestWatchType
                                      and C_QuestLog.GetQuestWatchType(id) ~= nil,
+                    tagID          = getTagID(id),
                     classification = (C_QuestInfoSystem
                                       and C_QuestInfoSystem.GetQuestClassification
                                       and C_QuestInfoSystem.GetQuestClassification(id))
@@ -101,6 +102,9 @@ local function fullRebuild()
     end
     for qid in pairs(firstSeen) do
         if not Cache.quests[qid] then firstSeen[qid] = nil end
+    end
+    for qid in pairs(tagIDCache) do
+        if not Cache.quests[qid] then tagIDCache[qid] = nil end
     end
     if next(Cache.quests) ~= nil then
         primed    = true

@@ -2,8 +2,9 @@ local _, ns = ...
 
 local QI = ns:RegisterSubsystem("NameplateQuestIcons", {})
 
-local ICON_SIZE    = 24   -- default icon px  (DB: general.npIconSize)
-local DEFAULT_TEXT = 13   -- default count px (DB: general.npIconTextSize)
+-- Defaults only - general.npIconSize and general.npIconTextSize override these
+local ICON_SIZE    = 24
+local DEFAULT_TEXT = 13
 local SPACING      = 3
 
 local function cfg()
@@ -20,9 +21,6 @@ local PLACEMENT = {
     BOTTOM = { point = "TOP",    rel = "BOTTOM", x = 0,  y = -4 },
 }
 
--- offX/offY are the user's fine-tune offsets, added on top of the placement's
--- base gap so the whole icon+count container (and thus both children) shift
--- together. WoW SetPoint y is positive-up.
 local function anchorFrame(f, plate, placement, offX, offY)
     local p = PLACEMENT[placement] or PLACEMENT.RIGHT
     f:ClearAllPoints()
@@ -34,8 +32,7 @@ local LT = Enum and Enum.TooltipDataLineType
 local QUEST_TITLE     = (LT and LT.QuestTitle)     or 17
 local QUEST_OBJECTIVE = (LT and LT.QuestObjective) or 8
 
--- Midnight can hand back "secret values" from restricted APIs that error if
--- indexed/compared. Guard tooltip text + GUID reads through this.
+-- Midnight restricted APIs can hand back secret values that error if indexed or compared
 local _issecret = _G.issecretvalue
 local function ok(v)
     if _issecret then return not _issecret(v) end
@@ -115,8 +112,7 @@ local function scanInto(unit, out)
     local lines = data and data.lines
     if not lines then return 0 end
 
-    -- Dedup by entry rather than filtering on the QuestPlayer line. objMap already
-    -- gates to quests you have, so a party member's line can only echo one of yours.
+    -- Dedup by entry instead of filtering the QuestPlayer line - objMap only holds your own quests, so a party member's line can only echo one of yours
     wipe(_scanSeen)
     local count, objMap = 0, nil
     for i = 2, #lines do
@@ -184,9 +180,7 @@ end
 
 local function render(plate, list, count, hostile)
     local f = getIconFrame(plate)
-    -- render() is the single source of truth for size/placement so recycled
-    -- nameplate frames (pooled by Blizzard, EQQuestIcons persists) always pick up
-    -- the current option values, even if they were off-screen during a change.
+    -- Re-read size and placement every pass - Blizzard pools nameplates, so a frame recycled while off-screen carries stale option values
     local iconSize, textSize, placement, offX, offY = cfg()
     anchorFrame(f, plate, placement, offX, offY)
     f:SetHeight(iconSize)
@@ -208,8 +202,7 @@ local function render(plate, list, count, hostile)
             ic:SetSize(iconSize, iconSize)
             ic.text:SetFont(STANDARD_TEXT_FONT, textSize, "OUTLINE")
 
-            -- objType keywords only classify on enUS. Locale-independent fallback:
-            -- an unclassified objective on an attackable unit is a kill, so skull it.
+            -- objType keywords only match on enUS, so treat an unclassified objective on an attackable unit as a kill
             local qtype = q.type
             if qtype == "DEFAULT" and hostile then qtype = "KILL" end
             local def = TEX[qtype] or TEX.DEFAULT
@@ -344,11 +337,6 @@ function QI:ApplyEnabled()
     end
 end
 
--- Live-applies placement / icon size / count-text size to every visible
--- nameplate. render() reads the current option values on every pass and is the
--- single source of truth for size/placement (so pooled frames recycled while
--- off-screen self-correct), so a plain refresh is all this needs. Only EQ's own
--- child frame is touched, never the protected nameplate, so it is taint-safe.
 function QI:ApplyLayout()
     if not self.enabled then return end
     refreshAllPlates("LAYOUT")

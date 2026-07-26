@@ -141,6 +141,7 @@ LibDataBroker-powered launcher compatible with Titan Panel, ChocolateBar, ElvUI'
 | `/eqs questobj` | Dump every watched quest's objectives, including fallback sources for empty objective lists |
 | `/eqs autopopup` | Probe the auto-quest popup API surface (`GetNumAutoQuestPopUps` etc.) |
 | `/eqs wqdebug` | Dump every data source the World Quests tracker section consults |
+| `/eqs profdebug` | Dump every tracked profession recipe with its required reagent slots, per-slot kind (basic / currency / modifying), held-vs-needed counts and quality-tier count; flags any slot where the all-qualities total differs from the tier-1-only total |
 | `/eqs dir` | Diagnose "Get Directions": every waypoint coordinate source for the super-tracked quest, in yards, plus the one the resolver picks |
 | `/eqs profile [show \| reset \| mem on \| mem off \| memhog \| auto on \| auto off \| auto list]` | Built-in profiler with hot-path auto-instrument |
 

@@ -16,9 +16,7 @@ local function blizzardIsWatched(questID)
            and C_QuestLog.GetQuestWatchType(questID) ~= nil
 end
 
--- NOT C_QuestLog.IsWorldQuest here: that is static classification, true for an
--- EXPIRED world quest forever, so it could never prune (ghost entries survived
--- every login and got re-watched each session).
+-- Not C_QuestLog.IsWorldQuest: that stays true for an expired world quest forever, so ghost entries could never be pruned
 local function questStillActive(questID)
     if C_TaskQuest and C_TaskQuest.GetQuestTimeLeftMinutes then
         local t = C_TaskQuest.GetQuestTimeLeftMinutes(questID)
@@ -75,8 +73,6 @@ function W:IsTracked(questID)
     return list and list[questID] == true
 end
 
--- Tracked by ANY store: our persistent list OR Blizzard's runtime WQ watch
--- (the latter can hold quests we never persisted, e.g. auto-watches).
 function W:IsWatched(questID)
     if self:IsTracked(questID) then return true end
     if C_QuestLog and C_QuestLog.GetNumWorldQuestWatches
@@ -90,9 +86,7 @@ function W:IsWatched(questID)
     return blizzardIsWatched(questID)
 end
 
--- Used by the Events tracker section so it sees both Blizzard's runtime
--- watch list AND any of our persistent ones that haven't been re-added yet
--- (e.g., during the first second after login).
+-- Union both stores - persistent entries are not back in Blizzard's watch list until the post-login restore runs
 function W:GetTrackedQuests()
     local out = {}
     local seen = {}
@@ -121,8 +115,7 @@ end
 function W:OnEnable()
     local Events = ns:GetSubsystem("Events")
     Events:On("PLAYER_ENTERING_WORLD", function()
-        -- WQ data takes a beat to populate after login. Two-second delay
-        -- gives the API time before we restore.
+        -- WQ data is not populated immediately after login, so restore has to wait
         C_Timer.After(2, restore)
     end)
     Events:On("QUEST_TURNED_IN", function(_, questID)

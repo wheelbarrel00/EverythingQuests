@@ -77,6 +77,16 @@ DB.defaults = {
             blockSpacing         = 2,
             lineSpacing          = 0,
             headerSpacing        = 0,
+            blockLayout          = "classic",
+            cardColor            = { r = 0.09, g = 0.10, b = 0.12, a = 0.73 },
+            cardBorderColor      = { r = 0.00, g = 0.00, b = 0.00, a = 0.45 },
+            cardBorderSize       = 1,
+            cardPadding          = 6,
+            cardTintByType       = false,
+            cardTintCampaign     = { r = 0.20, g = 0.14, b = 0.04, a = 0.80 },
+            cardTintLegendary    = { r = 0.24, g = 0.12, b = 0.01, a = 0.80 },
+            cardTintDungeon      = { r = 0.02, g = 0.11, b = 0.20, a = 0.80 },
+            cardTintRaid         = { r = 0.02, g = 0.15, b = 0.03, a = 0.80 },
             scrollBarBg          = true,
             scrollBarBgColor     = { r = 0.60, g = 0.60, b = 0.65, a = 0.25 },
             hideScrollBar        = false,
@@ -193,15 +203,14 @@ local APPEARANCE_KEYS = {
     "headerBar", "headerBarColor", "headerBarHeight", "headerBarStyle",
     "headerBarSoftEdges", "headerBarSoftEdgeStrength",
     "blockSpacing", "lineSpacing", "headerSpacing", "scale",
+    "blockLayout", "cardColor", "cardBorderColor", "cardBorderSize", "cardPadding",
+    "cardTintByType", "cardTintCampaign", "cardTintLegendary", "cardTintDungeon", "cardTintRaid",
     "showBackground", "backgroundColor", "showBorder", "borderColor", "borderSize",
     "scrollBarBg", "scrollBarBgColor", "hideScrollBar", "skinScrollBar",
     "scrollBarThumbColor", "scrollBarThumbWidth", "hideScrollArrows",
 }
 
--- Reverts only the Appearance-tab settings (fonts, colours, shadows, header bar,
--- scroll-bar skin, zone-bar look) to defaults by clearing the keys; AceDB re-applies
--- the defaults on the reload that follows. Behaviour settings (filters, sections,
--- sounds, sort, etc.) and the zone bar's saved position/lock are left untouched.
+-- Clearing a key lets AceDB re-apply its default - behavior keys and the zone bar's saved position are left alone by design
 function DB:ResetTrackerAppearance()
     local prof = self.db and self.db.profile and self.db.profile.tracker
     if not prof then return end

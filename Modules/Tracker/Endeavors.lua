@@ -83,18 +83,29 @@ function E:Render(content, contentWidth, yStart, collapsed)
     if collapsed or count == 0 then return 0, count end
 
     local Media = ns:GetSubsystem("Media")
+    local Card = ns:GetSubsystem("TrackerCard")
+    local cardOn, pad, borderSize = false, 0, 0
+    local cardBg, cardBorder
+    if Card then
+        cardOn, pad, borderSize = Card:State()
+        cardBg, cardBorder = Card:Colors()
+    end
+
     local y = yStart
     local shown = 0
     for i = 1, count do
         local info = C_PerksActivities and C_PerksActivities.GetPerksActivityInfo and C_PerksActivities.GetPerksActivityInfo(ids[i])
         if info then
             shown = shown + 1
+            local groupTop = y
+            if cardOn then y = y + pad end
             local row = acquireHeader(content)
-            row:SetWidth(contentWidth)
+            row:SetWidth(math.max(1, contentWidth - pad * 2))
             row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+            row:SetPoint("TOPLEFT", content, "TOPLEFT", pad, -y)
             row.title:SetText(info.activityName or ("Activity #" .. tostring(ids[i])))
             if Media and Media.ApplyTrackerTitleFont then Media:ApplyTrackerTitleFont(row.title) end
+            local lastBottom = y + HEADER_H
             y = y + HEADER_H + ROW_GAP
 
             local reqs = info.requirementsList
@@ -108,14 +119,26 @@ function E:Render(content, contentWidth, yStart, collapsed)
                     else
                         line = "|cff999999" .. line .. "|r"
                     end
-                    local lr = acquireLine(content)
-                    lr:SetWidth(contentWidth)
+                    -- Parented to the header row so the group card draws behind the text, anchored to content so placement is unchanged
+                    local lr = acquireLine(row)
+                    lr:SetWidth(math.max(1, contentWidth - pad * 2))
                     lr:ClearAllPoints()
-                    lr:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+                    lr:SetPoint("TOPLEFT", content, "TOPLEFT", pad, -y)
                     lr.text:SetText(line)
                     if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(lr.text, -2) end
-                    y = y + LINE_H + ROW_GAP + ns.Util.LineSpacing()
+                    lastBottom = y + LINE_H
+                    local advance = LINE_H + ROW_GAP + ns.Util.LineSpacing()
+                    if cardOn then advance = math.max(advance, LINE_H) end
+                    y = y + advance
                 end
+            end
+
+            if cardOn then
+                local groupBottom = lastBottom + pad
+                Card:Draw(row, groupBottom - groupTop, pad, borderSize, cardBg, cardBorder)
+                y = groupBottom + Card:Gap(ROW_GAP, true)
+            elseif Card then
+                Card:Clear(row)
             end
         end
     end

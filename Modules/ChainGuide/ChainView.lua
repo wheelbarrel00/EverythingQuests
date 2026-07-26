@@ -125,7 +125,7 @@ local function buildNode(parent)
     b:SetScript("OnLeave", nodeOnLeave)
     b:SetScript("OnClick", nodeOnClick)
 
-    -- Propagate to canvas so a drag-pan can start from anywhere, including on a node; nodeOnClick suppresses pan-gesture clicks.
+    -- Propagate to the canvas so a drag-pan can start on a node - nodeOnClick suppresses pan-gesture clicks
     if b.SetPropagateMouseClicks then b:SetPropagateMouseClicks(true) end
 
     return b
@@ -254,7 +254,7 @@ local function buildQuestTooltip(item, statusKey)
     end
     GameTooltip:AddLine("ID: " .. tostring(item.id), 0.5, 0.5, 0.5)
 
-    -- GetQuestDifficultyLevel returns 0 until quest data is cached; only show when > 0.
+    -- GetQuestDifficultyLevel returns 0 until quest data is cached
     if item.id and C_QuestLog and C_QuestLog.GetQuestDifficultyLevel then
         local lvl = C_QuestLog.GetQuestDifficultyLevel(item.id)
         if lvl and lvl > 0 then
@@ -298,7 +298,7 @@ local function buildQuestTooltip(item, statusKey)
 
     local QR = ns:GetSubsystem("QuestRewards")
     if QR then
-        -- Completed quests are gone from the log; the API reports objectives as 0/N, so skip them to avoid "unfinished" display under a green "Completed" header.
+        -- Completed quests are gone from the log and the API reports their objectives as 0/N, so skip them
         if statusKey ~= "complete" then
             local hadObjectives = QR:RenderObjectives(GameTooltip, item.id)
             if hadObjectives then GameTooltip:AddLine(" ") end
@@ -360,7 +360,7 @@ function nodeOnClick(self)
     local pane = canvas and canvas._pane
     if pane and pane._panning then
         if pane._panMoved then return end
-        -- OnUpdate may not have run yet between press and click on a heavy frame; re-check live travel (Blizzard order: OnMouseDown -> OnClick -> OnMouseUp).
+        -- OnUpdate may not have run between press and click, so re-check live travel (order is OnMouseDown then OnClick then OnMouseUp)
         if pane._panStartX then
             local scale = canvas:GetEffectiveScale()
             if scale and scale ~= 0 then
@@ -406,7 +406,7 @@ end
 local function canvasOnUpdate(self)
     local pane = self._pane
     if not (pane and pane._panning) then return end
-    -- Button can be released off-frame; live button state is the authoritative stop signal.
+    -- Button can be released off-frame, so live button state is the authoritative stop signal
     if not (IsMouseButtonDown and IsMouseButtonDown("LeftButton")) then stopPan(self); return end
 
     local scale = self:GetEffectiveScale()
@@ -427,7 +427,7 @@ local function canvasOnUpdate(self)
 
     local sc = pane._cvScroll
     if not sc then return end
-    -- Cursor right (dx>0) reveals content LEFT → offset decreases; cursor up (screen dy>0) reveals content BELOW → offset increases (scroll Y grows down, screen Y grows up).
+    -- Scroll Y grows down while screen Y grows up, hence the opposite signs on the two axes
     local hmax = sc:GetHorizontalScrollRange() or 0
     local vmax = sc:GetVerticalScrollRange()   or 0
     sc:SetHorizontalScroll(math.max(0, math.min(hmax, (sc:GetHorizontalScroll() or 0) - dx)))
@@ -463,7 +463,7 @@ local function canvasOnHide(self)
     if self._pane and self._pane._panning then stopPan(self) end
 end
 
--- Wheel handled on scroll child (not parent) because enabling mouse here takes mouse-focus; shift+wheel pans horizontally.
+-- Wheel lives on the scroll child because enabling mouse on the parent would steal mouse focus
 local function canvasOnMouseWheel(self, delta)
     local pane = self._pane
     local sc = pane and pane._cvScroll
@@ -528,8 +528,7 @@ function CV:Render(pane, chain, highlightQuestID)
     pane._cvContinue:Hide()
     pane._cvContinue._nextID, pane._cvContinue._chain = nil, nil
 
-    -- navChanged distinguishes a genuine navigation from passive QUEST_DATA_LOAD_RESULT re-renders; only genuine navigations auto-scroll.
-    -- _cvRenderedChain (set only on the success path) ensures the first non-empty render of a cold navigation still counts as a navigation.
+    -- Only genuine navigations auto-scroll, not passive re-renders - _cvRenderedChain is set on the success path so a cold navigation's first non-empty render still counts as one
     local navChanged = (chain ~= pane._cvScrolledChain)
                        or (highlightQuestID ~= pane._cvScrolledHighlight)
                        or (chain ~= pane._cvRenderedChain)

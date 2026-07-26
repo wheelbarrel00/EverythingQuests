@@ -3,9 +3,15 @@ local _, ns = ...
 local IB = ns:RegisterSubsystem("TrackerItemButtons", {})
 
 local BTN = 26
-local ITEM_GAP = 6              -- visual gap between the item button and the quest-type icon it sits left of
-local PAD_X, PAD_Y = 6, 2       -- mirror Blocks.lua block padding so the button lands in the gutter Blocks reserves
+local ITEM_GAP = 6
 local RANGE_THROTTLE = 0.25
+
+-- Read padding from Blocks rather than mirroring a copy - a stale copy puts the button on the card border
+local function blockPadding()
+    local Blocks = ns:GetSubsystem("TrackerBlocks")
+    if Blocks and Blocks.Padding then return Blocks:Padding() end
+    return 6, 2
+end
 
 IB.buttons   = {}
 local pool   = {}
@@ -56,7 +62,7 @@ end
 local function buildButton()
     local b = CreateFrame("Button", nil, container, "SecureActionButtonTemplate")
     b:SetSize(BTN, BTN)
-    -- SecureActionButton must register both AnyDown and AnyUp; AnyUp-only frequently misses the secure /use.
+    -- SecureActionButton needs both AnyDown and AnyUp - AnyUp alone frequently misses the secure use
     b:RegisterForClicks("AnyDown", "AnyUp")
     b:SetAttribute("type", "item")
 
@@ -104,15 +110,13 @@ function IB:_applySecure(questID)
     b._rangeTimer = 0
     b:SetAttribute("item", link)
     b:ClearAllPoints()
-    -- Anchor to the container, NOT the block: anchoring a secure frame to a block pulls
-    -- the block into the secure anchor-family, making Tracker:Render's Show/Hide/SetPoint
-    -- on that block ADDON_ACTION_BLOCKED in combat. The container is never mutated in
-    -- combat, so it safely absorbs the protection without tainting the block.
-    -- Lands in the left gutter Blocks reserves (IB:Gutter), directly left of the type icon.
+    -- Anchor to the container, NOT the block - a secure anchor-family block makes
+    -- Show/Hide/SetPoint on it ADDON_ACTION_BLOCKED in combat
     local cl, ct = container:GetLeft(), container:GetTop()
     local bl, bt = block:GetLeft(), block:GetTop()
     if cl and ct and bl and bt then
-        b:SetPoint("TOPLEFT", container, "TOPLEFT", (bl - cl) + PAD_X, (bt - ct) - PAD_Y)
+        local padX, padY = blockPadding()
+        b:SetPoint("TOPLEFT", container, "TOPLEFT", (bl - cl) + padX, (bt - ct) - padY)
         b:Show()
     else
         b:Hide()
@@ -139,8 +143,7 @@ local function deferFn(questID)
     if not f then
         f = function()
             IB:_applySecure(questID)
-            -- _applySecure only creates/positions the secure button. On the combat-end
-            -- flush it would otherwise show blank until an unrelated render repaints it.
+            -- Paint here too or the combat-end flush leaves the button blank until an unrelated render
             local b = IB.buttons[questID]
             if b and b:IsShown() then paint(b, questID) end
         end
@@ -158,21 +161,16 @@ local function applySecure(questID)
     end
 end
 
--- Once true, the tracker/scroll/content are ancestors of a SecureActionButton,
--- so their SetHeight/SetSize are protected and must not be called in combat.
--- Retiring a button only hides it (still parented), so this is one-way per session.
+-- Once the tracker chain has hosted a secure button its SetHeight/SetSize are combat-protected,
+-- and retiring a button only hides it, so this never goes back to false
 function IB:HasSecureButtons()
     return next(self.buttons) ~= nil or #pool > 0
 end
 
--- Horizontal space Blocks must reserve on the left of a quest with a usable item,
--- so the item button sits directly left of the quest-type icon (button + gap).
 function IB:Gutter()
     return BTN + ITEM_GAP
 end
 
--- True when a quest will show an item button (feature enabled + the quest has a
--- usable special item). Blocks queries this to decide whether to indent the icon.
 function IB:WantsButton(questID)
     local DB = ns:GetSubsystem("DB")
     local on = not DB or DB.db.profile.tracker.showItemButtons ~= false

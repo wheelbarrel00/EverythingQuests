@@ -49,7 +49,7 @@ end
 function DBmod:ApplyOverlay(chain)
     if not chain or chain._overlayApplied then return end
     local items = chain.items
-    if not items or #items == 0 then return end          -- don't latch _overlayApplied; retry when items arrive
+    if not items or #items == 0 then return end          -- don't latch _overlayApplied - retry when items arrive
     local overlays = ns.CHAINGUIDE_OVERLAYS
     local overlay  = overlays and (overlays[chain.questlineID] or overlays[chain.id])
     if not overlay then chain._overlayApplied = true; return end

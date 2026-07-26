@@ -75,8 +75,6 @@ function S:GetCounts()
     return counts
 end
 
--- Lays the reward-category rows into the panel's summary region (top-aligned) and
--- returns the height used, or 0 when there is nothing to show.
 function S:Render(parent)
     local DB = ns:GetSubsystem("DB")
     if not (DB and DB.db.profile.worldQuests.enabled ~= false

@@ -16,6 +16,17 @@ Blocks._fontOutline = nil
 
 local _sweepScratch = {}
 
+local CARD_PAD_DEFAULT = 6
+
+-- Folds a color into one integer so the change gates can compare colors without allocating
+local function colorKey(c)
+    if not c then return 0 end
+    return math.floor((c.r or 0) * 255 + 0.5) * 16777216
+         + math.floor((c.g or 0) * 255 + 0.5) * 65536
+         + math.floor((c.b or 0) * 255 + 0.5) * 256
+         + math.floor((c.a or 1) * 255 + 0.5)
+end
+
 function Blocks:BeginRenderPass()
     local DB    = ns:GetSubsystem("DB")
     local t     = DB and DB.db.profile.tracker
@@ -35,12 +46,8 @@ function Blocks:BeginRenderPass()
         shR, shG, shB, shA = sc and sc.r or 0, sc and sc.g or 0, sc and sc.b or 0, sc and sc.a or 1
         shStr      = t.textShadowStrength or 2
     end
-    -- Title offset + shadow feed the SAME change-gated SetFont/shadow pass as the
-    -- font, so changing any of them bumps _fontGen and restyles all blocks. The
-    -- shadow SIZE (textShadowStrength) must be in this gate too: pooled blocks
-    -- only re-run ApplyTextShadow when _fontGen bumps, so without it dragging the
-    -- Shadow Size slider would leave the Quests section stuck at its old offset
-    -- while freshly-rendered sections (World Quests, etc.) update.
+    -- Every input to the SetFont/shadow pass must be in this gate - pooled blocks only
+    -- restyle when _fontGen bumps, so an omission freezes already-rendered sections
     if file ~= self._fontFile or size ~= self._fontSize or outline ~= self._fontOutline
        or titleDelta ~= self._titleSizeDelta or shadow ~= self._textShadow
        or shR ~= self._shR or shG ~= self._shG or shB ~= self._shB or shA ~= self._shA
@@ -74,15 +81,31 @@ function Blocks:BeginRenderPass()
         dirty = true
     end
 
-    -- Line/Header Spacing feed the change-gated SetSpacing/subGap/height pass, so a
-    -- change must bump _renderGen or pooled Quests blocks stay frozen while freshly
-    -- rebuilt sections update - the same trap the shadow-size note above describes.
     local lineSp   = t and t.lineSpacing   or 0
     local headerSp = t and t.headerSpacing or 0
     if lineSp ~= self._lineSpacing or headerSp ~= self._headerSpacing then
         self._lineSpacing, self._headerSpacing = lineSp, headerSp
         dirty = true
     end
+
+    self._Card = ns:GetSubsystem("TrackerCard")
+
+    -- The border color gates here, not in the per-block _rCardKey - summing two color
+    -- keys into one number lets a compensating change to both freeze the old colors
+    local cardOn  = (t and t.blockLayout == "card") and true or false
+    local cardPad = cardOn and (t and t.cardPadding or CARD_PAD_DEFAULT) or nil
+    local cardBS  = cardOn and (t and t.cardBorderSize or 1) or nil
+    local baseBg, baseBorder
+    if cardOn and self._Card then baseBg, baseBorder = self._Card:Colors(t) end
+    local borderKey = colorKey(baseBorder)
+    if cardOn ~= self._cardOn or cardPad ~= self._cardPad or cardBS ~= self._cardBorderSize
+       or borderKey ~= self._cardBorderKey then
+        self._cardOn, self._cardPad, self._cardBorderSize = cardOn, cardPad, cardBS
+        self._cardBorderKey = borderKey
+        dirty = true
+    end
+    self._cardBg, self._cardBorderColor = baseBg, baseBorder
+    self._cardTint = cardOn and t and t.cardTintByType and true or false
 
     if dirty then self._renderGen = self._renderGen + 1 end
 
@@ -100,6 +123,37 @@ local CATEGORY_COLOR     = { 0.42, 0.69, 1.00 }
 
 local NEW_WINDOW = 3600
 local NEW_TAG    = "|cff6BAFFFNEW|r "
+
+local TAG_DUNGEON = (Enum and Enum.QuestTag and Enum.QuestTag.Dungeon) or 81
+local TAG_RAID    = (Enum and Enum.QuestTag and Enum.QuestTag.Raid)    or 62
+local TAG_RAID10  = (Enum and Enum.QuestTag and Enum.QuestTag.Raid10)  or 85
+local TAG_RAID25  = (Enum and Enum.QuestTag and Enum.QuestTag.Raid25)  or 88
+
+local CLASS_CAMPAIGN  = Enum and Enum.QuestClassification and Enum.QuestClassification.Campaign
+local CLASS_LEGENDARY = Enum and Enum.QuestClassification and Enum.QuestClassification.Legendary
+
+-- Most specific wins - an instance tag beats a storyline classification
+local function cardTintFor(cfg, q)
+    local tag = q.tagID
+    if tag then
+        if tag == TAG_DUNGEON then return cfg.cardTintDungeon end
+        if tag == TAG_RAID or tag == TAG_RAID10 or tag == TAG_RAID25 then return cfg.cardTintRaid end
+    end
+    if CLASS_LEGENDARY and q.classification == CLASS_LEGENDARY then return cfg.cardTintLegendary end
+    if q.isCampaign or (CLASS_CAMPAIGN and q.classification == CLASS_CAMPAIGN) then
+        return cfg.cardTintCampaign
+    end
+    return nil
+end
+
+-- ItemButtons reads this too, so the secure button stays in the gutter
+function Blocks:Padding()
+    if self._cardOn then
+        local p = self._cardPad or CARD_PAD_DEFAULT
+        return p, p
+    end
+    return PAD_X, PAD_Y
+end
 
 local _atlasOK = {}
 local function atlasExists(atlas)
@@ -260,10 +314,7 @@ local function buildBlock()
     b.iconGlow:SetSize(50, 50)
     b.iconGlow:SetPoint("CENTER")
     b.iconGlow:SetBlendMode("ADD")
-    -- Keep the classification glow but at half strength. ADD blend means
-    -- alpha scales the added light, so 0.5 = ~50% less glow. Set once
-    -- here; applyQuestIcon only touches the atlas + vertex color, never
-    -- alpha, so this persists across pooled-block reuse.
+    -- Set once - applyQuestIcon only touches the atlas and vertex color, so this survives pooled reuse
     b.iconGlow:SetAlpha(0.5)
 
     b.icon = b.iconHolder:CreateTexture(nil, "ARTWORK", nil, 0)
@@ -293,8 +344,7 @@ local function buildBlock()
         local wasDragging = self._wasDragging
         self._wasDragging = nil
         if wasDragging or not self.questID then return end
-        -- Combat-hide leaves the tracker shown at alpha 0 (Hide is protected), so
-        -- ignore clicks on the invisible frame - otherwise they untrack/open menus.
+        -- Combat-hide leaves the tracker shown at alpha 0 because Hide is protected, so ignore clicks
         local T = ns:GetSubsystem("Tracker")
         if T and T.frame and T.frame._eqHidden then return end
 
@@ -316,14 +366,8 @@ local function buildBlock()
                 return
             end
 
-            -- Optional Blizzard-style split (tracker.splitQuestClick): the
-            -- left-side POI icon/circle focuses, the title opens the quest
-            -- log. We hit-test by cursor X against the icon's right edge
-            -- rather than giving the icon its own mouse handler, because the
-            -- whole block is the drag-reorder target — a mouse-enabled child
-            -- would swallow drags that start on the icon. GetCursorPosition
-            -- is in raw pixels, so divide by the block's effective scale to
-            -- compare against GetRight() (which is already in scaled coords).
+            -- Hit-test by cursor X - a mouse-enabled icon child would swallow drags starting on it
+            -- GetCursorPosition is raw pixels, so divide by effective scale to compare with GetRight
             local DB  = ns:GetSubsystem("DB")
             local cfg = DB and DB.db.profile.tracker
             if cfg and cfg.splitQuestClick then
@@ -385,11 +429,12 @@ function Blocks:AcquireFor(parent, questID)
     if not b then
         b = tremove(self.pool) or buildBlock()
         b:SetParent(parent)
+        local padX, padY = self:Padding()
         b.iconHolder:ClearAllPoints()
-        b.iconHolder:SetPoint("TOPLEFT", b, "TOPLEFT", PAD_X, -PAD_Y)
+        b.iconHolder:SetPoint("TOPLEFT", b, "TOPLEFT", padX, -padY)
         b.title:ClearAllPoints()
         b.title:SetPoint("TOPLEFT",  b.iconHolder, "TOPRIGHT", ICON_TITLE_GAP, 1)
-        b.title:SetPoint("TOPRIGHT", b, "TOPRIGHT", -PAD_X, -PAD_Y)
+        b.title:SetPoint("TOPRIGHT", b, "TOPRIGHT", -padX, -padY)
         b.category:ClearAllPoints()
         b.category:SetPoint("TOPLEFT",  b.title, "BOTTOMLEFT",  0, -TITLE_TO_CAT_GAP)
         b.category:SetPoint("TOPRIGHT", b.title, "BOTTOMRIGHT", 0, -TITLE_TO_CAT_GAP)
@@ -433,6 +478,8 @@ function Blocks:Sweep()
         b._rSimp  = nil
         b._rWidth = nil
         b._rObjN  = nil
+        b._rCardKey = nil
+        if self._Card then self._Card:Clear(b) end
         self.byID[qid] = nil
         self.pool[#self.pool + 1] = b
         s[i] = nil
@@ -459,6 +506,14 @@ function Blocks:RenderQuest(block, questData, simplifyMode)
     local objs = questData.objectives
     local nObj = objs and #objs or 0
     local curW = block:GetWidth()
+
+    local cardBg
+    local cardKey = 0
+    if self._cardOn then
+        cardBg  = (self._cardTint and cardTintFor(cfg, questData)) or self._cardBg
+        cardKey = colorKey(cardBg)
+    end
+
     local changed =
            block._rID    ~= qid
         or block._rGen   ~= self._renderGen
@@ -474,6 +529,7 @@ function Blocks:RenderQuest(block, questData, simplifyMode)
         or block._rWidth ~= curW
         or block._rObjN  ~= nObj
         or block._rItem  ~= hasItem
+        or block._rCardKey ~= cardKey
     if not changed and nObj > 0 then
         local pt, pf = block._rObjT, block._rObjF
         for i = 1, nObj do
@@ -488,10 +544,21 @@ function Blocks:RenderQuest(block, questData, simplifyMode)
 
     applyQuestIcon(block.iconGlow, block.icon, block.iconBang, questData, focused)
 
-    -- Quests with a usable item reserve a left gutter so the item button sits directly
-    -- left of the type icon; the icon (and the title anchored to it) shift right by gutter.
+    local padX, padY = self:Padding()
+
+    -- nil height makes the card track the block, which sizes itself further down
+    if self._cardOn and self._Card then
+        self._Card:Draw(block, nil, 0, self._cardBorderSize, cardBg, self._cardBorderColor)
+    elseif self._Card then
+        self._Card:Clear(block)
+    end
+
+    -- Re-anchor here and not just on acquire - the padding these hang off changes with the layout preset
     block.iconHolder:ClearAllPoints()
-    block.iconHolder:SetPoint("TOPLEFT", block, "TOPLEFT", PAD_X + gutter, -PAD_Y)
+    block.iconHolder:SetPoint("TOPLEFT", block, "TOPLEFT", padX + gutter, -padY)
+    block.title:ClearAllPoints()
+    block.title:SetPoint("TOPLEFT",  block.iconHolder, "TOPRIGHT", ICON_TITLE_GAP, 1)
+    block.title:SetPoint("TOPRIGHT", block, "TOPRIGHT", -padX, -padY)
 
     local titleText = questData.title or ("Quest #" .. tostring(qid))
     if cfg.showLevelInTracker and questData.level and questData.level > 0 then
@@ -562,12 +629,10 @@ function Blocks:RenderQuest(block, questData, simplifyMode)
                                  cfg.showObjectiveNumbers == false, completeHex)
     block.subText:SetText(subText)
 
-    -- Force a deterministic wrap width on the multi-line FontStrings.
-    -- Without explicit SetWidth, GetStringHeight can return stale values
-    -- on the first render after width changes, causing blocks to overlap.
+    -- Without an explicit SetWidth, GetStringHeight returns stale values after a width change and blocks overlap
     local blockW = curW
     if blockW and blockW > 0 then
-        local titleW   = blockW - (ICON_SIZE + ICON_TITLE_GAP + PAD_X * 2 + gutter)
+        local titleW   = blockW - (ICON_SIZE + ICON_TITLE_GAP + padX * 2 + gutter)
         local subTextW = titleW
         if titleW > 0 then
             block.title:SetWidth(titleW)
@@ -583,7 +648,7 @@ function Blocks:RenderQuest(block, questData, simplifyMode)
     if block.category:IsShown() then
         categoryH = TITLE_TO_CAT_GAP + block.category:GetStringHeight()
     end
-    local h = titleH + categoryH + subGap + block.subText:GetStringHeight() + PAD_Y * 2
+    local h = titleH + categoryH + subGap + block.subText:GetStringHeight() + padY * 2
     block:SetHeight(h)
 
     block._rID    = qid
@@ -600,6 +665,7 @@ function Blocks:RenderQuest(block, questData, simplifyMode)
     block._rWidth = curW
     block._rObjN  = nObj
     block._rItem  = hasItem
+    block._rCardKey = cardKey
     local pt = block._rObjT; if not pt then pt = {}; block._rObjT = pt end
     local pf = block._rObjF; if not pf then pf = {}; block._rObjF = pf end
     for i = 1, nObj do

@@ -114,9 +114,7 @@ local function categoryByMapID(rootID)
     return nil
 end
 
--- zoneRoot is called several times per tracker render (HeaderInfo + Render), each
--- walking up to MAX_HOPS GetMapInfo allocations. Cache it, invalidated on the zone
--- events onZone already fires for.
+-- Called several times per tracker render and each walk costs up to MAX_HOPS GetMapInfo allocations, so cache it and let onZone flip _rootDirty
 local _rootID, _rootName, _rootDirty = nil, nil, true
 local function zoneRoot()
     if not _rootDirty then return _rootID, _rootName end
@@ -390,7 +388,7 @@ function ZP:OnEnable()
     Events:On("QUEST_TURNED_IN",       onQuest)
     Events:On("QUEST_REMOVED",         onQuest)
 
-    -- GetAvailableQuestLines is async; re-resolve when data lands so the cache learns the mapping.
+    -- GetAvailableQuestLines is async, so re-resolve when the data lands and the cache learns the mapping
     Events:On("QUESTLINE_UPDATE", onZone)
 end
 

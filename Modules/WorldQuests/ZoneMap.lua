@@ -113,9 +113,6 @@ local function releaseAll()
     end
 end
 
--- Lays the current zone's world-quest rows into the panel's scroll list and
--- returns (contentHeight, headerText). Returns (0, nil) when there is nothing to
--- show (feature off, not a zone map, or no pins), so the panel hides the section.
 function Z:Render(list)
     local DB = ns:GetSubsystem("DB")
     if not (DB and DB.db.profile.worldQuests.enabled ~= false

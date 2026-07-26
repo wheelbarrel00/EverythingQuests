@@ -128,7 +128,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
     owScale:SetWidth(280)
     Options:AttachTooltip(owScale, L["Options Window Scale"],
         L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."])
-    -- The slider sits inside the window it scales, so resizing mid-drag fights the drag and snaps to the ends. Preview the number live and apply the scale on release.
+    -- The slider sits inside the window it scales, so applying mid-drag fights the drag and snaps to the ends
     if owScale.slider then
         owScale.slider:HookScript("OnMouseUp", function() Options:ApplyWindowScale() end)
     end
@@ -233,8 +233,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
                 local DB = ns:GetSubsystem("DB")
                 if DB and DB.db then
                     if DB.db.ResetProfile then DB.db:ResetProfile() end
-                    -- ResetProfile clears only the profile scope. Restore the account-wide
-                    -- global and per-character settings the dialog also promises to reset.
+                    -- ResetProfile clears only the profile scope, so restore the global and per-character settings too
                     local g = DB.db.global
                     if g then
                         g.optionsWindowScale = DB.defaults.global.optionsWindowScale

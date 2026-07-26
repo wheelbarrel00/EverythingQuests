@@ -42,9 +42,7 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
             end
     end
 
-    -- Alignment + size re-anchor/re-font the banner, which happens in
-    -- TrackerScenario:Refresh (not Tracker:Refresh, which never drives it), so
-    -- these setters run a full scenario refresh for live preview.
+    -- The banner re-anchors and re-fonts only in TrackerScenario:Refresh - Tracker:Refresh never drives it
     local function scenarioRenderSetting(key)
         return
             function()
@@ -59,8 +57,6 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
             end
     end
 
-    -- Header-bar settings re-tint the section-header bars directly (no full
-    -- Tracker:Refresh needed — the bars are children of the headers).
     local function headerBarSetting(key)
         return
             function()
@@ -104,9 +100,7 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
     Options:AttachTooltip(headerSizeSlider, L["Header Size Offset"],
         L["Sizes the section headers (Quests, Campaign, and so on) independently of the quest text. Added on top of the Font Size above: the default 4 keeps headers at their current size, lower shrinks them (handy on a low UI scale), higher enlarges them."])
 
-    -- Outline flags passed directly to FontString:SetFont. WoW accepts a
-    -- comma-joined combo (e.g. "MONOCHROME, OUTLINE") and ignores tokens
-    -- it doesn't recognize, so an empty string == no outline.
+    -- Passed straight to FontString:SetFont, which takes a comma-joined combo and ignores unknown tokens, so "" means no outline
     local OUTLINE_OPTIONS = {
         { value = "",                          label = L["None"] },
         { value = "OUTLINE",                   label = L["Outline"] },
@@ -204,8 +198,7 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
         L["Sizes the scenario / delve objective (criteria) lines shown under the banner, separately from the Banner Text Size above. Raise it if the criteria text looks small next to your quest and World Quest text."])
 
     local trackerHeader = Options:CreateSectionHeader(content, L["Tracker"])
-    -- Anchored at the end of the builder to the RIGHT column (under Zone Bar), swapped with
-    -- Tracker Skins so the taller Tracker section (now with the Header bar) fits on-screen.
+    -- Anchored at the end of the builder, under a section built further down
 
     local bgGet, bgSet = trackerSetting("showBackground")
     local bgCheck = Options:CreateCheckbox(content, L["Background"], bgGet, bgSet)
@@ -286,7 +279,7 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
     hbSoftCheck.label:ClearAllPoints()
     hbSoftCheck.label:SetPoint("RIGHT", hbSoftCheck, "LEFT", -4, 1)
     hbSoftCheck:SetPoint("LEFT", hbStyleDD.button, "RIGHT", 24 + (hbSoftCheck.label:GetStringWidth() or 70), 1)
-    -- The label sits LEFT here, so flip the tooltip's right-extending hit rect to the left.
+    -- The label sits LEFT here, so flip the tooltip's right-extending hit rect to the left
     hbSoftCheck:SetHitRectInsets(-((hbSoftCheck.label:GetStringWidth() or 70) + 8), 0, 0, 0)
 
     local hbHeightGet, hbHeightSet = headerBarSetting("headerBarHeight")
@@ -462,10 +455,7 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
         if DB then DB.db.profile.tracker.scale = value end
         local Tracker = ns:GetSubsystem("Tracker")
         if not Tracker then return end
-        -- SetScale is protected once the tracker has secure item-button
-        -- descendants. Out of combat: apply now (responsive slider). In
-        -- combat: just save + Refresh — Render applies it combat-safely
-        -- (deferred to combat-end) via the single guarded code path.
+        -- SetScale is protected once the tracker has secure item-button descendants, so in combat only save and let Render apply it at combat-end
         if not InCombatLockdown() and Tracker.frame then
             Tracker.frame:SetScale(value)
         elseif Tracker.Refresh then
@@ -522,6 +512,87 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
     Options:AttachTooltip(headerSpacingSlider, L["Header Spacing"],
         L["Adds or removes space around section headers and beneath each quest's title. 0 keeps the default spacing."])
 
+    -- Scoped so these locals release at the end of the block - Lua caps a function at 200 active locals
+    local cardTail
+    do
+    local cardHeader = Options:CreateSectionHeader(content, L["Quest Rows"])
+    cardHeader:SetPoint("TOPLEFT", headerSpacingSlider, "BOTTOMLEFT", 0, -20)
+
+    local LAYOUT_OPTIONS = {
+        { value = "classic", label = L["Plain"] },
+        { value = "card",    label = L["Card"] },
+    }
+    local layoutGet, layoutSet = trackerSetting("blockLayout")
+    local layout = Options:CreateRadioGroup(content, L["Row Layout"],
+        LAYOUT_OPTIONS, function() return layoutGet() or "classic" end, layoutSet, 300, 14,
+        L["Row Layout"],
+        L["How each quest is drawn in the tracker. |cffffffffPlain|r is the default look - text straight on the tracker background. |cffffffffCard|r gives every quest its own panel with a background and border, which makes long lists easier to read apart."])
+    layout:SetPoint("TOPLEFT", cardHeader, "BOTTOMLEFT", 0, -8)
+
+    local cardColorGet, cardColorSet = trackerSetting("cardColor")
+    local cardColorPicker = Options:CreateColorPicker(content, L["Background Color"], cardColorGet, cardColorSet)
+    cardColorPicker:SetPoint("TOPLEFT", layout, "BOTTOMLEFT", 0, -8)
+    Options:AttachTooltip(cardColorPicker, L["Background Color"],
+        L["Fill color behind each quest card. Only used while Row Layout is set to Card."])
+
+    local cardBorderColorGet, cardBorderColorSet = trackerSetting("cardBorderColor")
+    local cardBorderPicker = Options:CreateColorPicker(content, L["Border Color"], cardBorderColorGet, cardBorderColorSet)
+    cardBorderPicker:SetPoint("TOPLEFT", cardColorPicker, "BOTTOMLEFT", 0, -10)
+    alignSwatchTo(cardBorderPicker, cardColorPicker)
+    Options:AttachTooltip(cardBorderPicker, L["Border Color"],
+        L["Outline color around each quest card. Only used while Row Layout is set to Card."])
+
+    local cardBorderSizeGet, cardBorderSizeSet = trackerSetting("cardBorderSize")
+    local cardBorderSlider = Options:CreateSlider(content, L["Border Thickness"], 0, 4, 1,
+        function() return cardBorderSizeGet() or 1 end, cardBorderSizeSet)
+    cardBorderSlider:SetPoint("TOPLEFT", cardBorderPicker, "BOTTOMLEFT", 0, -20)
+    cardBorderSlider:SetWidth(280)
+    Options:AttachTooltip(cardBorderSlider, L["Border Thickness"],
+        L["How thick the card outline is, in pixels. 0 hides the outline and leaves just the fill."])
+
+    local cardPaddingGet, cardPaddingSet = trackerSetting("cardPadding")
+    local cardPaddingSlider = Options:CreateSlider(content, L["Card Padding"], 2, 14, 1,
+        function() return cardPaddingGet() or 6 end, cardPaddingSet)
+    cardPaddingSlider:SetPoint("TOPLEFT", cardBorderSlider, "BOTTOMLEFT", 0, -16)
+    cardPaddingSlider:SetWidth(280)
+    Options:AttachTooltip(cardPaddingSlider, L["Card Padding"],
+        L["Breathing room between a card's edge and the text inside it. Larger values make taller cards."])
+
+    local tintGet, tintSet = trackerSetting("cardTintByType")
+    local tintCheck = Options:CreateCheckbox(content, L["Tint cards by quest type"], tintGet, tintSet,
+        L["Give campaign, legendary, dungeon and raid quests their own card color so you can tell them apart at a glance. Anything else uses the plain background color above."])
+    tintCheck:SetPoint("TOPLEFT", cardPaddingSlider, "BOTTOMLEFT", 0, -16)
+
+    local campaignTintGet, campaignTintSet = trackerSetting("cardTintCampaign")
+    local campaignTint = Options:CreateColorPicker(content, L["Campaign"], campaignTintGet, campaignTintSet)
+    campaignTint:SetPoint("TOPLEFT", tintCheck, "BOTTOMLEFT", 0, -10)
+    Options:AttachTooltip(campaignTint, L["Campaign"],
+        L["Card color for campaign quests. Needs Tint cards by quest type switched on."])
+
+    local legendaryTintGet, legendaryTintSet = trackerSetting("cardTintLegendary")
+    local legendaryTint = Options:CreateColorPicker(content, L["Legendary"], legendaryTintGet, legendaryTintSet)
+    legendaryTint:SetPoint("TOPLEFT", campaignTint, "BOTTOMLEFT", 0, -10)
+    alignSwatchTo(legendaryTint, campaignTint)
+    Options:AttachTooltip(legendaryTint, L["Legendary"],
+        L["Card color for legendary quests. Needs Tint cards by quest type switched on."])
+
+    local dungeonTintGet, dungeonTintSet = trackerSetting("cardTintDungeon")
+    local dungeonTint = Options:CreateColorPicker(content, L["Dungeon"], dungeonTintGet, dungeonTintSet)
+    dungeonTint:SetPoint("TOPLEFT", legendaryTint, "BOTTOMLEFT", 0, -10)
+    alignSwatchTo(dungeonTint, campaignTint)
+    Options:AttachTooltip(dungeonTint, L["Dungeon"],
+        L["Card color for dungeon quests. Needs Tint cards by quest type switched on."])
+
+    local raidTintGet, raidTintSet = trackerSetting("cardTintRaid")
+    local raidTint = Options:CreateColorPicker(content, L["Raid"], raidTintGet, raidTintSet)
+    raidTint:SetPoint("TOPLEFT", dungeonTint, "BOTTOMLEFT", 0, -10)
+    alignSwatchTo(raidTint, campaignTint)
+    Options:AttachTooltip(raidTint, L["Raid"],
+        L["Card color for raid quests. Needs Tint cards by quest type switched on."])
+
+    cardTail = raidTint
+    end
+
     local function zbScaleGet()
         local DB = ns:GetSubsystem("DB")
         local st = DB and DB.db.profile.tracker.zoneProgressBar
@@ -538,7 +609,7 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
         end
     end
     local zbScaleSlider = Options:CreateSlider(content, L["Zone Bar Scale"], 0.5, 2.0, 0.05, zbScaleGet, zbScaleSet)
-    zbScaleSlider:SetPoint("TOPLEFT", headerSpacingSlider, "BOTTOMLEFT", 0, -16)
+    zbScaleSlider:SetPoint("TOPLEFT", cardTail, "BOTTOMLEFT", 0, -20)
     zbScaleSlider:SetWidth(280)
 
     local function zbState()
@@ -640,5 +711,6 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
     zbCountPicker:SetPoint("TOPLEFT", zbHeaderPicker, "BOTTOMLEFT", 0, -12)
     alignSwatchTo(zbCountPicker, zbHeaderPicker)
 
-    trackerHeader:SetPoint("TOPLEFT", zbCountPicker, "BOTTOMLEFT", 0, -20)
+    -- Anchored last because it re-homes the Tracker section built far above
+    trackerHeader:SetPoint("TOPLEFT", hideArrowsCheck, "BOTTOMLEFT", 0, -20)
 end)

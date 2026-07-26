@@ -20,8 +20,7 @@ V.linePool     = {}
 V.activeHeaders = {}
 V.activeLines   = {}
 
--- RequestLoadQuestByID on some builds fires QUEST_DATA_LOAD_RESULT even for
--- already-loaded quests, creating a refresh→request→event loop; load once per session.
+-- RequestLoadQuestByID can fire QUEST_DATA_LOAD_RESULT for already-loaded quests, so load once per session or it loops
 V._requestedLoad = {}
 
 local function buildHeader(parent)
@@ -88,8 +87,7 @@ local function buildHeader(parent)
         if T and T.frame and T.frame._eqHidden then return end
         if button == "RightButton" then
             if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
-            -- Capture the quest now: a re-render can reassign this pooled row
-            -- to a different quest while the menu is open.
+            -- Capture the quest now - a re-render can reassign this pooled row while the menu is open
             local qid = self.questID
             local Watch = ns:GetSubsystem("WQWatchPersist")
             local tracked = Watch and ((Watch.IsWatched and Watch:IsWatched(qid))
@@ -198,7 +196,7 @@ local function getWatchedWorldQuests()
     return out
 end
 
--- C_TaskQuest.GetQuestsForPlayerByMapID was renamed to GetQuestsOnMap; try new name first.
+-- C_TaskQuest.GetQuestsForPlayerByMapID was renamed to GetQuestsOnMap - try the new name first
 local function fetchTaskQuestsForMap(mapID)
     if not (C_TaskQuest and mapID) then return {} end
     if C_TaskQuest.GetQuestsOnMap then
@@ -215,8 +213,7 @@ local function getInZoneActiveTaskQuests()
     local mapID = C_Map.GetBestMapForUnit("player")
     if not mapID or mapID <= 0 then return {} end
 
-    -- GetLogIndexForQuestID returns non-nil for hidden task quests that the Quests
-    -- section deliberately skips; use Cache:Get instead to match the same filter.
+    -- GetLogIndexForQuestID returns non-nil for hidden task quests, so match the Quests section via Cache:Get instead
     local Cache = ns:GetSubsystem("Cache")
     local function isInQuestsSection(qid)
         return Cache and Cache.Get and Cache:Get(qid) ~= nil
@@ -299,9 +296,7 @@ local _activeCache    = {}
 local _activeSeen     = {}
 local _activeDirty    = true
 local _activeShowWorld
--- Per-quest static render data (atlas/canGroup/title). Refetching it every render
--- churned a GetQuestTagInfo table plus 3 API calls per WQ, even on no-change passes.
--- Wiped whenever the active set is rebuilt (which covers the data-load event).
+-- Per-quest static render data - only invalidated when the active set is rebuilt
 local _wqStatic       = {}
 local function showWorldFilter()
     local DB = ns:GetSubsystem("DB")
@@ -315,8 +310,7 @@ local function rebuildActiveWorldQuests()
     wipe(_wqStatic)
     _activeShowWorld = showWorldFilter()
     local Cache = ns:GetSubsystem("Cache")
-    -- knownWorldQuest: watched/zone sources are world quests by construction;
-    -- isWorldQuest() needs tag data that stale or out-of-zone quests never load.
+    -- knownWorldQuest is needed because isWorldQuest reads tag data that out-of-zone quests never load
     local function push(qid, knownWorldQuest)
         if qid and not _activeSeen[qid]
            and not (Cache and Cache.Get and Cache:Get(qid) ~= nil)
@@ -355,7 +349,7 @@ local function buildStatic(qid)
     if QuestUtil and QuestUtil.GetWorldQuestAtlasInfo and tagInfo then
         atlas = QuestUtil.GetWorldQuestAtlasInfo(qid, tagInfo, false) or atlas
     end
-    -- CanCreateQuestGroup is the exact signal Blizzard's own tracker uses. GetActivityIDForQuestID returns truthy for ordinary world quests too, so avoid it.
+    -- Use CanCreateQuestGroup - GetActivityIDForQuestID returns truthy for ordinary world quests too
     local canGroup
     if QuestUtil and QuestUtil.CanCreateQuestGroup then
         canGroup = QuestUtil.CanCreateQuestGroup(qid)
@@ -391,13 +385,23 @@ function V:Render(content, contentWidth, yStart, collapsed)
     local superID = (C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID
                      and C_SuperTrack.GetSuperTrackedQuestID()) or 0
 
+    local Card = ns:GetSubsystem("TrackerCard")
+    local cardOn, pad, borderSize = false, 0, 0
+    local cardBg, cardBorder
+    if Card then
+        cardOn, pad, borderSize = Card:State(t)
+        cardBg, cardBorder = Card:Colors(t)
+    end
+
     local y = yStart
     for i = 1, count do
         local qid = quests[i]
+        local groupTop = y
+        if cardOn then y = y + pad end
         local row = acquireHeader(content)
-        row:SetWidth(contentWidth)
+        row:SetWidth(math.max(1, contentWidth - pad * 2))
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+        row:SetPoint("TOPLEFT", content, "TOPLEFT", pad, -y)
         row.questID = qid
 
         local st = _wqStatic[qid]
@@ -427,6 +431,7 @@ function V:Render(content, contentWidth, yStart, collapsed)
             row.title:SetTextColor(1.0, 0.82, 0.0)
         end
         if Media and Media.ApplyTrackerTitleFont then Media:ApplyTrackerTitleFont(row.title) end
+        local lastBottom = y + HEADER_H
         y = y + HEADER_H + ROW_GAP
 
         if C_QuestLog and C_QuestLog.RequestLoadQuestByID
@@ -440,10 +445,11 @@ function V:Render(content, contentWidth, yStart, collapsed)
         for j = 1, #objs do
             local obj = objs[j]
             if obj and obj.text and obj.text ~= "" then
-                local lr = acquireLine(content)
-                lr:SetWidth(contentWidth)
+                -- Parented to the header row so the card draws behind the text, but anchored to content
+                local lr = acquireLine(row)
+                lr:SetWidth(math.max(1, contentWidth - pad * 2))
                 lr:ClearAllPoints()
-                lr:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+                lr:SetPoint("TOPLEFT", content, "TOPLEFT", pad, -y)
                 local txt = obj.text
                 if obj.finished then
                     txt = "|A:common-icon-checkmark:12:12|a |cff" .. doneHex .. txt .. "|r"
@@ -454,8 +460,20 @@ function V:Render(content, contentWidth, yStart, collapsed)
                 if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(lr.text, -2) end
                 local h = math.max(lr.text:GetStringHeight(), LINE_H)
                 lr:SetHeight(h)
-                y = y + h + ROW_GAP + ns.Util.LineSpacing()
+                lastBottom = y + h
+                -- A negative Line Spacing can pull the advance under the row height and overrun a card fill, so floor it
+                local advance = h + ROW_GAP + ns.Util.LineSpacing()
+                if cardOn then advance = math.max(advance, h) end
+                y = y + advance
             end
+        end
+
+        if cardOn then
+            local groupBottom = lastBottom + pad
+            Card:Draw(row, groupBottom - groupTop, pad, borderSize, cardBg, cardBorder)
+            y = groupBottom + Card:Gap(ROW_GAP, true)
+        elseif Card then
+            Card:Clear(row)
         end
     end
 
@@ -487,7 +505,7 @@ function V:OnEnable()
     Events:On("ZONE_CHANGED_NEW_AREA",    markActiveDirty)
     Events:On("PLAYER_ENTERING_WORLD",    markActiveDirty)
 
-    -- QUEST_LOG_UPDATE doesn't always fire after RequestLoadQuestByID; use QUEST_DATA_LOAD_RESULT.
+    -- QUEST_LOG_UPDATE does not always fire after RequestLoadQuestByID, so use QUEST_DATA_LOAD_RESULT
     local function dataLoadFlush()
         _activeDirty = true
         refresh()

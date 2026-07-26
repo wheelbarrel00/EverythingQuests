@@ -10,9 +10,7 @@ local LABEL_PAD    = 6
 local LINE_INDENT  = 14
 local MAX_CRITERIA = 12
 
--- GetAchievementCriteriaInfo flags bit 0x1 (EVALUATION_TREE_FLAG_PROGRESS_BAR):
--- progress-bar criteria have an EMPTY criteriaString but real quantity/reqQuantity,
--- so they must be detected via this flag rather than by checking criteriaString.
+-- Progress-bar criteria have an empty criteriaString but real quantities, so detect them via this GetAchievementCriteriaInfo flag bit
 local PROGRESS_BAR_FLAG = 0x1
 
 A.headerPool    = {}
@@ -151,6 +149,14 @@ function A:Render(content, contentWidth, yStart, collapsed)
             math.floor(ovB * 255 + 0.5))
     end
 
+    local Card = ns:GetSubsystem("TrackerCard")
+    local cardOn, pad, borderSize = false, 0, 0
+    local cardBg, cardBorder
+    if Card then
+        cardOn, pad, borderSize = Card:State(t)
+        cardBg, cardBorder = Card:Colors(t)
+    end
+
     local shownCount = 0
     local y = yStart
     for i = 1, count do
@@ -158,10 +164,12 @@ function A:Render(content, contentWidth, yStart, collapsed)
         local _, name, _, _, _, _, _, _, _, icon = GetAchievementInfo(id)
         if name then
             shownCount = shownCount + 1
+            local groupTop = y
+            if cardOn then y = y + pad end
             local row = acquireHeader(content)
-            row:SetWidth(contentWidth)
+            row:SetWidth(math.max(1, contentWidth - pad * 2))
             row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+            row:SetPoint("TOPLEFT", content, "TOPLEFT", pad, -y)
             local label = name
             if icon then label = "|T" .. icon .. ":0|t " .. name end
             row.title:SetText(label)
@@ -173,6 +181,7 @@ function A:Render(content, contentWidth, yStart, collapsed)
                 row.title:SetTextColor(1.0, 0.82, 0.0)
             end
             if Media and Media.ApplyTrackerTitleFont then Media:ApplyTrackerTitleFont(row.title) end
+            local lastBottom = y + HEADER_H
             y = y + HEADER_H + ROW_GAP
 
             local num = (GetAchievementNumCriteria and GetAchievementNumCriteria(id)) or 0
@@ -200,16 +209,29 @@ function A:Render(content, contentWidth, yStart, collapsed)
                         line = "|cff999999- " .. critString .. "|r"
                     end
                     if line then
-                        local lr = acquireLine(content)
-                        lr:SetWidth(contentWidth)
+                        -- Parented to the header row so the group card draws behind the text, anchored to content so placement is unchanged
+                        local lr = acquireLine(row)
+                        lr:SetWidth(math.max(1, contentWidth - pad * 2))
                         lr:ClearAllPoints()
-                        lr:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+                        lr:SetPoint("TOPLEFT", content, "TOPLEFT", pad, -y)
                         lr.text:SetText(line)
                         if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(lr.text, -2) end
                         shownCrit = shownCrit + 1
-                        y = y + LINE_H + ROW_GAP + ns.Util.LineSpacing()
+                        lastBottom = y + LINE_H
+                        -- A negative Line Spacing can pull the advance under the row height, which would overrun a card fill
+                        local advance = LINE_H + ROW_GAP + ns.Util.LineSpacing()
+                        if cardOn then advance = math.max(advance, LINE_H) end
+                        y = y + advance
                     end
                 end
+            end
+
+            if cardOn then
+                local groupBottom = lastBottom + pad
+                Card:Draw(row, groupBottom - groupTop, pad, borderSize, cardBg, cardBorder)
+                y = groupBottom + Card:Gap(ROW_GAP, true)
+            elseif Card then
+                Card:Clear(row)
             end
         end
     end

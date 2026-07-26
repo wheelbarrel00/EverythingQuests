@@ -1,7 +1,4 @@
--- Drawn on EQ's private PinTooltip rather than the shared GameTooltip: under
--- Midnight's "secret value" system, leaving EQ's taint on the shared tooltip can
--- make the NEXT tooltip (e.g. a Blizzard AreaPOI hover) throw during layout. The
--- private frame keeps us off the shared singleton entirely. See Util.PinTooltip.
+-- Draws on the private PinTooltip, never the shared GameTooltip - our taint left on the shared singleton can make the next Blizzard tooltip throw during layout
 
 local _, ns = ...
 

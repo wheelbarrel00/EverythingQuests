@@ -46,7 +46,7 @@ read_globals = {
     -- functions
     "hooksecurefunc", "issecurevariable", "InCombatLockdown", "secureexecuterange",
     "IsModifiedClick", "IsAltKeyDown", "IsInGroup", "IsQuestCompletable",
-    "QuestMapFrame_OpenToQuestDetails", "QuestUtil", "QuestUtils_GetQuestName",
+    "QuestMapFrame_OpenToQuestDetails", "QuestUtil", "ProfessionsUtil", "QuestUtils_GetQuestName",
     "QuestUtils_IsQuestWorldQuest", "QuestMapQuestOptions_OpenQuestDetails",
     "QuestMapFrame_UpdateQuestDetailsButtons", "QuestMapFrame_GetDetailQuestID",
     "QuestLogPopupDetailFrame_Show", "QuestLogPopupDetailFrame_Update",
@@ -81,6 +81,8 @@ read_globals = {
     "Enum", "SOUNDKIT", "RAID_CLASS_COLORS", "FACTION_BAR_COLORS",
     "LE_QUEST_FREQUENCY_DAILY", "LE_QUEST_FREQUENCY_WEEKLY",
     "ERR_QUEST_COMPLETE_S", "SEARCH", "OKAY",
+    "PROFESSIONS_TRACKER_REAGENT_FORMAT", "PROFESSIONS_TRACKER_REAGENT_COUNT_FORMAT",
+    "PROFESSIONS_TRACKER_REAGENT_RANGE_FORMAT", "PROFESSIONS_CRAFTING_FORM_RECRAFTING_HEADER",
     -- WoW global string / table extensions and misc
     "wipe", "tinsert", "tremove", "tContains", "tIndexOf", "CopyTable", "ipairs_reverse",
     "strsplit", "strjoin", "strtrim", "strrep", "gsub", "format", "tostringall", "bit",

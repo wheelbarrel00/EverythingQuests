@@ -3,21 +3,29 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.35.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.35.0"
+local FEATURE_POPUP_VERSION = "1.36.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.36.0"
 
 local POPUP_BODY = [[
 |cffEBB706Missed the last update?|r
 If you skipped a version, every release's full notes live right inside the addon. Type |cffffffff/eqs|r, open the |cffffffffAbout|r tab, and read the changelog there. This popup only covers the latest release.
 
-|cffEBB706Restyle the zone progress bar|r
-Under |cffffffff/eqs|r > Appearance you can now change the zone progress bar's texture and fill color. Choose from seven bundled Everything Quests bar styles or any texture provided by SharedMedia and other addons, each shown with a live preview. Thanks to Da Warrior for the request.
+|cffEBB706Something new in the works: EQ Objective Tracker|r
+I want to give you a heads up on a project I am starting. |cffffffffEQ Objective Tracker|r is a new addon that is just the tracker. If you have ever wanted the tracker side of Everything Quests without the rest of what Everything Quests does, that is what this is. One addon, one job: replacing Blizzard's default objective tracker and doing it well. It works completely on its own and does not need Everything Quests installed. Right now there are very few tracker options for Midnight, so this fills a real gap.
 
-|cffEBB706Space out the tracker your way|r
-Two new sliders under |cffffffff/eqs|r > Appearance, |cffffffffLine Spacing|r and |cffffffffHeader Spacing|r, let you loosen or tighten the space between objective lines and around section headers to fit the tracker to your screen. Thanks to Rhinoplasty for the line-spacing idea.
+|cffEBB706What it means for you|r
+Nothing breaks, and you do not have to do anything. Down the road, Everything Quests' tracker is going to move out into EQ Objective Tracker, and Everything Quests will include it automatically in its download. When that happens you will just update Everything Quests like normal and get both. Your layout and settings carry over on their own. No reinstall, no reconfiguring, no extra steps.
+The reason for doing it this way is maintenance. Instead of me fixing the same tracker bug twice in two different addons, there is one copy of the tracker code that both use. Fixes land everywhere at once, which means fewer bugs and faster updates for everyone.
 
-|cffEBB706A class color button in the color picker|r
-If you do not run ElvUI, the color picker now has a |cffffffffClass|r button that sets any Everything Quests color to your class color in one click.
+|cffEBB706Other versions of WoW, and the timeline|r
+EQ Objective Tracker is being built from the start so it can eventually run on other versions of WoW, not just retail. Classic, Cata, Mists and so on. Version one will be retail only because that is where the need is right now, but the foundation is there to add the others afterward.
+The standalone tracker comes first, retail only. The Everything Quests change comes after that, once the tracker has been out in the wild and tested by real people. Other flavors come after that. I will post on the Discord as things progress, and if you have thoughts on what you want out of a tracker, now is a genuinely good time to say so, since I am still designing the thing.
+
+|cffEBB706New: a card layout for the tracker|r
+A new |cffffffffQuest Rows|r section under |cffffffff/eqs|r > Appearance switches the tracker from plain rows to |cffffffffCard|r layout, which draws every quest, achievement, endeavor, tracked recipe and world quest on its own bordered panel. You set the background color, border color, border thickness and padding, and you can optionally tint cards by quest type so campaign, dungeon, raid and world quests stand out at a glance. |cffffffffPlain|r stays the default, so nothing changes until you switch it on.
+
+|cffEBB706Fixed: profession reagent counts|r
+The Profession section only ever counted the lowest quality of a reagent, so a bag full of rank 2 or rank 3 materials could still read as |cffffffff0|r held. It now counts every quality tier, the same way Blizzard's own tracker does. Recrafts are fixed too. They are labeled correctly, they list their own reagents, and a recipe you track both normally and as a recraft now shows as two separate entries. Required modifying slots and currency reagents are no longer skipped, and a slot that accepts a variable amount now shows a range.
 
 |cffEBB706Thank you|r
 Thanks to |cffffffffZox|r (French) and |cffffffffMalevi4|r (Russian) for keeping Everything Quests translated, and to everyone sending in reports and suggestions.
@@ -61,8 +69,7 @@ local function announceChat()
         .. FEATURE_POPUP_VERSION .. " \226\128\148 " .. link)
 end
 
--- Custom chat hyperlink (|Haddon:EverythingQuests:whatsnew|h); the client ignores the
--- unknown link type, so we open the popup ourselves when ours is clicked.
+-- The client ignores our custom addon link type, so the popup has to be opened here
 hooksecurefunc("SetItemRef", function(link)
     if link == "addon:EverythingQuests:whatsnew" then
         WN:Show()
@@ -75,8 +82,7 @@ function WN:Build()
     local f = CreateFrame("Frame", "EQWhatsNewFrame", UIParent, "BackdropTemplate")
     f:SetSize(560, 480)
     f:SetPoint("CENTER")
-    -- Above the Options window's DIALOG strata so the popup isn't hidden
-    -- if the player opens Options before reading it.
+    -- Above the Options window's DIALOG strata so the popup is not hidden behind it
     f:SetFrameStrata("FULLSCREEN_DIALOG")
     f:SetMovable(true)
     f:EnableMouse(true)
@@ -180,8 +186,7 @@ function WN:Build()
     f.dontShow.text:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
     f.dontShow:SetScript("OnShow", function(self2)
         local m = currentMode()
-        -- Remember the non-"none" mode so unchecking restores it (e.g. a chat-link
-        -- user keeps "chat" instead of being silently reset to "popup").
+        -- Remember the non-none mode so unchecking restores it instead of resetting a chat-link user to popup
         if m ~= "none" then self2._prevMode = m end
         self2:SetChecked(m == "none")
     end)
@@ -196,7 +201,7 @@ function WN:Build()
     end)
     f.dontShow:SetScript("OnEnter", function(self2)
         GameTooltip:SetOwner(self2, "ANCHOR_RIGHT")
-        -- SetText arg 5 is alpha (not wrap); pass 1 or the line can render invisible.
+        -- SetText arg 5 is alpha, not wrap - pass 1 or the line can render invisible
         GameTooltip:SetText(L["Stops What's New notices entirely. You can turn them back on in /eqs > General."], 1, 1, 1, 1, true)
         GameTooltip:Show()
     end)

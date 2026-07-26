@@ -12,11 +12,7 @@ function C:OnInitialize()
     local DB = ns:GetSubsystem("DB")
     self.cache = DB.chainCache
     self.charKey = charKey()
-    -- UnitClass returns (localizedName, classFile, classID); we persist the
-    -- locale-independent classFile ("WARRIOR"). The old one-liner
-    -- `local _, classFile = (UnitClass and UnitClass("player")) or nil, nil`
-    -- truncated the call to its FIRST return via the parens/`or`, so
-    -- classFile was ALWAYS nil and the cached class never persisted.
+    -- Keep this two-step - wrapping UnitClass in parens or an "or" truncates it to its first return and the locale-independent classFile ends up nil
     local _, classFile
     if UnitClass then _, classFile = UnitClass("player") end
     local rec = self.cache[self.charKey]
@@ -29,7 +25,7 @@ function C:OnInitialize()
         }
         self.cache[self.charKey] = rec
     elseif not rec.class then
-        rec.class = classFile          -- self-heal entries written before the fix
+        rec.class = classFile
     end
     rec.lastSeen = time()              -- stamp the current char each login so PruneStaleRecords spares it
     self.char = rec
@@ -89,8 +85,7 @@ function C:IsChainComplete(chain)
     return false
 end
 
--- Same-cell collapse: faction-paired steps share one overlay cell; counting both
--- would inflate the denominator and prevent 100%. Count each cell once (best status).
+-- Faction-paired steps share one overlay cell - counting both would inflate the denominator and block 100%
 local _cpStatus = {}
 local _cpKeys   = {}
 function C:ChainProgress(chain)

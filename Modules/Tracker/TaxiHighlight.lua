@@ -7,7 +7,6 @@ local RETRY_DELAY_S = 0.10
 
 local _glow
 
--- Memoized retry closure (one allocation total instead of one per retry).
 local _retriesLeft = 0
 local _retryFn
 

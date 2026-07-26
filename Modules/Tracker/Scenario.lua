@@ -41,11 +41,7 @@ local function pickAtlases(textureKit)
 end
 
 local function categoryLabel(scenarioType, textureKit, scenarioName, instType, diffID)
-    -- scenarioType 8 is the Delve template, but Ritual Sites (the Void ritual-
-    -- site activity, e.g. Broken Throne) REUSE it while Blizzard's own UI calls
-    -- them "Ritual Site". They're separable by kit: a ritual site reports a
-    -- non-delve "themed-scenario" kit (live: type 8 / "themed-scenario" / diff
-    -- 12); a real Midnight delve reports a "delves-*" kit or nil.
+    -- Ritual Sites reuse the Delve scenarioType 8 - only the texture kit separates them
     if scenarioType == 8 then
         if textureKit and textureKit ~= "" and not textureKit:lower():find("delve") then
             return "Ritual Site"
@@ -58,11 +54,7 @@ local function categoryLabel(scenarioType, textureKit, scenarioName, instType, d
     if scenarioType == 7 then return "Warfront" end
     if scenarioType == 2 then return "Proving Grounds" end
 
-    -- Follower Dungeons and *normal* dungeons BOTH report scenarioType 3
-    -- (verified live: Windrunner Spire = type 3 / difficulty 205 "Follower";
-    -- Magisters' Terrace = type 3 / difficulty 1 "Normal"). So the type
-    -- number alone is NOT the signal — difficulty id 205 is. Keying off
-    -- type 3 here would mislabel every normal dungeon as a Follower Dungeon.
+    -- Normal dungeons also report scenarioType 3 - only difficulty 205 means Follower Dungeon
     if diffID == 205 then return "Follower Dungeon" end
 
     if scenarioName then
@@ -89,11 +81,7 @@ local function resolveName(scenarioName, instName, instType)
     return nil
 end
 
--- Unreleased / PTR scenario steps sometimes return an internal developer
--- string as the criteria description, e.g. "12.0.5 Void Assaults - Eversong
--- - Major Attack - Scenario 01 - Step 02 Completion (JTL)". Player-facing
--- text never starts with a game version or carries "- Step NN" build
--- markers, so detect those and show the bar alone instead.
+-- Unreleased steps can return an internal build string - real criteria never start with a version or carry "- Step NN"
 local function looksInternal(s)
     if not s or s == "" then return false end
     if s:find("^%s*%d+%.%d+%.%d+") then return true end
@@ -186,11 +174,7 @@ function S:Build()
     banner.Stage:SetSize(172, 18)
     banner.Stage:SetJustifyH("CENTER")
     banner.Stage:SetTextColor(1, 0.914, 0.682)
-    -- The Stage + Name banner lines mimic Blizzard's native scenario header
-    -- chrome and carry their OWN drop-shadow, SEPARATE from the main tracker
-    -- text shadow (Appearance "Scenario" group). Applied per-render in S:Refresh
-    -- via Media:ApplyScenarioShadow so the user's toggle/colour/size take effect
-    -- live; the defaults (ON, 1px, black) preserve the formerly hardcoded shadow.
+    -- Banner lines take the separate Scenario shadow settings, applied per-render in Refresh
 
     banner.Name = banner:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     banner.Name:SetSize(172, 28)
@@ -232,8 +216,7 @@ function S:ApplyHeaderLabels(scenarioType, textureKit, scenarioName)
 
     local Media = ns:GetSubsystem("Media")
     subHeader.text:SetText(primary)
-    -- +4 over quest titles, mirroring Frame.lua HEADER_FONT_DELTA so the name
-    -- line sizes like the "Quests"/"Achievements" section headers.
+    -- +4 mirrors Frame.lua HEADER_FONT_DELTA so this sizes like the section headers
     if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(subHeader.text, 4) end
 
     if twoTier then
@@ -256,8 +239,7 @@ function S:ApplyHeaderLabels(scenarioType, textureKit, scenarioName)
     end
 end
 
--- ApplyHeaderLabels memoizes on scenario identity, so a mid-scenario font change
--- would leave the sub-header stale while the banner re-fonts. Re-apply every Refresh.
+-- ApplyHeaderLabels memoizes on scenario identity, so the font must be re-applied every Refresh
 function S:ApplyHeaderFont()
     local subHeader = self.subHeader
     if not subHeader then return end
@@ -271,9 +253,7 @@ function S:ApplyHeaderFont()
     else
         h = SUBHEADER_H
     end
-    -- Re-fonting changes the reserved height, so keep subHeaderH in sync (Refresh
-    -- reads it below for the banner anchor + container). Only touch height on an
-    -- actual change so steady-state refreshes stay no-ops.
+    -- Refresh reads subHeaderH for the banner anchor, so keep it in sync after a re-font
     if h ~= self.subHeaderH then
         self.subHeaderH = h
         subHeader:SetHeight(h)
@@ -303,9 +283,7 @@ end
 function S:_SetContainerHeight(h)
     local container = self.frame
     if not container then return end
-    -- The quest scroll is anchored to this container's BOTTOM (Tracker/Frame.lua),
-    -- so resizing the container moves the secure item buttons that sit below it →
-    -- ADDON_ACTION_BLOCKED in combat. Defer to combat end like the main render gate.
+    -- Resizing this container moves the secure item buttons anchored below it - blocked in combat
     local IB = ns:GetSubsystem("TrackerItemButtons")
     if InCombatLockdown() and IB and IB.HasSecureButtons and IB:HasSecureButtons() then
         local Ev = ns:GetSubsystem("Events")
@@ -428,10 +406,7 @@ function S:Refresh()
 
     releaseAllCriteria()
     local Media = ns:GetSubsystem("Media")
-    -- Criteria rows stay centered in the container regardless of the banner's
-    -- alignment (the box may be left/right-anchored); anchoring the first row to
-    -- the banner's bottom-centre would drag the rows off-centre and overflow the
-    -- tracker edge. Vertical position still tracks the banner's fixed height.
+    -- Criteria rows center on the container, not the banner - a side-aligned banner would push them off-centre
     local prev = nil
     local firstRowY = (self.subHeaderH or SUBHEADER_H) + BANNER_GAP + bh + CRITERIA_LINE_GAP
     local barWidth = math.floor(container:GetWidth() * BAR_W_RATIO)
@@ -498,9 +473,7 @@ function S:Refresh()
 
                 local desc = info.description or ""
                 local label = desc
-                -- Default Blizzard pattern: drop the X/Y prefix on completed
-                -- criteria. The green check already communicates "done", so
-                -- "100/200 Cultists purged" simplifies to "Cultists purged".
+                -- Completed criteria drop the X/Y prefix, matching the default tracker
                 if not info.isFormatted and not info.completed
                    and info.totalQuantity and info.totalQuantity > 0 then
                     label = ("%d/%d %s"):format(info.quantity or 0, info.totalQuantity, desc)

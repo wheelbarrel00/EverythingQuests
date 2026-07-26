@@ -2,8 +2,7 @@ local _, ns = ...
 
 local Q = ns:RegisterSubsystem("TrackerQuestSound", {})
 
--- Midnight (12.x) can hand back "secret values" that error if indexed/operated
--- on by addon (tainted) code — even though they still report type "string".
+-- Midnight can hand back "secret values" that error when indexed by tainted addon code, even though they still report type "string"
 local _issecret = _G.issecretvalue
 
 Q.lastComplete = {}
@@ -55,8 +54,7 @@ local function detectTransitions()
     if not (Cache and Cache.All) then return end
     local quests = Cache:All()
 
-    -- Skip the very first pass after login: every already-complete quest
-    -- would otherwise fire a sound the moment we initialize.
+    -- Skip the first pass after login or every already-complete quest fires a sound
     if not Q.armed then
         for id, q in pairs(quests) do
             Q.lastComplete[id] = q.isComplete or false
@@ -72,7 +70,7 @@ local function detectTransitions()
         -- was==false (not `not was`): a first-seen already-complete quest is nil here and must not fire (cold-login false positive).
         if now and was == false then
             local title = q.title or ""
-            -- Already played by the instant chat path; skip so the debounced pass doesn't double-play.
+            -- Already played by the instant chat path, so skip it or the debounced pass double-plays
             if not isRecent(title) then
                 n = n + 1
                 _readyTitles[n] = title
@@ -108,9 +106,7 @@ local function getCompletePattern()
 end
 
 local function onSystemChat(_, msg)
-    -- A secret-value system message still reports type "string", but indexing
-    -- it (msg:match below) throws from tainted addon code. Skip those — the
-    -- Cache-diff path still catches quests that enter the log.
+    -- msg:match on a secret value throws, and the Cache-diff path still catches those quests
     if _issecret and _issecret(msg) then return end
     if type(msg) ~= "string" then return end
     local p = getCompletePattern()

@@ -21,10 +21,8 @@ local function ensureSV()
     return sv
 end
 
--- History groups by the player's local calendar day. Stored timestamps are UTC
--- epoch, so shift by the client offset before dividing. Labels render the shifted
--- midnight with date("!...") (Frame.lua). Forcing isdst=false on both broken-down
--- times cancels the standard-time error so the offset stays DST-correct.
+-- Stored timestamps are UTC epoch, so a shifted local day must be rendered back with date("!...") or it shifts twice
+-- Forcing isdst=false on both broken-down times cancels the standard-time error so the offset stays DST-correct
 local function tzOffset()
     local now = time()
     local u, l = date("!*t", now), date("*t", now)
@@ -249,9 +247,7 @@ function R:BackupInfo()
     return { count = #best.entries, ts = best.ts or 0 }
 end
 
--- Quest IDs with at least one entry still missing a title. Lets a
--- QUEST_DATA_LOAD_RESULT for an unrelated quest skip the full-entries scan.
--- Invalidated (set nil) on any entry mutation and rebuilt lazily here.
+-- Cache of quest IDs still missing a title - any mutation of sv.entries must set _pendingTitles nil to invalidate it
 local function ensurePendingTitles(self)
     if self._pendingTitles then return self._pendingTitles end
     local set = {}
@@ -420,8 +416,7 @@ function R:_enforceRetention()
     if n <= cap then return end
     local drop = n - cap
 
-    -- Evict undated backfill stubs (t == 0) before dated turn-ins: stubs land
-    -- at the newest slots, so a plain front-trim would discard real history first.
+    -- Evict undated backfill stubs before dated turn-ins - stubs land at the newest slots, so a plain front-trim would discard real history first
     local stubDrop = 0
     for i = 1, n do
         if (entries[i].t or 0) == 0 then stubDrop = stubDrop + 1 end
@@ -463,8 +458,7 @@ function R:Backfill()
         if e.c == key then seen[e.q] = true end
     end
 
-    -- Cap stubs to the room left under retention so a huge backfill can't
-    -- push out (or churn-allocate over) real dated history.
+    -- Cap stubs to the room left under retention so a huge backfill cannot push out real dated history
     local cap = retention()
     local room = (cap > 0) and (cap - #entries) or math.huge
     local added = 0

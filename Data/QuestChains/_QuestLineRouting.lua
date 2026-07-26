@@ -88,5 +88,5 @@ ns.QUESTLINE_ROUTING = {
     [6272] = { cat = ns.CAT.VOID_ACROPOLIS, name = "Umbral Blitz" },
     [6309] = { cat = ns.CAT.VOID_ACROPOLIS, name = "Assault and Strike Back: Val" },
     [6275] = { cat = ns.CAT.SUNSTRIDER_OMNIUM, name = "The Sunstrider Omnium" },
-    -- Campaign spine is sourced live via C_CampaignInfo in CampaignSource.lua; do not add campaign questlines here.
+    -- Campaign spine is sourced live via C_CampaignInfo in CampaignSource.lua - do not add campaign questlines here
 }

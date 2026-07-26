@@ -16,7 +16,8 @@ P.reagentPool  = {}
 P.activeHeaders  = {}
 P.activeReagents = {}
 
-local INCLUDE_ACCOUNT = { false, true }
+-- GetRecipesTracked's only arg is isRecraft, and the same recipeID can appear in both lists, so key on the pair
+local IS_RECRAFT = { false, true }
 
 local function buildHeader(parent)
     local r = CreateFrame("Button", nil, parent)
@@ -52,10 +53,7 @@ local function buildHeader(parent)
                 end)
                 root:CreateButton(L["Untrack Recipe"], function()
                     if C_TradeSkillUI.SetRecipeTracked then
-                        -- arg #3 (isRecraft) is a REQUIRED boolean — the API
-                        -- raises "bad argument #3" on nil, which is exactly
-                        -- what isRecraft is for a normal (non-recraft) tracked
-                        -- recipe. Coerce to a real boolean.
+                        -- Arg #3 is a required boolean - nil raises "bad argument #3"
                         C_TradeSkillUI.SetRecipeTracked(recipeID, false, isRecraft and true or false)
                     end
                 end)
@@ -116,20 +114,16 @@ local function getTrackedRecipes()
 
     local results = {}
     local seen = {}
-    for _, includeAccount in ipairs(INCLUDE_ACCOUNT) do
-        local list = C_TradeSkillUI.GetRecipesTracked(includeAccount)
+    for _, isRecraft in ipairs(IS_RECRAFT) do
+        local list = C_TradeSkillUI.GetRecipesTracked(isRecraft)
         if list then
             for i = 1, #list do
                 local entry = list[i]
-                local rid, isRecraft
-                if type(entry) == "table" then
-                    rid, isRecraft = entry.recipeID, entry.isRecraft
-                else
-                    rid = entry
-                end
-                if rid and not seen[rid] then
-                    seen[rid] = true
-                    results[#results + 1] = { recipeID = rid, isRecraft = isRecraft and true or false }
+                local rid = (type(entry) == "table") and entry.recipeID or entry
+                local key = (isRecraft and "R" or "N") .. tostring(rid)
+                if rid and not seen[key] then
+                    seen[key] = true
+                    results[#results + 1] = { recipeID = rid, isRecraft = isRecraft }
                 end
             end
         end
@@ -139,49 +133,102 @@ end
 
 local BASIC_REAGENT = (Enum and Enum.CraftingReagentType and Enum.CraftingReagentType.Basic) or 0
 
--- The reagent list is static per (recipeID, isRecraft). GetRecipeSchematic returns
--- fresh multi-KB nested tables, and BAG_UPDATE_DELAYED drives renders while farming,
--- so cache the extracted list. Item counts stay live (fetched per render below).
+local REAGENT_FMT = PROFESSIONS_TRACKER_REAGENT_FORMAT or "%s %s"
+local COUNT_FMT   = PROFESSIONS_TRACKER_REAGENT_COUNT_FORMAT or "%d/%d"
+local RANGE_FMT   = PROFESSIONS_TRACKER_REAGENT_RANGE_FORMAT or "%d-%d"
+
+local function slotRequired(slot)
+    if ProfessionsUtil and ProfessionsUtil.IsReagentSlotRequired then
+        return ProfessionsUtil.IsReagentSlotRequired(slot)
+    end
+    return slot.reagentType == BASIC_REAGENT
+end
+
+local function slotModifying(slot)
+    if ProfessionsUtil and ProfessionsUtil.IsReagentSlotModifyingRequired then
+        return ProfessionsUtil.IsReagentSlotModifyingRequired(slot)
+    end
+    return false
+end
+
+local function slotQuantityRequired(slot, reagent)
+    if slot.GetQuantityRequired then
+        local ok, n = pcall(slot.GetQuantityRequired, slot, reagent)
+        if ok and n then return n end
+    end
+    return slot.quantityRequired or 0
+end
+
+-- The reagent list is static per (recipeID, isRecraft) and GetRecipeSchematic allocates fresh multi-KB tables, so cache the extracted entries. Counts and names still resolve live per render
 local _reagentCache = {}
 local function getReagents(recipeID, isRecraft)
-    local key = (isRecraft and "R" or "") .. recipeID
+    local key = (isRecraft and "R" or "N") .. recipeID
     local cached = _reagentCache[key]
     if cached then return cached end
-    if not (C_TradeSkillUI and C_TradeSkillUI.GetRecipeSchematic) then return {} end
-    local ok, schematic = pcall(C_TradeSkillUI.GetRecipeSchematic, recipeID, isRecraft and true or false)
+    local getSchematic = (ProfessionsUtil and ProfessionsUtil.GetRecipeSchematic)
+                      or (C_TradeSkillUI and C_TradeSkillUI.GetRecipeSchematic)
+    if not getSchematic then return {} end
+    local ok, schematic = pcall(getSchematic, recipeID, isRecraft and true or false)
     if not ok or not schematic or not schematic.reagentSlotSchematics then return {} end
 
     local out = {}
     for i = 1, #schematic.reagentSlotSchematics do
         local slot = schematic.reagentSlotSchematics[i]
-        if slot and slot.reagentType == BASIC_REAGENT and slot.reagents and slot.reagents[1] then
-            local need = slot.quantityRequired or 0
-            local itemID = slot.reagents[1].itemID
-            if itemID and need > 0 then
-                out[#out + 1] = { itemID = itemID, need = need }
+        local reagent = slot and slot.reagents and slot.reagents[1]
+        if reagent and slotRequired(slot) then
+            local isModifying = slotModifying(slot)
+            local entry = {
+                reagents   = slot.reagents,
+                need       = slotQuantityRequired(slot, reagent),
+                itemID     = (not isModifying) and reagent.itemID or nil,
+                currencyID = (not isModifying) and reagent.currencyID or nil,
+                slotText   = isModifying and slot.slotInfo and slot.slotInfo.slotText or nil,
+            }
+            if slot.IsVariableQuantityReagent and slot.GetVariableQuantityRange
+               and slot:IsVariableQuantityReagent(reagent) then
+                entry.varMin, entry.varMax = slot:GetVariableQuantityRange(reagent)
+            end
+            if (entry.slotText or entry.itemID or entry.currencyID)
+               and (entry.need > 0 or entry.varMin) then
+                -- Blizzard orders modifying-required slots ahead of the basic ones.
+                tinsert(out, isModifying and 1 or #out + 1, entry)
             end
         end
     end
-    -- Reached only with a valid loaded schematic, so cache even an empty list
-    -- (a reagent-less or not-learned account recipe) - the early return above
-    -- leaves unloaded recipes uncached so they still retry.
+    -- Only reached with a loaded schematic, so caching an empty list is safe - unloaded recipes returned early and stay uncached so they retry
     _reagentCache[key] = out
     return out
 end
 
-local function getItemCount(itemID)
-    if C_Item and C_Item.GetItemCount then
-        return C_Item.GetItemCount(itemID, true, false, true, true) or 0
+-- Sums every quality tier under the game's own bank and warband rules, so a stack of only rank-2 or rank-3 still counts
+local function reagentHave(entry)
+    if ProfessionsUtil and ProfessionsUtil.AccumulateReagentsInPossession and entry.reagents then
+        return ProfessionsUtil.AccumulateReagentsInPossession(entry.reagents) or 0
+    end
+    if entry.currencyID and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+        local info = C_CurrencyInfo.GetCurrencyInfo(entry.currencyID)
+        return (info and info.quantity) or 0
+    end
+    if entry.itemID and C_Item and C_Item.GetItemCount then
+        return C_Item.GetItemCount(entry.itemID, true, false, true, true) or 0
     end
     return 0
 end
 
-local function getItemName(itemID)
-    if C_Item and C_Item.GetItemNameByID then
-        local n = C_Item.GetItemNameByID(itemID)
-        if n then return n end
+local function reagentName(entry)
+    if entry.slotText then return entry.slotText end
+    if entry.currencyID and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+        local info = C_CurrencyInfo.GetCurrencyInfo(entry.currencyID)
+        if info and info.name then return info.name end
     end
-    return "Item " .. tostring(itemID)
+    if entry.itemID then
+        if C_Item and C_Item.GetItemNameByID then
+            local n = C_Item.GetItemNameByID(entry.itemID)
+            if n then return n end
+        end
+        return "Item " .. tostring(entry.itemID)
+    end
+    return ""
 end
 
 function P:Render(content, contentWidth, yStart, collapsed)
@@ -193,6 +240,14 @@ function P:Render(content, contentWidth, yStart, collapsed)
     if collapsed or count == 0 then return 0, count end
 
     local Media = ns:GetSubsystem("Media")
+    local Card = ns:GetSubsystem("TrackerCard")
+    local cardOn, pad, borderSize = false, 0, 0
+    local cardBg, cardBorder
+    if Card then
+        cardOn, pad, borderSize = Card:State()
+        cardBg, cardBorder = Card:Colors()
+    end
+
     local y = yStart
     for i = 1, count do
         local entry = recipes[i]
@@ -200,10 +255,12 @@ function P:Render(content, contentWidth, yStart, collapsed)
         local name = (info and info.name) or ("Recipe #" .. tostring(entry.recipeID))
         local icon = info and info.icon
 
+        local groupTop = y
+        if cardOn then y = y + pad end
         local row = acquireHeader(content)
-        row:SetWidth(contentWidth)
+        row:SetWidth(math.max(1, contentWidth - pad * 2))
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+        row:SetPoint("TOPLEFT", content, "TOPLEFT", pad, -y)
 
         if icon then
             row.icon:SetTexture(icon)
@@ -213,41 +270,113 @@ function P:Render(content, contentWidth, yStart, collapsed)
         end
 
         local label = name
-        if entry.isRecraft then label = label .. " |cffaaaaaa(Recraft)|r" end
+        if entry.isRecraft then
+            label = PROFESSIONS_CRAFTING_FORM_RECRAFTING_HEADER
+                and PROFESSIONS_CRAFTING_FORM_RECRAFTING_HEADER:format(name)
+                or (name .. " |cffaaaaaa(Recraft)|r")
+        end
         row.title:SetText(label)
         row.recipeID   = entry.recipeID
         row.isRecraft  = entry.isRecraft
         row.recipeName = name
         if Media and Media.ApplyTrackerTitleFont then Media:ApplyTrackerTitleFont(row.title) end
 
+        local lastBottom = y + HEADER_H
         y = y + HEADER_H + ROW_GAP
 
         local reagents = getReagents(entry.recipeID, entry.isRecraft)
         for j = 1, #reagents do
             local rg = reagents[j]
-            local have = getItemCount(rg.itemID)
-            local nm = getItemName(rg.itemID)
+            local nm = reagentName(rg)
 
-            local rrow = acquireReagent(content)
-            rrow:SetWidth(contentWidth)
+            -- Parented to the header row so the group card draws behind the text, anchored to content so placement is unchanged
+            local rrow = acquireReagent(row)
+            rrow:SetWidth(math.max(1, contentWidth - pad * 2))
             rrow:ClearAllPoints()
-            rrow:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+            rrow:SetPoint("TOPLEFT", content, "TOPLEFT", pad, -y)
 
-            local met = have >= rg.need
+            -- Variable-quantity slots depend on unreadable crafting-form choices, so show the range and never mark them satisfied
+            local body, met
+            if rg.varMin then
+                body = format(REAGENT_FMT, format(RANGE_FMT, rg.varMin, rg.varMax), nm)
+            else
+                local have = reagentHave(rg)
+                body = format(REAGENT_FMT, format(COUNT_FMT, have, rg.need), nm)
+                met = have >= rg.need
+            end
+
             local line
             if met then
-                line = format("|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t |cff40ff40%d/%d %s|r", have, rg.need, nm)
+                line = format("|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t |cff40ff40%s|r", body)
             else
-                line = format("|cff999999- %d/%d %s|r", have, rg.need, nm)
+                line = format("|cff999999- %s|r", body)
             end
             rrow.text:SetText(line)
             if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(rrow.text, -2) end
 
-            y = y + REAGENT_H + ROW_GAP + ns.Util.LineSpacing()
+            lastBottom = y + REAGENT_H
+            -- A negative Line Spacing can pull the advance under the row height, which would overrun a card fill
+            local advance = REAGENT_H + ROW_GAP + ns.Util.LineSpacing()
+            if cardOn then advance = math.max(advance, REAGENT_H) end
+            y = y + advance
+        end
+
+        if cardOn then
+            local groupBottom = lastBottom + pad
+            Card:Draw(row, groupBottom - groupTop, pad, borderSize, cardBg, cardBorder)
+            y = groupBottom + Card:Gap(ROW_GAP, true)
+        elseif Card then
+            Card:Clear(row)
         end
     end
 
     return y - yStart, count
+end
+
+function P:Dump()
+    local tag = "|cffEBB706EQ Prof|r: "
+    if not (C_TradeSkillUI and C_TradeSkillUI.GetRecipesTracked) then
+        print(tag .. "C_TradeSkillUI.GetRecipesTracked unavailable.")
+        return
+    end
+
+    local hasUtil  = ProfessionsUtil ~= nil
+    local hasReq   = hasUtil and ProfessionsUtil.IsReagentSlotRequired ~= nil
+    local hasMod   = hasUtil and ProfessionsUtil.IsReagentSlotModifyingRequired ~= nil
+    local hasAccum = hasUtil and ProfessionsUtil.AccumulateReagentsInPossession ~= nil
+    print(format("%sAPI  ProfessionsUtil=%s  SlotRequired=%s  SlotModifying=%s  Accumulate=%s",
+        tag, tostring(hasUtil), tostring(hasReq), tostring(hasMod), tostring(hasAccum)))
+
+    local recipes = getTrackedRecipes()
+    print(format("%s%d tracked recipe(s)  (normal + recraft)", tag, #recipes))
+
+    for i = 1, #recipes do
+        local e = recipes[i]
+        local info = C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(e.recipeID)
+        print(format("%s[%d] %s  id=%d  isRecraft=%s", tag, i,
+            (info and info.name) or "?", e.recipeID, tostring(e.isRecraft)))
+
+        local rs = getReagents(e.recipeID, e.isRecraft)
+        if #rs == 0 then print("       (no required reagent slots resolved)") end
+        for j = 1, #rs do
+            local rg = rs[j]
+            local all = reagentHave(rg)
+            local tier1 = 0
+            if rg.itemID and C_Item and C_Item.GetItemCount then
+                tier1 = C_Item.GetItemCount(rg.itemID, true, false, true, true) or 0
+            end
+            local kind = rg.slotText and "MODIFYING" or (rg.currencyID and "CURRENCY " or "basic    ")
+            local note = ""
+            if rg.itemID and all ~= tier1 then
+                note = format("  <<< QUALITY FIX (old code showed %d)", tier1)
+            end
+            if rg.varMin then
+                note = note .. format("  <<< VARIABLE %s-%s", tostring(rg.varMin), tostring(rg.varMax))
+            end
+            print(format("       %s %-34s have=%-5d need=%-4d qualityTiers=%d%s",
+                kind, reagentName(rg), all, rg.need or 0, (rg.reagents and #rg.reagents) or 0, note))
+        end
+    end
 end
 
 local function recomputeHasTrackedRecipes()

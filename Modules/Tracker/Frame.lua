@@ -23,16 +23,12 @@ local MAX_W, MAX_H     = 600, 2000
 
 local HEADER_COLOR = { 0.93, 0.32, 0.10 }
 
--- The sections a user may freely reorder within the main scroll. World Quests
--- ("events") is deliberately absent: it renders in its own capped scroll region,
--- so its placement is a top/bottom choice handled by ApplyWorldQuestsPosition.
+-- World Quests is deliberately absent - it renders in its own capped scroll region and is placed by ApplyWorldQuestsPosition.
 local REORDERABLE_IDS = { "zoneprogress", "campaign", "quests", "profession", "endeavors", "achievements" }
 local REORDERABLE_SET = {}
 for _, id in ipairs(REORDERABLE_IDS) do REORDERABLE_SET[id] = true end
 
--- Keep saved ids in their saved order, drop anything unknown, and append any
--- reorderable section missing from the save so a newly-added section can never
--- vanish from an old profile.
+-- Appending the reorderable ids missing from the save keeps a newly-added section from vanishing on an old profile.
 local function reconcileSectionOrder(saved)
     local seen, out = {}, {}
     if type(saved) == "table" then
@@ -63,12 +59,23 @@ local function getHeaderColor()
     return HEADER_COLOR[1], HEADER_COLOR[2], HEADER_COLOR[3]
 end
 
+-- Card mode floors the gap - at the default spacing of 2 adjacent card borders touch and read as one block.
+local CARD_MIN_GAP = 4
+
+-- With the scroll bar hidden its gutter is dead space, so mirror the left inset to keep the column centred.
+local function scrollGutter()
+    local DB  = ns:GetSubsystem("DB")
+    local cfg = DB and DB.db.profile.tracker
+    if cfg and cfg.hideScrollBar == true then return CONTENT_PAD * 2 end
+    return SCROLLBAR_GUTTER
+end
+
 local function getBlockGap()
     local DB = ns:GetSubsystem("DB")
-    if DB and DB.db.profile.tracker and DB.db.profile.tracker.blockSpacing then
-        return DB.db.profile.tracker.blockSpacing
-    end
-    return 4
+    local t  = DB and DB.db.profile.tracker
+    local gap = (t and t.blockSpacing) or 4
+    if t and t.blockLayout == "card" then return math.max(gap, CARD_MIN_GAP) end
+    return gap
 end
 
 local function disableBlizzardTracker()
@@ -234,8 +241,7 @@ function Tracker:BuildFrame()
 
     local scenarioContainer = CreateFrame("Frame", nil, f)
     scenarioContainer:SetPoint("TOPLEFT",  CONTENT_PAD, -DRAG_HANDLE_H)
-    -- Reserve the same scroll-bar gutter the quest list reserves so the banner
-    -- and criteria align with the scrolled quest text, not the wider frame edge.
+    -- Reserve the quest list's scroll-bar gutter so the banner aligns with the scrolled quest text.
     scenarioContainer:SetPoint("TOPRIGHT", -(SCROLLBAR_GUTTER - CONTENT_PAD), -DRAG_HANDLE_H)
     scenarioContainer:SetHeight(1)
     f.scenarioContainer = scenarioContainer
@@ -268,8 +274,7 @@ function Tracker:BuildFrame()
     f.eventsScrollBarBG = eBg
 
     local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    -- scroll + eventsRegion (World Quests) are anchored by ApplyWorldQuestsPosition,
-    -- which honours the Top/Bottom setting; do not hard-anchor them to each other here.
+    -- scroll and eventsRegion are anchored by ApplyWorldQuestsPosition per the Top/Bottom setting - do not hard-anchor them here.
 
     local content = CreateFrame("Frame", nil, scroll)
     content:SetSize(cfg.width - SCROLLBAR_GUTTER, 1)
@@ -390,18 +395,14 @@ local function makeSectionHeader(parent, id, title, onToggle)
     h:SetHeight(SECTION_H)
     h:RegisterForClicks("LeftButtonUp")
 
-    -- Optional "stock look" gradient bar behind the header text. White base so
-    -- ApplyHeaderBar can tint it with a horizontal gradient; BACKGROUND keeps it
-    -- below the hairline (ARTWORK) and the label/count (OVERLAY). Hidden by default.
+    -- White base so ApplyHeaderBar can tint it, and BACKGROUND keeps it under the hairline and the label.
     h.bar = h:CreateTexture(nil, "BACKGROUND")
     h.bar:SetColorTexture(1, 1, 1, 1)
     h.bar:SetPoint("LEFT",  h, "LEFT",  0, 0)
     h.bar:SetPoint("RIGHT", h, "RIGHT", 0, 0)
     h.bar:Hide()
 
-    -- Optional soft-edge mask: feathers the bar's top/left/right (hard bottom, where
-    -- it meets the content) while leaving the horizontal gradient intact — it masks
-    -- the bar's ALPHA only. Added to the bar in ApplyHeaderBar when the option is on.
+    -- The mask affects the bar's alpha only, so the gradient survives it.
     if h.CreateMaskTexture then
         h.barMask = h:CreateMaskTexture(nil, "BACKGROUND")
         h.barMask:SetTexture("Interface\\AddOns\\EverythingQuests\\Media\\Textures\\headerbar-softmask.tga",
@@ -477,9 +478,7 @@ function Tracker:ApplySectionOrder()
     for _, id in ipairs(self:GetInContentOrder()) do
         list[#list + 1] = { id = id, title = titles[id] }
     end
-    -- World Quests never sits in the in-content flow (it has its own scroll region);
-    -- keep its header in the list so it still builds, but the render loop skips it and
-    -- ApplyWorldQuestsPosition decides whether the region anchors above or below.
+    -- World Quests stays in the list so its header still builds, but the render loop skips it and its region is anchored separately.
     list[#list + 1] = { id = "events", title = titles["events"] }
     self.sectionList = list
 end
@@ -500,6 +499,17 @@ function Tracker:MoveSection(id, delta)
     self:Refresh()
 end
 
+-- Guard on the last gutter - SetPoint fires scenarioContainer's OnSizeChanged, which calls Refresh, so an unguarded re-inset re-enters every pass.
+function Tracker:ApplyContentInset()
+    local f = self.frame
+    if not (f and f.scenarioContainer) then return end
+    local gutter = scrollGutter()
+    if f._contentGutter == gutter then return end
+    f._contentGutter = gutter
+    f.scenarioContainer:SetPoint("TOPLEFT",  CONTENT_PAD, -DRAG_HANDLE_H)
+    f.scenarioContainer:SetPoint("TOPRIGHT", -(gutter - CONTENT_PAD), -DRAG_HANDLE_H)
+end
+
 function Tracker:ApplyWorldQuestsPosition()
     local f = self.frame
     if not f then return end
@@ -508,8 +518,7 @@ function Tracker:ApplyWorldQuestsPosition()
     local scen   = f.scenarioContainer
     if not (scroll and region and scen) then return end
 
-    -- scroll is in the item-button protected ancestor chain, so re-anchoring it is a
-    -- protected move; defer out of combat exactly like the content sizing in Render.
+    -- scroll is in the item-button protected ancestor chain, so re-anchoring it in combat is a protected move.
     local IB = ns:GetSubsystem("TrackerItemButtons")
     if InCombatLockdown() and IB and IB.HasSecureButtons and IB:HasSecureButtons() then
         local Ev = ns:GetSubsystem("Events")
@@ -543,9 +552,7 @@ function Tracker:SetWorldQuestsPosition(pos)
     self:Refresh()
 end
 
--- Optional gradient bar behind each section header (a "stock" look). The bar is a
--- child of the header, so it shows/hides and tracks width with the header itself;
--- this only needs to run on build and when the options change, never per-render.
+-- The bar is a child of the header and tracks it, so this only runs on build and on option changes, never per-render.
 function Tracker:ApplyHeaderBar(h)
     if not (h and h.bar) then return end
     local DB  = ns:GetSubsystem("DB")
@@ -558,10 +565,7 @@ function Tracker:ApplyHeaderBar(h)
     local r, g, b, a = c.r or 0.80, c.g or 0.60, c.b or 0.20, c.a or 0.85
     h.bar:SetHeight(cfg.headerBarHeight or 22)
     if h.bar.SetGradient then
-        -- Solid gradient from the full picked colour to a darker shade of it (both at the
-        -- picked alpha), not a fade to transparent. Header Bar 1 runs it left→right; Header
-        -- Bar 2 runs it top→bottom (SetGradient VERTICAL takes min=bottom, max=top, so the
-        -- darker shade is the min). Reuse cached ColorMixins so the sliders don't churn GC.
+        -- SetGradient VERTICAL takes min=bottom then max=top, so the darker shade goes first. Cached ColorMixins keep slider drags from churning GC.
         local k = 0.4
         if h._barC1 then h._barC1:SetRGBA(r, g, b, a) else h._barC1 = CreateColor(r, g, b, a) end
         if h._barC2 then h._barC2:SetRGBA(r * k, g * k, b * k, a) else h._barC2 = CreateColor(r * k, g * k, b * k, a) end
@@ -574,10 +578,7 @@ function Tracker:ApplyHeaderBar(h)
     if h.barMask then
         local wantSoft = cfg.headerBarSoftEdges and true or false
         if wantSoft then
-            -- Strength controls softness by how far the mask is grown past the bar on the
-            -- top/left/right: at 10 the mask matches the bar (full feather, softest); lower
-            -- values oversize the mask so the bar samples its solid interior and the edge
-            -- tightens toward hard. The bottom stays flush so that edge is never softened.
+            -- Strength is inverted - lower values oversize the mask so the bar samples its solid interior, and the bottom stays flush so that edge never feathers.
             local s    = cfg.headerBarSoftEdgeStrength or 10
             local extX = 30 * (10 - s) / 9
             local extY = 8  * (10 - s) / 9
@@ -724,10 +725,7 @@ function Tracker:_RenderQuestGroup(content, contentWidth, yStart, collapsed, wan
     local profile = DB.db.profile.tracker
     local quests  = Cache:All()
 
-    -- Quests with a COMPLETE auto-quest popup are drawn as popup boxes (campaign-
-    -- routed and counted by TrackerAutoQuestPopup); exclude them here so they are
-    -- not also listed as a block or double-counted. Only when popups are enabled —
-    -- with them off there is no box, so the quest must fall back to a normal block.
+    -- Quests with a complete auto-quest popup are drawn as popup boxes, so exclude them here to avoid a duplicate block - but only while popups are enabled.
     wipe(_popupSet)
     if AC and AC.FillCompleteSet and profile.showQuestPopups ~= false then
         AC:FillCompleteSet(_popupSet)
@@ -946,8 +944,7 @@ function Tracker:_UpdateDistanceSort(sortMode)
     wipe(_distScratch)
     local Cache = ns:GetSubsystem("Cache")
     if Cache and Cache.All then
-        -- Complete quests resolve to their turn-in POI; skipping them pinned
-        -- ready-to-turn-in quests to the bottom instead of sorting by hand-in distance.
+        -- Complete quests resolve to their turn-in POI, so skipping them would pin ready-to-turn-in quests to the bottom.
         for id in pairs(Cache:All()) do
             local distSq, onContinent = C_QuestLog.GetDistanceSqToQuest(id)
             if distSq and onContinent and distSq == distSq then
@@ -991,6 +988,8 @@ function Tracker:Render()
     if not f then return end
     local content = f.content
     if not content then return end
+
+    self:ApplyContentInset()
 
     if f._eqHidden or not f:IsShown() then
         f._pendingRender = true
@@ -1040,13 +1039,10 @@ function Tracker:Render()
         end
     end
 
-    -- Keep the scroll child's width tracking the live frame width so the quest
-    -- list reacts to drag-resize (it was frozen at its build-time width, while the
-    -- banner spans the frame). Secure-gated: content is in the item button's
-    -- protected ancestor chain, like the content:SetHeight below.
+    -- Secure-gated - content is in the item button's protected ancestor chain, like the content:SetHeight below.
     local _IBw = ns:GetSubsystem("TrackerItemButtons")
     local _secureW = InCombatLockdown() and _IBw and _IBw.HasSecureButtons and _IBw:HasSecureButtons()
-    local liveContentW = math.max(1, math.floor((f:GetWidth() or 0) + 0.5) - SCROLLBAR_GUTTER)
+    local liveContentW = math.max(1, math.floor((f:GetWidth() or 0) + 0.5) - scrollGutter())
     if not _secureW and math.floor((content:GetWidth() or 0) + 0.5) ~= liveContentW then
         content:SetWidth(liveContentW)
     end
@@ -1179,13 +1175,9 @@ function Tracker:Render()
 
     local questContentH = y
 
-    -- Quest list gets vertical-space priority so its trailing section
-    -- (Achievements / in-tracker zone bar) is never shown header-without-body.
-    -- The WQ region has one header and scrolls cleanly, so it yields; wqFloor
-    -- keeps it from vanishing and the fraction still caps it when quests are short.
+    -- Quests get vertical-space priority so a trailing section is never left header-without-body, and wqFloor keeps the WQ region from vanishing.
     local eventsCap
     if cfg and cfg.worldQuestsHeightOverride then
-        -- WQ gets its set height; quests keep a floor so they can't vanish.
         local wqWant   = SECTION_H + 2 + math.max(0, cfg.worldQuestsHeight or 0)
         local questMin = SECTION_H + 2 + 40
         eventsCap = math.max(0, math.min(wqWant, available - questMin))
@@ -1210,10 +1202,7 @@ function Tracker:Render()
 
     local wqRegionH = self:_RenderPinnedEvents(eventsCap) or 0
 
-    -- Quest viewport = leftover after WQ's actual height. Only snap the clip UP to a
-    -- section top when the cut lands inside that header's own row (header shown with
-    -- no body). A section whose body merely overflows the cut must keep scrolling --
-    -- snapping to its top there would collapse the viewport to the sections above it.
+    -- Only snap the clip up when the cut lands inside a header's own row - snapping when a body merely overflows would collapse the viewport to the sections above.
     local scrollH = math.min(questContentH, available - wqRegionH)
     if scrollH < questContentH then
         for i = #sectionTops, 1, -1 do
@@ -1227,7 +1216,7 @@ function Tracker:Render()
     if scrollH < 1 then scrollH = 1 end
 
     if f.scroll and not secureLocked then
-        local scrollW = math.max(1, (f:GetWidth() or 0) - SCROLLBAR_GUTTER)
+        local scrollW = math.max(1, (f:GetWidth() or 0) - scrollGutter())
         f.scroll:SetSize(scrollW, scrollH)
         if f.scroll.UpdateScrollChildRect then f.scroll:UpdateScrollChildRect() end
     end
@@ -1255,8 +1244,7 @@ function Tracker:Render()
             f.bgFrame:Hide()
             f.background:Hide()
         else
-            -- Span the full dragged frame (down to the grip), not the content, so the
-            -- bordered window never collapses to a few lines while the grip sits far below.
+            -- Span the full dragged frame, not the content, so the bordered window never collapses while the grip sits far below.
             f.bgFrame:SetHeight(f:GetHeight() or maxH)
             if cfg.showBackground then f.background:Show() else f.background:Hide() end
             if cfg.showBackground or cfg.showBorder then f.bgFrame:Show() else f.bgFrame:Hide() end
@@ -1264,11 +1252,7 @@ function Tracker:Render()
     end
 end
 
--- With World Quests pinned to the TOP the quest scroll (and its protected item
--- buttons) hangs off this region's bottom, so resizing it in combat moves the secure
--- chain and throws ADDON_ACTION_BLOCKED. Defer out of combat exactly like
--- content:SetHeight and Scenario:_SetContainerHeight. In BOTTOM mode (default) nothing
--- protected sits below the region, so it resizes freely with no gate.
+-- In TOP mode the protected quest scroll hangs off this region, so resizing it in combat blocks. BOTTOM mode has nothing protected below and needs no gate.
 function Tracker:_SetEventsRegionHeight(region, h)
     local DB  = ns:GetSubsystem("DB")
     local pos = (DB and DB.db.profile.tracker and DB.db.profile.tracker.worldQuestsPosition) or "bottom"

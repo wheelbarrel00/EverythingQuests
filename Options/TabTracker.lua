@@ -392,7 +392,7 @@ Options:AddTab("tracker", L["Tracker"], function(content)
             local r = self2:GetParent()
             local name = (r and SECTION_ROW_LABELS[r.sectionID]) or ""
             GameTooltip:SetOwner(self2, "ANCHOR_RIGHT")
-            -- SetText arg 5 is alpha (not wrap); pass 1 or the line can render invisible.
+            -- SetText arg 5 is alpha, not wrap - pass 1 or the line can render invisible
             GameTooltip:SetText((isUp and L["Move %s up"] or L["Move %s down"]):format(name), 1, 1, 1, 1, true)
             GameTooltip:AddLine(L["Reorders where this section sits in the tracker. A section only shows while it has something in it, so empty sections won't visibly move."], 0.82, 0.82, 0.82, true)
             GameTooltip:Show()

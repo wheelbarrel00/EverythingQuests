@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 _G.EverythingQuests = ns
 ns.NAME = addonName
-ns.VERSION = "1.35.0"
+ns.VERSION = "1.36.0"
 
 ns.DISCORD_URL = "https://discord.gg/vm8K2WfQUE"
 
@@ -57,7 +57,6 @@ _G.BINDING_NAME_EVERYTHINGQUESTS_TOGGLE_CHAINGUIDE = "Toggle Chain Guide"
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("PLAYER_LOGIN")
 loader:SetScript("OnEvent", function()
-    -- Isolate each subsystem so one that errors does not abort the rest of the load.
     for _, name in ipairs(ns.subsystemOrder) do
         local sub = ns.subsystems[name]
         if sub.OnInitialize then xpcall(sub.OnInitialize, geterrorhandler(), sub) end

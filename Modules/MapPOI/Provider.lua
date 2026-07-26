@@ -6,7 +6,7 @@ local PIN_TEMPLATE = "EQQuestPinTemplate"
 
 local providerMixin = CreateFromMixins(MapCanvasDataProviderMixin)
 
--- SetPinTemplateType only takes effect for the current canvas; must register here in OnAdded, not earlier.
+-- SetPinTemplateType only applies to the current canvas, so it has to be registered here in OnAdded
 function providerMixin:OnAdded(mapCanvas)
     MapCanvasDataProviderMixin.OnAdded(self, mapCanvas)
     mapCanvas:SetPinTemplateType(PIN_TEMPLATE, "BUTTON")

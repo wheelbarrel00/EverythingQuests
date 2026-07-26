@@ -4,10 +4,7 @@ local M = ns:RegisterSubsystem("WQWorldMap", {})
 
 local PIN_TEMPLATE = "EQWorldQuestPinTemplate"
 
--- Max reward-data preload attempts per quest before we give up counting it
--- as "pending". Some WQs never return reward data (cross-faction, transient
--- API gaps); without a cap one stuck quest keeps the adaptive retry firing
--- the full pin walk every 2s for the life of the open map.
+-- Some WQs never return reward data, and without this cap one stuck quest keeps the retry re-walking every pin every 2s
 local MAX_LOAD_ATTEMPTS = 3
 
 local function getWorldQuests(mapID)
@@ -55,15 +52,13 @@ function providerMixin:_DoRefresh()
 
     self:_AcquirePins()
 
-    -- Only rebuild the panel while it's open; when closed it's already hidden (the
-    -- toggle hid it), so refreshing it is wasted tainted work on the open map. The
-    -- open case still self-hides it if the pins were cleared (WQ pins turned off).
+    -- Only rebuild the panel while open - the toggle already hid it, so refreshing it is wasted tainted work on the open map
     local DB = ns:GetSubsystem("DB")
     if DB and DB.db.profile.worldQuests.popoutOpen then
         local Panel = ns:GetSubsystem("WQPanel")
         if Panel and Panel.Refresh then Panel:Refresh() end
     end
-    -- Tab owns its own show/hide + content gate, so refresh it every cycle.
+    -- Tab owns its own show/hide and content gate, so it refreshes every cycle
     local Tab = ns:GetSubsystem("WQTab")
     if Tab and Tab.Refresh then Tab:Refresh() end
 end
@@ -218,9 +213,7 @@ end
 function M:OnEnable()
     local Events = ns:GetSubsystem("Events")
 
-    -- _mapHooked guard: PLAYER_ENTERING_WORLD fires on every loading screen, so without
-    -- it each entry appended a fresh OnShow/OnHide closure to WorldMapFrame — unbounded
-    -- closures on a permanent Blizzard frame over a session.
+    -- _mapHooked guard: PLAYER_ENTERING_WORLD fires on every loading screen, so without it each entry appends another OnShow/OnHide closure to WorldMapFrame
     local function startTicker() self:StartTicker() end
     local function stopTicker()  self:StopTicker()  end
     Events:On("PLAYER_ENTERING_WORLD", function()
@@ -245,8 +238,6 @@ function M:OnEnable()
         if WorldMapFrame and WorldMapFrame:IsShown() then self:UpdateSelections() end
     end)
 
-    -- Do NOT hooksecurefunc(WorldMap_WorldQuestDataProviderMixin, "RefreshAllData"):
-    -- it ties EQ's insecure closure to Blizzard's WQ-provider on the shared map canvas,
-    -- spreading EQ taint to every map refresh and making EQ the blamed addon when the
-    -- systemic AreaPOI "secret value" bug fires. Events + ticker already cover all changes.
+    -- Do NOT hooksecurefunc WorldMap_WorldQuestDataProviderMixin.RefreshAllData - it spreads EQ taint to every map refresh
+    -- and gets EQ blamed for the systemic AreaPOI secret-value bug. The events above plus the ticker already cover all changes.
 end

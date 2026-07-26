@@ -2,9 +2,6 @@ local _, ns = ...
 
 local AC = ns:RegisterSubsystem("TrackerAutoComplete", {})
 
--- Fills `out` with the questIDs that currently have a COMPLETE auto-quest popup.
--- Those quests render as popup boxes (TrackerAutoQuestPopup) instead of normal
--- blocks, so the tracker uses this set to exclude them from the block list.
 function AC:FillCompleteSet(out)
     wipe(out)
     if not GetNumAutoQuestPopUps then return out end
