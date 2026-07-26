@@ -1056,6 +1056,7 @@ function Tracker:Render()
 
     local hr, hg, hb = getHeaderColor()
     local gap = getBlockGap()
+    local headerGap = SECTION_H + math.max(0, 2 + ns.Util.HeaderSpacing())
 
     local y = 0
     local sectionTops = {}
@@ -1101,7 +1102,7 @@ function Tracker:Render()
             local rendererName = SECTION_RENDERERS[def.id]
             local sectionCollapsed = self:IsSectionCollapsed(def.id)
 
-            local probeY = y + SECTION_H + 2
+            local probeY = y + headerGap
 
             local popupH, popupCount = 0, 0
             local AQP = (def.id == "campaign" or def.id == "quests")
@@ -1168,7 +1169,7 @@ function Tracker:Render()
                     end
                 end
                 sectionTops[#sectionTops + 1] = y
-                y = y + SECTION_H + 2 + sectionHeight + gap
+                y = y + headerGap + sectionHeight + gap
             else
                 headerFrame:Hide()
             end
@@ -1218,7 +1219,7 @@ function Tracker:Render()
         for i = #sectionTops, 1, -1 do
             local top = sectionTops[i]
             if top > 0 and top < scrollH then
-                if scrollH - top < SECTION_H + 2 then scrollH = top end
+                if scrollH - top < headerGap then scrollH = top end
                 break
             end
         end

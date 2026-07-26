@@ -243,7 +243,7 @@ function P:Render(content, contentWidth, yStart, collapsed)
             rrow.text:SetText(line)
             if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(rrow.text, -2) end
 
-            y = y + REAGENT_H + ROW_GAP
+            y = y + REAGENT_H + ROW_GAP + ns.Util.LineSpacing()
         end
     end
 

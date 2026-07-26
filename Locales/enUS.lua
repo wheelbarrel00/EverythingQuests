@@ -315,9 +315,15 @@ L["Divider Line Color"] = true
 L["Sets the color of the thin line under each section header. Defaults to the original gold."] = true
 L["Tracker Scale"] = true
 L["Block Spacing"] = true
+L["Line Spacing"] = true
+L["Adds vertical space between a quest's objective lines, across the whole tracker. 0 keeps the default spacing."] = true
+L["Header Spacing"] = true
+L["Adds or removes space around section headers and beneath each quest's title. 0 keeps the default spacing."] = true
 L["Zone Bar Scale"] = true
 L["Zone Bar Appearance"] = true
 L["Same as tracker font"] = true
+L["Bar Texture"] = true
+L["Sets the fill texture of the zone progress bar. Textures added by other media addons (such as SharedMedia, ElvUI, or Details) appear here too."] = true
 L["Header Color"] = true
 L["Count Color"] = true
 

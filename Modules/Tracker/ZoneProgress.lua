@@ -42,6 +42,20 @@ local function barState()
     return p.zoneProgressBar
 end
 
+local DEFAULT_BAR_TEXTURE = [[Interface\TargetingFrame\UI-StatusBar]]
+
+local function applyBarFill(bar)
+    if not bar then return end
+    local st = barState() or {}
+    local Media = ns:GetSubsystem("Media")
+    local tex = (Media and Media.GetStatusBarFile and Media:GetStatusBarFile(st.barTexture))
+                or DEFAULT_BAR_TEXTURE
+    bar:SetStatusBarTexture(tex)
+    local c = st.barColor
+    if c then bar:SetStatusBarColor(c.r, c.g, c.b, c.a or 1)
+    else       bar:SetStatusBarColor(0.26, 0.42, 1.0) end
+end
+
 local function qlQuestStore()
     local db = DBsub()
     if not (db and db.db and db.db.global) then return nil end
@@ -489,8 +503,7 @@ function ZP:_AcquireFrame()
     bar:SetPoint("BOTTOMRIGHT", -6, 5)
     bar:SetHeight(FRAME_BAR_H)
     bar:SetMinMaxValues(0, 100)
-    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    bar:SetStatusBarColor(0.26, 0.42, 1.0)
+    applyBarFill(bar)
     bar.bg = bar:CreateTexture(nil, "BACKGROUND")
     bar.bg:SetAllPoints()
     bar.bg:SetColorTexture(0.04, 0.07, 0.18, 0.9)
@@ -545,6 +558,7 @@ function ZP:UpdateFrame()
         Media:ApplyTrackerFont(f.count, -2, bf)
         Media:ApplyTrackerFont(f.bar.label, -2, bf)
     end
+    applyBarFill(f.bar)
 
     f:Show()
 end
@@ -602,6 +616,16 @@ function ZP:SetCountColor(c)
     self:UpdateFrame()
 end
 
+function ZP:SetBarTexture(name)
+    local st = barState(); if st then st.barTexture = (name ~= "" and name) or nil end
+    self:_Repaint()
+end
+
+function ZP:SetBarColor(c)
+    local st = barState(); if st then st.barColor = c end
+    self:_Repaint()
+end
+
 function ZP:HeaderInfo()
     local rootID, name = zoneRoot()
     if not rootID then return nil end
@@ -619,8 +643,7 @@ function ZP:_AcquireBar(parent)
     bar = CreateFrame("StatusBar", nil, parent)
     bar:SetHeight(BAR_H)
     bar:SetMinMaxValues(0, 100)
-    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    bar:SetStatusBarColor(0.26, 0.42, 1.0)
+    applyBarFill(bar)
 
     bar.bg = bar:CreateTexture(nil, "BACKGROUND")
     bar.bg:SetAllPoints()
@@ -677,6 +700,7 @@ function ZP:Render(content, contentWidth, yStart, collapsed)
 
     local Media = ns:GetSubsystem("Media")
     if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(bar.label, -2) end
+    applyBarFill(bar)
 
     bar:Show()
     return ROW_PAD_TOP + BAR_H + ROW_PAD_BOT, 1, total

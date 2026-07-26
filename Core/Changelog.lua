@@ -2,6 +2,19 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.35.0", date = "2026-07-26",
+        sections = {
+            { head = "New Features", items = {
+                "Restyle the zone progress bar - a new Bar Texture dropdown and Bar Color picker under /eqs > Appearance let you change the bar's fill texture and color. Choose from seven bundled Everything Quests bar styles or any statusbar texture from SharedMedia and other media addons, each shown with a live preview in a scrollable list. Thanks to Da Warrior for the request.",
+                "Tracker line and header spacing - two new sliders under /eqs > Appearance, Line Spacing and Header Spacing, add or reduce the vertical space between a quest's objective lines and around section headers. Thanks to Rhinoplasty for the line-spacing idea.",
+                "Class color button in the color picker - for players without ElvUI, the color picker now has a Class button that sets any Everything Quests color to your class color.",
+            } },
+            { head = "Improvements", items = {
+                "French and Russian translations updated for the new options. Thanks to Zox (French) and Malevi4 (Russian).",
+            } },
+        },
+    },
+    {
         version = "1.34.0", date = "2026-07-15",
         sections = {
             { head = "New Features", items = {

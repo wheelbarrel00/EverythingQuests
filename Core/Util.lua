@@ -15,6 +15,18 @@ Util.color = {
     dim           = { 0.50,  0.50,  0.50,  1.00 },
 }
 
+function Util.LineSpacing()
+    local DB = ns:GetSubsystem("DB")
+    local cfg = DB and DB.db and DB.db.profile and DB.db.profile.tracker
+    return math.max(-8, math.min(24, (cfg and cfg.lineSpacing) or 0))
+end
+
+function Util.HeaderSpacing()
+    local DB = ns:GetSubsystem("DB")
+    local cfg = DB and DB.db and DB.db.profile and DB.db.profile.tracker
+    return math.max(-8, math.min(24, (cfg and cfg.headerSpacing) or 0))
+end
+
 function Util.FmtDuration(secs)
     secs = math.max(0, math.floor(secs or 0))
     local h = math.floor(secs / 3600)

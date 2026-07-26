@@ -5,6 +5,20 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.35.0] - 2026-07-26
+
+Customize the zone progress bar's texture and color, new Line Spacing and Header Spacing sliders for the tracker, and a Class color button in the color picker for players without ElvUI.
+
+### New Features
+
+- **Restyle the zone progress bar** - a new Bar Texture dropdown and Bar Color picker under `/eqs` > Appearance > Zone Bar Appearance let you change the bar's fill texture and color. Choose from seven bundled Everything Quests bar styles or any statusbar texture provided by SharedMedia and other media addons, each shown with a live preview in a scrollable list. Thanks to Da Warrior for the request.
+- **Tracker line and header spacing** - two new sliders under `/eqs` > Appearance, **Line Spacing** and **Header Spacing**, add or reduce the vertical space between a quest's objective lines and around section headers, so you can fit more on screen or give the tracker more room to breathe. Thanks to Rhinoplasty for the line-spacing idea.
+- **Class color button in the color picker** - for players without ElvUI, the color picker now has a **Class** button that sets any Everything Quests color to your class color.
+
+### Improvements
+
+- **French and Russian translations** updated for the new options. Thanks to Zox (French) and Malevi4 (Russian).
+
 ## [1.34.0] - 2026-07-15
 
 A new option to scale the whole settings window, wider translation coverage, and a batch of smaller fixes and background performance improvements.

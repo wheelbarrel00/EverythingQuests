@@ -75,6 +75,8 @@ DB.defaults = {
             headerBarSoftEdges   = false,
             headerBarSoftEdgeStrength = 10,
             blockSpacing         = 2,
+            lineSpacing          = 0,
+            headerSpacing        = 0,
             scrollBarBg          = true,
             scrollBarBgColor     = { r = 0.60, g = 0.60, b = 0.65, a = 0.25 },
             hideScrollBar        = false,
@@ -190,7 +192,7 @@ local APPEARANCE_KEYS = {
     "titleColorUseClass", "headerColorUseClass",
     "headerBar", "headerBarColor", "headerBarHeight", "headerBarStyle",
     "headerBarSoftEdges", "headerBarSoftEdgeStrength",
-    "blockSpacing", "scale",
+    "blockSpacing", "lineSpacing", "headerSpacing", "scale",
     "showBackground", "backgroundColor", "showBorder", "borderColor", "borderSize",
     "scrollBarBg", "scrollBarBgColor", "hideScrollBar", "skinScrollBar",
     "scrollBarThumbColor", "scrollBarThumbWidth", "hideScrollArrows",
@@ -208,6 +210,7 @@ function DB:ResetTrackerAppearance()
     if zb then
         zb.showBackground, zb.showBorder, zb.scale = nil, nil, nil
         zb.borderColor, zb.headerColor, zb.countColor, zb.font = nil, nil, nil, nil
+        zb.barTexture, zb.barColor = nil, nil
     end
 end
 

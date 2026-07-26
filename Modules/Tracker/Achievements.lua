@@ -207,7 +207,7 @@ function A:Render(content, contentWidth, yStart, collapsed)
                         lr.text:SetText(line)
                         if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(lr.text, -2) end
                         shownCrit = shownCrit + 1
-                        y = y + LINE_H + ROW_GAP
+                        y = y + LINE_H + ROW_GAP + ns.Util.LineSpacing()
                     end
                 end
             end

@@ -454,7 +454,7 @@ function V:Render(content, contentWidth, yStart, collapsed)
                 if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(lr.text, -2) end
                 local h = math.max(lr.text:GetStringHeight(), LINE_H)
                 lr:SetHeight(h)
-                y = y + h + ROW_GAP
+                y = y + h + ROW_GAP + ns.Util.LineSpacing()
             end
         end
     end

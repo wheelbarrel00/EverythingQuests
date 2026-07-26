@@ -84,6 +84,20 @@ local WOW_FONTS = {
     { name = "WoW Morpheus",                file = [[Fonts\MORPHEUS.TTF]] },
 }
 
+local STATUSBAR_PATH = [[Interface\AddOns\EverythingQuests\Media\Statusbars\]]
+local STATUSBARS = {
+    { name = "EQ Smooth",   file = STATUSBAR_PATH .. "EQ-Smooth.tga" },
+    { name = "EQ Glaze",    file = STATUSBAR_PATH .. "EQ-Glaze.tga" },
+    { name = "EQ Gradient", file = STATUSBAR_PATH .. "EQ-Gradient.tga" },
+    { name = "EQ Bevel",    file = STATUSBAR_PATH .. "EQ-Bevel.tga" },
+    { name = "EQ Glow",     file = STATUSBAR_PATH .. "EQ-Glow.tga" },
+    { name = "EQ Gloss",    file = STATUSBAR_PATH .. "EQ-Gloss.tga" },
+    { name = "EQ Steel",    file = STATUSBAR_PATH .. "EQ-Steel.tga" },
+}
+
+-- LSM's built-in "Blizzard" statusbar. Also EQ's fallback when LSM is absent.
+local DEFAULT_STATUSBAR = [[Interface\TargetingFrame\UI-StatusBar]]
+
 function Media:OnInitialize()
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     if not LSM then return end
@@ -95,6 +109,9 @@ function Media:OnInitialize()
     end
     for _, f in ipairs(WOW_FONTS) do
         LSM:Register("font", f.name, f.file)
+    end
+    for _, s in ipairs(STATUSBARS) do
+        LSM:Register("statusbar", s.name, s.file)
     end
     self.LSM = LSM
 end
@@ -149,6 +166,34 @@ function Media:GetFontFile(name)
         if f.name == name then return f.file end
     end
     return STANDARD_TEXT_FONT
+end
+
+function Media:GetStatusBarList()
+    local out = {}
+    local LSM = self.LSM
+    local names = LSM and LSM:List("statusbar")
+    if names and #names > 0 then
+        for _, name in ipairs(names) do
+            out[#out + 1] = { value = name, label = name }
+        end
+        return out
+    end
+    for _, s in ipairs(STATUSBARS) do
+        out[#out + 1] = { value = s.name, label = s.name }
+    end
+    return out
+end
+
+function Media:GetStatusBarFile(name)
+    local LSM = self.LSM
+    if LSM then
+        local f = LSM:Fetch("statusbar", name or "Blizzard")
+        if f then return f end
+    end
+    for _, s in ipairs(STATUSBARS) do
+        if s.name == name then return s.file end
+    end
+    return DEFAULT_STATUSBAR
 end
 
 local function setShadow(fontstring, enabled, color, strength)

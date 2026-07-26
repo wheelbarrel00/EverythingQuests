@@ -114,7 +114,7 @@ function E:Render(content, contentWidth, yStart, collapsed)
                     lr:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
                     lr.text:SetText(line)
                     if Media and Media.ApplyTrackerFont then Media:ApplyTrackerFont(lr.text, -2) end
-                    y = y + LINE_H + ROW_GAP
+                    y = y + LINE_H + ROW_GAP + ns.Util.LineSpacing()
                 end
             end
         end

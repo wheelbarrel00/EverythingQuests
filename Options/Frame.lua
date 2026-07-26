@@ -53,7 +53,7 @@ function Options:Build()
 
     f.version = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.version:SetPoint("TOPRIGHT", -34, -14)
-    f.version:SetText("v" .. (ns.VERSION or "1.34.0"))
+    f.version:SetText("v" .. (ns.VERSION or "1.35.0"))
     f.version:SetTextColor(unpack(YELLOW))
 
     f.discord = CreateFrame("Button", nil, f)
@@ -608,6 +608,152 @@ function Options:CreateFontDropdown(parent, label, options, getter, setter)
     return container
 end
 
+function Options:CreateStatusBarDropdown(parent, label, options, getter, setter)
+    local container = CreateFrame("Frame", nil, parent)
+    container:SetSize(220, 44)
+
+    local labelFS = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    labelFS:SetPoint("TOPLEFT")
+    labelFS:SetText(label)
+    labelFS:SetTextColor(1, 1, 1)
+
+    local btn = CreateFrame("Button", nil, container, "BackdropTemplate")
+    btn:SetHeight(22)
+    btn:SetPoint("TOPLEFT",  labelFS, "BOTTOMLEFT", 0, -4)
+    btn:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, -22)
+    local bg = btn:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.10, 0.10, 0.10, 0.95)
+    btn.swatch = btn:CreateTexture(nil, "ARTWORK")
+    btn.swatch:SetPoint("LEFT", 6, 0)
+    btn.swatch:SetSize(60, 12)
+    btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    btn.text:SetPoint("LEFT", 74, 0)
+    btn.text:SetPoint("RIGHT", -22, 0)
+    btn.text:SetJustifyH("LEFT")
+    btn.text:SetWordWrap(false)
+    btn.text:SetTextColor(unpack(YELLOW))
+    btn.arrow = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    btn.arrow:SetPoint("RIGHT", -6, 0)
+    btn.arrow:SetText("v")
+    btn.arrow:SetTextColor(unpack(YELLOW))
+
+    local ROW_H, MAX_VISIBLE = 22, 12
+    local popup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    popup:SetFrameStrata("FULLSCREEN_DIALOG")
+    popup:Hide()
+    local pbg = popup:CreateTexture(nil, "BACKGROUND")
+    pbg:SetAllPoints()
+    pbg:SetColorTexture(0.04, 0.04, 0.04, 0.98)
+    local border = popup:CreateTexture(nil, "BORDER")
+    border:SetPoint("TOPLEFT", -1, 1)
+    border:SetPoint("BOTTOMRIGHT", 1, -1)
+    border:SetColorTexture(0.30, 0.30, 0.30, 1)
+
+    local scroll = CreateFrame("ScrollFrame", nil, popup, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT",     4, -4)
+    scroll:SetPoint("BOTTOMRIGHT", -24, 4)
+    local scrollChild = CreateFrame("Frame", nil, scroll)
+    scrollChild:SetSize(1, 1)
+    scroll:SetScrollChild(scrollChild)
+    scroll:EnableMouseWheel(true)
+    scroll:SetScript("OnMouseWheel", function(sf, delta)
+        local range = sf:GetVerticalScrollRange()
+        local cur = sf:GetVerticalScroll()
+        sf:SetVerticalScroll(math.min(range, math.max(0, cur - delta * ROW_H * 2)))
+    end)
+
+    local function applySwatch(tex, value)
+        local Media = ns:GetSubsystem("Media")
+        local file = Media and Media.GetStatusBarFile and Media:GetStatusBarFile(value)
+        if file then
+            tex:SetTexture(file)
+            tex:SetVertexColor(0.26, 0.42, 1.0)
+            tex:Show()
+        else
+            tex:Hide()
+        end
+    end
+
+    local function setCurrentLabel()
+        local current = getter and getter()
+        applySwatch(btn.swatch, current)
+        for _, opt in ipairs(options) do
+            if opt.value == current then btn.text:SetText(opt.label); return end
+        end
+        btn.text:SetText(tostring(current or ""))
+    end
+
+    local rows = {}
+    local function rebuildRows()
+        for _, row in ipairs(rows) do row:Hide() end
+        for i, opt in ipairs(options) do
+            local row = rows[i]
+            if not row then
+                row = CreateFrame("Button", nil, scrollChild)
+                row:SetHeight(ROW_H)
+                local hl = row:CreateTexture(nil, "HIGHLIGHT")
+                hl:SetAllPoints()
+                hl:SetColorTexture(1, 1, 1, 0.10)
+                row.swatchBg = row:CreateTexture(nil, "BACKGROUND")
+                row.swatchBg:SetPoint("LEFT", 6, 0)
+                row.swatchBg:SetSize(60, 12)
+                row.swatchBg:SetColorTexture(0, 0, 0, 0.6)
+                row.swatch = row:CreateTexture(nil, "ARTWORK")
+                row.swatch:SetPoint("LEFT", 6, 0)
+                row.swatch:SetSize(60, 12)
+                row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                row.text:SetPoint("LEFT", 74, 0)
+                row.text:SetPoint("RIGHT", -6, 0)
+                row.text:SetJustifyH("LEFT")
+                row.text:SetWordWrap(false)
+                rows[i] = row
+            end
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT",  scrollChild, "TOPLEFT",  0, -(i - 1) * ROW_H)
+            row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, -(i - 1) * ROW_H)
+            row.text:SetText(opt.label)
+            row.text:SetTextColor(unpack(YELLOW))
+            applySwatch(row.swatch, opt.value)
+            row:SetScript("OnClick", function()
+                if setter then setter(opt.value) end
+                popup:Hide()
+                setCurrentLabel()
+            end)
+            row:Show()
+        end
+        scrollChild:SetSize(math.max(1, scroll:GetWidth()), math.max(1, #options * ROW_H))
+    end
+
+    btn:SetScript("OnClick", function()
+        if popup:IsShown() then popup:Hide(); return end
+        popup:ClearAllPoints()
+        popup:SetPoint("TOPLEFT",  btn, "BOTTOMLEFT",  0, -2)
+        popup:SetPoint("TOPRIGHT", btn, "BOTTOMRIGHT", 0, -2)
+        local visible = math.min(#options, MAX_VISIBLE)
+        popup:SetHeight(visible * ROW_H + 8)
+        popup:Show()
+        rebuildRows()
+    end)
+
+    popup:SetScript("OnShow", function(self)
+        self._closer = self._closer or CreateFrame("Button", nil, UIParent)
+        self._closer:SetAllPoints(UIParent)
+        self._closer:SetFrameStrata("FULLSCREEN")
+        self._closer:RegisterForClicks("AnyDown")
+        self._closer:SetScript("OnClick", function() self:Hide() end)
+        self._closer:Show()
+    end)
+    popup:SetScript("OnHide", function(self)
+        if self._closer then self._closer:Hide() end
+    end)
+
+    setCurrentLabel()
+    container.button = btn
+    container.sync   = setCurrentLabel
+    return container
+end
+
 function Options:CreateSlider(parent, label, min, max, step, getter, setter)
     local container = CreateFrame("Frame", nil, parent)
     container:SetSize(220, 44)
@@ -652,6 +798,43 @@ function Options:CreateSlider(parent, label, min, max, step, getter, setter)
 
     container.slider = slider
     return container
+end
+
+-- ElvUI adds its own class-color button to the ColorPickerFrame, so EQ only adds
+-- one when ElvUI is absent to avoid a duplicate.
+local function elvUILoaded()
+    local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G["IsAddOnLoaded"]
+    return (f and f("ElvUI")) and true or false
+end
+
+local _classColorButton
+local _activeColorApply
+local _activeReopen
+
+local function ensureClassColorButton()
+    if _classColorButton ~= nil then return _classColorButton or nil end
+    if elvUILoaded() or not ColorPickerFrame then _classColorButton = false; return nil end
+    local b = Options:CreateYellowButton(ColorPickerFrame, _G.CLASS or "Class", function()
+        local getCC = ns.Util and ns.Util.GetPlayerClassColor
+        if not getCC then return end
+        local r, g, bl = getCC()
+        if not r or not _activeReopen then return end
+        -- SetColorRGB does not reliably move the 10.2.5+ picker, so re-open it seeded
+        -- with the class color (the supported way to set it) then commit to the setting.
+        local a = (ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha()) or 1
+        _activeReopen(r, g, bl, a)
+        if _activeColorApply then _activeColorApply() end
+    end)
+    b:SetSize(90, 22)
+    b:SetPoint("TOPLEFT", ColorPickerFrame, "TOPRIGHT", 6, -34)
+    b:Hide()
+    ColorPickerFrame:HookScript("OnHide", function()
+        if _classColorButton then _classColorButton:Hide() end
+        _activeColorApply = nil
+        _activeReopen = nil
+    end)
+    _classColorButton = b
+    return b
 end
 
 function Options:CreateColorPicker(parent, label, getter, setter)
@@ -710,13 +893,20 @@ function Options:CreateColorPicker(parent, label, getter, setter)
             paint()
         end
         if ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow then
-            ColorPickerFrame:SetupColorPickerAndShow({
-                r = c.r or 0, g = c.g or 0, b = c.b or 0,
-                opacity = c.a or 1, hasOpacity = true,
-                swatchFunc = function() applyColor() end,
-                opacityFunc = function() applyColor() end,
-                cancelFunc  = function() applyColor(orig) end,
-            })
+            local function openWith(nr, ng, nb, na)
+                ColorPickerFrame:SetupColorPickerAndShow({
+                    r = nr, g = ng, b = nb,
+                    opacity = na, hasOpacity = true,
+                    swatchFunc = function() applyColor() end,
+                    opacityFunc = function() applyColor() end,
+                    cancelFunc  = function() applyColor(orig) end,
+                })
+                _activeColorApply = applyColor
+                _activeReopen = openWith
+                local classBtn = ensureClassColorButton()
+                if classBtn then classBtn:Show() end
+            end
+            openWith(c.r or 0, c.g or 0, c.b or 0, c.a or 1)
         end
     end)
 

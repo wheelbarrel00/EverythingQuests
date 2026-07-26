@@ -490,6 +490,38 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
     spacingSlider:SetPoint("TOPLEFT", scaleSlider, "BOTTOMLEFT", 0, -16)
     spacingSlider:SetWidth(280)
 
+    local function lineSpacingGet()
+        local DB = ns:GetSubsystem("DB")
+        return DB and DB.db.profile.tracker.lineSpacing or 0
+    end
+    local function lineSpacingSet(value)
+        local DB = ns:GetSubsystem("DB")
+        if DB then DB.db.profile.tracker.lineSpacing = value end
+        local Tracker = ns:GetSubsystem("Tracker")
+        if Tracker then Tracker:Refresh() end
+    end
+    local lineSpacingSlider = Options:CreateSlider(content, L["Line Spacing"], 0, 12, 1, lineSpacingGet, lineSpacingSet)
+    lineSpacingSlider:SetPoint("TOPLEFT", spacingSlider, "BOTTOMLEFT", 0, -16)
+    lineSpacingSlider:SetWidth(280)
+    Options:AttachTooltip(lineSpacingSlider, L["Line Spacing"],
+        L["Adds vertical space between a quest's objective lines, across the whole tracker. 0 keeps the default spacing."])
+
+    local function headerSpacingGet()
+        local DB = ns:GetSubsystem("DB")
+        return DB and DB.db.profile.tracker.headerSpacing or 0
+    end
+    local function headerSpacingSet(value)
+        local DB = ns:GetSubsystem("DB")
+        if DB then DB.db.profile.tracker.headerSpacing = value end
+        local Tracker = ns:GetSubsystem("Tracker")
+        if Tracker then Tracker:Refresh() end
+    end
+    local headerSpacingSlider = Options:CreateSlider(content, L["Header Spacing"], -2, 12, 1, headerSpacingGet, headerSpacingSet)
+    headerSpacingSlider:SetPoint("TOPLEFT", lineSpacingSlider, "BOTTOMLEFT", 0, -16)
+    headerSpacingSlider:SetWidth(280)
+    Options:AttachTooltip(headerSpacingSlider, L["Header Spacing"],
+        L["Adds or removes space around section headers and beneath each quest's title. 0 keeps the default spacing."])
+
     local function zbScaleGet()
         local DB = ns:GetSubsystem("DB")
         local st = DB and DB.db.profile.tracker.zoneProgressBar
@@ -506,7 +538,7 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
         end
     end
     local zbScaleSlider = Options:CreateSlider(content, L["Zone Bar Scale"], 0.5, 2.0, 0.05, zbScaleGet, zbScaleSet)
-    zbScaleSlider:SetPoint("TOPLEFT", spacingSlider, "BOTTOMLEFT", 0, -16)
+    zbScaleSlider:SetPoint("TOPLEFT", headerSpacingSlider, "BOTTOMLEFT", 0, -16)
     zbScaleSlider:SetWidth(280)
 
     local function zbState()
@@ -562,6 +594,29 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
     zbFontDD:SetPoint("TOPLEFT", zbBorderCheck, "BOTTOMLEFT", 0, -14)
     zbFontDD:SetWidth(280)
 
+    local zbTexList = (Media and Media.GetStatusBarList and Media:GetStatusBarList()) or {}
+    local zbTexGet = function() local st = zbState(); return (st and st.barTexture) or "Blizzard" end
+    local zbTexSet = function(v)
+        local st = zbState(); if st then st.barTexture = (v ~= "" and v) or nil end
+        local ZP = zbZP(); if ZP and ZP.SetBarTexture then ZP:SetBarTexture(v) end
+    end
+    local zbTexDD = Options:CreateStatusBarDropdown(content, L["Bar Texture"], zbTexList, zbTexGet, zbTexSet)
+    zbTexDD:SetPoint("TOPLEFT", zbFontDD, "BOTTOMLEFT", 0, -14)
+    zbTexDD:SetWidth(280)
+    Options:AttachTooltip(zbTexDD, L["Bar Texture"],
+        L["Sets the fill texture of the zone progress bar. Textures added by other media addons (such as SharedMedia, ElvUI, or Details) appear here too."])
+
+    local function zbBarColorGet()
+        local st = zbState()
+        return (st and st.barColor) or { r = 0.26, g = 0.42, b = 1.0, a = 1 }
+    end
+    local function zbBarColorSet(c)
+        local st = zbState(); if st then st.barColor = c end
+        local ZP = zbZP(); if ZP and ZP.SetBarColor then ZP:SetBarColor(c) end
+    end
+    local zbBarColorPicker = Options:CreateColorPicker(content, L["Bar Color"], zbBarColorGet, zbBarColorSet)
+    zbBarColorPicker:SetPoint("TOPLEFT", zbTexDD, "BOTTOMLEFT", 0, -16)
+
     local function zbHeaderColorGet()
         local st = zbState()
         return (st and st.headerColor) or { r = 0.93, g = 0.32, b = 0.10, a = 1 }
@@ -571,7 +626,7 @@ ns:GetSubsystem("Options"):AddTab("appearance", L["Appearance"], function(conten
         local ZP = zbZP(); if ZP and ZP.SetHeaderColor then ZP:SetHeaderColor(c) end
     end
     local zbHeaderPicker = Options:CreateColorPicker(content, L["Header Color"], zbHeaderColorGet, zbHeaderColorSet)
-    zbHeaderPicker:SetPoint("TOPLEFT", zbFontDD, "BOTTOMLEFT", 0, -16)
+    zbHeaderPicker:SetPoint("TOPLEFT", zbBarColorPicker, "BOTTOMLEFT", 0, -16)
 
     local function zbCountColorGet()
         local st = zbState()

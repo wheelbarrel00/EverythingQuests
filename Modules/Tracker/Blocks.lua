@@ -74,6 +74,16 @@ function Blocks:BeginRenderPass()
         dirty = true
     end
 
+    -- Line/Header Spacing feed the change-gated SetSpacing/subGap/height pass, so a
+    -- change must bump _renderGen or pooled Quests blocks stay frozen while freshly
+    -- rebuilt sections update - the same trap the shadow-size note above describes.
+    local lineSp   = t and t.lineSpacing   or 0
+    local headerSp = t and t.headerSpacing or 0
+    if lineSp ~= self._lineSpacing or headerSp ~= self._headerSpacing then
+        self._lineSpacing, self._headerSpacing = lineSp, headerSp
+        dirty = true
+    end
+
     if dirty then self._renderGen = self._renderGen + 1 end
 
     for _, b in pairs(self.byID) do b._used = false end
@@ -526,17 +536,19 @@ function Blocks:RenderQuest(block, questData, simplifyMode)
     end
 
     local categoryText = (cfg.showZoneTag ~= false) and questData.zone or nil
+    local hasCategory = categoryText and categoryText ~= ""
+    local subGap = math.max(0, (hasCategory and CAT_TO_SUB_GAP or TITLE_TO_SUB_GAP) + ns.Util.HeaderSpacing())
     block.subText:ClearAllPoints()
-    if categoryText and categoryText ~= "" then
+    if hasCategory then
         block.category:SetText(categoryText)
         block.category:Show()
-        block.subText:SetPoint("TOPLEFT",  block.category, "BOTTOMLEFT",  0, -CAT_TO_SUB_GAP)
-        block.subText:SetPoint("TOPRIGHT", block.category, "BOTTOMRIGHT", 0, -CAT_TO_SUB_GAP)
+        block.subText:SetPoint("TOPLEFT",  block.category, "BOTTOMLEFT",  0, -subGap)
+        block.subText:SetPoint("TOPRIGHT", block.category, "BOTTOMRIGHT", 0, -subGap)
     else
         block.category:SetText("")
         block.category:Hide()
-        block.subText:SetPoint("TOPLEFT",  block.title, "BOTTOMLEFT",  0, -TITLE_TO_SUB_GAP)
-        block.subText:SetPoint("TOPRIGHT", block.title, "BOTTOMRIGHT", 0, -TITLE_TO_SUB_GAP)
+        block.subText:SetPoint("TOPLEFT",  block.title, "BOTTOMLEFT",  0, -subGap)
+        block.subText:SetPoint("TOPRIGHT", block.title, "BOTTOMRIGHT", 0, -subGap)
     end
 
     local completeHex
@@ -564,12 +576,13 @@ function Blocks:RenderQuest(block, questData, simplifyMode)
         end
     end
 
+    block.subText:SetSpacing(ns.Util.LineSpacing())
+
     local titleH    = math.max(block.title:GetStringHeight(), ICON_SIZE)
     local categoryH = 0
     if block.category:IsShown() then
         categoryH = TITLE_TO_CAT_GAP + block.category:GetStringHeight()
     end
-    local subGap = block.category:IsShown() and CAT_TO_SUB_GAP or TITLE_TO_SUB_GAP
     local h = titleH + categoryH + subGap + block.subText:GetStringHeight() + PAD_Y * 2
     block:SetHeight(h)
 

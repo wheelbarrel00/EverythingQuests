@@ -3,21 +3,21 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.34.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.34.0"
+local FEATURE_POPUP_VERSION = "1.35.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.35.0"
 
 local POPUP_BODY = [[
 |cffEBB706Missed the last update?|r
 If you skipped a version, every release's full notes live right inside the addon. Type |cffffffff/eqs|r, open the |cffffffffAbout|r tab, and read the changelog there. This popup only covers the latest release.
 
-|cffEBB706Scale the settings window to fit your screen|r
-A new |cffffffffOptions Window Scale|r slider under |cffffffff/eqs|r > General resizes the entire Everything Quests options window, so you can make it larger or smaller to suit your display. The setting is account-wide, so it follows you across characters.
+|cffEBB706Restyle the zone progress bar|r
+Under |cffffffff/eqs|r > Appearance you can now change the zone progress bar's texture and fill color. Choose from seven bundled Everything Quests bar styles or any texture provided by SharedMedia and other addons, each shown with a live preview. Thanks to Da Warrior for the request.
 
-|cffEBB706More of the interface follows your language|r
-Several World Quest labels and status lines that used to show in English no matter your game client - time left, world quest, expired, ready to turn in, and more - now use your language's translation.
+|cffEBB706Space out the tracker your way|r
+Two new sliders under |cffffffff/eqs|r > Appearance, |cffffffffLine Spacing|r and |cffffffffHeader Spacing|r, let you loosen or tighten the space between objective lines and around section headers to fit the tracker to your screen. Thanks to Rhinoplasty for the line-spacing idea.
 
-|cffEBB706Smoother, lighter, and a batch of fixes|r
-The World Quests section, profession lookups, Quest History, and quest nameplate icons all do less redundant work now. On the fixes side: quest item buttons no longer stay blank after combat, blank quest objectives now fill in properly on login, wiping History also clears its gold and trends data, and Chain Guide chapters no longer show up twice.
+|cffEBB706A class color button in the color picker|r
+If you do not run ElvUI, the color picker now has a |cffffffffClass|r button that sets any Everything Quests color to your class color in one click.
 
 |cffEBB706Thank you|r
 Thanks to |cffffffffZox|r (French) and |cffffffffMalevi4|r (Russian) for keeping Everything Quests translated, and to everyone sending in reports and suggestions.
