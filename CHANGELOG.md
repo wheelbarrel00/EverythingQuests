@@ -5,6 +5,22 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.0] - 2026-07-30
+
+A batch of tracker fixes, most of them colors and text that ignored your settings, plus the Chain Guide now recognizes the patch 12.0.7 storyline under the campaign name the game itself uses.
+
+### Bug Fixes
+
+- **The scroll bar thumb no longer stays stuck on the solid color** - turning **Solid color thumb** back off left the thumb showing the flat color until you reloaded, and toggling the option again could not recover it. Current retail thumbs are plain textures rather than atlases, and only the atlas was being restored.
+- **Endeavor requirements no longer show a double dash** - every requirement line in the Endeavors section read `- - 1 / 15 Quests completed`, because the game already supplies the bullet and Everything Quests added a second one. Completed requirements also had a stray dash sitting next to their checkmark.
+- **Endeavor requirements show colored progress counts** - the whole line was drawn in flat grey, so a requirement's `0/15` never got the red, orange or green treatment that quest objectives, achievements and event objectives all use. Requirements with no count of their own still stay grey, as they do elsewhere.
+- **Completed endeavor requirements and profession reagents follow your complete color** - both were locked to green and ignored **Use title color for completed quests**, which the Achievements and quest sections already honored.
+- **Endeavor titles follow your title color** - the title color and **Use class color** options both name endeavor titles, but the Endeavors section never applied either and its titles stayed Blizzard yellow.
+
+### Improvements
+
+- **The Chain Guide now knows The Curse of Ula'tek** - the patch 12.0.7 storyline was listed as "Revelations (12.0.7)" with its five questlines sitting loose below the zones. It now carries the campaign name the game uses, sits with the other campaigns, and renders as a campaign map with its chapters in order: Legacy of the Amani, An Island of Fangs, Ghosts of the Past, Original Sin, and The Battle for Atal'Utek.
+
 ## [1.36.0] - 2026-07-26
 
 An optional card layout that gives every tracked row its own bordered panel, plus a rewrite of profession reagent counting that fixes four separate ways it could report the wrong numbers.

@@ -871,17 +871,23 @@ local function applyScrollBarSkin(sf, cfg)
 
     local thumbTex = bar.GetThumbTexture and bar:GetThumbTexture()
     if thumbTex then
+        -- Retail thumbs are not atlas-based, so an atlas-only restore left the solid color stranded
         if not bar._eqThumbCaptured then
             bar._eqThumbCaptured = true
-            bar._eqThumbAtlas = thumbTex.GetAtlas and thumbTex:GetAtlas() or nil
-            bar._eqThumbW     = thumbTex:GetWidth()
+            bar._eqThumbAtlas   = thumbTex.GetAtlas and thumbTex:GetAtlas() or nil
+            bar._eqThumbTexture = thumbTex.GetTexture and thumbTex:GetTexture() or nil
+            bar._eqThumbW       = thumbTex:GetWidth()
         end
         if on then
             thumbTex:SetTexture(nil)
             thumbTex:SetColorTexture(c.r or 0.60, c.g or 0.60, c.b or 0.65, c.a or 0.90)
             if w and w > 0 then thumbTex:SetWidth(w) end
         elseif bar._eqThumbSkinned then
-            if bar._eqThumbAtlas then thumbTex:SetAtlas(bar._eqThumbAtlas, true) end
+            if bar._eqThumbAtlas then
+                thumbTex:SetAtlas(bar._eqThumbAtlas, true)
+            elseif bar._eqThumbTexture then
+                thumbTex:SetTexture(bar._eqThumbTexture)
+            end
             if bar._eqThumbW and bar._eqThumbW > 0 then thumbTex:SetWidth(bar._eqThumbW) end
         end
         bar._eqThumbSkinned = on
@@ -889,6 +895,7 @@ local function applyScrollBarSkin(sf, cfg)
         local tf = bar.Thumb or (bar.Track and bar.Track.Thumb)
         if tf then
             local skin = tf._eqSkinTex
+            if not tf._eqThumbW or tf._eqThumbW <= 0 then tf._eqThumbW = tf:GetWidth() end
             if on then
                 if not skin then
                     skin = tf:CreateTexture(nil, "OVERLAY")
@@ -900,6 +907,7 @@ local function applyScrollBarSkin(sf, cfg)
                 if w and w > 0 then tf:SetWidth(w) end
             elseif skin then
                 skin:Hide()
+                if tf._eqThumbW > 0 then tf:SetWidth(tf._eqThumbW) end
             end
         end
     end

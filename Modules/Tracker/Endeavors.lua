@@ -8,6 +8,8 @@ local ROW_GAP      = 2
 local LABEL_PAD    = 6
 local LINE_INDENT  = 14
 
+local colorizeProgress = ns.Util.ColorizeProgress
+
 E.headerPool   = {}
 E.linePool     = {}
 E.activeHeaders = {}
@@ -83,12 +85,25 @@ function E:Render(content, contentWidth, yStart, collapsed)
     if collapsed or count == 0 then return 0, count end
 
     local Media = ns:GetSubsystem("Media")
+
+    local DB = ns:GetSubsystem("DB")
+    local t  = DB and DB.db and DB.db.profile and DB.db.profile.tracker
+    local ovR, ovG, ovB
+    if ns.Util and ns.Util.EffectiveTitleColor then ovR, ovG, ovB = ns.Util.EffectiveTitleColor(t) end
+    local doneHex = "40ff40"
+    if t and t.overrideCompleteGreen ~= false and ovR then
+        doneHex = ("%02x%02x%02x"):format(
+            math.floor(ovR * 255 + 0.5),
+            math.floor(ovG * 255 + 0.5),
+            math.floor(ovB * 255 + 0.5))
+    end
+
     local Card = ns:GetSubsystem("TrackerCard")
     local cardOn, pad, borderSize = false, 0, 0
     local cardBg, cardBorder
     if Card then
-        cardOn, pad, borderSize = Card:State()
-        cardBg, cardBorder = Card:Colors()
+        cardOn, pad, borderSize = Card:State(t)
+        cardBg, cardBorder = Card:Colors(t)
     end
 
     local y = yStart
@@ -104,6 +119,11 @@ function E:Render(content, contentWidth, yStart, collapsed)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", content, "TOPLEFT", pad, -y)
             row.title:SetText(info.activityName or ("Activity #" .. tostring(ids[i])))
+            if ovR then
+                row.title:SetTextColor(ovR, ovG, ovB)
+            else
+                row.title:SetTextColor(1.0, 0.82, 0.0)
+            end
             if Media and Media.ApplyTrackerTitleFont then Media:ApplyTrackerTitleFont(row.title) end
             local lastBottom = y + HEADER_H
             y = y + HEADER_H + ROW_GAP
@@ -112,12 +132,15 @@ function E:Render(content, contentWidth, yStart, collapsed)
             if reqs then
                 for j = 1, #reqs do
                     local rq = reqs[j]
-                    local txt = rq.requirementText or ""
-                    local line = "- " .. txt
+                    -- requirementText arrives pre-bulleted, so EQ's own dash doubled it to "- - 1 / 15"
+                    local txt = (rq.requirementText or ""):gsub("^%s*%-%s+", "")
+                    local line
                     if rq.completed then
-                        line = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t |cff40ff40" .. txt .. "|r"
+                        line = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t |cff" .. doneHex .. txt .. "|r"
+                    elseif txt:find("%d+%s*/%s*%d+") then
+                        line = "- " .. colorizeProgress(txt)
                     else
-                        line = "|cff999999" .. line .. "|r"
+                        line = "|cff999999- " .. txt .. "|r"
                     end
                     -- Parented to the header row so the group card draws behind the text, anchored to content so placement is unchanged
                     local lr = acquireLine(row)

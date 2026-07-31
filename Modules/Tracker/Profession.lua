@@ -240,12 +240,25 @@ function P:Render(content, contentWidth, yStart, collapsed)
     if collapsed or count == 0 then return 0, count end
 
     local Media = ns:GetSubsystem("Media")
+
+    local DB = ns:GetSubsystem("DB")
+    local t  = DB and DB.db and DB.db.profile and DB.db.profile.tracker
+    local ovR, ovG, ovB
+    if ns.Util and ns.Util.EffectiveTitleColor then ovR, ovG, ovB = ns.Util.EffectiveTitleColor(t) end
+    local doneHex = "40ff40"
+    if t and t.overrideCompleteGreen ~= false and ovR then
+        doneHex = ("%02x%02x%02x"):format(
+            math.floor(ovR * 255 + 0.5),
+            math.floor(ovG * 255 + 0.5),
+            math.floor(ovB * 255 + 0.5))
+    end
+
     local Card = ns:GetSubsystem("TrackerCard")
     local cardOn, pad, borderSize = false, 0, 0
     local cardBg, cardBorder
     if Card then
-        cardOn, pad, borderSize = Card:State()
-        cardBg, cardBorder = Card:Colors()
+        cardOn, pad, borderSize = Card:State(t)
+        cardBg, cardBorder = Card:Colors(t)
     end
 
     local y = yStart
@@ -307,7 +320,7 @@ function P:Render(content, contentWidth, yStart, collapsed)
 
             local line
             if met then
-                line = format("|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t |cff40ff40%s|r", body)
+                line = format("|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t |cff%s%s|r", doneHex, body)
             else
                 line = format("|cff999999- %s|r", body)
             end

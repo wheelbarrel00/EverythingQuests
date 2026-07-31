@@ -2,6 +2,21 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.37.0", date = "2026-07-30",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "The scroll bar thumb no longer stays stuck on the solid color. Turning Solid color thumb back off left the thumb showing the flat color until you reloaded, and toggling the option again could not recover it. Current retail thumbs are plain textures rather than atlases, and only the atlas was being restored.",
+                "Endeavor requirements no longer show a double dash. Every requirement line in the Endeavors section read \"- - 1 / 15 Quests completed\", because the game already supplies the bullet and Everything Quests added a second one. Completed requirements also had a stray dash next to their checkmark.",
+                "Endeavor requirements show colored progress counts. The whole line was drawn in flat grey, so a requirement's 0/15 never got the red, orange or green treatment that quest objectives, achievements and event objectives all use. Requirements with no count of their own still stay grey, as they do elsewhere.",
+                "Completed endeavor requirements and profession reagents follow your complete color. Both were locked to green and ignored Use title color for completed quests, which the Achievements and quest sections already honored.",
+                "Endeavor titles follow your title color. The title color and Use class color options both name endeavor titles, but the Endeavors section never applied either and its titles stayed Blizzard yellow.",
+            } },
+            { head = "Improvements", items = {
+                "The Chain Guide now knows The Curse of Ula'tek. The patch 12.0.7 storyline was listed as \"Revelations (12.0.7)\" with its five questlines sitting loose below the zones. It now carries the campaign name the game uses, sits with the other campaigns, and renders as a campaign map with its chapters in order: Legacy of the Amani, An Island of Fangs, Ghosts of the Past, Original Sin, and The Battle for Atal'Utek.",
+            } },
+        },
+    },
+    {
         version = "1.36.0", date = "2026-07-26",
         sections = {
             { head = "New Features", items = {

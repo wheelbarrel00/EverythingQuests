@@ -53,7 +53,7 @@ function Options:Build()
 
     f.version = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.version:SetPoint("TOPRIGHT", -34, -14)
-    f.version:SetText("v" .. (ns.VERSION or "1.36.0"))
+    f.version:SetText("v" .. (ns.VERSION or "1.37.0"))
     f.version:SetTextColor(unpack(YELLOW))
 
     f.discord = CreateFrame("Button", nil, f)
@@ -1074,6 +1074,74 @@ local function eqSlashHandler(msg)
                     print("        " .. table.concat(quests, ", "))
                 end
             end
+        end
+        return
+    elseif msg:match("^campfind") then
+        local filter = msg:match("^campfind%s+(.+)$")
+        if not (C_CampaignInfo and C_CampaignInfo.GetCampaignInfo) then
+            print("|cffEBB706EQ CampFind|r: campaign API unavailable on this build.")
+            return
+        end
+        local DBm = ns:GetSubsystem("ChainGuideDatabase")
+        local known = {}
+        if DBm then
+            for _, cat in pairs(DBm.categories) do
+                if cat.campaignID then known[cat.campaignID] = cat.name or "?" end
+            end
+        end
+        local seen, ids = {}, {}
+        local function add(id)
+            if id and id > 0 and not seen[id] then
+                seen[id] = true
+                ids[#ids + 1] = id
+            end
+        end
+        if C_CampaignInfo.GetAvailableCampaigns then
+            for _, id in ipairs(C_CampaignInfo.GetAvailableCampaigns() or {}) do add(id) end
+        end
+        -- GetAvailableCampaigns does not return every campaign - the live run missed both registered ones
+        if C_CampaignInfo.GetCampaignID and C_QuestLog
+           and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetInfo then
+            for i = 1, C_QuestLog.GetNumQuestLogEntries() do
+                local info = C_QuestLog.GetInfo(i)
+                if info and not info.isHeader and info.questID then
+                    add(C_CampaignInfo.GetCampaignID(info.questID))
+                end
+            end
+        end
+        table.sort(ids)
+        local needle = filter and filter:gsub("[^%w]", "")
+        print(("|cffEBB706EQ CampFind|r %d campaign(s) visible%s:"):format(
+            #ids, needle and (" \194\183 filter '" .. filter .. "'") or ""))
+        local shown = 0
+        for c = 1, #ids do
+            local id   = ids[c]
+            local ci   = C_CampaignInfo.GetCampaignInfo(id)
+            local name = (ci and ci.name) or "?"
+            local flat = name:lower():gsub("[^%w]", "")
+            if not needle or flat:find(needle, 1, true) then
+                shown = shown + 1
+                local chapters = (C_CampaignInfo.GetChapterIDs and C_CampaignInfo.GetChapterIDs(id)) or {}
+                print(("  campaignID=|cff66ccff%d|r |cffffffff%s|r  %d chapter(s)  %s"):format(
+                    id, name, #chapters,
+                    known[id] and ("|cff44ff44registered as '" .. known[id] .. "'|r")
+                              or "|cffff6666NOT registered|r"))
+                for i = 1, #chapters do
+                    local chID = chapters[i]
+                    local chi  = C_CampaignInfo.GetCampaignChapterInfo
+                                 and C_CampaignInfo.GetCampaignChapterInfo(chID)
+                    local quests = (C_QuestLine and C_QuestLine.GetQuestLineQuests
+                                    and C_QuestLine.GetQuestLineQuests(chID)) or {}
+                    print(("    [%d] questlineID=|cff66ccff%d|r %s  (%d quest(s))"):format(
+                        i, chID, (chi and chi.name) or "?", #quests))
+                end
+                if not known[id] then
+                    print(("    paste into _Index.lua:  campaignID = %d, name = \"%s\""):format(id, name))
+                end
+            end
+        end
+        if shown == 0 then
+            print("  (nothing matched \194\183 run |cffffffff/eqs campfind|r with no filter to list them all)")
         end
         return
     elseif msg:match("^zonedump") then

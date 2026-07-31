@@ -80,13 +80,14 @@ ns.QUESTLINE_ROUTING = {
     [5932] = { cat = ns.CAT.HARANDAR, name = "Trials of the Shulka" },
     [5750] = { cat = ns.CAT.ARATOR, name = "The Path of Light" },
     [5751] = { cat = ns.CAT.ARATOR, name = "Regrets of the Past" },
-    [6050] = { cat = ns.CAT.REVELATIONS, name = "Legacy of the Amani" },
-    [6229] = { cat = ns.CAT.REVELATIONS, name = "An Island of Fangs" },
-    [6230] = { cat = ns.CAT.REVELATIONS, name = "Ghosts of the Past" },
-    [6231] = { cat = ns.CAT.REVELATIONS, name = "Original Sin" },
-    [6232] = { cat = ns.CAT.REVELATIONS, name = "The Battle for Atal'Utek" },
+    -- Campaign 324 chapters - the Chain Guide skips them, but ZoneProgress needs them as the map 2424 denominator
+    [6050] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "Legacy of the Amani" },
+    [6229] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "An Island of Fangs" },
+    [6230] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "Ghosts of the Past" },
+    [6231] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "Original Sin" },
+    [6232] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "The Battle for Atal'Utek" },
     [6272] = { cat = ns.CAT.VOID_ACROPOLIS, name = "Umbral Blitz" },
     [6309] = { cat = ns.CAT.VOID_ACROPOLIS, name = "Assault and Strike Back: Val" },
     [6275] = { cat = ns.CAT.SUNSTRIDER_OMNIUM, name = "The Sunstrider Omnium" },
-    -- Campaign spine is sourced live via C_CampaignInfo in CampaignSource.lua - do not add campaign questlines here
+    -- Campaign spines come live from C_CampaignInfo - only add a campaign questline here if ZoneProgress needs it
 }
