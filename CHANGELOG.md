@@ -5,7 +5,7 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.37.0] - 2026-07-30
+## [1.37.0] - 2026-07-31
 
 A batch of tracker fixes, most of them colors and text that ignored your settings, plus the Chain Guide now recognizes the patch 12.0.7 storyline under the campaign name the game itself uses.
 

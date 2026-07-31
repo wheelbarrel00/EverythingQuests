@@ -2,7 +2,7 @@ local _, ns = ...
 
 ns.Changelog = {
     {
-        version = "1.37.0", date = "2026-07-30",
+        version = "1.37.0", date = "2026-07-31",
         sections = {
             { head = "Bug Fixes", items = {
                 "The scroll bar thumb no longer stays stuck on the solid color. Turning Solid color thumb back off left the thumb showing the flat color until you reloaded, and toggling the option again could not recover it. Current retail thumbs are plain textures rather than atlases, and only the atlas was being restored.",
