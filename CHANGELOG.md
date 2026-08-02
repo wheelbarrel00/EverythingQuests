@@ -5,6 +5,18 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.1] - 2026-08-02
+
+Everything in this release came out of building EQ Objective Tracker, a new standalone tracker you will be able to run on its own without Everything Quests. Porting Everything Quests' code across surfaced five bugs in Everything Quests itself, and three of them had never been reported because nobody could see them.
+
+### Bug Fixes
+
+- **Equipment slot names in reward tooltips are now translated** - the gear comparison line on a quest reward showed its slot in English no matter what language the client was set to. All 21 slot names now come from the game's own text, so they match the wording on the item tooltip you are comparing against and are correct in every language.
+- **A cloak reward no longer says "go back"** - the slot name for a cloak shared a phrase with the Chain Guide's navigation button, so French, Russian and Korean players comparing a cloak read the word for "go back" where the slot name should have been.
+- **The reward chest tooltip works again** - hovering the chest icon on a scenario bonus objective silently did nothing. The icon sat underneath the panel's own drag region, so the hover never reached it.
+- **The drag ghost is readable again** - reordering quests by hand showed a solid red block that covered the row you were dropping onto. It is now a gold-outlined label that matches the width of the row you picked up, and you can see through it to the row underneath.
+- **The profile list is sorted** - the profile dropdown listed profiles in no particular order, and the order could change between sessions without you touching anything.
+
 ## [1.37.0] - 2026-07-31
 
 A batch of tracker fixes, most of them colors and text that ignored your settings, plus the Chain Guide now recognizes the patch 12.0.7 storyline under the campaign name the game itself uses.

@@ -8,6 +8,10 @@ DD.dropIndex   = nil
 local GHOST_THROTTLE_S = 1/30
 local _ghostAccum      = 0
 
+local GHOST_H     = 24
+local GHOST_MIN_W = 120
+local GHOST_EDGE  = 1
+
 local function ghostOnUpdate(_, elapsed)
     _ghostAccum = _ghostAccum + elapsed
     if _ghostAccum < GHOST_THROTTLE_S then return end
@@ -17,22 +21,24 @@ end
 
 local function ensureGhost()
     if DD.ghost then return DD.ghost end
-    local g = CreateFrame("Frame", nil, UIParent)
-    g:SetSize(220, 24)
+    local g = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    g:SetSize(220, GHOST_H)
     g:SetFrameStrata("TOOLTIP")
     g:Hide()
 
-    local bg = g:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0.92, 0.72, 0.02, 0.55)
-
-    local border = g:CreateTexture(nil, "BORDER")
-    border:SetAllPoints()
-    border:SetColorTexture(0.635, 0.0, 0.039, 1)
+    -- Layering two textures instead would put an opaque rim UNDER the translucent fill, so
+    -- the fill would blend against gold rather than against the row being dropped onto
+    g:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = GHOST_EDGE,
+    })
+    g:SetBackdropColor(0.09, 0.10, 0.12, 0.80)
+    g:SetBackdropBorderColor(0.92, 0.72, 0.02, 1)
 
     g.text = g:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    g.text:SetPoint("LEFT",  4, 0)
-    g.text:SetPoint("RIGHT", -4, 0)
+    g.text:SetPoint("LEFT",  6, 0)
+    g.text:SetPoint("RIGHT", -6, 0)
     g.text:SetJustifyH("LEFT")
     g.text:SetWordWrap(false)
     g.text:SetTextColor(1, 1, 1, 1)
@@ -70,6 +76,9 @@ function DD:OnBlockDragStart(block)
     local title = (q and q.title) or ("Quest #" .. tostring(block.questID))
 
     local g = ensureGhost()
+    -- The ghost sits on UIParent while the block carries the Tracker Scale
+    local blockW = (block:GetWidth() or 0) * block:GetEffectiveScale() / g:GetEffectiveScale()
+    g:SetWidth(math.max(blockW, GHOST_MIN_W))
     g.text:SetText(title)
     g:Show()
 

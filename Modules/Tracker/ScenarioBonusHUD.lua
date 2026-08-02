@@ -56,7 +56,11 @@ local function buildRow(parent)
 end
 
 function H:_AcquireRow(parent)
-    return ns.Util.AcquirePooled(self.rowPool, self.activeRows, parent, buildRow)
+    local row = ns.Util.AcquirePooled(self.rowPool, self.activeRows, parent, buildRow)
+    -- The HUD frame is mouse-enabled for its own drag, so the reward button needs an explicit
+    -- level above it or OnEnter never fires. Re-applied per acquire because SetParent resets it
+    row.reward:SetFrameLevel(parent:GetFrameLevel() + 5)
+    return row
 end
 
 function H:_ReleaseRows()

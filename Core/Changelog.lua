@@ -2,6 +2,18 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.37.1", date = "2026-08-02",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "Equipment slot names in reward tooltips are now translated. The gear comparison line on a quest reward showed its slot in English no matter what language the client was set to. All 21 slot names now come from the game's own text, so they match the wording on the item tooltip you are comparing against and are correct in every language.",
+                "A cloak reward no longer says \"go back\". The slot name for a cloak shared a phrase with the Chain Guide's navigation button, so French, Russian and Korean players comparing a cloak read the word for \"go back\" where the slot name should have been.",
+                "The reward chest tooltip works again. Hovering the chest icon on a scenario bonus objective silently did nothing, because the icon sat underneath the panel's own drag region and the hover never reached it.",
+                "The drag ghost is readable again. Reordering quests by hand showed a solid red block that covered the row you were dropping onto. It is now a gold-outlined label that matches the width of the row you picked up, and you can see through it to the row underneath.",
+                "The profile list is sorted. The profile dropdown listed profiles in no particular order, and the order could change between sessions without you touching anything.",
+            } },
+        },
+    },
+    {
         version = "1.37.0", date = "2026-07-31",
         sections = {
             { head = "Bug Fixes", items = {

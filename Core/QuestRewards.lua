@@ -50,32 +50,9 @@ local function detailedIlvl(link)
     return C_Item.GetDetailedItemLevelInfo(link)
 end
 
-local SLOT_LABEL = {
-    INVTYPE_HEAD           = "Head",
-    INVTYPE_NECK           = "Neck",
-    INVTYPE_SHOULDER       = "Shoulder",
-    INVTYPE_CLOAK          = "Back",
-    INVTYPE_CHEST          = "Chest",
-    INVTYPE_ROBE           = "Chest",
-    INVTYPE_WAIST          = "Waist",
-    INVTYPE_LEGS           = "Legs",
-    INVTYPE_FEET           = "Feet",
-    INVTYPE_WRIST          = "Wrist",
-    INVTYPE_HAND           = "Hands",
-    INVTYPE_FINGER         = "Finger",
-    INVTYPE_TRINKET        = "Trinket",
-    INVTYPE_WEAPON         = "Weapon",
-    INVTYPE_2HWEAPON       = "Two-Hand",
-    INVTYPE_WEAPONMAINHAND = "Main Hand",
-    INVTYPE_WEAPONOFFHAND  = "Off Hand",
-    INVTYPE_RANGED         = "Ranged",
-    INVTYPE_RANGEDRIGHT    = "Ranged",
-    INVTYPE_SHIELD         = "Off Hand",
-    INVTYPE_HOLDABLE       = "Off Hand",
-}
+-- An equipLoc token is itself the name of a Blizzard global string, already localized
 local function slotLabel(equipLoc)
-    local s = SLOT_LABEL[equipLoc]
-    return s and L[s] or ""
+    return (equipLoc and _G[equipLoc]) or ""
 end
 
 local function equippedComparison(equipLoc)

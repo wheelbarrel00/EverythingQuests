@@ -257,7 +257,11 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         local DB = ns:GetSubsystem("DB")
         local out = {}
         if not (DB and DB.db and DB.db.GetProfiles) then return out end
-        for _, name in ipairs(DB.db:GetProfiles()) do
+        -- AceDB builds this list with pairs(), so the order is arbitrary and reshuffles
+        -- between sessions unless we sort it. The table is freshly built per call
+        local names = DB.db:GetProfiles()
+        table.sort(names)
+        for _, name in ipairs(names) do
             out[#out + 1] = { value = name, label = name }
         end
         return out
