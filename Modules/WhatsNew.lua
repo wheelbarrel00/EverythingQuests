@@ -3,32 +3,30 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.36.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.36.0"
+local FEATURE_POPUP_VERSION = "1.38.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.38.0"
 
 local POPUP_BODY = [[
-|cffEBB706Missed the last update?|r
-If you skipped a version, every release's full notes live right inside the addon. Type |cffffffff/eqs|r, open the |cffffffffAbout|r tab, and read the changelog there. This popup only covers the latest release.
+|cffEBB706The tracker has moved into its own addon|r
+Everything Quests' tracker is now a separate addon called |cffffffffEQ Objective Tracker|r, and it came down with this update automatically. You do not need to install anything, and nothing needs setting up again. Your tracker's position, size, fonts, colors, section order, filters and sorting all carried across on their own, along with your pinned quests, hidden quests and collapsed sections on every character.
 
-|cffEBB706Something new in the works: EQ Objective Tracker|r
-I want to give you a heads up on a project I am starting. |cffffffffEQ Objective Tracker|r is a new addon that is just the tracker. If you have ever wanted the tracker side of Everything Quests without the rest of what Everything Quests does, that is what this is. One addon, one job: replacing Blizzard's default objective tracker and doing it well. It works completely on its own and does not need Everything Quests installed. Right now there are very few tracker options for Midnight, so this fills a real gap.
+If the tracker looks and behaves exactly as it did yesterday, that is the intended result.
 
-|cffEBB706What it means for you|r
-Nothing breaks, and you do not have to do anything. Down the road, Everything Quests' tracker is going to move out into EQ Objective Tracker, and Everything Quests will include it automatically in its download. When that happens you will just update Everything Quests like normal and get both. Your layout and settings carry over on their own. No reinstall, no reconfiguring, no extra steps.
-The reason for doing it this way is maintenance. Instead of me fixing the same tracker bug twice in two different addons, there is one copy of the tracker code that both use. Fixes land everywhere at once, which means fewer bugs and faster updates for everyone.
+|cffEBB706Where the settings live now|r
+The tracker's own options moved with it. Open them with the |cffffffffcogwheel|r at the top right of the tracker, or by typing |cffffffff/eqot|r. Everything that used to be under |cffffffff/eqs|r > Tracker and |cffffffff/eqs|r > Appearance is in there, in the same shape.
 
-|cffEBB706Other versions of WoW, and the timeline|r
-EQ Objective Tracker is being built from the start so it can eventually run on other versions of WoW, not just retail. Classic, Cata, Mists and so on. Version one will be retail only because that is where the need is right now, but the foundation is there to add the others afterward.
-The standalone tracker comes first, retail only. The Everything Quests change comes after that, once the tracker has been out in the wild and tested by real people. Other flavors come after that. I will post on the Discord as things progress, and if you have thoughts on what you want out of a tracker, now is a genuinely good time to say so, since I am still designing the thing.
+Everything Quests' own options are still |cffffffff/eqs|r. There is now an |cffffffffEverything Quests logo|r beside the cogwheel on the tracker that opens them, and the minimap button still works the way it always has. The chain icon for the Chain Guide is still there too. Any of the three icons can be switched off under |cffffffff/eqs|r > General.
 
-|cffEBB706New: a card layout for the tracker|r
-A new |cffffffffQuest Rows|r section under |cffffffff/eqs|r > Appearance switches the tracker from plain rows to |cffffffffCard|r layout, which draws every quest, achievement, endeavor, tracked recipe and world quest on its own bordered panel. You set the background color, border color, border thickness and padding, and you can optionally tint cards by quest type so campaign, dungeon, raid and world quests stand out at a glance. |cffffffffPlain|r stays the default, so nothing changes until you switch it on.
+|cffEBB706Why split it up|r
+There is now one copy of the tracker code instead of two. A tracker bug fixed once is fixed for everybody, which means fewer bugs and faster updates. It also means people who only ever wanted the tracker can run just that, without the quest log book, map overlays, chain guide and history that Everything Quests adds on top.
 
-|cffEBB706Fixed: profession reagent counts|r
-The Profession section only ever counted the lowest quality of a reagent, so a bag full of rank 2 or rank 3 materials could still read as |cffffffff0|r held. It now counts every quality tier, the same way Blizzard's own tracker does. Recrafts are fixed too. They are labeled correctly, they list their own reagents, and a recipe you track both normally and as a recraft now shows as two separate entries. Required modifying slots and currency reagents are no longer skipped, and a slot that accepts a variable amount now shows a range.
+Everything Quests is not going anywhere, and none of the rest of it changed in this update.
+
+|cffEBB706If something looks wrong|r
+Both addons need to be enabled. If the tracker is missing entirely, check that |cffffffffEQ Objective Tracker|r is ticked in your AddOns list. Type |cffffffff/eqot status|r for a readout of what the tracker is doing, and please report anything odd on the Discord or on GitHub with that output included. This is a big change under the hood and reports genuinely help.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffZox|r (French) and |cffffffffMalevi4|r (Russian) for keeping Everything Quests translated, and to everyone sending in reports and suggestions.
+Thanks to |cffffffffZox|r (French) and |cffffffffMalevi4|r (Russian) for keeping Everything Quests translated, and to everyone who sent reports and suggestions while this was being built.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]

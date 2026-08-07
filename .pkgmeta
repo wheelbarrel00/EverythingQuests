@@ -5,6 +5,15 @@ curse-id: 1544648
 
 enable-nolib-creation: no
 
+# The install half of the dependency, keyed on the CurseForge SLUG. The TOC's
+# '## Dependencies:' line is the load-order half and uses the addon FOLDER name instead.
+# Both are required: with only the TOC line, a manager that did not fetch EQOT leaves EQ
+# with a red title and "Dependency missing" and no way to repair it in the client.
+# Do NOT also add an externals entry for it - the packager overwrites a manually set
+# relation with embeddedLibrary for a fetched external, which kills auto-install.
+required-dependencies:
+  - eq-objective-tracker
+
 changelog-title: Everything Quests
 manual-changelog:
   filename: .release_changelog.md

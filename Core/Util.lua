@@ -15,18 +15,6 @@ Util.color = {
     dim           = { 0.50,  0.50,  0.50,  1.00 },
 }
 
-function Util.LineSpacing()
-    local DB = ns:GetSubsystem("DB")
-    local cfg = DB and DB.db and DB.db.profile and DB.db.profile.tracker
-    return math.max(-8, math.min(24, (cfg and cfg.lineSpacing) or 0))
-end
-
-function Util.HeaderSpacing()
-    local DB = ns:GetSubsystem("DB")
-    local cfg = DB and DB.db and DB.db.profile and DB.db.profile.tracker
-    return math.max(-8, math.min(24, (cfg and cfg.headerSpacing) or 0))
-end
-
 function Util.FmtDuration(secs)
     secs = math.max(0, math.floor(secs or 0))
     local h = math.floor(secs / 3600)
@@ -78,20 +66,6 @@ function Util.EffectiveTitleColor(cfg)
     end
     local ov = cfg and cfg.titleColorOverride
     if ov and ov.r then return ov.r, ov.g, ov.b end
-end
-
-function Util.ReconcileOrder(orderMap)
-    if type(orderMap) ~= "table" then return {} end
-    local list = {}
-    for qid, ord in pairs(orderMap) do
-        if type(qid) == "number" and type(ord) == "number" then
-            list[#list + 1] = { qid, ord }
-        end
-    end
-    table.sort(list, function(a, b) return a[2] < b[2] end)
-    local clean = {}
-    for i = 1, #list do clean[list[i][1]] = i end
-    return clean
 end
 
 local function progressRepl(have, need)

@@ -101,11 +101,6 @@ function Profiler:Unwrap(subsystemName, methodName)
 end
 
 Profiler.HOT_PATHS = {
-    { "Tracker",         "Render"        },
-    { "Tracker",         "Refresh"       },
-    { "TrackerBlocks",   "RenderQuest"   },
-    { "TrackerBlocks",   "Sweep"         },
-    { "TrackerScenario", "Refresh"       },
     { "WQPanel",         "Refresh"       },
     { "WQSummary",       "Render"        },
     { "WQWorldMap",      "Refresh"       },

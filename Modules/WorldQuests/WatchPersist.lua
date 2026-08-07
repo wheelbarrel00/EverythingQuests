@@ -28,10 +28,16 @@ local function questStillActive(questID)
     return false
 end
 
+-- The tracker lives in EQ Objective Tracker now. It refreshes itself on
+-- QUEST_WATCH_LIST_CHANGED anyway, so this only makes a map-pin track land immediately
+-- rather than on the next event.
 local function notifyTracker()
-    local Tracker = ns:GetSubsystem("Tracker")
+    local T = _G.EQObjectiveTracker
+    local Tracker = T and T.GetModule and T:GetModule("Tracker")
     if Tracker and Tracker.Refresh then Tracker:Refresh() end
 end
+
+local restored = false
 
 local function restore()
     local list = getList()
@@ -45,7 +51,21 @@ local function restore()
             end
         end
     end
+    restored = true
     notifyTracker()
+end
+
+-- The tracker untracks through Blizzard's API directly now, so this store no longer hears
+-- about it and restore() would re-add the quest on the next loading screen. Pruning here is
+-- what makes an untrack stick. Gated on restored because Blizzard's watch list is empty until
+-- restore has run, and pruning against it before then would wipe the saved set on every login.
+local function pruneUnwatched()
+    if not restored then return end
+    local list = getList()
+    if not list then return end
+    for questID in pairs(list) do
+        if not blizzardIsWatched(questID) then list[questID] = nil end
+    end
 end
 
 function W:Track(questID)
@@ -118,6 +138,7 @@ function W:OnEnable()
         -- WQ data is not populated immediately after login, so restore has to wait
         C_Timer.After(2, restore)
     end)
+    Events:On("QUEST_WATCH_LIST_CHANGED", pruneUnwatched)
     Events:On("QUEST_TURNED_IN", function(_, questID)
         local list = getList()
         if list and questID then list[questID] = nil end

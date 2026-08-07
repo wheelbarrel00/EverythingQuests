@@ -29,22 +29,17 @@ local L = ns.L
 L["General"] = true
 L["Show quest pins on the world map"] = true
 L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Quests you haven't accepted yet keep the game's own yellow \"!\" markers; EQ does not change those. Uncheck this box and all of EQ's red markers go away."] = true
-L["Lock tracker"] = true
-L["Disable drag-to-move and resize."] = true
-L["Hide tracker in combat"] = true
-L["Hide tracker in instances"] = true
-L["Raids, dungeons, delves."] = true
-L["Hide tracker when world map is open"] = true
-L["Hide tracker in Mythic+"] = true
-L["Hides the tracker during an active Mythic+ run, then brings it back when the run ends."] = true
-L["Auto-track accepted quests"] = true
-L["Matches Blizzard's default."] = true
 L["Auto-accept quests"] = true
 L["Hold Alt to pause."] = true
 L["Auto-turn-in quests"] = true
 L["Skips reward-choice screens."] = true
-L["Keep focused quest after relog"] = true
-L["Restores the waypoint arrow."] = true
+L["Tracker"] = true
+L["Open Tracker Settings"] = true
+L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."] = true
+L["Show Everything Quests icon on the tracker"] = true
+L["Adds the Everything Quests logo at the top right of the tracker, which opens this options window. The tracker's own cogwheel opens the tracker's settings instead. You can also reach this window from the minimap button or by typing /eqs."] = true
+L["Show Chain Guide icon on the tracker"] = true
+L["Adds a small chain icon beside the cogwheel at the top right of the tracker, which opens the Chain Guide."] = true
 L["Options Window Scale"] = true
 L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."] = true
 L["Popup window"] = true
@@ -83,97 +78,6 @@ L["Switching profiles reloads the UI. Profiles are shared across characters; use
 L["Slash commands"] = true
 L["/eqs\n/everythingquests\n\n|cff999999Both open this options window.|r\n\n/eqs whatsnew\n\n|cff999999Show what's new in the latest update.|r\n\n/eqs session\n\n|cff999999Show a recap of your current play session.|r"] = true
 L["Show minimap button"] = true
-
--- ─── Options/TabTracker.lua ───
-L["Zone"] = true
-L["Status"] = true
-L["Type"] = true
-L["Level"] = true
-L["Distance"] = true
-L["Recent"] = true
-L["Manual"] = true
-L["Normal quests"] = true
-L["Daily quests"] = true
-L["Weekly quests"] = true
-L["Campaign quests"] = true
-L["World quests"] = true
-L["Show only quests in current zone"] = true
-L["Tracker"] = true
-L["On-Screen Tracker"] = true
-L["Show only watched quests"] = true
-L["Matches Blizzard's default tracker."] = true
-L["Simplify Mode"] = true
-L["Show only the first incomplete objective per quest."] = true
-L["Simplify tracked achievements"] = true
-L["Show only incomplete criteria for tracked achievements."] = true
-L["Sort Order"] = true
-L["|cffaaaaaaDrag and drop the quests in the tracker to reorder them however you like.|r"] = true
-L["Filters"] = true
-L["Reset filters to defaults"] = true
-L["Options"] = true
-L["Quest Title Color By Difficulty"] = true
-L["Show quest level prefix"] = true
-L["For example, [60] Title."] = true
-L["Show zone label under quest titles"] = true
-L["Show objective progress numbers"] = true
-L["For example, 0/4, 1/1, etc."] = true
-L["Show quest ID"] = true
-L["Useful for bug reports."] = true
-L["Show tracked / total on the Quests & Campaign headers"] = true
-L["For example, 3/9."] = true
-L["Show usable quest item buttons"] = true
-L["Click to use the quest's item."] = true
-L["Show Options icon on the tracker"] = true
-L["A small cogwheel at the top-right of the tracker that opens the options panel."] = true
-L["Show Chain Guide icon on the tracker"] = true
-L["A small book at the top-right of the tracker that opens the Chain Guide."] = true
-L["Hide scroll bar"] = true
-L["Scroll with the mouse wheel instead."] = true
-L["Show Quest Discovered popups"] = true
-L["Boxes for newly discovered / completed quests."] = true
-L["Show NEW tag on recently accepted quests"] = true
-L["For about an hour after accepting."] = true
-L["Split quest click"] = true
-L["Click the icon to focus, click the title to open the quest log."] = true
-L["Quest Sound"] = true
-L["Plays when a quest is ready to turn in."] = true
-L["Quest Complete Sound"] = true
-L["Tracker Visibility"] = true
-L["Profession section"] = true
-L["Achievements section"] = true
-L["Achievements you're tracking."] = true
-L["World Quests section"] = true
-L["Auto-list current-zone world quests"] = true
-L["Lists every WQ in your zone without tracking each."] = true
-L["Set a custom World Quests height"] = true
-L["By default the World Quests area shares space with your quest list and gets squeezed when you have a lot of quests. Turn this on to give it its own height, set by the slider below."] = true
-L["World Quests height"] = true
-L["Section Order"] = true
-L["Rearrange the tracker's sections with the arrows below. A section only appears on the tracker while it has something in it, so reordering an empty section won't look like anything changed. World Quests scroll in their own panel and can only sit at the very top or bottom \226\128\148 use the Top/Bottom control."] = true
-L["Top"] = true
-L["Bottom"] = true
-L["World Quests position"] = true
-L["Where the World Quests panel sits on the tracker. |cffffffffTop|r puts it above your quests; |cffffffffBottom|r keeps it below your quests (the default). World Quests scroll in their own capped panel, which is why they can't be mixed in between the other sections."] = true
-L["Zone Progress"] = true
-L["Campaign"] = true
-L["Quests"] = true
-L["Profession"] = true
-L["Endeavors"] = true
-L["Achievements"] = true
-L["Move %s up"] = true
-L["Move %s down"] = true
-L["Reorders where this section sits in the tracker. A section only shows while it has something in it, so empty sections won't visibly move."] = true
-L["Zone Progress Bar"] = true
-L["Show zone progress bar"] = true
-L["Approximate questline progress."] = true
-L["Float as a movable bar"] = true
-L["Drag to move; right-click to lock or reset."] = true
-L["Scenario Bonus Objectives"] = true
-L["Show bonus objectives HUD"] = true
-L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = true
-L["HUD Scale"] = true
-L["Sizes the bonus objectives HUD."] = true
-L["Changes apply immediately to the on-screen tracker."] = true
 
 -- ─── Options/TabWorldQuests.lua ───
 L["Gold"] = true
@@ -242,109 +146,6 @@ L["%d days ago"] = true
 L["\n|cffaaaaaaLast pruned: %s|r"] = true
 L["Prune stale entries now"] = true
 L["|cffEBB706EQ|r: pruned |cffffffff%d|r stale character record(s) and |cffffffff%d|r waypoint(s)."] = true
-
--- ─── Options/TabAppearance.lua ───
-L["Appearance"] = true
-L["Font"] = true
-L["Font Size"] = true
-L["Title Size Offset"] = true
-L["Sizes quest and achievement titles separately from the objective text. This value is added to the Font Size above: 0 keeps titles the same size as the base font, positive makes them larger, negative smaller."] = true
-L["Header Size Offset"] = true
-L["Sizes the section headers (Quests, Campaign, and so on) independently of the quest text. Added on top of the Font Size above: the default 4 keeps headers at their current size, lower shrinks them (handy on a low UI scale), higher enlarges them."] = true
-L["Outline"] = true
-L["Thick"] = true
-L["Mono"] = true
-L["Mono Outline"] = true
-L["Mono Thick"] = true
-L["Font Outline"] = true
-L["Text Shadow"] = true
-L["Draws a soft drop-shadow behind all tracker text so it stays readable over bright or busy backgrounds. Use Shadow Color to tint it and Shadow Size to set how far it's cast."] = true
-L["Shadow Color"] = true
-L["Shadow Size"] = true
-L["How far the text drop-shadow is cast behind the letters. Higher values give a larger, more pronounced shadow; lower values keep it tight. Only applies while Text Shadow is on."] = true
-L["Scenario"] = true
-L["Draws a drop-shadow behind the scenario / delve banner text (the Stage and name lines). This is SEPARATE from the Text Shadow above, which affects only the quest and objective text — the banner is styled on its own."] = true
-L["How far the scenario banner's drop-shadow is cast. Higher values give a larger, more pronounced shadow; lower values keep it tight. Only applies while the Scenario Text Shadow above is on."] = true
-L["Center"] = true
-L["Banner Alignment"] = true
-L["Positions the scenario / delve banner within the tracker. Left lines it up with the quest text, Center keeps it centered (the default), and Right pushes it to the tracker's right edge."] = true
-L["Banner Text Size"] = true
-L["Grows or shrinks the scenario / delve banner's Stage and name text. 0 is the default size. The banner artwork is a fixed size, so large values may overflow it."] = true
-L["Criteria Text Size"] = true
-L["Sizes the scenario / delve objective (criteria) lines shown under the banner, separately from the Banner Text Size above. Raise it if the criteria text looks small next to your quest and World Quest text."] = true
-L["Background"] = true
-L["Background Color"] = true
-L["Border"] = true
-L["Border Color"] = true
-L["Border Thickness"] = true
-L["Header Bar"] = true
-L["Header bar"] = true
-L["Draws a coloured gradient bar behind each section header (Quests, Campaign, World Quests, and so on), for a look closer to the default Blizzard tracker. Off by default."] = true
-L["Bar Color"] = true
-L["Header Bar 1"] = true
-L["Header Bar 2"] = true
-L["Bar Style"] = true
-L["Header Bar 1 is a horizontal gradient (bright on the left, dark on the right). Header Bar 2 is a vertical gradient (bright at the top, dark at the bottom). Bar Color, Bar Height, and Soft edges all apply to whichever style you pick."] = true
-L["Soft edges"] = true
-L["Feathers the top, left, and right edges of the header bar so it blends into the UI instead of sitting in a hard box. The gradient colour is unchanged. Only applies while Header bar is on; off by default."] = true
-L["Bar Height"] = true
-L["How tall the section-header bar is. The bar is centred on the header row, so larger values fill more of it."] = true
-L["Edge Softness"] = true
-L["How soft the header bar's feathered edges are when Soft edges is on. Higher is softer; lower tightens toward a hard edge."] = true
-L["Tracker Skins"] = true
-L["Scroll Bar Background"] = true
-L["Scroll Bar Color"] = true
-L["Solid color thumb"] = true
-L["Replaces the tracker scroll bar's textured thumb (the draggable block) with a flat single-colour block. Use the Thumb Color and Thumb Width controls to style it. Off restores the stock Blizzard bar."] = true
-L["Thumb Color"] = true
-L["Thumb Width"] = true
-L["Hide scroll bar arrows"] = true
-L["Hides the up and down arrow buttons at the ends of the tracker scroll bar. The bar still scrolls by dragging the thumb or using the mouse wheel."] = true
-L["Colors & Dimensions"] = true
-L["Reset to Defaults"] = true
-L["Reset all Appearance settings to defaults?"] = true
-L["Quest Title Color Override"] = true
-L["When cleared, falls back to difficulty coloring or default yellow."] = true
-L["Use class color"] = true
-L["Colors quest, achievement, and endeavor titles with the class color of the character you are currently logged in on. Overrides the color above while it is on. Off by default."] = true
-L["Use title color for completed quests"] = true
-L["Instead of green."] = true
-L["Section Header Color"] = true
-L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color above while it is on. Off by default."] = true
-L["Divider Line Color"] = true
-L["Sets the color of the thin line under each section header. Defaults to the original gold."] = true
-L["Tracker Scale"] = true
-L["Block Spacing"] = true
-L["Line Spacing"] = true
-L["Adds vertical space between a quest's objective lines, across the whole tracker. 0 keeps the default spacing."] = true
-L["Header Spacing"] = true
-L["Adds or removes space around section headers and beneath each quest's title. 0 keeps the default spacing."] = true
-L["Quest Rows"] = true
-L["Plain"] = true
-L["Card"] = true
-L["Row Layout"] = true
-L["How each quest is drawn in the tracker. |cffffffffPlain|r is the default look - text straight on the tracker background. |cffffffffCard|r gives every quest its own panel with a background and border, which makes long lists easier to read apart."] = true
-L["Fill color behind each quest card. Only used while Row Layout is set to Card."] = true
-L["Outline color around each quest card. Only used while Row Layout is set to Card."] = true
-L["How thick the card outline is, in pixels. 0 hides the outline and leaves just the fill."] = true
-L["Card Padding"] = true
-L["Breathing room between a card's edge and the text inside it. Larger values make taller cards."] = true
-L["Tint cards by quest type"] = true
-L["Give campaign, legendary, dungeon and raid quests their own card color so you can tell them apart at a glance. Anything else uses the plain background color above."] = true
-L["Card color for campaign quests. Needs Tint cards by quest type switched on."] = true
-L["Legendary"] = true
-L["Card color for legendary quests. Needs Tint cards by quest type switched on."] = true
-L["Dungeon"] = true
-L["Card color for dungeon quests. Needs Tint cards by quest type switched on."] = true
-L["Raid"] = true
-L["Card color for raid quests. Needs Tint cards by quest type switched on."] = true
-L["Zone Bar Scale"] = true
-L["Zone Bar Appearance"] = true
-L["Same as tracker font"] = true
-L["Bar Texture"] = true
-L["Sets the fill texture of the zone progress bar. Textures added by other media addons (such as SharedMedia, ElvUI, or Details) appear here too."] = true
-L["Header Color"] = true
-L["Count Color"] = true
 
 -- ─── Options/TabHistory.lua ───
 L["History"] = true
@@ -438,6 +239,7 @@ L["Collapse the category and chain list so the graph fills the whole window. Cli
 L["Back"] = true
 L["Forward"] = true
 L["Home"] = true
+L["Options"] = true
 L["Find quest"] = true
 L["Type a quest name or its ID to jump to the chain that contains it."] = true
 L["Go"] = true
@@ -469,6 +271,7 @@ L["Click to expand"] = true
 L["Export"] = true
 L["Re-scan names"] = true
 L["Asks the server for the name of any \"Quest #12345\" entries. They'll fill in over the next minute or two as responses arrive."] = true
+L["Quests"] = true
 L["Streak"] = true
 L["Chain Timeline"] = true
 L["Activity"] = true
@@ -483,6 +286,7 @@ L["Past 7 days"] = true
 L["Past 30 days"] = true
 L["Type:"] = true
 L["All types"] = true
+L["Campaign"] = true
 L["Questline"] = true
 L["Calling"] = true
 L["Recurring"] = true
@@ -490,6 +294,7 @@ L["World Quest"] = true
 L["Sort:"] = true
 L["Date"] = true
 L["Name"] = true
+L["Type"] = true
 L["Sort direction"] = true
 L["Click to flip ascending / descending."] = true
 L["Hide undated  |cffaaaaaa(backfilled)|r"] = true
@@ -552,53 +357,11 @@ L["first time seeing |cffffffff%s|r - added %d past completion%s (no dates; futu
 L["Quest history loaded empty; restored a backup from %s (%d entries)."] = true
 L["Quest history for %s was missing; restored a backup from %s (%d entries)."] = true
 
--- ─── Modules/Tracker/Achievements.lua ───
-L["Left-click to open, right-click to untrack."] = true
-
--- ─── Modules/Tracker/AutoQuestPopup.lua ───
-L["Click to view quest"] = true
-L["Quest Complete!"] = true
-L["Quest Discovered!"] = true
-
--- ─── Modules/Tracker/Events.lua ───
-L["Find Group"] = true
-L["Open the Premade Group Finder for this quest."] = true
-L["Untrack Quest"] = true
-L["Track Quest"] = true
-L["Super-track (follow arrow)"] = true
-L["Search on Wowhead"] = true
-
--- ─── Modules/Tracker/Frame.lua ───
-L["Tracker locked"] = true
-L["Move and resize are off. Uncheck \"Lock tracker\" in /eqs > General."] = true
-L["Drag to move the tracker"] = true
-L["/eqs for options"] = true
-L["Open the options panel"] = true
+-- ─── Modules/TrackerBridge.lua ───
+L["EQ Objective Tracker is not loaded, so the tracker is unavailable."] = true
 L["Open the Chain Guide"] = true
-L["Unpin from tracker"] = true
-L["Pin to tracker"] = true
-L["Unfocus"] = true
-L["Focus"] = true
+L["Open the Everything Quests options"] = true
 L["Get Directions"] = true
-L["Open in Map & Quest Log"] = true
-L["Pop Out Quest Details"] = true
-L["Abandon Quest"] = true
-L["Drag the top edge of the tracker to move it.\n\nType |cffEBB706/eqs|r for options."] = true
-
--- ─── Modules/Tracker/Profession.lua ───
-L["Open in Profession"] = true
-L["Untrack Recipe"] = true
-
--- ─── Modules/Tracker/Scenario.lua ───
-L["Final Stage"] = true
-L["Stage %d"] = true
-
--- ─── Modules/Tracker/ScenarioBonusHUD.lua ───
-L["Bonus Objectives"] = true
-L["Unlock (allow moving)"] = true
-L["Lock position"] = true
-L["Reset position"] = true
-L["Delve Bonus Loot"] = true
 
 -- ─── Modules/WhatsNew.lua ───
 L["See what's new"] = true
@@ -610,6 +373,10 @@ L["Stops What's New notices entirely. You can turn them back on in /eqs > Genera
 
 -- ─── Modules/WorldQuests/Pin.lua ───
 L["World Quest #"] = true
+L["Untrack Quest"] = true
+L["Track Quest"] = true
+L["Super-track (follow arrow)"] = true
+L["Search on Wowhead"] = true
 
 -- ─── Modules/WorldQuests/Summary.lua ───
 L["Gear"] = true

@@ -202,11 +202,12 @@ Options:AddTab("worldQuests", L["World Quests"], function(content)
     scroll:SetScrollChild(list)
 
     do
-        local DB = ns:GetSubsystem("DB")
-        local cfg = DB and DB.db.profile.tracker
+        -- This used to borrow the tracker's scroll bar colors. The tracker owns its own
+        -- settings in EQ Objective Tracker now, and they should not govern a panel over here,
+        -- so this draws the same default it always did without reaching across.
         local sBar = scroll.ScrollBar or scroll.scrollBar
-        if sBar and (not cfg or cfg.scrollBarBg ~= false) then
-            local s = (cfg and cfg.scrollBarBgColor) or { r = 0.60, g = 0.60, b = 0.65, a = 0.25 }
+        if sBar then
+            local s = { r = 0.60, g = 0.60, b = 0.65, a = 0.25 }
             local sbBG = content:CreateTexture(nil, "BORDER")
             sbBG:SetPoint("TOPLEFT",     sBar, "TOPLEFT",    -1, 0)
             sbBG:SetPoint("BOTTOMRIGHT", sBar, "BOTTOMRIGHT", 1, 0)

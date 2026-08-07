@@ -13,8 +13,6 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             function(value)
                 local DB = ns:GetSubsystem("DB")
                 if DB then DB.db.profile.general[key] = value end
-                local V = ns:GetSubsystem("TrackerVisibility")
-                if V and V.Apply then V:Apply() end
             end
     end
 
@@ -43,61 +41,12 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Quests you haven't accepted yet keep the game's own yellow \"!\" markers; EQ does not change those. Uncheck this box and all of EQ's red markers go away."])
     qpins:SetPoint("TOPLEFT", h, "BOTTOMLEFT", 0, -16)
 
-    local function lockGet()
-        local DB = ns:GetSubsystem("DB")
-        return DB and DB.db.profile.general.lockTracker
-    end
-    local function lockSet(value)
-        local DB = ns:GetSubsystem("DB")
-        if DB then DB.db.profile.general.lockTracker = value and true or false end
-        local Tracker = ns:GetSubsystem("Tracker")
-        if Tracker and Tracker.ApplyLockState then Tracker:ApplyLockState() end
-    end
-    local lock = Options:CreateCheckbox(content,
-        L["Lock tracker"],
-        lockGet, lockSet,
-        L["Disable drag-to-move and resize."])
-    lock:SetPoint("TOPLEFT", qpins, "BOTTOMLEFT", 0, -2)
-
-    local combatGet, combatSet = generalSetting("hideInCombat")
-    local combat = Options:CreateCheckbox(content,
-        L["Hide tracker in combat"],
-        combatGet, combatSet)
-    combat:SetPoint("TOPLEFT", lock, "BOTTOMLEFT", 0, -2)
-
-    local instGet, instSet = generalSetting("hideInInstances")
-    local inst = Options:CreateCheckbox(content,
-        L["Hide tracker in instances"],
-        instGet, instSet,
-        L["Raids, dungeons, delves."])
-    inst:SetPoint("TOPLEFT", combat, "BOTTOMLEFT", 0, -2)
-
-    local mapGet, mapSet = generalSetting("hideOnMapOpen")
-    local mapHide = Options:CreateCheckbox(content,
-        L["Hide tracker when world map is open"],
-        mapGet, mapSet)
-    mapHide:SetPoint("TOPLEFT", inst, "BOTTOMLEFT", 0, -2)
-
-    local mplusGet, mplusSet = generalSetting("hideInMythicPlus")
-    local mplus = Options:CreateCheckbox(content,
-        L["Hide tracker in Mythic+"],
-        mplusGet, mplusSet,
-        L["Hides the tracker during an active Mythic+ run, then brings it back when the run ends."])
-    mplus:SetPoint("TOPLEFT", mapHide, "BOTTOMLEFT", 0, -2)
-
-    local autoGet, autoSet = generalSetting("autoTrackAccepted")
-    local auto = Options:CreateCheckbox(content,
-        L["Auto-track accepted quests"],
-        autoGet, autoSet,
-        L["Matches Blizzard's default."])
-    auto:SetPoint("TOPLEFT", mplus, "BOTTOMLEFT", 0, -2)
-
     local autoAccGet, autoAccSet = generalSetting("autoAcceptQuests")
     local autoAcc = Options:CreateCheckbox(content,
         L["Auto-accept quests"],
         autoAccGet, autoAccSet,
         L["Hold Alt to pause."])
-    autoAcc:SetPoint("TOPLEFT", auto, "BOTTOMLEFT", 0, -2)
+    autoAcc:SetPoint("TOPLEFT", qpins, "BOTTOMLEFT", 0, -2)
 
     local autoTIGet, autoTISet = generalSetting("autoTurnInQuests")
     local autoTI = Options:CreateCheckbox(content,
@@ -106,12 +55,43 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         L["Skips reward-choice screens."])
     autoTI:SetPoint("TOPLEFT", autoAcc, "BOTTOMLEFT", 0, -2)
 
-    local restoreGet, restoreSet = generalSetting("restoreSuperTrackOnLogin")
-    local restore = Options:CreateCheckbox(content,
-        L["Keep focused quest after relog"],
-        restoreGet, restoreSet,
-        L["Restores the waypoint arrow."])
-    restore:SetPoint("TOPLEFT", autoTI, "BOTTOMLEFT", 0, -2)
+    -- The tracker moved out to EQ Objective Tracker, which owns its own options panel. Every
+    -- setting that used to sit on this tab and on the deleted Tracker and Appearance tabs is
+    -- there now, so this points at it rather than leaving people hunting.
+    local trackerHeader = Options:CreateSectionHeader(content, L["Tracker"])
+    trackerHeader:SetPoint("TOPLEFT", autoTI, "BOTTOMLEFT", 0, -16)
+
+    local trackerBtn = Options:CreateYellowButton(content, L["Open Tracker Settings"], function()
+        local Bridge = ns:GetSubsystem("TrackerBridge")
+        if Bridge then Bridge:OpenTrackerOptions() end
+    end)
+    trackerBtn:SetPoint("TOPLEFT", trackerHeader, "BOTTOMLEFT", 0, -10)
+    Options:AttachTooltip(trackerBtn, L["Open Tracker Settings"],
+        L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."])
+
+    local eqIconGet, eqIconSet = generalSetting("showEQIcon")
+    local eqIcon = Options:CreateCheckbox(content,
+        L["Show Everything Quests icon on the tracker"],
+        eqIconGet,
+        function(value)
+            eqIconSet(value)
+            local Bridge = ns:GetSubsystem("TrackerBridge")
+            if Bridge then Bridge:ApplyEQIcon() end
+        end,
+        L["Adds the Everything Quests logo at the top right of the tracker, which opens this options window. The tracker's own cogwheel opens the tracker's settings instead. You can also reach this window from the minimap button or by typing /eqs."])
+    eqIcon:SetPoint("TOPLEFT", trackerBtn, "BOTTOMLEFT", 0, -8)
+
+    local chainIconGet, chainIconSet = generalSetting("showChainGuideIcon")
+    local chainIcon = Options:CreateCheckbox(content,
+        L["Show Chain Guide icon on the tracker"],
+        chainIconGet,
+        function(value)
+            chainIconSet(value)
+            local Bridge = ns:GetSubsystem("TrackerBridge")
+            if Bridge then Bridge:ApplyChainIcon() end
+        end,
+        L["Adds a small chain icon beside the cogwheel at the top right of the tracker, which opens the Chain Guide."])
+    chainIcon:SetPoint("TOPLEFT", eqIcon, "BOTTOMLEFT", 0, -2)
 
     local function owScaleGet()
         local DB = ns:GetSubsystem("DB")
@@ -124,7 +104,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         end
     end
     local owScale = Options:CreateSlider(content, L["Options Window Scale"], 0.7, 1.4, 0.05, owScaleGet, owScaleSet)
-    owScale:SetPoint("TOPLEFT", restore, "BOTTOMLEFT", 0, -18)
+    owScale:SetPoint("TOPLEFT", chainIcon, "BOTTOMLEFT", 0, -18)
     owScale:SetWidth(280)
     Options:AttachTooltip(owScale, L["Options Window Scale"],
         L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."])

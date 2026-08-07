@@ -2,7 +2,8 @@
 ## Title: Everything Quests
 ## Notes: Unified replacement for the Blizzard quest experience — tracker, quest log book, world map overlays, and a Midnight chain guide.
 ## Author: Wheelbarrel00
-## Version: 1.37.1
+## Version: 1.38.0
+## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
 ## IconTexture: Interface\AddOns\EverythingQuests\Media\Textures\eq-logo-v3
@@ -43,27 +44,9 @@ Core\Changelog.lua
 # Modules (subsystems must exist before Data/* registers into them)
 Modules\Minimap\Minimap.lua
 
-Modules\Tracker\Frame.lua
-Modules\Tracker\Card.lua
-Modules\Tracker\Blocks.lua
-Modules\Tracker\RewardTooltip.lua
-Modules\Tracker\AutoQuestPopup.lua
-Modules\Tracker\Filters.lua
-Modules\Tracker\Sort.lua
-Modules\Tracker\DragDrop.lua
-Modules\Tracker\AutoComplete.lua
-Modules\Tracker\Scenario.lua
-Modules\Tracker\Profession.lua
-Modules\Tracker\Endeavors.lua
-Modules\Tracker\Achievements.lua
-Modules\Tracker\Events.lua
-Modules\Tracker\ZoneProgress.lua
-Modules\Tracker\ScenarioBonusHUD.lua
-Modules\Tracker\QuestSound.lua
-Modules\Tracker\Visibility.lua
-Modules\Tracker\ItemButtons.lua
-Modules\Tracker\TaxiHighlight.lua
-Modules\Tracker\SuperTrackPersist.lua
+# The tracker itself lives in EQ Objective Tracker, declared above as a required dependency.
+# This only puts EQ's own features back onto its rows and header.
+Modules\TrackerBridge.lua
 
 Modules\WorldQuests\Rewards.lua
 Modules\WorldQuests\Tooltip.lua
@@ -117,10 +100,8 @@ Data\QuestChains\_Overlays_Val.lua
 # Options (Frame.lua must load before Tab*.lua)
 Options\Frame.lua
 Options\TabGeneral.lua
-Options\TabTracker.lua
 Options\TabWorldQuests.lua
 Options\TabChainGuide.lua
-Options\TabAppearance.lua
 Options\TabHistory.lua
 Options\TabAbout.lua
 

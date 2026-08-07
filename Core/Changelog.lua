@@ -2,6 +2,24 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.38.0", date = "2026-08-06",
+        sections = {
+            { head = "Changes", items = {
+                "The tracker is now its own addon, EQ Objective Tracker, and it comes down automatically with Everything Quests. Your position, size, fonts, colors, section order, filters and sorting all carry over on their own, along with your pinned quests, hidden quests, collapsed sections and saved world quest watches on every character. There is nothing to set up again.",
+                "Tracker settings moved to their own panel. Open it with the cogwheel at the top right of the tracker, or by typing /eqot. Everything that was under /eqs > Tracker and /eqs > Appearance is there in the same shape, and those two tabs have been removed from Everything Quests. The General tab has a button through to the new panel.",
+                "There is a new Everything Quests logo on the tracker beside the cogwheel, because the cogwheel now opens the tracker's own settings. It opens /eqs. The Chain Guide chain icon is still there, and all three icons can be switched off under /eqs > General. The minimap button is unchanged.",
+                "The reason for the split is maintenance. There is one copy of the tracker code now instead of two, so a tracker fix lands everywhere at once. It also means anyone who only wants a tracker can run EQ Objective Tracker on its own.",
+            } },
+            { head = "Bug Fixes", items = {
+                "Untracking a world quest sticks. A world quest untracked from the tracker could reappear on the next loading screen, because the map's saved watch list never heard about it.",
+            } },
+            { head = "Notes", items = {
+                "Nothing else changed. The quest log book, world map overlays, nameplate icons, quest history and Chain Guide all work as before.",
+                "If the tracker is missing, check that EQ Objective Tracker is enabled in your AddOns list. Typing /eqot status prints what the tracker is doing, and that output is the most useful thing to include in a bug report.",
+            } },
+        },
+    },
+    {
         version = "1.37.1", date = "2026-08-02",
         sections = {
             { head = "Bug Fixes", items = {

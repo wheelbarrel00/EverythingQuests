@@ -53,7 +53,7 @@ function Options:Build()
 
     f.version = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.version:SetPoint("TOPRIGHT", -34, -14)
-    f.version:SetText("v" .. (ns.VERSION or "1.37.1"))
+    f.version:SetText("v" .. (ns.VERSION or "1.38.0"))
     f.version:SetTextColor(unpack(YELLOW))
 
     f.discord = CreateFrame("Button", nil, f)
@@ -943,22 +943,6 @@ local function eqSlashHandler(msg)
     elseif msg == "scenario" then
         Options:DumpScenarioInfo()
         return
-    elseif msg == "bonushud" then
-        local Hud = ns:GetSubsystem("TrackerScenarioBonusHUD")
-        if Hud and Hud.Dump then Hud:Dump() end
-        return
-    elseif msg == "bonushud test" then
-        local Hud = ns:GetSubsystem("TrackerScenarioBonusHUD")
-        if Hud and Hud.ToggleTest then Hud:ToggleTest() end
-        return
-    elseif msg == "profdebug" then
-        local Prof = ns:GetSubsystem("TrackerProfession")
-        if Prof and Prof.Dump then Prof:Dump() end
-        return
-    elseif msg == "trackerdebug" then
-        local T = ns:GetSubsystem("Tracker")
-        if T and T.DebugSize then T:DebugSize() end
-        return
     elseif msg == "questobj" then
         Options:DumpQuestObjectives()
         return
@@ -1184,29 +1168,6 @@ local function eqSlashHandler(msg)
                 print("        " .. table.concat(quests, ", "))
             end
         end
-        return
-    elseif msg:match("^zonebar") then
-        local ZP = ns:GetSubsystem("TrackerZoneProgress")
-        if msg:match("debug") then
-            ns.zoneBarDebug = not ns.zoneBarDebug
-            print("|cffEBB706EQ ZoneBar|r debug " .. (ns.zoneBarDebug and "ON" or "OFF"))
-        end
-        if ZP and ZP.PrintStatus then ZP:PrintStatus() end
-        return
-    elseif msg == "skindebug" then
-        local T = ns:GetSubsystem("Tracker")
-        local f = T and T.frame
-        local sf = f and f.scroll
-        local bar = sf and (sf.ScrollBar or sf.scrollBar)
-        if not bar then print("|cffEBB706EQ Skin|r: no scroll bar found"); return end
-        print(("|cffEBB706EQ Skin|r bar: %s  name=%s"):format(bar:GetObjectType(), bar:GetName() or "(unnamed)"))
-        print(("  GetThumbTexture=%s thumbTex=%s"):format(
-            tostring(bar.GetThumbTexture ~= nil),
-            tostring(bar.GetThumbTexture and bar:GetThumbTexture())))
-        print(("  .Thumb=%s  .Track=%s"):format(tostring(bar.Thumb), tostring(bar.Track)))
-        print(("  up: .ScrollUpButton=%s .Back=%s   down: .ScrollDownButton=%s .Forward=%s"):format(
-            tostring(bar.ScrollUpButton), tostring(bar.Back),
-            tostring(bar.ScrollDownButton), tostring(bar.Forward)))
         return
     elseif msg:match("^profile") then
         local rest = msg:match("^profile%s*(.*)$") or ""

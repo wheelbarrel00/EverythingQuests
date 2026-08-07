@@ -5,6 +5,25 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.0] - 2026-08-06
+
+Everything Quests' tracker has moved out into its own addon, EQ Objective Tracker, which now comes down automatically with Everything Quests. Your layout and settings carry across on their own and there is nothing to set up again. The reason for the split is maintenance: there is one copy of the tracker code now instead of two, so a tracker fix lands everywhere at once.
+
+### Changes
+
+- **The tracker is now EQ Objective Tracker** - a required dependency, installed for you. Your position, size, fonts, colors, section order, filters and sorting all carry over, along with your pinned quests, hidden quests, collapsed sections and saved world quest watches on every character.
+- **Tracker settings moved to their own panel** - open it with the cogwheel at the top right of the tracker, or by typing `/eqot`. Everything that was under `/eqs` > Tracker and `/eqs` > Appearance is there, in the same shape. Those two tabs have been removed from Everything Quests, and the General tab has a button through to the new panel.
+- **An Everything Quests icon on the tracker** - the cogwheel now opens the tracker's settings, so there is a new Everything Quests logo beside it that opens `/eqs`. The Chain Guide chain icon is still there, and each of the three icons can be switched off under `/eqs` > General. The minimap button is unchanged.
+
+### Bug Fixes
+
+- **Untracking a world quest sticks** - a world quest untracked from the tracker could come back on the next loading screen, because the map's saved watch list never heard about it.
+
+### Notes
+
+- Nothing else in Everything Quests changed. The quest log book, world map overlays, nameplate icons, quest history and Chain Guide all work as before.
+- If the tracker is missing, check that EQ Objective Tracker is enabled in your AddOns list. `/eqot status` prints what the tracker is doing and is the most useful thing to include in a bug report.
+
 ## [1.37.1] - 2026-08-02
 
 Everything in this release came out of building EQ Objective Tracker, a new standalone tracker you will be able to run on its own without Everything Quests. Porting Everything Quests' code across surfaced five bugs in Everything Quests itself, and three of them had never been reported because nobody could see them.

@@ -5,132 +5,18 @@ local DB = ns:RegisterSubsystem("DB", {})
 DB.defaults = {
     profile = {
         general = {
-            lockTracker      = false,
-            hideInCombat     = false,
-            hideInInstances  = false,
-            hideOnMapOpen    = false,
-            hideInMythicPlus = false,
-            autoTrackAccepted = true,
             autoAcceptQuests = false,
             autoTurnInQuests = false,
-            restoreSuperTrackOnLogin = true,
+            -- Moved out of the deleted tracker block. The icon itself is drawn by EQ
+            -- Objective Tracker, but whether it appears is EQ's setting, so TrackerBridge
+            -- adds and removes the registration from here rather than dimming it.
+            showChainGuideIcon = true,
+            showEQIcon = true,
             npIconPlacement = "RIGHT",
             npIconSize      = 24,
             npIconTextSize  = 13,
             npIconOffsetX   = 0,
             npIconOffsetY   = 0,
-        },
-        tracker = {
-            anchor = "TOPRIGHT",
-            xOffset = -85,
-            yOffset = -200,
-            width = 305,
-            maxHeight = 600,
-            scale = 1.0,
-            simplifyMode = false,
-            simplifyAchievements = false,
-            sortMode = "zone",
-            manualOrder = {},
-            showOnlyWatched = true,
-            showBackground = false,
-            backgroundColor = { r = 0, g = 0, b = 0, a = 0.6 },
-            showBorder = false,
-            borderColor = { r = 0.635, g = 0.000, b = 0.039, a = 1 },
-            borderSize  = 1,
-            font = "GothamXNarrow Black",
-            fontSize = 15,
-            fontOutline = "OUTLINE",
-            titleSizeDelta = 0,
-            textShadow      = false,
-            textShadowColor = { r = 0, g = 0, b = 0, a = 1 },
-            textShadowStrength = 2,
-            scenarioTextShadow      = true,
-            scenarioTextShadowColor = { r = 0, g = 0, b = 0, a = 1 },
-            scenarioTextShadowStrength = 1,
-            scenarioTextAlign     = "CENTER",
-            scenarioTextSizeDelta = 0,
-            scenarioFontSize      = 13,
-            colorByDifficulty = true,
-            showItemButtons = true,
-            showOptionsIcon    = true,
-            showChainGuideIcon = true,
-            questSoundEnabled = true,
-            questCompleteSound = "EQ: Work Complete",
-            showLevelInTracker   = false,
-            showZoneTag          = false,
-            showObjectiveNumbers = true,
-            showQuestID          = false,
-            showQuestTotal       = true,
-            titleColorOverride   = nil,
-            titleColorUseClass   = false,
-            overrideCompleteGreen = true,
-            headerColor          = { r = 0.93, g = 0.32, b = 0.10, a = 1 },
-            headerColorUseClass  = false,
-            headerDividerColor   = { r = 0.92, g = 0.72, b = 0.02, a = 0.85 },
-            headerSizeDelta      = 4,
-            headerBar            = false,
-            headerBarColor       = { r = 0.80, g = 0.60, b = 0.20, a = 0.85 },
-            headerBarHeight      = 22,
-            headerBarStyle       = 1,
-            headerBarSoftEdges   = false,
-            headerBarSoftEdgeStrength = 10,
-            blockSpacing         = 2,
-            lineSpacing          = 0,
-            headerSpacing        = 0,
-            blockLayout          = "classic",
-            cardColor            = { r = 0.09, g = 0.10, b = 0.12, a = 0.73 },
-            cardBorderColor      = { r = 0.00, g = 0.00, b = 0.00, a = 0.45 },
-            cardBorderSize       = 1,
-            cardPadding          = 6,
-            cardTintByType       = false,
-            cardTintCampaign     = { r = 0.20, g = 0.14, b = 0.04, a = 0.80 },
-            cardTintLegendary    = { r = 0.24, g = 0.12, b = 0.01, a = 0.80 },
-            cardTintDungeon      = { r = 0.02, g = 0.11, b = 0.20, a = 0.80 },
-            cardTintRaid         = { r = 0.02, g = 0.15, b = 0.03, a = 0.80 },
-            scrollBarBg          = true,
-            scrollBarBgColor     = { r = 0.60, g = 0.60, b = 0.65, a = 0.25 },
-            hideScrollBar        = false,
-            skinScrollBar        = false,
-            scrollBarThumbColor  = { r = 0.60, g = 0.60, b = 0.65, a = 0.90 },
-            scrollBarThumbWidth  = 8,
-            hideScrollArrows     = false,
-            showQuestPopups      = true,
-            showRecentlyAddedTag = true,
-            splitQuestClick      = false,
-            filters = {
-                showNormal      = true,
-                showDaily       = true,
-                showWeekly      = true,
-                showCampaign    = true,
-                showWorld       = true,
-                onlyCurrentZone = false,
-            },
-            showProfessionSection = true,
-            showAchievementsSection = true,
-            showWorldQuestsSection = true,
-            sectionOrder = { "zoneprogress", "campaign", "quests", "profession", "endeavors", "achievements" },
-            worldQuestsPosition = "bottom",
-            showZoneProgressBar = false,
-            zoneProgressLocation = "floating",
-            zoneProgressBar = {
-                point = "CENTER", relPoint = "CENTER", x = 0, y = 220,
-                scale = 1.0,
-                locked = false,
-                showBorder = true,
-                showBackground = true,
-            },
-            scenarioBonusHUD = {
-                enabled = false,
-                point = "CENTER", relPoint = "CENTER", x = 0, y = -120,
-                scale = 1.0,
-                locked = false,
-                showBorder = true,
-                showBackground = true,
-            },
-            autoListZoneWorldQuests = false,
-            worldQuestsPinnedMaxFraction = 0.40,
-            worldQuestsHeightOverride = false,
-            worldQuestsHeight = 120,
         },
         worldQuests = {
             enabled = true,
@@ -176,52 +62,20 @@ DB.defaults = {
             zoneCat = {},
         },
     },
+    -- pinned, hidden, collapsedHeaders, trackerCollapsed and zoneProgress all moved to EQ
+    -- Objective Tracker with the tracker. They are dropped from the defaults but deliberately
+    -- NOT deleted from the saved variable: EQOT's first-run import reads them straight out of
+    -- EverythingQuestsCharDB to carry a user's pins, hidden quests and collapsed sections
+    -- across, and that import only ever runs once.
+    -- trackedWorldQuests stays because WatchPersist still drives EQ's own map pins from it.
     char = {
-        favorites = {},
-        pinned = {},
-        hidden = {},
         trackedWorldQuests = {},
-        collapsedHeaders = {},
-        trackerCollapsed = false,
         trackedChainID = nil,
         minimap = { hide = false, minimapPos = 220 },
         lastOptionsTab = "general",
-        zoneProgress = {
-            questlines = {},
-        },
     },
 }
 
-local APPEARANCE_KEYS = {
-    "font", "fontSize", "fontOutline", "titleSizeDelta",
-    "textShadow", "textShadowColor", "textShadowStrength",
-    "scenarioTextShadow", "scenarioTextShadowColor", "scenarioTextShadowStrength",
-    "scenarioTextAlign", "scenarioTextSizeDelta", "scenarioFontSize",
-    "colorByDifficulty", "titleColorOverride", "overrideCompleteGreen", "headerColor",
-    "headerDividerColor", "headerSizeDelta",
-    "titleColorUseClass", "headerColorUseClass",
-    "headerBar", "headerBarColor", "headerBarHeight", "headerBarStyle",
-    "headerBarSoftEdges", "headerBarSoftEdgeStrength",
-    "blockSpacing", "lineSpacing", "headerSpacing", "scale",
-    "blockLayout", "cardColor", "cardBorderColor", "cardBorderSize", "cardPadding",
-    "cardTintByType", "cardTintCampaign", "cardTintLegendary", "cardTintDungeon", "cardTintRaid",
-    "showBackground", "backgroundColor", "showBorder", "borderColor", "borderSize",
-    "scrollBarBg", "scrollBarBgColor", "hideScrollBar", "skinScrollBar",
-    "scrollBarThumbColor", "scrollBarThumbWidth", "hideScrollArrows",
-}
-
--- Clearing a key lets AceDB re-apply its default - behavior keys and the zone bar's saved position are left alone by design
-function DB:ResetTrackerAppearance()
-    local prof = self.db and self.db.profile and self.db.profile.tracker
-    if not prof then return end
-    for _, k in ipairs(APPEARANCE_KEYS) do prof[k] = nil end
-    local zb = prof.zoneProgressBar
-    if zb then
-        zb.showBackground, zb.showBorder, zb.scale = nil, nil, nil
-        zb.borderColor, zb.headerColor, zb.countColor, zb.font = nil, nil, nil, nil
-        zb.barTexture, zb.barColor = nil, nil
-    end
-end
 
 function DB:OnInitialize()
     local AceDB = LibStub("AceDB-3.0")
@@ -237,10 +91,12 @@ function DB:OnInitialize()
     self.chainCache = _G.EverythingQuestsChainCache
     ns.db = self.db
 
-    local Util = ns.Util
-    local t = self.db and self.db.profile and self.db.profile.tracker
-    if Util and Util.ReconcileOrder and t then
-        t.manualOrder = Util.ReconcileOrder(t.manualOrder)
+    -- showChainGuideIcon moved from profile.tracker to profile.general when the tracker left.
+    -- Carried across by hand, or anyone who had turned the icon off gets it back silently.
+    local p = self.db and self.db.profile
+    if p and p.tracker and p.tracker.showChainGuideIcon ~= nil
+       and p.general.showChainGuideIcon == nil then
+        p.general.showChainGuideIcon = p.tracker.showChainGuideIcon
     end
 end
 

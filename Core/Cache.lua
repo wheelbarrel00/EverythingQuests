@@ -114,11 +114,26 @@ local function fullRebuild()
     Cache.dirtyObjectives = false
 end
 
+-- Both of these moved to EQ Objective Tracker with the tracker itself. They are read back
+-- rather than dropped because they gate the expensive objective refresh below, and MapPOI
+-- still runs off this cache. Guarded because '## Dependencies:' cannot express a minimum
+-- version, so an older EQOT satisfies it and answers nil here - which falls back to
+-- refreshing everything rather than refreshing nothing.
+local function trackerFilterState()
+    local T = _G.EQObjectiveTracker
+    local DB = T and T.GetModule and T:GetModule("DB")
+    if not (DB and DB.Tracker) then return false, nil end
+
+    local cfg  = DB:Tracker()
+    local char = DB.Char and DB:Char()
+    local onlyWatched = cfg and cfg.showOnlyWatched ~= false
+    -- EQOT keys pinned by provider first so two providers cannot collide on a bare id.
+    local pinnedSet = char and char.pinned and char.pinned.quests
+    return onlyWatched and true or false, pinnedSet
+end
+
 local function refreshDynamicFields()
-    local DB = ns:GetSubsystem("DB")
-    local profile = DB and DB.db.profile.tracker
-    local onlyWatched = (not profile) or profile.showOnlyWatched ~= false
-    local pinnedSet = DB and DB.char and DB.char.pinned
+    local onlyWatched, pinnedSet = trackerFilterState()
     for id, q in pairs(Cache.quests) do
         local watched = C_QuestLog.GetQuestWatchType
                         and C_QuestLog.GetQuestWatchType(id) ~= nil
