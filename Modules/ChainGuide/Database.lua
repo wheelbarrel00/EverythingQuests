@@ -15,8 +15,10 @@ end
 
 function DBmod:CurrentCharacter()
     if self._char then return self._char end
-    local _, classFile = UnitClass and UnitClass("player")
-    local _, raceFile  = UnitRace and UnitRace("player")
+    -- Two-step on purpose - "UnitClass and UnitClass(...)" is a binary expression, so it truncates to the first return and the locale-independent token lands nil
+    local _, classFile, raceFile
+    if UnitClass then _, classFile = UnitClass("player") end
+    if UnitRace  then _, raceFile  = UnitRace("player")  end
     self._char = {
         faction = UnitFactionGroup and UnitFactionGroup("player"),
         class   = classFile,

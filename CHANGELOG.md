@@ -5,6 +5,20 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.1] - 2026-08-07
+
+Follow-up fixes to the tracker split, plus two bugs found while going back over the code afterwards.
+
+### Bug Fixes
+
+- **Chain Guide steps that differ by class or race now resolve properly** - a chain step with a class-specific or race-specific version always fell back to the generic one, because the player's class and race were being read in a way that quietly produced nothing at all. Faction-specific steps were never affected.
+- **The Quest History Trends view no longer shows a box on Korean clients** - the weekly date range separator used a dash the Korean game font has no glyph for, so it drew as an empty box in the bar tooltip and in exported text.
+
+### Improvements
+
+- **More of the interface is translated in Korean** - the phrases added by the tracker split are now covered, including the General tab's tracker settings button and the tracker icon options.
+- **The addon description and README match the split** - both still described a tracker that Everything Quests no longer contains, and pointed at options tabs that have moved to EQ Objective Tracker.
+
 ## [1.38.0] - 2026-08-06
 
 Everything Quests' tracker has moved out into its own addon, EQ Objective Tracker, which now comes down automatically with Everything Quests. Your layout and settings carry across on their own and there is nothing to set up again. The reason for the split is maintenance: there is one copy of the tracker code now instead of two, so a tracker fix lands everywhere at once.

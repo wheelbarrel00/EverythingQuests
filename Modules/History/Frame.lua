@@ -1327,7 +1327,8 @@ function HF:_renderTrends()
             bar:SetSize(math.max(barW, 1), math.max(h, 1))
             bar.fill:SetColorTexture(YELLOW[1], YELLOW[2], YELLOW[3], v > 0 and 0.9 or 0.12)
             local rng = p.label
-            if gran == "weekly" then rng = rng .. " \226\128\147 " .. date("!%b %d", p.day1 * 86400) end
+            -- Plain hyphen, not an en dash - the Korean game font has no glyph for U+2013 and draws a box
+            if gran == "weekly" then rng = rng .. " - " .. date("!%b %d", p.day1 * 86400) end
             bar._rangeText = rng
             bar._valueText = formatMetric(metric, v)
             bar:Show()
@@ -1573,7 +1574,7 @@ function HF:_exportTrends()
     for i = 1, #data.periods do
         local p = data.periods[i]
         local period = (gran == "weekly")
-            and (date("!%Y-%m-%d", p.day0 * 86400) .. " – " .. date("!%Y-%m-%d", p.day1 * 86400))
+            and (date("!%Y-%m-%d", p.day0 * 86400) .. " - " .. date("!%Y-%m-%d", p.day1 * 86400))
             or  date("!%Y-%m-%d", p.day0 * 86400)
         lines[#lines + 1] = ("%s | %d | %d | %s"):format(
             period, p.count, p.xp, fmtMoneyText(p.gold))

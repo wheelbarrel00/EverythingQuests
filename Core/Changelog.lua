@@ -2,6 +2,19 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.38.1", date = "2026-08-07",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "Chain Guide steps that differ by class or race now resolve properly. A chain step with a class-specific or race-specific version always fell back to the generic one, because the player's class and race were being read in a way that quietly produced nothing at all. Faction-specific steps were never affected.",
+                "The Quest History Trends view no longer shows a box on Korean clients. The weekly date range separator used a dash the Korean game font has no glyph for, so it drew as an empty box in the bar tooltip and in exported text.",
+            } },
+            { head = "Improvements", items = {
+                "More of the interface is translated in Korean. The phrases added by the tracker split are now covered, including the General tab's tracker settings button and the tracker icon options.",
+                "The addon description and README match the split. Both still described a tracker that Everything Quests no longer contains, and pointed at options tabs that have moved to EQ Objective Tracker.",
+            } },
+        },
+    },
+    {
         version = "1.38.0", date = "2026-08-06",
         sections = {
             { head = "Changes", items = {

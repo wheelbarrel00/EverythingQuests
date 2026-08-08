@@ -53,7 +53,7 @@ function Options:Build()
 
     f.version = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.version:SetPoint("TOPRIGHT", -34, -14)
-    f.version:SetText("v" .. (ns.VERSION or "1.38.0"))
+    f.version:SetText("v" .. (ns.VERSION or "1.38.1"))
     f.version:SetTextColor(unpack(YELLOW))
 
     f.discord = CreateFrame("Button", nil, f)
@@ -792,118 +792,6 @@ function Options:CreateSlider(parent, label, min, max, step, getter, setter)
     end)
 
     container.slider = slider
-    return container
-end
-
--- Skipped when another UI already adds a class-color button to the picker, to avoid a duplicate
-local function elvUILoaded()
-    local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G["IsAddOnLoaded"]
-    return (f and f("ElvUI")) and true or false
-end
-
-local _classColorButton
-local _activeColorApply
-local _activeReopen
-
-local function ensureClassColorButton()
-    if _classColorButton ~= nil then return _classColorButton or nil end
-    if elvUILoaded() or not ColorPickerFrame then _classColorButton = false; return nil end
-    local b = Options:CreateYellowButton(ColorPickerFrame, _G.CLASS or "Class", function()
-        local getCC = ns.Util and ns.Util.GetPlayerClassColor
-        if not getCC then return end
-        local r, g, bl = getCC()
-        if not r or not _activeReopen then return end
-        -- SetColorRGB does not reliably move the 10.2.5+ picker, so re-open it seeded with the class color
-        local a = (ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha()) or 1
-        _activeReopen(r, g, bl, a)
-        if _activeColorApply then _activeColorApply() end
-    end)
-    b:SetSize(90, 22)
-    b:SetPoint("TOPLEFT", ColorPickerFrame, "TOPRIGHT", 6, -34)
-    b:Hide()
-    ColorPickerFrame:HookScript("OnHide", function()
-        if _classColorButton then _classColorButton:Hide() end
-        _activeColorApply = nil
-        _activeReopen = nil
-    end)
-    _classColorButton = b
-    return b
-end
-
-function Options:CreateColorPicker(parent, label, getter, setter)
-    local container = CreateFrame("Frame", nil, parent)
-    container:SetSize(220, 22)
-
-    local labelFS = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    labelFS:SetPoint("LEFT")
-    labelFS:SetText(label)
-    labelFS:SetTextColor(1, 1, 1)
-
-    local btn = CreateFrame("Button", nil, container, "BackdropTemplate")
-    btn:SetSize(44, 20)
-    btn:SetPoint("LEFT", labelFS, "RIGHT", 8, 0)
-    local border = btn:CreateTexture(nil, "BACKGROUND")
-    border:SetAllPoints()
-    border:SetColorTexture(0.92, 0.72, 0.02, 1)
-    local underlay = btn:CreateTexture(nil, "BORDER")
-    underlay:SetPoint("TOPLEFT", 2, -2)
-    underlay:SetPoint("BOTTOMRIGHT", -2, 2)
-    underlay:SetColorTexture(0, 0, 0, 1)
-    local swatch = btn:CreateTexture(nil, "ARTWORK")
-    swatch:SetPoint("TOPLEFT", 2, -2)
-    swatch:SetPoint("BOTTOMRIGHT", -2, 2)
-
-    local function paint()
-        local c = getter and getter() or { r = 1, g = 1, b = 1, a = 1 }
-        swatch:SetColorTexture(c.r or 0, c.g or 0, c.b or 0, c.a or 1)
-    end
-    paint()
-
-    btn:SetScript("OnClick", function()
-        local c = getter and getter() or { r = 1, g = 1, b = 1, a = 1 }
-        -- cancelFunc's prev arg changed shape in the 10.2.5 picker overhaul (alpha unreliable), so restore from this snapshot
-        local orig = { r = c.r or 0, g = c.g or 0, b = c.b or 0, a = c.a or 1 }
-        local function applyColor(restore)
-            local r, g, b, a
-            if restore then
-                r, g, b, a = restore.r, restore.g, restore.b, restore.a
-            elseif ColorPickerFrame and ColorPickerFrame.GetColorRGB then
-                r, g, b = ColorPickerFrame:GetColorRGB()
-                -- GetColorAlpha arrived in 10.0 and OpacitySliderFrame was removed at the same time
-                if ColorPickerFrame.GetColorAlpha then
-                    a = ColorPickerFrame:GetColorAlpha()
-                elseif OpacitySliderFrame then
-                    a = 1 - OpacitySliderFrame:GetValue()
-                else
-                    a = c.a or 1
-                end
-            else
-                r, g, b, a = c.r, c.g, c.b, c.a
-            end
-            if setter then setter({ r = r, g = g, b = b, a = a }) end
-            paint()
-        end
-        if ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow then
-            local function openWith(nr, ng, nb, na)
-                ColorPickerFrame:SetupColorPickerAndShow({
-                    r = nr, g = ng, b = nb,
-                    opacity = na, hasOpacity = true,
-                    swatchFunc = function() applyColor() end,
-                    opacityFunc = function() applyColor() end,
-                    cancelFunc  = function() applyColor(orig) end,
-                })
-                _activeColorApply = applyColor
-                _activeReopen = openWith
-                local classBtn = ensureClassColorButton()
-                if classBtn then classBtn:Show() end
-            end
-            openWith(c.r or 0, c.g or 0, c.b or 0, c.a or 1)
-        end
-    end)
-
-    container.button = btn
-    container.label  = labelFS
-    container.paint  = paint
     return container
 end
 
