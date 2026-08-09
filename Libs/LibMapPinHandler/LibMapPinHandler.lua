@@ -96,7 +96,14 @@ function ShadowCanvas:GetCanvasContainer()                       return self.own
 function ShadowCanvas:GetMapID()                                 return self.ownerMap:GetMapID()                            end
 function ShadowCanvas:EvaluateLockReasons()                                                                                 end
 function ShadowCanvas:GetPinFrameLevelsManager()                 return self.ownerMap.pinFrameLevelsManager                 end
-function ShadowCanvas:ProcessGlobalPinMouseActionHandlers(...)   return self.ownerMap:ProcessGlobalPinMouseActionHandlers(...) end
+
+-- MEASURED 2026-08-09: ProcessGlobalPinMouseActionHandlers is nil on Classic Era 1.15.9 and a
+-- function on retail, so this passthrough would raise there rather than no-op. Guarded so a
+-- flavor without the handler loses the passthrough and not the pin.
+function ShadowCanvas:ProcessGlobalPinMouseActionHandlers(...)
+    if not self.ownerMap.ProcessGlobalPinMouseActionHandlers then return end
+    return self.ownerMap:ProcessGlobalPinMouseActionHandlers(...)
+end
 
 -- ─── Public access ─────────────────────────────────────────────────────
 local cache = {}                            -- frame -> shadow canvas (1:1, lifetime-of-session)

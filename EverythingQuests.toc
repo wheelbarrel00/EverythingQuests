@@ -88,6 +88,12 @@ Modules\History\Recorder.lua
 Modules\History\Frame.lua
 Modules\History\Session.lua
 
+# Data\QuestCoords_Classic.lua is Era quest data and no retail map uses those UiMapIDs, so it
+# is listed by the flavor TOCs ONLY. Those are gitignored, so CI sees neither them nor the
+# coverage they provide - this directive is what declares the hole instead of hiding it, and
+# tools/check_toc.py errors if it ever goes stale. It has to live HERE, in the tracked TOC.
+# check-toc: flavor-only Data/QuestCoords_Classic.lua
+
 # Data (registers chain definitions into ChainGuideDatabase)
 Data\QuestChains\_Index.lua
 Data\QuestChains\_QuestLineRouting.lua

@@ -7,6 +7,21 @@ local Pin = EQQuestPinMixin
 local ICON_QUEST_AVAILABLE = "Interface\\GossipFrame\\AvailableQuestIcon"
 local ICON_QUEST_TURNIN    = "Interface\\GossipFrame\\ActiveQuestIcon"
 
+-- The two icon paths above are vanilla-era art and exist on every flavor. This ring is NOT -
+-- it is a world quest atlas with no Classic equivalent. Resolved once through GetAtlasInfo
+-- rather than handing SetAtlas a name the client may not know, because a raise here would
+-- cost the pin entirely rather than just its ring.
+local RING_ATLAS = "worldquest-emissary-ring"
+local _ringAtlas
+
+local function ringAtlas()
+    if _ringAtlas == nil then
+        local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(RING_ATLAS)
+        _ringAtlas = (info ~= nil) and RING_ATLAS or false
+    end
+    return _ringAtlas
+end
+
 function Pin:OnLoad()
     -- QUEST_PING is the highest standard pin tier - a lower tier puts our pins under Blizzard's and they never see a click
     self:UseFrameLevelType("PIN_FRAME_LEVEL_QUEST_PING")
@@ -20,8 +35,14 @@ function Pin:OnAcquired(questID, x, y, isComplete)
     self:SetPosition(x, y)
 
     if self.ring then
-        self.ring:SetAtlas("worldquest-emissary-ring")
-        self.ring:SetVertexColor(0.635, 0.0, 0.039, 1)           -- #a2000a
+        local atlas = ringAtlas()
+        if atlas then
+            self.ring:SetAtlas(atlas)
+            self.ring:SetVertexColor(0.635, 0.0, 0.039, 1)       -- #a2000a
+            self.ring:Show()
+        else
+            self.ring:Hide()
+        end
     end
     self.icon:SetTexture(isComplete and ICON_QUEST_TURNIN or ICON_QUEST_AVAILABLE)
     self.icon:SetVertexColor(1, 1, 1, 1)
