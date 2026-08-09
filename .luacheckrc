@@ -6,7 +6,9 @@
 std               = "lua51"
 max_line_length   = false   -- changelog / locale strings are intentionally long
 codes             = true
-exclude_files     = { "Libs/", "*TRANSLATE-ME*.lua", "Locales/*TRANSLATE-ME*.lua" }
+-- docs/ is gitignored local tooling and generated scratch, never shipped, and it is written
+-- for standalone Lua rather than the WoW environment - linting it only moves the baseline.
+exclude_files     = { "Libs/", "*TRANSLATE-ME*.lua", "Locales/*TRANSLATE-ME*.lua", "docs/" }
 
 -- WoW callbacks are written as `function obj:Method()` / `function(self, ...)`;
 -- an unused or shadowed implicit `self` is idiomatic here, not a smell. The
@@ -18,7 +20,7 @@ globals = {
     "EverythingQuests",
     "EverythingQuestsDB", "EverythingQuestsCharDB", "EverythingQuestsChainCache",
     "EverythingQuestsHistory", "EverythingQuestsHistoryBackups",
-    "SlashCmdList", "SLASH_EVERYTHINGQUESTS1", "SLASH_EVERYTHINGQUESTS2",
+    "SlashCmdList", "SLASH_EVERYTHINGQUESTS1", "SLASH_EVERYTHINGQUESTS2", "SLASH_EQSPROBE1",
     "EQQuestPinMixin", "EQWorldQuestPinMixin", "EQChainPinMixin",
     "BINDING_HEADER_EVERYTHINGQUESTS",
 }
@@ -32,7 +34,6 @@ read_globals = {
     "QuestFont", "QuestFont_Large", "QuestFont_Super_Huge", "ObjectiveTrackerHeaderFont",
     "STANDARD_TEXT_FONT",
     "WorldMapFrame", "QuestMapFrame", "QuestLogFrame", "FlightMapFrame", "Minimap",
-    "ObjectiveTrackerFrame", "ObjectiveTrackerManager", "ColorPickerFrame", "OpacitySliderFrame",
     "QuestLogPopupDetailFrame", "ChatFrame1", "DEFAULT_CHAT_FRAME",
     "EditModeManagerFrame", "SettingsPanel",
     -- C_ namespaces
@@ -78,7 +79,7 @@ read_globals = {
     "CreateVector2D", "CreateColor", "PIN_FRAME_LEVEL_AREA_POI", "PIN_FRAME_LEVEL_QUEST_PING",
     "LibStub", "Settings", "MenuUtil", "Menu", "TomTom",
     -- constants / enums / colors
-    "Enum", "SOUNDKIT", "RAID_CLASS_COLORS", "FACTION_BAR_COLORS",
+    "Enum", "SOUNDKIT", "FACTION_BAR_COLORS",
     "LE_QUEST_FREQUENCY_DAILY", "LE_QUEST_FREQUENCY_WEEKLY",
     "ERR_QUEST_COMPLETE_S", "SEARCH", "OKAY",
     "PROFESSIONS_TRACKER_REAGENT_FORMAT", "PROFESSIONS_TRACKER_REAGENT_COUNT_FORMAT",

@@ -25,6 +25,9 @@ Libs\LibMapPinHandler\LibMapPinHandler.lua
 # Core (defines RegisterSubsystem; must load before any module)
 Core\Init.lua
 
+# ns.Has and ns.Compat are read at file scope by consumers, so this loads before all of them
+Core\Compat.lua
+
 # Locales (define ns.L before any consumer; enUS first to create the table)
 Locales\enUS.lua
 Locales\frFR.lua
@@ -40,6 +43,7 @@ Core\Media.lua
 Core\Dialog.lua
 Core\QuestRewards.lua
 Core\Changelog.lua
+Core\FlavorProbe.lua
 
 # Modules (subsystems must exist before Data/* registers into them)
 Modules\Minimap\Minimap.lua

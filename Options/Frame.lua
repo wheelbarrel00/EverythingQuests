@@ -820,6 +820,9 @@ local function eqSlashHandler(msg)
         Options:Show()
         Options:SelectTab("about")
         return
+    elseif msg:match("^flavorprobe") then
+        if ns.FlavorProbe then ns.FlavorProbe:Run(msg:match("^flavorprobe%s+(.+)$")) end
+        return
     elseif msg:match("^discover") then
         local hint = msg:match("^discover%s+(.+)$")
         local QLS = ns:GetSubsystem("ChainGuideQuestLineSource")
