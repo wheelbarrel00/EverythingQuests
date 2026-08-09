@@ -21,3 +21,15 @@ koKR-TRANSLATE-ME*.lua
 
 # Local dev tooling + drafts (not part of the shipped addon)
 docs/
+
+# Bytecode from the tools/ gates. tools/ is TRACKED, unlike docs/, so without this
+# 'git add -A' commits tools/__pycache__ the first time a gate runs.
+__pycache__/
+*.pyc
+
+# Phase 0 cross-flavor scaffold TOCs. The packager derives a CurseForge game version from
+# every TOC it packages, so committing these would advertise Classic Era and TBC support
+# for an addon that only loads a probe there. DELETE THESE TWO LINES when the TOCs list a
+# real, tested addon and that support claim is one we can stand behind.
+EverythingQuests_Vanilla.toc
+EverythingQuests_TBC.toc

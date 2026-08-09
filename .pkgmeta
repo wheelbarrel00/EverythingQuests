@@ -32,5 +32,6 @@ ignore:
   - .claude
   - .luarc.json
   - .luacheckrc
+  - tools
   - .release_changelog.md
   - Media/Textures/eq-logo-source.png

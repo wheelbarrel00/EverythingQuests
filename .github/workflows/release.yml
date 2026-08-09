@@ -47,6 +47,14 @@ jobs:
             echo "Annotated tag — packaging as a stable release."
           fi
 
+      - name: Check TOC file lists
+        # The flavor TOCs are gitignored while they are Phase 0 scaffolds, so this run only
+        # sees the retail TOC and says so. It is still worth having here: a TOC that lists a
+        # file the tag does not carry packages a zip that errors on load.
+        run: |
+          python3 tools/test_check_toc.py
+          python3 tools/check_toc.py
+
       - name: Build per-release changelog
         run: awk '/^## / { if (seen) exit; seen=1 } seen' CHANGELOG.md > .release_changelog.md
         
