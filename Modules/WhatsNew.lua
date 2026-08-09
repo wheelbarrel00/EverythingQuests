@@ -67,12 +67,15 @@ local function announceChat()
         .. FEATURE_POPUP_VERSION .. " \226\128\148 " .. link)
 end
 
--- The client ignores our custom addon link type, so the popup has to be opened here
-hooksecurefunc("SetItemRef", function(link)
-    if link == "addon:EverythingQuests:whatsnew" then
-        WN:Show()
-    end
-end)
+-- The client ignores our custom addon link type, so the popup has to be opened here. Guarded
+-- because this runs at file scope - an absent hook takes the whole popup down with the file.
+if type(hooksecurefunc) == "function" and type(_G.SetItemRef) == "function" then
+    hooksecurefunc("SetItemRef", function(link)
+        if link == "addon:EverythingQuests:whatsnew" then
+            WN:Show()
+        end
+    end)
+end
 
 function WN:Build()
     if self.frame then return self.frame end

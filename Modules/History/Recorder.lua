@@ -313,8 +313,13 @@ local _titleQueue = {}
 local _titleTimer
 
 function R:RequestMissingTitles()
-    if not (C_QuestLog and C_QuestLog.RequestLoadQuestByID) then return 0 end
+    -- The sweep runs first even where the round trip cannot, being the only path that
+    -- re-resolves titles on rows already written. On Classic it rests entirely on
+    -- QuestUtils_GetQuestName - measured PRESENT on Era, though whether it returns a name
+    -- there is still open - because the rung below it in Util.QuestTitle is curated Midnight
+    -- data that no Classic TOC lists.
     self:SweepTitles()
+    if not ns.Has.QuestDataRequest then return 0 end
     wipe(_titleQueue)
     local seen = {}
     local entries = self.sv.entries
@@ -332,7 +337,7 @@ function R:RequestMissingTitles()
 end
 
 function R:_pumpTitles()
-    if not (C_QuestLog and C_QuestLog.RequestLoadQuestByID) then return end
+    if not ns.Has.QuestDataRequest then return end
     local BATCH = 10
     local fired = 0
     while #_titleQueue > 0 and fired < BATCH do
@@ -443,13 +448,12 @@ function R:_enforceRetention()
     end
 end
 
+local _completedIDs = {}
+
 function R:Backfill()
     local key = charKey()
-    local got
-    if C_QuestLog and C_QuestLog.GetAllCompletedQuestIDs then
-        got = C_QuestLog.GetAllCompletedQuestIDs()
-    end
-    if not got then return 0 end
+    local got, total = ns.Compat.CompletedQuestIDs(_completedIDs)
+    if total == 0 then return 0 end
 
     local seen = {}
     local entries = self.sv.entries
@@ -462,7 +466,7 @@ function R:Backfill()
     local cap = retention()
     local room = (cap > 0) and (cap - #entries) or math.huge
     local added = 0
-    for i = 1, #got do
+    for i = 1, total do
         if room <= 0 then break end
         local qid = got[i]
         if not seen[qid] then

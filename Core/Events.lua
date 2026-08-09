@@ -3,15 +3,37 @@ local _, ns = ...
 local Events = ns:RegisterSubsystem("Events", {})
 local frame = CreateFrame("Frame")
 local listeners = {}
+local unknown = {}
 
 function Events:On(event, fn)
+    if unknown[event] then return end
     local list = listeners[event]
     if not list then
+        -- RegisterEvent RAISES on an event the client does not know rather than quietly
+        -- no-opping, and modules are listed on every flavor. Refusing the listener leaves
+        -- the feature inert there instead of aborting whatever was enabling it. Recorded
+        -- rather than swallowed, or a subsystem goes quiet with nothing to say why.
+        if not pcall(frame.RegisterEvent, frame, event) then
+            unknown[event] = true
+            return
+        end
         list = {}
         listeners[event] = list
-        frame:RegisterEvent(event)
     end
     list[#list + 1] = fn
+end
+
+function Events:Unknown()
+    local names = {}
+    for event in pairs(unknown) do names[#names + 1] = event end
+    table.sort(names)
+    return names
+end
+
+function Events:DebugLine()
+    local names = self:Unknown()
+    if #names == 0 then return "events: every registration accepted by this client" end
+    return ("events: %d unknown on this client - %s"):format(#names, table.concat(names, ", "))
 end
 
 function Events:Off(event, fn)

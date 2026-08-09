@@ -46,7 +46,7 @@ end
 local function onQuestGreeting()
     if paused() then return end
 
-    if autoTurnInOn() and GetNumActiveQuests then
+    if autoTurnInOn() and GetNumActiveQuests and GetActiveTitle and SelectActiveQuest then
         local n = GetNumActiveQuests() or 0
         for i = 1, n do
             local _, isComplete = GetActiveTitle(i)
@@ -57,7 +57,7 @@ local function onQuestGreeting()
         end
     end
 
-    if autoAcceptOn() and GetNumAvailableQuests then
+    if autoAcceptOn() and GetNumAvailableQuests and SelectAvailableQuest then
         local n = GetNumAvailableQuests() or 0
         if n >= 1 then SelectAvailableQuest(1) end
     end

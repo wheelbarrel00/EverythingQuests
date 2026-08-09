@@ -56,15 +56,16 @@ local function elvUILoaded()
 end
 
 local activeQuests = {}
+local _logRows = {}
 
 local function rebuildCache()
     wipe(activeQuests)
-    if not (C_QuestLog and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetQuestObjectives) then
+    if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then
         return
     end
-    local n = C_QuestLog.GetNumQuestLogEntries() or 0
-    for i = 1, n do
-        local info = C_QuestLog.GetInfo and C_QuestLog.GetInfo(i)
+    local rows, last = ns.Compat.CollectQuestLog(_logRows)
+    for i = 1, last do
+        local info = rows[i]
         if info and not info.isHeader and info.questID and info.title then
             local objectives = C_QuestLog.GetQuestObjectives(info.questID)
             if objectives then
@@ -107,7 +108,10 @@ end
 local _scanSeen = {}
 local function scanInto(unit, out)
     wipe(out)
-    if not (C_TooltipInfo and C_TooltipInfo.GetUnit) then return 0 end
+    -- ⚠ Classic has no C_TooltipInfo.GetUnit, so this returns 0 and the icons never appear.
+    -- The replacement is a GameTooltip:SetUnit plus TextLeft<i>:GetText() scrape, not written
+    -- yet because whether a Classic unit tooltip carries quest lines at all is unmeasured.
+    if not ns.Has.TooltipDataUnit then return 0 end
     local data = C_TooltipInfo.GetUnit(unit)
     local lines = data and data.lines
     if not lines then return 0 end

@@ -52,14 +52,16 @@ local function getObjectivesText(id)
     return text
 end
 
+local _logRows = {}
+
 local function fullRebuild()
     wipe(Cache.quests)
     wipe(Cache.headerOrder)
 
     local currentHeader = nil
-    local n = C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetNumQuestLogEntries() or 0
-    for i = 1, n do
-        local info = C_QuestLog.GetInfo and C_QuestLog.GetInfo(i)
+    local rows, last = ns.Compat.CollectQuestLog(_logRows)
+    for i = 1, last do
+        local info = rows[i]
         if info then
             if info.isHeader then
                 currentHeader = info.title
@@ -78,7 +80,11 @@ local function fullRebuild()
                     level          = info.level,
                     zone           = currentHeader,
                     frequency      = info.frequency,
-                    isComplete     = C_QuestLog.IsComplete and C_QuestLog.IsComplete(id) or false,
+                    -- Classic has no C_QuestLog.IsComplete. Its completion flag rides the quest
+                    -- log row instead, as a NUMBER: 1 ready to turn in, -1 failed, nil neither.
+                    isComplete     = (C_QuestLog.IsComplete and C_QuestLog.IsComplete(id))
+                                     or info.isComplete == 1
+                                     or false,
                     isOnMap        = info.isOnMap,
                     isCampaign     = deriveIsCampaign(id, info),
                     isAutoComplete = info.isAutoComplete,
@@ -180,8 +186,15 @@ function Cache:OnInitialize()
     Events:On("QUEST_REMOVED",    dirtyAll)
     Events:On("QUEST_TURNED_IN",  dirtyAll)
 
+    -- ⛔ The cheap refresh below re-reads objectives but cannot learn that a quest became READY
+    -- TO TURN IN, because on Classic that flag lives on the quest log ROW and only the full
+    -- rebuild walks those. Without this the turn-in icon would not appear until the next
+    -- accept or hand-in. A Classic log is about 20 entries, so a full rebuild is cheap there.
+    local hasIsComplete = type(C_QuestLog) == "table"
+                          and type(C_QuestLog.IsComplete) == "function"
+
     local function dirtyDynamic()
-        if not primed then
+        if not primed or not hasIsComplete then
             Cache.dirtyAll = true
         else
             Cache.dirtyObjectives = true
