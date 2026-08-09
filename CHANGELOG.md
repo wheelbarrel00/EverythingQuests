@@ -7,17 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.38.1] - 2026-08-07
 
-Follow-up fixes to the tracker split, plus two bugs found while going back over the code afterwards.
+Follow-up fixes to the tracker split, plus a bug found while going back over the code afterwards.
 
 ### Bug Fixes
 
-- **Chain Guide steps that differ by class or race now resolve properly** - a chain step with a class-specific or race-specific version always fell back to the generic one, because the player's class and race were being read in a way that quietly produced nothing at all. Faction-specific steps were never affected.
 - **The Quest History Trends view no longer shows a box on Korean clients** - the weekly date range separator used a dash the Korean game font has no glyph for, so it drew as an empty box in the bar tooltip and in exported text.
 
 ### Improvements
 
 - **More of the interface is translated in Korean** - the phrases added by the tracker split are now covered, including the General tab's tracker settings button and the tracker icon options.
 - **The addon description and README match the split** - both still described a tracker that Everything Quests no longer contains, and pointed at options tabs that have moved to EQ Objective Tracker.
+
+### Notes
+
+- **The Chain Guide's class and race check was corrected internally.** It read your character's class and race in a way that quietly produced nothing at all. No chain published today varies its steps by class or race, so there is nothing to see here; the check is simply right now for chains that will. Faction handling was never affected.
 
 ## [1.38.0] - 2026-08-06
 
