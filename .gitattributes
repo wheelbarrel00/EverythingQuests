@@ -1,0 +1,9 @@
+# The locale tooling in EverythingLocales writes LF, but a fresh clone under
+# core.autocrlf=true checks out CRLF, so regenerating a locale reported every line as
+# changed and buried the real edit. Pinning authored Lua to LF ends that.
+*.lua text eol=lf
+
+# Vendored third-party code keeps whatever core.autocrlf gives it. Both attributes have to
+# be unset - 'eol' on its own still forces conversion - and '!' unsets rather than '-',
+# which would instead turn conversion off and rewrite these to LF.
+Libs/** !text !eol
