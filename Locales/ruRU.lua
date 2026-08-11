@@ -27,6 +27,7 @@ local L = ns.L
 L["General"] = "Основные"
 L["Show quest pins on the world map"] = "Показывать метки заданий на карте мира"
 L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Quests you haven't accepted yet keep the game's own yellow \"!\" markers; EQ does not change those. Uncheck this box and all of EQ's red markers go away."] = "Это круглые метки, которые Everything Quests ставит на карте мира для заданий, которые уже взяты (те, что в журнале заданий). \nКрасный \"!\" означает «иди сюда для следующего шага этого задания». \nКрасный \"?\" означает «это задание выполнено - иди сюда, чтобы сдать его». \nЗадания, которые вы ещё не приняли, сохраняют стандартные жёлтые метки \"!\" игры; EQ их не меняет. Снимите эту галочку - и все красные метки EQ исчезнут."
+L["World map pin scale"] = "Масштаб меток на карте мира"
 L["Auto-accept quests"] = "Авто-принятие заданий"
 L["Hold Alt to pause."] = "Зажмите Alt для самостоятельного принятия."
 L["Auto-turn-in quests"] = "Авто-сдача заданий"
@@ -119,7 +120,6 @@ L["Reward"] = "Награда"
 L["Faction"] = "Фракция"
 L["A-Z"] = "А-Я"
 L["Sort zone quest list by"] = "Сортировать список заданий зоны по"
-L["World map pin scale"] = "Масштаб меток на карте мира"
 L["Filters apply immediately when the world map is open."] = "Фильтры применяются мгновенно, когда карта мира открыта."
 
 -- ─── Options/TabChainGuide.lua ───

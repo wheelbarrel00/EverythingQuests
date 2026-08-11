@@ -29,6 +29,13 @@ local L = ns.L
 L["General"] = true
 L["Show quest pins on the world map"] = true
 L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Quests you haven't accepted yet keep the game's own yellow \"!\" markers; EQ does not change those. Uncheck this box and all of EQ's red markers go away."] = true
+L["World map pin scale"] = true
+L["Quest pins already grow as you zoom in and shrink as you zoom out. This scales that whole range, so raise it if the pins are hard to pick out on a large or high-resolution display."] = true
+L["Objective pins per quest"] = true
+L["No limit"] = true
+L["How many places to mark for a single quest on one map. The busiest locations are kept first, so a lower number still points you somewhere useful. Slide all the way right for no limit at all - a few gathering quests can then put hundreds of markers on one map."] = true
+L["Show objective pins on the minimap"] = true
+L["Puts the same objective markers on the minimap as on the world map, for the zone you are standing in. They use the per-quest limit above. Hover one for the quest name and what it still needs."] = true
 L["Auto-accept quests"] = true
 L["Hold Alt to pause."] = true
 L["Auto-turn-in quests"] = true
@@ -121,7 +128,6 @@ L["Reward"] = true
 L["Faction"] = true
 L["A-Z"] = true
 L["Sort zone quest list by"] = true
-L["World map pin scale"] = true
 L["Filters apply immediately when the world map is open."] = true
 
 -- ─── Options/TabChainGuide.lua ───
@@ -356,6 +362,10 @@ L["Press Ctrl+A to select all, then Ctrl+C to copy."] = true
 L["first time seeing |cffffffff%s|r - added %d past completion%s (no dates; future turn-ins are dated)."] = true
 L["Quest history loaded empty; restored a backup from %s (%d entries)."] = true
 L["Quest history for %s was missing; restored a backup from %s (%d entries)."] = true
+
+-- ─── Modules/MapPOI/Pin.lua ───
+L["Dungeon entrance"] = true
+L["and %d more"] = true
 
 -- ─── Modules/TrackerBridge.lua ───
 L["EQ Objective Tracker is not loaded, so the tracker is unavailable."] = true

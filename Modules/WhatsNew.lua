@@ -3,30 +3,26 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.38.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.38.0"
+local FEATURE_POPUP_VERSION = "1.39.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.39.0"
 
 local POPUP_BODY = [[
-|cffEBB706The tracker has moved into its own addon|r
-Everything Quests' tracker is now a separate addon called |cffffffffEQ Objective Tracker|r, and it came down with this update automatically. You do not need to install anything, and nothing needs setting up again. Your tracker's position, size, fonts, colors, section order, filters and sorting all carried across on their own, along with your pinned quests, hidden quests and collapsed sections on every character.
+|cffEBB706Everything Quests now runs on Classic Era|r
+This is the first release that works on |cffffffffClassic Era|r, and it is deliberately a limited one. What is in are the parts that have been tested in game on a live Era client: quest markers on the world map and the minimap, quest icons on nameplates, auto-accept and auto-turn-in, the minimap button, and the |cffffffff/eqs|r options window.
 
-If the tracker looks and behaves exactly as it did yesterday, that is the intended result.
+Markers show every place a quest can be advanced rather than a single spot, and they tell you whether you are there to kill something, loot something, or use an object. Clicking one drops a |cffffffffTomTom|r arrow if you have TomTom installed. An objective that lives inside a dungeon is marked at the dungeon entrance instead, so you at least know which door to go through.
 
-|cffEBB706Where the settings live now|r
-The tracker's own options moved with it. Open them with the |cffffffffcogwheel|r at the top right of the tracker, or by typing |cffffffff/eqot|r. Everything that used to be under |cffffffff/eqs|r > Tracker and |cffffffff/eqs|r > Appearance is in there, in the same shape.
+|cffEBB706What is not there yet|r
+The |cffffffffChain Guide|r, the |cffffffffWorld Quests|r panel and |cffffffffQuest History|r stay retail-only for now. |cffffffffBurning Crusade Classic|r and |cffffffffMists of Pandaria Classic|r are next in line, and more Classic features are actively being worked on.
 
-Everything Quests' own options are still |cffffffff/eqs|r. There is now an |cffffffffEverything Quests logo|r beside the cogwheel on the tracker that opens them, and the minimap button still works the way it always has. The chain icon for the Chain Guide is still there too. Any of the three icons can be switched off under |cffffffff/eqs|r > General.
+|cffEBB706Expect some rough edges|r
+A first release on a new game version will have problems that testing did not catch. If a marker sends you to the wrong place, an icon looks wrong, or anything throws an error, please report it on the |cffffffffDiscord|r or on |cffffffffGitHub|r. Typing |cffffffff/eqsprobe|r prints exactly what the addon found on your client, and pasting that into a report makes it far easier to act on.
 
-|cffEBB706Why split it up|r
-There is now one copy of the tracker code instead of two. A tracker bug fixed once is fixed for everybody, which means fewer bugs and faster updates. It also means people who only ever wanted the tracker can run just that, without the quest log book, map overlays, chain guide and history that Everything Quests adds on top.
-
-Everything Quests is not going anywhere, and none of the rest of it changed in this update.
-
-|cffEBB706If something looks wrong|r
-Both addons need to be enabled. If the tracker is missing entirely, check that |cffffffffEQ Objective Tracker|r is ticked in your AddOns list. Type |cffffffff/eqot status|r for a readout of what the tracker is doing, and please report anything odd on the Discord or on GitHub with that output included. This is a big change under the hood and reports genuinely help.
+|cffEBB706Map markers are easier to read, on every version|r
+Hovering a marker now lists every quest at that spot instead of only the top one, so markers sitting on top of each other no longer hide one another. Markers are also a fixed size at every zoom level now, rather than shrinking as you zoom out.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffZox|r (French) and |cffffffffMalevi4|r (Russian) for keeping Everything Quests translated, and to everyone who sent reports and suggestions while this was being built.
+Thanks to |cffffffffZox|r (French) and |cffffffffMalevi4|r (Russian) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]

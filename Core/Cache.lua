@@ -186,7 +186,7 @@ function Cache:OnInitialize()
     Events:On("QUEST_REMOVED",    dirtyAll)
     Events:On("QUEST_TURNED_IN",  dirtyAll)
 
-    -- ⛔ The cheap refresh below re-reads objectives but cannot learn that a quest became READY
+    -- The cheap refresh below re-reads objectives but cannot learn that a quest became READY
     -- TO TURN IN, because on Classic that flag lives on the quest log ROW and only the full
     -- rebuild walks those. Without this the turn-in icon would not appear until the next
     -- accept or hand-in. A Classic log is about 20 entries, so a full rebuild is cheap there.

@@ -1,8 +1,7 @@
 local _, ns = ...
 
--- Temporary cross-flavor measurement command for the Classic port. Every probed global is
--- reached through _G with a variable name, so probing a new one needs no .luacheckrc entry.
--- Nothing here may become a runtime branch: the build number is reported, never tested.
+-- Cross-flavor measurement command. Probed globals go through _G with a variable name so a
+-- new one needs no .luacheckrc entry, and nothing here may become a runtime branch.
 
 local Probe = {}
 ns.FlavorProbe = Probe
@@ -34,9 +33,8 @@ local function resolve(path)
     return obj
 end
 
--- Counted with select('#') rather than '#' on the table: a probed function returning nil in
--- any slot leaves a hole, and '#' finds a border rather than the count, so a tuple would
--- print short and read as a genuinely shorter return.
+-- select('#') rather than '#' on the table - a nil in any slot leaves a hole, and a short
+-- count would read as a genuinely shorter return.
 local function countAndPack(...)
     return select("#", ...), { ... }
 end
@@ -44,6 +42,45 @@ end
 local function val(v)
     if type(v) == "string" and #v > 40 then return ("%q..(%d)"):format(v:sub(1, 40), #v) end
     return ("%s(%s)"):format(tostring(v), type(v))
+end
+
+-- Sparse quest-id keyed tables have no border, so # answers 0 on a full table
+local function countKeys(t)
+    if type(t) ~= "table" then return "n/a" end
+    local n = 0
+    for _ in pairs(t) do n = n + 1 end
+    return n
+end
+
+-- A pin may sit at any of a quest's stored spawn points, so checking only the single-point
+-- table reports correctly placed pins as misplaced. Report the source table with the distance.
+local function nearestStored(questID, gotX, gotY, mapID)
+    local best, source
+    local function consider(x, y, tag)
+        local d = math.max(math.abs(gotX - x), math.abs(gotY - y))
+        if not best or d < best then best, source = d, tag end
+    end
+
+    local coords = ns.CLASSIC_QUEST_COORDS
+    local packed = coords and coords[questID]
+    if packed then
+        local rest = packed % 1e8
+        consider(math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4, "single-point")
+    end
+
+    local byMap = ns.CLASSIC_QUEST_SPAWNS and ns.CLASSIC_QUEST_SPAWNS[questID]
+    if byMap then
+        local list = mapID and byMap[mapID]
+        if list then
+            -- The leading digit is the objective kind and must come off first, or every point
+            -- decodes to a nonsense coordinate.
+            for i = 1, #list do
+                local rest = list[i] % 1e8
+                consider(math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4, "spawn")
+            end
+        end
+    end
+    return best, source
 end
 
 local function emit(list, per)
@@ -57,11 +94,11 @@ local function emit(list, per)
     end
 end
 
--- Existence alone answers "yes" for a stub the client kept with no system behind it, which
--- is how a capability probe gets mistaken for a content probe. Anything load bearing is
--- CALLED here and its real returns are printed.
-local function callDump(label, path, ...)
-    local fn = resolve(path)
+-- Existence answers "yes" for a stub the client kept with no system behind it, so anything
+-- load bearing is called here and its real returns printed.
+-- Takes the function itself. A LibStub library is never a global, so resolving one by _G path
+-- prints ABSENT for a function that is right there.
+local function dumpCall(label, fn, ...)
     if type(fn) ~= "function" then
         line("%s: ABSENT", label)
         return nil
@@ -77,6 +114,10 @@ local function callDump(label, path, ...)
     return packed[2]
 end
 
+local function callDump(label, path, ...)
+    return dumpCall(label, resolve(path), ...)
+end
+
 local function present(paths)
     local missing, have = {}, {}
     for _, p in ipairs(paths) do
@@ -89,10 +130,8 @@ local function present(paths)
     emit(have, 2)
 end
 
--- ⛔ present() answers "is this a FUNCTION", so anything table valued routed through it reads
--- MISSING on every flavor. The first `pins` run did exactly that to five mixins and reported
--- them absent on RETAIL, where MapPOI provably works - the retail control is the only reason
--- that was caught. Report the TYPE for anything that is not expected to be a function.
+-- present() answers "is this a function", so a table valued name routed through it reads
+-- MISSING on every flavor. Report the type instead for anything that is not a function.
 local function kinds(paths)
     local parts = {}
     for _, p in ipairs(paths) do
@@ -101,9 +140,8 @@ local function kinds(paths)
     emit(parts, 2)
 end
 
--- Bounded by a ceiling and terminated on the first nil title, never by GetNumQuestLogEntries.
--- That counts only VISIBLE rows on Classic, so a collapsed header hides quests that stay
--- perfectly addressable by index.
+-- Bounded by a ceiling and the first nil title, never by GetNumQuestLogEntries, which counts
+-- only visible rows on Classic and hides quests that stay addressable by index.
 local MAX_LOG_SCAN = 75
 
 local function collectQuests(limit)
@@ -131,8 +169,7 @@ local function collectQuests(limit)
             local ok, n = pcall(numEntries)
             if ok and type(n) == "number" then reported = n end
         end
-        -- The count is a floor, never the bound - see the note above. This branch used to
-        -- loop to it, which is the very thing that makes a probe under-report on Classic.
+        -- The count is a floor, never the bound - see the note above.
         for i = 1, reported + MAX_LOG_SCAN do
             local ok2, info = pcall(getInfo, i)
             if not (ok2 and type(info) == "table") then
@@ -149,8 +186,7 @@ local function collectQuests(limit)
     return ids, titles, "none"
 end
 
--- The headline question of the whole port. Modules/MapPOI, the Chain Guide waypoint and Get
--- Directions all resolve a quest to coordinates, and every one of them starts here.
+-- Modules/MapPOI, the Chain Guide waypoint and Get Directions all start here.
 function Probe:Map()
     out("map and coordinates")
 
@@ -195,9 +231,8 @@ function Probe:Map()
     })
 end
 
--- Classic kept a POI api of its own and C_QuestLog.GetQuestsOnMap is a stub that answers an
--- empty table forever, so the names are discovered from _G rather than assumed. Whether any
--- of them yields per-quest coordinates decides whether map pins need a quest database.
+-- C_QuestLog.GetQuestsOnMap is a stub that answers an empty table on Classic, so the POI
+-- names are discovered from _G rather than assumed.
 local function scanGlobals(pattern)
     local hits = {}
     for k, v in pairs(_G) do
@@ -315,9 +350,8 @@ function Probe:Quest()
     })
 end
 
--- Fields are printed by NAME because a return count cannot answer "is this row usable".
--- Anything the client hands back that is not in the expected set is printed too, since a
--- renamed field looks identical to an absent one from the caller's side.
+-- Fields are printed by name, extras included - a renamed field looks identical to an absent
+-- one from the caller's side, and a return count cannot tell them apart.
 local function dumpFields(label, t, order)
     if type(t) ~= "table" then
         line("%s: %s", label, val(t))
@@ -376,9 +410,8 @@ function Probe:Port()
         if not found then line("  called cleanly but no non-header row was found") end
     end
 
-    -- Era has neither C_QuestLog.GetInfo nor C_QuestLog.GetNumQuestLogEntries, so these
-    -- pre-namespace globals are the only row source there. Positions are printed rather
-    -- than named because Compat's flat row reads them BY POSITION.
+    -- Era has neither C_QuestLog.GetInfo nor GetNumQuestLogEntries, so these pre-namespace
+    -- globals are its only row source. Positions are printed because Compat reads by position.
     line("1b. the flat quest log globals - the only row source where GetInfo is absent:")
     callDump("  GetNumQuestLogEntries()", "GetNumQuestLogEntries")
     local flatTitle = resolve("GetQuestLogTitle")
@@ -398,10 +431,8 @@ function Probe:Port()
         end
         if shown == 0 then line("  called cleanly but index 1 returned nothing") end
 
-        -- ⛔ Position 6 is isComplete in the 17-value layout, and it reads nil on every
-        -- INCOMPLETE quest - so a sample of three incomplete rows can never confirm it. Walk
-        -- the whole log and print position 6 beside the title, which makes a completed quest
-        -- prove the position instead of a signature lookup doing it.
+        -- Position 6 is isComplete and reads nil on every incomplete quest, so a short sample
+        -- can never confirm it. Walk the whole log so a completed quest proves the position.
         line("  1c. position 6 (isComplete?) across the whole log:")
         local anyComplete = false
         for i = 1, MAX_LOG_SCAN do
@@ -416,7 +447,7 @@ function Probe:Port()
             if cnt < 9 then break end
         end
         if not anyComplete then
-            line("    ⛔ nothing in the log has a non-nil [6]. Take a quest to READY TO TURN IN")
+            line("    nothing in the log has a non-nil [6]. Take a quest to READY TO TURN IN")
             line("    and re-run - only that can confirm which position carries isComplete.")
         end
     end
@@ -519,11 +550,8 @@ function Probe:Port()
     host:SetParent(nil)
 end
 
--- Modules/MapPOI draws no pins of its own. It rides Blizzard's map canvas through
--- LibMapPinHandler, which COPIES these names off MapCanvasMixin at load. A copy of a nil
--- stores nil and fails later at the call site, far from the cause, so the list is read out
--- here instead. ⚠ It is duplicated from LibMapPinHandler.lua's `borrow` table - if that one
--- grows, this one is silently short.
+-- LibMapPinHandler copies these names off MapCanvasMixin at load, and a copied nil fails far
+-- from its cause. Duplicated from that file's borrow table - if it grows, this list goes short.
 local CANVAS_BORROWED = {
     "OnShow", "OnHide", "RefreshAllDataProviders",
     "CallMethodOnPinsAndDataProviders", "ReapplyPinFrameLevels", "SetGlobalPinScale",
@@ -542,29 +570,23 @@ local CANVAS_HOOKED = {
     "ReapplyPinFrameLevels", "SetGlobalPinScale", "OnMapChanged",
 }
 
--- ⚠ RegisterForClicks is deliberately NOT here. Pin.lua calls it, but it is a Button WIDGET
--- method that the pin gets from SetPinTemplateType(.., "BUTTON") - it was never on this mixin,
--- and listing it reported MISSING on retail too.
--- ApplyCurrentPosition is what re-anchors a pin after the canvas resizes, so it is as load
--- bearing as the placement call itself.
+-- RegisterForClicks is deliberately not here - it is a Button widget method the pin gets from
+-- SetPinTemplateType, never a mixin method, and listing it reported MISSING on retail too.
 local PIN_METHODS = {
     "UseFrameLevelType", "SetScalingLimits", "SetPosition", "ApplyCurrentPosition",
     "OnAcquired", "OnReleased",
 }
 
--- Every row of the Classic coordinate table falls in one contiguous UiMapID block, measured
--- across both generated tables: 46 distinct ids, none outside this range. Whether THIS client
--- resolves them is the question that decides whether the dataset is usable at all - a table
--- of ids the client does not know places every pin nowhere.
+-- Every row of both generated tables falls in this one contiguous UiMapID block, 46 distinct
+-- ids. A client that cannot resolve them places every pin nowhere.
 local COORD_MAP_MIN, COORD_MAP_MAX = 1411, 1459
 
 local function decodePacked(v)
     return math.floor(v / 1e8), math.floor(v % 1e8 / 1e4) / 1e4, (v % 1e4) / 1e4
 end
 
--- Modules/MapPOI is the last module with no Classic path at all, and the reason is a data
--- source rather than a capability. This section asks the OTHER half: assuming the data, does
--- the canvas EQ hangs its pins on exist on this flavor.
+-- Assuming the data exists, this asks the other half - whether the canvas EQ hangs its pins
+-- on exists on this flavor.
 function Probe:Pins()
     out("map canvas and pin surface - what Modules/MapPOI rides on")
 
@@ -620,10 +642,8 @@ function Probe:Pins()
         })
     end
 
-    -- ⚠ PIN_FRAME_LEVEL_QUEST_PING is NOT a global - Pin.lua passes it as a STRING LITERAL to
-    -- UseFrameLevelType, and the manager resolves it. Probing _G for it reported nil on retail
-    -- too. What actually matters is whether this client's manager knows that name, so the
-    -- manager is dumped instead of a global being looked up.
+    -- PIN_FRAME_LEVEL_QUEST_PING is not a global - Pin.lua passes it as a string to
+    -- UseFrameLevelType, so the manager is dumped rather than _G looked up.
     local mgr = type(canvas) == "table" and canvas.pinFrameLevelsManager or nil
     if type(mgr) ~= "table" then
         line("pinFrameLevelsManager: %s - cannot check the frame level Pin.lua asks for", type(mgr))
@@ -664,11 +684,8 @@ function Probe:Pins()
         end
     end
 
-    -- The pin template lives in Modules/MapPOI/Pin.xml. Creating one is the only test that
-    -- covers the XML's inherits resolving on this client as well as the template existing.
-    -- ⚠ A TOC that does not list MapPOI fails this for a reason that has nothing to do with
-    -- the flavor, so EQQuestPinMixin is reported beside it - that global says whether the
-    -- module was loaded at all, which is what tells the two apart.
+    -- Creating a pin is the only test that covers Pin.xml's inherits resolving. EQQuestPinMixin
+    -- is reported beside it because a TOC that omits MapPOI fails this for an unrelated reason.
     local okPin, err = pcall(CreateFrame, "BUTTON", nil, UIParent, "EQQuestPinTemplate")
     line("EQQuestPinTemplate creates: %s%s   EQQuestPinMixin=%s", tostring(okPin),
          okPin and "" or (" - " .. tostring(err):sub(1, 50)),
@@ -723,9 +740,8 @@ function Probe:Pins()
     end
 end
 
--- ⛔ Every capability in the `pins` section answered yes on Era and NO PIN APPEARED. That is
--- no longer a capability question, so nothing here looks a name up: this walks the provider's
--- own decisions and COUNTS them. A stage that reports zero is the stage that is wrong.
+-- Nothing here looks a name up. It walks the provider's own decisions and counts them, so the
+-- stage that reports zero is the stage that is wrong.
 function Probe:MapPOI()
     out("Modules/MapPOI - why a pin did or did not appear")
 
@@ -745,7 +761,7 @@ function Probe:MapPOI()
     line("world map shown=%s  open mapID=%s  player mapID=%s  -> counting against %s",
          tostring(shown), tostring(openMap), tostring(playerMap), tostring(target))
     if not shown then
-        line("⚠ _DoRefresh early-returns while the map is CLOSED. Re-run with it OPEN.")
+        line("_DoRefresh early-returns while the map is CLOSED. Re-run with it OPEN.")
     end
 
     line("1. is the provider attached at all:")
@@ -758,14 +774,30 @@ function Probe:MapPOI()
          type(MP.provider), type(MP.shadow))
     line("  _DoRefresh ran %s time(s), last stage %q, last mapID=%s, pins acquired=%s",
          tostring(MP._refreshes), tostring(MP._stage), tostring(MP._mapID), tostring(MP._pins))
+    -- Splits the pin count by source. "12 pins" from the single-point table and "12 pins" from
+    -- the spawn map are different states with different causes, and they read identically above.
+    line("  ...of those from the objective SPAWN map=%s, single-point/Blizzard=%s",
+         tostring(MP._spawnPins),
+         tostring((MP._pins or 0) - (MP._spawnPins or 0)))
+    -- Thinned counts points the minimum separation rejected. Zero here with a high spawn count
+    -- means the spread filter is not running, which reads identically to "nothing to thin".
+    line("  spawn points thinned by minimum separation=%s", tostring(MP._spawnThinned))
+    -- The tooltip aggregates off this record, not the canvas, so a count below pins acquired
+    -- means an AcquirePin site missed its record() call.
+    line("  pins recorded for tooltip aggregation=%s  (must equal pins acquired above)",
+         tostring(MP._drawnN))
+    line("  spawn table loaded=%s  quests in it=%s",
+         tostring(ns.CLASSIC_QUEST_SPAWNS ~= nil), tostring(countKeys(ns.CLASSIC_QUEST_SPAWNS)))
     -- "never ran" and "cannot tell" are different claims and only one of them is evidence.
     if MP._refreshes == nil then
         line("  (no counters on this Provider.lua - it predates this diagnostic)")
     elseif MP._refreshes == 0 then
-        line("  ⛔ the refresh NEVER RAN. Nothing downstream of it can be the cause.")
+        line("  the refresh NEVER RAN. Nothing downstream of it can be the cause.")
     elseif (MP._pins or 0) > 0 then
-        line("  ⛔ pins WERE acquired and you cannot see them - this is a DRAW problem,")
-        line("  not a data one. Suspect the frame level in 2 below.")
+        -- Worded as a conditional because it cannot know what is on screen.
+        line("  pins WERE acquired. IF you cannot see any, that makes it a DRAW problem and")
+        line("  not a data one - suspect the frame level in 2 below. If you can see them,")
+        line("  this line means nothing.")
     end
     if MP.provider then
         local okMap, pmap = pcall(MP.provider.GetMap, MP.provider)
@@ -774,8 +806,8 @@ function Probe:MapPOI()
              (okMap and type(pmap) == "table" and pmap.GetMapID) and tostring(pmap:GetMapID()) or "n/a")
     end
 
-    -- ⛔ Pin.lua:12 passes this name as a STRING to UseFrameLevelType. A client that does not
-    -- DEFINE it cannot place the pin, and nothing raises - the pin is simply never positioned.
+    -- Pin.lua passes this name as a string to UseFrameLevelType. A client that does not define
+    -- it never positions the pin, and nothing raises.
     line("2. the frame level Pin.lua asks for, in the manager's own definitions:")
     local mgr = type(canvas) == "table" and canvas.pinFrameLevelsManager or nil
     local defs = type(mgr) == "table" and mgr.definitions or nil
@@ -790,12 +822,61 @@ function Probe:MapPOI()
         end
         table.sort(names)
         line("  PIN_FRAME_LEVEL_QUEST_PING defined: %s   (%d definition(s))",
-             found and "YES" or "⛔ NO", #names)
+             found and "YES" or "NO", #names)
         emit(names, 2)
         if type(mgr.GetValidFrameLevel) == "function" then
             callDump("  GetValidFrameLevel('PIN_FRAME_LEVEL_QUEST_PING')",
                      "WorldMapFrame.pinFrameLevelsManager.GetValidFrameLevel",
                      mgr, "PIN_FRAME_LEVEL_QUEST_PING")
+
+            -- What matters is where our level sits among the client's own types. An undefined
+            -- type falls back to a base that may be below the map's own layers.
+            local ours = mgr:GetValidFrameLevel("PIN_FRAME_LEVEL_QUEST_PING")
+            local rows, below, above = {}, 0, 0
+            for i = 1, #names do
+                local ok, lvl = pcall(mgr.GetValidFrameLevel, mgr, names[i])
+                if ok and type(lvl) == "number" then
+                    rows[#rows + 1] = { name = names[i], lvl = lvl }
+                    if type(ours) == "number" then
+                        if lvl > ours then above = above + 1 else below = below + 1 end
+                    end
+                end
+            end
+            table.sort(rows, function(a, b) return a.lvl > b.lvl end)
+            line("  every DEFINED type's level, highest first - ours is %s:", tostring(ours))
+            local top = {}
+            for i = 1, math.min(12, #rows) do
+                top[#top + 1] = ("%s=%d"):format(rows[i].name:gsub("PIN_FRAME_LEVEL_", ""),
+                                                 rows[i].lvl)
+            end
+            emit(top, 2)
+            -- `ours` is the manager's answer for the NAME Pin.lua asks for. Where the client
+            -- defines that name EQ defers to Blizzard entirely. Where it does not, EQ forces one
+            -- above the highest definition. Judging the undefined-name fallback printed a flat
+            -- "32 types sit above us" beside section 4's "level 2800 and it stuck", which is one
+            -- report disagreeing with itself.
+            if type(ours) == "number" then
+                line("  the NAME resolves to %d, and %d defined type(s) sit above that.",
+                     ours, above)
+            end
+            if found then
+                line("  the client DEFINES that name, so EQ leaves the level to Blizzard.")
+            else
+                local applied = (rows[1] and rows[1].lvl + 1) or ns.MAPPOI_FALLBACK_LEVEL
+                local overApplied = 0
+                for i = 1, #rows do
+                    if rows[i].lvl >= applied then overApplied = overApplied + 1 end
+                end
+                if overApplied == 0 then
+                    line("  the name is UNDEFINED here, so EQ forces %d, above all %d definitions.",
+                         applied, #rows)
+                    line("  Section 4 confirms what each pin ended up with.")
+                else
+                    line("  EQ forces %d and %d defined type(s) still sit at or above it -",
+                         applied, overApplied)
+                    line("  those can cover the pins. Check section 4 for the level that stuck.")
+                end
+            end
         end
     end
 
@@ -825,19 +906,17 @@ function Probe:MapPOI()
         line("  of those, in the coord table: %d", withCoord)
         line("  of those, stored on map %s: %d", tostring(target), onTarget)
         if logged == 0 then
-            line("  ⛔ Cache is EMPTY - the problem is upstream of MapPOI entirely.")
+            line("  Cache is EMPTY - the problem is upstream of MapPOI entirely.")
         elseif withCoord == 0 then
-            line("  ⛔ none of your quests are in the table - it is objective data for Era")
+            line("  none of your quests are in the table - it is objective data for Era")
         elseif onTarget == 0 then
-            line("  ⛔ every match is stored on ANOTHER map. Open the map to one of these:")
+            line("  every match is stored on ANOTHER map. Open the map to one of these:")
             emit(samples, 3)
         end
     end
 
-    -- ⛔ Once pins ARE acquired, every remaining hypothesis is about one frame's state, and
-    -- guessing between them is what the last two rounds cost. Read the pin instead.
-    -- ApplyPinPosition anchors as normalizedX * canvas:GetWidth(), so a canvas measuring zero
-    -- stacks every pin in one corner - which is why the canvas is measured here too.
+    -- ApplyPinPosition anchors as normalized * canvas:GetWidth(), so a canvas measuring zero
+    -- stacks every pin in one corner. That is why the canvas is measured here too.
     line("4. the acquired pins themselves:")
     local shadow = MP.shadow
     if type(shadow) ~= "table" or type(shadow.EnumeratePinsByTemplate) ~= "function" then
@@ -875,27 +954,37 @@ function Probe:MapPOI()
                     line("     %s -> %s %s  ofs %.1f, %.1f", tostring(p),
                          rel and ((rel.GetName and rel:GetName()) or "unnamed") or "nil",
                          tostring(rp), ox or 0, oy or 0)
-                    -- ⛔ MEASURED: ApplyPinPosition anchors at
-                    -- normalized * canvas:GetWidth() / PIN:GetScale(), because a SetPoint offset
-                    -- is read in the anchored frame's OWN coordinate space. Leaving the pin
-                    -- scale out of this division is what made seven correctly placed pins read
-                    -- as "off by 0.3" for three rounds.
-                    local packed = coords and pin.questID and coords[pin.questID]
-                    if packed and cw and ch and cw > 0 and ch > 0 then
+                    -- ApplyPinPosition anchors at normalized * canvas:GetWidth() / pin:GetScale(),
+                    -- because a SetPoint offset is read in the anchored frame's own scale units.
+                    if pin.questID and cw and ch and cw > 0 and ch > 0 then
                         local ps = pin:GetScale() or 1
                         local gotX, gotY = (ox or 0) * ps / cw, -(oy or 0) * ps / ch
-                        local rest = packed % 1e8
-                        local wantX = math.floor(rest / 1e4) / 1e4
-                        local wantY = (rest % 1e4) / 1e4
-                        local off = math.max(math.abs(gotX - wantX), math.abs(gotY - wantY))
-                        line("     scale %.4f  implied %.4f,%.4f  table %.4f,%.4f  %s",
-                             ps, gotX, gotY, wantX, wantY,
-                             off < 0.005 and "MATCH" or ("⛔ OFF BY %.4f"):format(off))
+                        local off, source = nearestStored(pin.questID, gotX, gotY, pin.mapID)
+                        if off then
+                            line("     scale %.4f  implied %.4f,%.4f  nearest stored %s point off by %.4f  %s",
+                                 ps, gotX, gotY, source, off,
+                                 off < 0.005 and "MATCH" or "NOT A STORED POINT")
+                        else
+                            line("     scale %.4f  implied %.4f,%.4f  (quest not in either table)",
+                                 ps, gotX, gotY)
+                        end
                     end
                 end
                 local icon = pin.icon
                 line("     icon=%s texture=%s", type(icon),
                      (icon and icon.GetTexture and tostring(icon:GetTexture())) or "n/a")
+                -- The one reading that separates "our code never ran" from "our value was
+                -- overwritten" - a bare level looks identical in both cases.
+                local want = pin.eqWantedLevel
+                local got = pin:GetFrameLevel()
+                if want == nil then
+                    line("     eqWantedLevel is NIL - Pin.lua never set a level on this pin")
+                elseif want ~= got then
+                    line("     EQ asked for level %s, frame reports %s - SOMETHING OVERWROTE IT",
+                         tostring(want), tostring(got))
+                else
+                    line("     level %s is EQ's own, and it stuck", tostring(want))
+                end
             end
         end
     end)
@@ -905,21 +994,31 @@ function Probe:MapPOI()
     end
     line("  enumerated %d pin(s), %d shown", n, drawn)
     if n == 0 then
-        line("  ⛔ the pool is EMPTY even though AcquirePin was called - the pins are being")
+        line("  the pool is EMPTY even though AcquirePin was called - the pins are being")
         line("  released again, so suspect a second refresh calling RemoveAllData.")
         return
     end
 
-    -- ⛔ Every pin implied the SAME divisor while the canvas reported another, which cannot be
-    -- a stale size - a stale size drifts, it does not stay exact across eight pins. So the two
-    -- premises get measured instead of reasoned about: is the frame the pins are anchored TO
-    -- the same object GetCanvas() answers, and what does ApplyPinPosition actually multiply by.
+    -- The reach follows zoom, so this is only true at the zoom it was taken at, and both axes
+    -- are printed because the canvas is not square. The count calls Pin's own function.
+    if firstPin and firstPin.NearbyQuestCount and cw and ch and cw > 0 and ch > 0 then
+        local reach = (firstPin:GetWidth() or 0) * (firstPin:GetScale() or 1)
+                      * (ns.MAPPOI_TOOLTIP_RADIUS_PINS or 1)
+        line("  tooltip aggregation reach=%.1f canvas units at this zoom"
+             .. "  (%.4f of the map in x, %.4f in y)", reach, reach / cw, reach / ch)
+        local okAgg, cnt = pcall(firstPin.NearbyQuestCount, firstPin)
+        line("  pin 1 (quest %s) would aggregate %s OTHER quest(s) into its tooltip",
+             tostring(firstPin.questID), okAgg and tostring(cnt) or "RAISED")
+    end
+
+    -- Both premises are measured rather than reasoned about - whether the pins' anchor frame is
+    -- the object GetCanvas() answers, and what ApplyPinPosition really multiplies by.
     line("5. the two premises behind the offset arithmetic:")
     if firstPin then
         local _, rel = firstPin:GetPoint(1)
         line("  pin's anchor frame IS GetCanvas(): %s", tostring(rel == cv))
         if rel ~= cv and rel and rel.GetWidth then
-            line("  ⛔ DIFFERENT FRAME. anchor frame is %.0f x %.0f, GetCanvas() is %.0f x %.0f",
+            line("  DIFFERENT FRAME. anchor frame is %.0f x %.0f, GetCanvas() is %.0f x %.0f",
                  rel:GetWidth() or 0, rel:GetHeight() or 0, cw or 0, ch or 0)
         end
         if rel and rel.GetScale then
@@ -948,13 +1047,8 @@ function Probe:MapPOI()
         end
         if firstPin.ApplyCurrentPosition then firstPin:ApplyCurrentPosition() end
 
-        -- ⛔ The placement is arithmetically correct, so the remaining question is purely
-        -- WHERE ON SCREEN the pin lands and whether anything covers it. GetLeft/GetTop are in
-        -- screen coordinates already scaled, so they can be compared frame to frame directly.
-        -- ⛔ GetLeft and friends answer in the frame's OWN scale units, NOT screen units, so
-        -- comparing two frames' rects without multiplying each by its own effective scale is
-        -- meaningless. Doing exactly that is what produced a bogus "it is CLIPPED" verdict
-        -- here - the third derived verdict in this section to fail on a coordinate space.
+        -- GetLeft and friends answer in the frame's own scale units, not screen units, so two
+        -- frames' rects must each be multiplied by their own effective scale before comparison.
         line("  rectangles, RAW (own units) then x effective scale (comparable):")
         local function rect(label, f)
             if not (f and f.GetLeft and f:GetLeft()) then
@@ -998,17 +1092,17 @@ function Probe:MapPOI()
                 line("    display is %d px tall, so the pin draws at about %.0f x %.0f REAL pixels",
                      physH, px, px)
                 if px < 12 then
-                    line("    ⛔ that is tiny. Correctly placed and effectively invisible.")
+                    line("    that is tiny. Correctly placed and effectively invisible.")
                 end
-                -- Actionable rather than descriptive: a place on screen to actually look at.
-                line("    ▶ LOOK AT about %.0f, %.0f pixels from your screen's TOP-LEFT",
+
+                line("    LOOK AT about %.0f, %.0f pixels from your screen's TOP-LEFT",
                      (pl + pr) / 2 * physH / 768, (768 - (pt + pb) / 2) * physH / 768)
-                line("    ▶ then MOUSE OVER that spot. A tooltip there means the pin is live")
+                line("    then MOUSE OVER that spot. A tooltip there means the pin is live")
                 line("      and only its ART is missing, which is a different bug entirely.")
             end
 
-            -- ⛔ Only pin 1 was ever containment tested, and at 2.1x zoom most of the canvas is
-            -- outside the window - so "1 of 7 visible" may be entirely expected. Count them.
+            -- At high zoom most of the canvas is outside the window, so a low visible count is
+            -- expected rather than a fault.
             local within = 0
             pcall(function()
                 for pin in shadow:EnumeratePinsByTemplate("EQQuestPinTemplate") do
@@ -1043,6 +1137,48 @@ function Probe:MapPOI()
                  tostring(firstPin.numberText:IsShown()),
                  tostring(firstPin.numberText:GetText() or ""))
         end
+
+        -- A buried pin and a hidden one read identically from the pin's own properties. The
+        -- only way to tell is to look at what shares the canvas above it.
+        line("  5b. frames on the canvas at or above the pin's level, which would COVER it:")
+        local pinLevel = firstPin:GetFrameLevel() or 0
+        -- The pin's OWN parent, not WorldMapFrame. Enumerating the wrong frame found nothing
+        -- above the pins and reported a clean bill for a canvas it had not looked at.
+        local pinParent = (firstPin.GetParent and firstPin:GetParent()) or canvas
+        local okKids, kidErr = pcall(function()
+            local kids = { pinParent:GetChildren() }
+            local over, overShown = 0, 0
+            for i = 1, #kids do
+                local k = kids[i]
+                local lvl = (k.GetFrameLevel and k:GetFrameLevel()) or -1
+                if lvl >= pinLevel then
+                    over = over + 1
+                    local vis = k.IsShown and k:IsShown()
+                    if vis then overShown = overShown + 1 end
+                    if over <= 8 then
+                        local w = (k.GetWidth and k:GetWidth()) or 0
+                        local h = (k.GetHeight and k:GetHeight()) or 0
+                        line("     %-28s level=%d strata=%s shown=%s  %dx%d",
+                             (k.GetName and k:GetName()) or "unnamed", lvl,
+                             tostring(k.GetFrameStrata and k:GetFrameStrata()),
+                             tostring(vis), w, h)
+                    end
+                end
+            end
+            line("     %d of %d sibling frame(s) under %s sit at or above level %d, %d shown",
+                 over, #kids, (pinParent.GetName and pinParent:GetName()) or "unnamed",
+                 pinLevel, overShown)
+            if overShown == 0 then
+                line("     nothing shown above the pins among their own siblings. That does not")
+                line("     rule out a cover from a higher strata elsewhere, only from here.")
+            else
+                line("     something IS above them. A full-canvas one that is shown would")
+                line("     explain art that flashes and then disappears.")
+            end
+        end)
+        if not okKids then
+            line("     could not enumerate canvas children - %s", tostring(kidErr):sub(1, 50))
+        end
     end
 
     line("6. call ApplyCurrentPosition on each pin and re-read the anchor:")
@@ -1060,20 +1196,15 @@ function Probe:MapPOI()
             if math.abs((ax or 0) - (bx or 0)) > 0.5 or math.abs((ay or 0) - (by or 0)) > 0.5 then
                 moved = moved + 1
             end
-            local packed = coords and pin.questID and coords[pin.questID]
-            if packed and cw and ch and cw > 0 and ch > 0 then
+            if pin.questID and cw and ch and cw > 0 and ch > 0 then
                 checked = checked + 1
                 local ps = pin:GetScale() or 1
-                local rest = packed % 1e8
-                local wantX = math.floor(rest / 1e4) / 1e4
-                local wantY = (rest % 1e4) / 1e4
-                local off = math.max(math.abs((ax or 0) * ps / cw - wantX),
-                                     math.abs(-(ay or 0) * ps / ch - wantY))
-                if off < 0.005 then nowMatch = nowMatch + 1 end
+                local gotX, gotY = (ax or 0) * ps / cw, -(ay or 0) * ps / ch
+                local off = nearestStored(pin.questID, gotX, gotY, pin.mapID)
+                if off and off < 0.005 then nowMatch = nowMatch + 1 end
                 line("    q=%s  before %.1f,%.1f  after %.1f,%.1f  -> %.4f,%.4f  %s",
-                     tostring(pin.questID), bx or 0, by or 0, ax or 0, ay or 0,
-                     (ax or 0) * ps / cw, -(ay or 0) * ps / ch,
-                     off < 0.005 and "MATCH" or "still off")
+                     tostring(pin.questID), bx or 0, by or 0, ax or 0, ay or 0, gotX, gotY,
+                     (off and off < 0.005) and "MATCH" or "NOT A STORED POINT")
             end
         end
     end)
@@ -1082,32 +1213,33 @@ function Probe:MapPOI()
         return
     end
     if haveApply == 0 then
-        line("  ⛔ MapCanvasPinMixin has no ApplyCurrentPosition on this client - the fix in")
+        line("  MapCanvasPinMixin has no ApplyCurrentPosition on this client - the fix in")
         line("  LibMapPinHandler cannot work and needs a different re-anchor call.")
     else
-        line("  %d pin(s) moved, %d of %d now match the table", moved, nowMatch, checked)
+        line("  %d pin(s) moved, %d of %d sit on a stored point", moved, nowMatch, checked)
         if nowMatch == checked and checked > 0 then
-            line("  ✅ re-applying IS the fix. If pins were still wrong before this, the")
-            line("  OnSizeChanged hook did not fire - reload and check again.")
+            line("  every pin is where the data says it should be. Nothing to fix here.")
+        elseif moved == 0 then
+            -- Do not blame ApplyPinPosition here - section 5 measures it directly. If pins fail
+            -- this check, suspect the comparison first.
+            line("  re-applying moved nothing, so the anchors were already settled. If some")
+            line("  pins read NOT A STORED POINT, check section 5's direct ApplyPinPosition")
+            line("  reading BEFORE suspecting the placement - the comparison has been the bug")
+            line("  every time so far.")
         else
-            line("  ⛔ re-applying did NOT correct them, so ApplyPinPosition on this flavor is")
-            line("  not dividing by canvas:GetWidth(). Measure that formula before fixing.")
+            line("  re-applying MOVED pins, which means something had left them stale.")
         end
     end
 end
 
--- ⛔ Every reading says the pins are correctly placed, shown, opaque, 40 REAL pixels and inside
--- the visible window - and they are not on screen. Another measurement of the same kind cannot
--- break that tie, so this stops measuring and makes them impossible to miss instead.
--- A magenta block APPEARS  -> the frame renders, and the ICON ART is the fault.
--- Nothing appears          -> the frame does not render, whatever the API reports about it.
--- ⚠ Size and strata only. The SCALE is deliberately left alone: the anchor offset is divided
--- by it, so changing the scale would move every pin and confuse the very thing being tested.
+-- Forces pins to an unmissable size and strata. The scale is deliberately left alone - the
+-- anchor offset is divided by it, so changing it would move every pin.
 function Probe:Flare(mode)
     mode = (mode or ""):match("^(%S*)") or ""
     if mode == "" then mode = "all" end
-    if not (mode == "all" or mode == "size" or mode == "strata" or mode == "reset") then
-        out("flare: use size, strata, reset, or no argument for all")
+    if not (mode == "all" or mode == "size" or mode == "strata" or mode == "reset"
+            or mode == "eqart" or mode == "solid" or mode == "level") then
+        out("flare: use size, strata, level, eqart, solid, reset, or no argument for all")
         return
     end
     out("flare %s - /reload also undoes it", mode)
@@ -1124,11 +1256,18 @@ function Probe:Flare(mode)
     local ok, err = pcall(function()
         for pin in shadow:EnumeratePinsByTemplate("EQQuestPinTemplate") do
             n = n + 1
-            local big  = (mode == "all" or mode == "size")
-            local high = (mode == "all" or mode == "strata")
+            -- eqart matches 'all' in every way EXCEPT the texture, so the two differ by one
+            -- variable and the comparison actually means something
+            local big  = (mode == "all" or mode == "size" or mode == "eqart")
+            local high = (mode == "all" or mode == "strata" or mode == "eqart")
 
             pin:SetSize(big and 120 or 28, big and 120 or 28)
-            if high then
+            if mode == "level" then
+                -- Level only. 'strata' moves both at once and cannot say which half is at
+                -- fault, and TOOLTIP strata would draw pins over the whole UI.
+                if base then pin:SetFrameStrata(base:GetFrameStrata()) end
+                pin:SetFrameLevel(9000)
+            elseif high then
                 pin:SetFrameStrata("TOOLTIP")
                 pin:SetFrameLevel(9000)
             elseif base then
@@ -1145,13 +1284,16 @@ function Probe:Flare(mode)
                     pin.icon:SetSize(18, 18)
                     pin.icon:SetPoint("CENTER")
                 end
-                if mode == "all" then
+                if mode == "eqart" then
+                    pin.icon:SetTexture(
+                        "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\loot.tga")
+                    pin.icon:SetVertexColor(1, 1, 1, 1)
+                elseif mode == "solid" or mode == "all" then
                     pin.icon:SetTexture("Interface\\Buttons\\WHITE8X8")
                     pin.icon:SetVertexColor(1, 0, 1, 1)
                 else
-                    -- ⛔ Restore from the pin's OWN isComplete, not a hardcoded icon. The first
-                    -- version forced the available icon in every mode, which silently turned a
-                    -- correct turn-in "?" back into a "!" and read as a second bug.
+                    -- Restore from the pin's own isComplete. A hardcoded icon here turns a
+                    -- correct turn-in marker back into an available one and reads as a bug.
                     pin.icon:SetTexture(pin.isComplete
                         and "Interface\\GossipFrame\\ActiveQuestIcon"
                         or  "Interface\\GossipFrame\\AvailableQuestIcon")
@@ -1167,14 +1309,32 @@ function Probe:Flare(mode)
         return
     end
     if n == 0 then
-        line("⛔ the pool is empty - open the world map on a zone with quests first.")
+        line("the pool is empty - open the world map on a zone with quests first.")
         return
     end
 
     line("applied to %d pin(s).", n)
     if mode == "all" then
         line("  MAGENTA BLOCKS -> the frames render, so the fault is size, strata or art.")
-        line("  Then run 'flare size' and 'flare strata' to tell WHICH.")
+        line("  Then run 'flare eqart' - same size, same strata, only the TEXTURE differs.")
+    elseif mode == "level" then
+        line("  shipped size AND shipped strata, level raised 2000 -> 9000.")
+        line("  VISIBLE -> the fix is a frame LEVEL bump, which is safe and stays inside")
+        line("     the map. NOT visible -> only a strata change works, and the occluder is")
+        line("     in a strata above the canvas rather than merely a higher level in it.")
+    elseif mode == "solid" then
+        -- Texture only. Every other mode moves size and strata together and cannot separate
+        -- "the frames are not drawing" from "the art is not readable".
+        line("  SHIPPED size and strata, ring hidden, icon = solid magenta.")
+        line("  Count what you see:")
+        line("    ~%d magenta dots -> the frames all draw and the fault is the ART", n)
+        line("    only a handful    -> the frames really are not drawing, and every")
+        line("                         texture theory including mine is wrong")
+    elseif mode == "eqart" then
+        line("  120x120 at TOOLTIP/9000, painted with EQ's OWN loot.tga.")
+        line("  This is the A side of an A/B with 'flare all', which is identical except")
+        line("  that it paints a BLIZZARD texture. Magenta visible here but EQ art blank")
+        line("  means the FILE does not draw, and nothing about frames or placement.")
     elseif mode == "size" then
         line("  120x120, real icon, at the SHIPPED strata and level 2000.")
         line("  VISIBLE -> size is the fault.  NOT visible -> strata is.")
@@ -1246,10 +1406,8 @@ function Probe:Tooltip()
     end
     tip:Hide()
 
-    -- A tooltip with no quest lines proves nothing if the target was an ITEM-DROP objective:
-    -- the client has no mob-to-item mapping, so only a type="monster" kill objective is a
-    -- fair test of the capability. Name the qualifying quests rather than make the tester
-    -- guess which mob counts.
+    -- Only a type="monster" kill objective is a fair test - the client has no mob-to-item
+    -- mapping, so an item objective proves nothing. Name the qualifying quests.
     local getObj = resolve("C_QuestLog.GetQuestObjectives")
     if type(getObj) ~= "function" then return end
     line("what EQ needs to match, from your quest log:")
@@ -1280,9 +1438,8 @@ function Probe:Tooltip()
     end
 end
 
--- RegisterEvent RAISES on an event the client does not know rather than quietly no-opping.
--- Core/Events.lua pcalls it and refuses the listener, so an absent event costs that feature
--- and not the load. This list is what EQ would ask for on a client that knew all of them.
+-- RegisterEvent raises on an event the client does not know. This list is what EQ would ask
+-- for on a client that knew all of them.
 local EVENTS = {
     "PLAYER_LOGIN", "PLAYER_LOGOUT", "PLAYER_ENTERING_WORLD", "PLAYER_MONEY",
     "PLAYER_REGEN_ENABLED", "QUEST_ACCEPTED", "QUEST_REMOVED", "QUEST_TURNED_IN",
@@ -1408,11 +1565,136 @@ function Probe:Misc()
     end
 end
 
+-- HereBeDragons converts coords from its own map table and AddMinimapIconMap answers false
+-- rather than raising, so the conversion is called across the whole dataset block here.
+function Probe:Minimap()
+    out("minimap objective pins")
+
+    -- EQ's own module first. LibStub's registry is shared, so the library answering says nothing
+    -- about whether EQ loaded it - any addon embedding HereBeDragons fills that slot, and on
+    -- retail with one installed the library reads present while EQ's minimap code is absent.
+    line("1. EQ's module:")
+    local MM = ns:GetSubsystem("MinimapQuestPins")
+    if not MM then
+        line("  MinimapQuestPins subsystem ABSENT - Modules/Minimap/QuestPins.lua is not listed")
+        line("  by this TOC. On retail that is correct and deliberate. On Classic it is a bug.")
+        return
+    end
+
+    local HBDP = LibStub and LibStub("HereBeDragons-Pins-2.0", true)
+    local HBD  = LibStub and LibStub("HereBeDragons-2.0", true)
+    line("2. the library, as LibStub answers it:")
+    line("  HereBeDragons-Pins-2.0=%s  HereBeDragons-2.0=%s",
+         HBDP and "present" or "ABSENT", HBD and "present" or "ABSENT")
+    line("  minor version in use=%s  (the newest copy loaded by ANY addon, not necessarily EQ's)",
+         tostring(select(2, LibStub:GetLibrary("HereBeDragons-Pins-2.0", true))))
+    if not HBDP then
+        line("  the module is listed but the library is not - nothing can draw")
+        return
+    end
+    line("  last rebuild stage=%q  mapID=%s", tostring(MM._stage), tostring(MM._mapID))
+    -- Registered and rejected are counted separately because AddMinimapIconMap failing is
+    -- silent, and it is the one failure that looks exactly like having nothing to draw.
+    line("  icons registered=%s  REJECTED by HereBeDragons=%s",
+         tostring(MM._registered), tostring(MM._rejected))
+
+    line("3. can HereBeDragons place the player at all:")
+    if HBD then
+        dumpCall("  GetPlayerWorldPosition()", HBD.GetPlayerWorldPosition, HBD)
+        dumpCall("  GetPlayerZone()", HBD.GetPlayerZone, HBD)
+    end
+    -- Without a player world position HBD hides every pin it has, so a zero here explains an
+    -- empty minimap on its own and nothing further down matters.
+    local px = HBD and HBD.GetPlayerWorldPosition and HBD:GetPlayerWorldPosition()
+    if not px then
+        line("  no player world position - HBD hides EVERY pin in this state. Nothing below")
+        line("  can produce a visible icon until this answers.")
+    end
+
+    line("4. the conversion, called on the player's own map:")
+    local here = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    line("  C_Map.GetBestMapForUnit('player')=%s  name=%s", tostring(here),
+         (here and C_Map.GetMapInfo and C_Map.GetMapInfo(here) and C_Map.GetMapInfo(here).name)
+         or "n/a")
+    if here and HBD then
+        dumpCall("  GetWorldCoordinatesFromZone(0.5, 0.5, here)",
+                 HBD.GetWorldCoordinatesFromZone, HBD, 0.5, 0.5, here)
+    end
+
+    -- The same 1411-1459 block section pins validates against C_Map, asked of HBD instead. HBD
+    -- converting them is a separate question from whether the client names them.
+    line("5. the dataset's map block, 1411-1459, through HereBeDragons:")
+    if HBD and HBD.GetWorldCoordinatesFromZone then
+        local okIDs, badIDs = 0, {}
+        for id = 1411, 1459 do
+            local x = HBD:GetWorldCoordinatesFromZone(0.5, 0.5, id)
+            if x then okIDs = okIDs + 1 else badIDs[#badIDs + 1] = tostring(id) end
+        end
+        line("  convertible: %d of 49", okIDs)
+        if #badIDs > 0 then
+            line("  NOT convertible - every quest whose spawns land here gets no minimap pin:")
+            emit(badIDs, 8)
+        end
+    end
+end
+
+-- A pin whose art does not resolve draws nothing while reading healthy. WoW indexes addon
+-- files at launch, so a texture added mid-session needs a full restart, not a /reload.
+function Probe:Media()
+    out("EQ's own texture files - do they resolve")
+    local BASE = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\"
+    local FILES = {
+        "skull.tga", "loot.tga", "object.tga",
+        "eq-logo-v3.tga", "discord.tga", "headerbar-softmask.tga",
+    }
+
+    local probeFrame = CreateFrame("Frame")
+    local tex = probeFrame:CreateTexture(nil, "ARTWORK")
+
+    local function handleFor(path)
+        tex:SetTexture(nil)
+        local ok = pcall(tex.SetTexture, tex, path)
+        if not ok then return nil, "RAISED" end
+        return tex:GetTexture(), nil
+    end
+
+    -- Both controls are load bearing. Blizzard assets carry positive baked-in FileDataIDs and
+    -- addon files get negative transient ones, so sign is not present-vs-absent.
+    local good = handleFor("Interface\\Buttons\\WHITE8X8")
+    local bogus = handleFor(BASE .. "this-file-does-not-exist-eqprobe.tga")
+    line("  control, a real BLIZZARD texture : %s", tostring(good))
+    line("  control, a path that CANNOT exist: %s", tostring(bogus))
+
+    local conclusive = (type(bogus) ~= "number")
+    if not conclusive then
+        line("  the impossible path answers a number too, so this client gives a handle to")
+        line("  ANY path and a handle proves nothing. Sizes below are the usable signal.")
+    end
+
+    for i = 1, #FILES do
+        local got, raised = handleFor(BASE .. FILES[i])
+        -- A second, independent reading - a texture whose file really loaded reports its own
+        -- dimensions, so neither the handle nor the size is trusted alone.
+        local w, h = tex:GetWidth(), tex:GetHeight()
+        line("  %-24s handle=%-12s %s", FILES[i], tostring(got or raised or "nil"),
+             (conclusive and got == nil) and "NOT FOUND" or "handle given")
+        line("      texture object reports %sx%s", tostring(w), tostring(h))
+    end
+
+    line("  DO NOT read a negative handle as missing - see the controls above.")
+    line("  To find out whether EQ's own art actually DRAWS, open the world map and run")
+    line("  /eqsprobe flare all   (Blizzard texture, magenta)  then")
+    line("  /eqsprobe flare eqart (EQ's own tga, same size and strata).")
+    line("  Magenta visible but EQ art not = the file is the problem, not the drawing.")
+end
+
 local SECTIONS = {
+    media   = Probe.Media,
     map     = Probe.Map,
     poi     = Probe.POI,
     pins    = Probe.Pins,
     mappoi  = Probe.MapPOI,
+    minimap = Probe.Minimap,
     flare   = Probe.Flare,
     quest   = Probe.Quest,
     port    = Probe.Port,
@@ -1421,6 +1703,12 @@ local SECTIONS = {
     ui      = Probe.UI,
     misc    = Probe.Misc,
 }
+
+-- Exposed for the offline crash-test harness, whose section list is hardcoded and would
+-- otherwise report PASS for a section nobody had added to it.
+function Probe:SectionNames()
+    return pairs(SECTIONS)
+end
 
 -- A section that raises must not cost the rest of the run, and must not vanish quietly
 -- either - a missing section reads as a section that found nothing.
@@ -1440,17 +1728,16 @@ function Probe:Run(msg)
         return
     end
     if which ~= "" then
-        out("unknown section %q - use map, poi, pins, mappoi, flare, quest, port, tooltip, events, ui, misc, or none for all",
+        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, flare, quest, port, tooltip, events, ui, misc, or none for all",
             which)
         return
     end
     out("EQ %s - full flavor probe", tostring(ns.VERSION))
-    for _, name in ipairs({ "misc", "port", "map", "poi", "pins", "quest", "events", "ui" }) do
+    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "quest", "events", "ui" }) do
         runSection(self, name, SECTIONS[name])
     end
-    -- tooltip, mappoi and flare are left out of the full run on purpose. Each needs something
-    -- set up first - a targeted quest mob, an open world map - so in a blind run each would
-    -- report the setup it lacks and read as a capability that is missing. flare also MUTATES.
+    -- tooltip, mappoi and flare are left out on purpose. Each needs setup first, so a blind run
+    -- would report the missing setup as a missing capability, and flare also mutates live pins.
     out("run /eqsprobe tooltip separately with a quest mob targeted, and /eqsprobe mappoi with the world map OPEN")
 end
 

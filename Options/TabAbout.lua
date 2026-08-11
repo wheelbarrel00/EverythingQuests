@@ -12,13 +12,15 @@ local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/everything-quests"
 local GITHUB_URL     = "https://github.com/wheelbarrel00/EverythingQuests"
 local BUG_URL        = "https://github.com/wheelbarrel00/EverythingQuests/issues"
 
+-- sub names the subsystem that serves the command, so a flavor that does not load that
+-- module lists no command it would silently ignore
 local COMMANDS = {
     { cmd = "/eqs",          desc = L["Open or close the options window"] },
-    { cmd = "/eqs chain",    desc = L["Open the Chain Guide"] },
-    { cmd = "/eqs history",  desc = L["Open the Quest History window"] },
-    { cmd = "/eqs session",  desc = L["Recap your current play session in chat"] },
-    { cmd = "/eqs discover", desc = L["List the current zone's quest chains in chat"] },
-    { cmd = "/eqs whatsnew", desc = L["Show the What's New popup again"] },
+    { cmd = "/eqs chain",    desc = L["Open the Chain Guide"], sub = "ChainGuide" },
+    { cmd = "/eqs history",  desc = L["Open the Quest History window"], sub = "HistoryFrame" },
+    { cmd = "/eqs session",  desc = L["Recap your current play session in chat"], sub = "Session" },
+    { cmd = "/eqs discover", desc = L["List the current zone's quest chains in chat"], sub = "ChainGuideQuestLineSource" },
+    { cmd = "/eqs whatsnew", desc = L["Show the What's New popup again"], sub = "WhatsNew" },
     { cmd = "/eqs about",    desc = L["Open this About tab"] },
 }
 
@@ -134,29 +136,36 @@ ns:GetSubsystem("Options"):AddTab("about", L["About"], function(content)
     body(WHITE .. L["A unified replacement for the Blizzard quest experience: a custom tracker, world-map overlays, quest history, and a Midnight chain guide."] .. CLOSE)
     gap(10)
 
-    linkRow({
+    local links = {
         { label = L["Join our Discord"], onClick = function() ns:ShowDiscord() end },
         { label = L["CurseForge"],       onClick = function() ns:ShowURL(CURSEFORGE_URL) end },
         { label = L["GitHub"],           onClick = function() ns:ShowURL(GITHUB_URL) end },
         { label = L["Report a Bug"],     onClick = function() ns:ShowURL(BUG_URL) end },
-        { label = L["What's New"],       onClick = function()
+    }
+    if ns:GetSubsystem("WhatsNew") then
+        links[#links + 1] = { label = L["What's New"], onClick = function()
             local WN = ns:GetSubsystem("WhatsNew"); if WN and WN.Show then WN:Show() end
-        end },
-    })
+        end }
+    end
+    linkRow(links)
     gap(8)
 
     header(L["Commands"])
     for _, c in ipairs(COMMANDS) do
-        local cmd = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        cmd:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
-        cmd:SetText(GOLD .. c.cmd .. CLOSE)
-        local d = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        d:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT + 120, Y)
-        d:SetText(WHITE .. c.desc .. CLOSE)
-        Y = Y - 18
+        if not c.sub or ns:GetSubsystem(c.sub) then
+            local cmd = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            cmd:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
+            cmd:SetText(GOLD .. c.cmd .. CLOSE)
+            local d = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            d:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT + 120, Y)
+            d:SetText(WHITE .. c.desc .. CLOSE)
+            Y = Y - 18
+        end
     end
     gap(2)
-    body(MUTED .. L["Tip: right-click the minimap button to open Options."] .. CLOSE, 0, 11)
+    if ns:GetSubsystem("Minimap") then
+        body(MUTED .. L["Tip: right-click the minimap button to open Options."] .. CLOSE, 0, 11)
+    end
     gap(10)
 
     header(L["Tutorials"])
@@ -222,4 +231,4 @@ ns:GetSubsystem("Options"):AddTab("about", L["About"], function(content)
 
     sc:SetHeight(math_max(1, -Y + 10))
     if scroll.UpdateScrollChildRect then scroll:UpdateScrollChildRect() end
-end)
+end, true)

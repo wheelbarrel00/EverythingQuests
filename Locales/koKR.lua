@@ -27,6 +27,7 @@ local L = ns.L
 L["General"] = "일반"
 L["Show quest pins on the world map"] = "세계 지도에 퀘스트 핀 표시"
 L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Quests you haven't accepted yet keep the game's own yellow \"!\" markers; EQ does not change those. Uncheck this box and all of EQ's red markers go away."] = "이미 수락한(퀘스트 일지에 있는) 퀘스트에 대해 Everything Quests가 큰 지도에 찍는 둥근 빨간 표시입니다. 빨간 \"!\"는 \"이 퀘스트의 다음 단계로 가라\", 빨간 \"?\"는 \"이 퀘스트는 완료됨 - 여기서 완료하라\"는 뜻입니다. 아직 수락 안 한 퀘스트는 게임 기본 노란 \"!\" 표시를 그대로 둡니다(EQ는 그것을 바꾸지 않음). 이 설정을 끄면 EQ의 빨간 표시가 모두 사라집니다."
+L["World map pin scale"] = "지도 핀 배율"
 L["Auto-accept quests"] = "퀘스트 자동 수락"
 L["Hold Alt to pause."] = "Alt 누르면 일시정지."
 L["Auto-turn-in quests"] = "퀘스트 자동 완료"
@@ -119,7 +120,6 @@ L["Reward"] = "보상"
 L["Faction"] = "세력"
 L["A-Z"] = "가나다"
 L["Sort zone quest list by"] = "지역 퀘스트 목록 정렬 기준"
-L["World map pin scale"] = "지도 핀 배율"
 L["Filters apply immediately when the world map is open."] = "지도가 열려 있을 때 필터가 즉시 적용됩니다."
 
 -- ─── Options/TabChainGuide.lua ───

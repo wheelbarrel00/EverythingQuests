@@ -2,6 +2,25 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.39.0", date = "2026-08-10",
+        sections = {
+            { head = "New Features", items = {
+                "Classic Era support, limited but real. Quest markers on the world map and the minimap, quest icons on nameplates, auto-accept and auto-turn-in, the minimap button and the /eqs options window all work on Classic Era. Burning Crusade Classic and Mists of Pandaria Classic are next.",
+                "Objective markers on Classic show every place a quest can be advanced rather than a single spot, and say whether you are there to kill, loot or use something. Clicking one sets a TomTom waypoint if TomTom is installed, and objectives inside a dungeon are marked at the dungeon entrance.",
+                "Objective markers on the minimap, for the zone you are standing in, with a hover tooltip naming the quest and what it still needs. There is a checkbox for them under /eqs > General.",
+                "Marker tooltips aggregate. Hovering a marker lists every quest at that spot instead of only the top one, so overlapping markers no longer hide each other. This applies on every game version.",
+            } },
+            { head = "Improvements", items = {
+                "Markers are a fixed size at every zoom level. They no longer shrink as you zoom out, which made them easy to miss on large or high-resolution displays. There is a scale slider under /eqs > General.",
+                "A marker only names the objectives its own location serves. A spot that drops one of a quest's four items no longer advertises the other three, and a location whose objective is already finished is not drawn at all.",
+                "Markers for one quest keep a minimum distance apart, which covers more of a zone with fewer icons.",
+            } },
+            { head = "Bug Fixes", items = {
+                "Map pin frame levels are resolved properly again. The lookup read the wrong frame and always fell through to a hardcoded level, on every game version. Retail now leaves pin placement to the game as it did before, and Classic gets a level computed from what the client actually defines.",
+            } },
+        },
+    },
+    {
         version = "1.38.1", date = "2026-08-07",
         sections = {
             { head = "Bug Fixes", items = {

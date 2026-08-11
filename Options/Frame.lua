@@ -13,8 +13,10 @@ local YELLOW          = ns.Util.color.buttonYellow
 local TAB_HEIGHT      = 28
 local TAB_PADDING_X   = 18
 
-function Options:AddTab(id, label, builder)
-    self.tabs[id] = { id = id, label = label, builder = builder }
+-- ownScroll means the builder creates its own scroll frame, so this must not wrap it in a
+-- second one - two nested UIPanelScrollFrameTemplates draw two scroll bars side by side
+function Options:AddTab(id, label, builder, ownScroll)
+    self.tabs[id] = { id = id, label = label, builder = builder, ownScroll = ownScroll }
     self.tabOrder[#self.tabOrder + 1] = id
 end
 
@@ -53,7 +55,7 @@ function Options:Build()
 
     f.version = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.version:SetPoint("TOPRIGHT", -34, -14)
-    f.version:SetText("v" .. (ns.VERSION or "1.38.1"))
+    f.version:SetText("v" .. (ns.VERSION or "1.39.0"))
     f.version:SetTextColor(unpack(YELLOW))
 
     f.discord = CreateFrame("Button", nil, f)
@@ -148,38 +150,47 @@ function Options:SelectTab(id)
     if self.activeContent then self.activeContent:Hide() end
     local tab = self.tabs[id]
     if tab and tab.builder then
-        if not tab.scrollFrame then
-            local scroll = CreateFrame("ScrollFrame", nil, f.tabContent, "UIPanelScrollFrameTemplate")
-            scroll:SetPoint("TOPLEFT", 0, 0)
-            scroll:SetPoint("BOTTOMRIGHT", -24, 0)
-            scroll:EnableMouseWheel(true)
-            scroll:SetScript("OnMouseWheel", function(sf, delta)
-                local range = sf:GetVerticalScrollRange()
-                local v = math.min(range, math.max(0, sf:GetVerticalScroll() - delta * 40))
-                sf:SetVerticalScroll(v)
-            end)
-            local child = CreateFrame("Frame", nil, scroll)
-            child:SetSize(1, 1500)
-            scroll:SetScrollChild(child)
-            scroll:SetScript("OnSizeChanged", function(_, w) if w and w > 0 then child:SetWidth(w) end end)
-            if scroll:GetWidth() > 0 then child:SetWidth(scroll:GetWidth()) end
-            tab.scrollFrame  = scroll
-            tab.contentFrame = child
-            tab.builder(child)
-            -- Measured next frame - the layout has not resolved yet, so the height would be wrong now
-            C_Timer.After(0, function()
-                local top = child:GetTop()
-                if not top then return end
-                local lowest = top
-                for _, c in ipairs({ child:GetChildren() }) do
-                    local b = c:GetBottom()
-                    if b and b < lowest then lowest = b end
-                end
-                child:SetHeight((top - lowest) + 28)
-            end)
+        if not tab.panel then
+            if tab.ownScroll then
+                local host = CreateFrame("Frame", nil, f.tabContent)
+                host:SetPoint("TOPLEFT", 0, 0)
+                host:SetPoint("BOTTOMRIGHT", 0, 0)
+                tab.panel        = host
+                tab.contentFrame = host
+                tab.builder(host)
+            else
+                local scroll = CreateFrame("ScrollFrame", nil, f.tabContent, "UIPanelScrollFrameTemplate")
+                scroll:SetPoint("TOPLEFT", 0, 0)
+                scroll:SetPoint("BOTTOMRIGHT", -24, 0)
+                scroll:EnableMouseWheel(true)
+                scroll:SetScript("OnMouseWheel", function(sf, delta)
+                    local range = sf:GetVerticalScrollRange()
+                    local v = math.min(range, math.max(0, sf:GetVerticalScroll() - delta * 40))
+                    sf:SetVerticalScroll(v)
+                end)
+                local child = CreateFrame("Frame", nil, scroll)
+                child:SetSize(1, 1500)
+                scroll:SetScrollChild(child)
+                scroll:SetScript("OnSizeChanged", function(_, w) if w and w > 0 then child:SetWidth(w) end end)
+                if scroll:GetWidth() > 0 then child:SetWidth(scroll:GetWidth()) end
+                tab.panel        = scroll
+                tab.contentFrame = child
+                tab.builder(child)
+                -- Measured next frame - the layout has not resolved yet, so the height would be wrong now
+                C_Timer.After(0, function()
+                    local top = child:GetTop()
+                    if not top then return end
+                    local lowest = top
+                    for _, c in ipairs({ child:GetChildren() }) do
+                        local b = c:GetBottom()
+                        if b and b < lowest then lowest = b end
+                    end
+                    child:SetHeight((top - lowest) + 28)
+                end)
+            end
         end
-        tab.scrollFrame:Show()
-        self.activeContent = tab.scrollFrame
+        tab.panel:Show()
+        self.activeContent = tab.panel
     end
     local DB = ns:GetSubsystem("DB")
     if DB then DB.char.lastOptionsTab = id end
@@ -749,7 +760,8 @@ function Options:CreateStatusBarDropdown(parent, label, options, getter, setter)
     return container
 end
 
-function Options:CreateSlider(parent, label, min, max, step, getter, setter)
+-- formatter is for sliders whose end stop means something other than its number
+function Options:CreateSlider(parent, label, min, max, step, getter, setter, formatter)
     local container = CreateFrame("Frame", nil, parent)
     container:SetSize(220, 44)
 
@@ -769,6 +781,7 @@ function Options:CreateSlider(parent, label, min, max, step, getter, setter)
     end
     local valueFmt = chooseFormat(step)
     local function formatValue(v)
+        if formatter then return formatter(v) end
         return valueFmt:format(v)
     end
 

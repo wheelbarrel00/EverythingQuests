@@ -7,9 +7,8 @@ DB.defaults = {
         general = {
             autoAcceptQuests = false,
             autoTurnInQuests = false,
-            -- Moved out of the deleted tracker block. The icon itself is drawn by EQ
-            -- Objective Tracker, but whether it appears is EQ's setting, so TrackerBridge
-            -- adds and removes the registration from here rather than dimming it.
+            -- EQ Objective Tracker draws these icons, but EQ owns whether they appear, so
+            -- TrackerBridge adds and removes the registration from here.
             showChainGuideIcon = true,
             showEQIcon = true,
             npIconPlacement = "RIGHT",
@@ -32,7 +31,10 @@ DB.defaults = {
             pinScale     = 1.0,
         },
         map = {
-            showQuestPins = true,
+            showQuestPins    = true,
+            showMinimapPins  = true,
+            pinScale         = 1.0,
+            pinCap           = 50,
         },
         history = {
             enabled   = true,
@@ -62,12 +64,8 @@ DB.defaults = {
             zoneCat = {},
         },
     },
-    -- pinned, hidden, collapsedHeaders, trackerCollapsed and zoneProgress all moved to EQ
-    -- Objective Tracker with the tracker. They are dropped from the defaults but deliberately
-    -- NOT deleted from the saved variable: EQOT's first-run import reads them straight out of
-    -- EverythingQuestsCharDB to carry a user's pins, hidden quests and collapsed sections
-    -- across, and that import only ever runs once.
-    -- trackedWorldQuests stays because WatchPersist still drives EQ's own map pins from it.
+    -- pinned, hidden, collapsedHeaders, trackerCollapsed and zoneProgress are dropped from the
+    -- defaults but must stay in the saved variable - EQOT's one-time import still reads them.
     char = {
         trackedWorldQuests = {},
         trackedChainID = nil,

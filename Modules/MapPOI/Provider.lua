@@ -12,7 +12,21 @@ function providerMixin:OnAdded(mapCanvas)
     mapCanvas:SetPinTemplateType(PIN_TEMPLATE, "BUTTON")
 end
 
+-- Every pin this provider draws, so a hovered pin can aggregate its neighbours without
+-- enumerating the canvas - ExecuteOnAllPins and RegisterPin are both absent on Era.
+M._drawnN = 0
+M._drawnQ, M._drawnX, M._drawnY, M._drawnK, M._drawnM = {}, {}, {}, {}, {}
+
+-- kind and mask ride along so an aggregated neighbour's tooltip names the objectives its own
+-- nearest pin serves.
+local function record(qid, x, y, kind, mask)
+    local n = M._drawnN + 1
+    M._drawnN, M._drawnQ[n], M._drawnX[n], M._drawnY[n] = n, qid, x, y
+    M._drawnK[n], M._drawnM[n] = kind, mask
+end
+
 function providerMixin:RemoveAllData()
+    M._drawnN = 0
     if self:GetMap() then
         self:GetMap():RemoveAllPinsByTemplate(PIN_TEMPLATE)
     end
@@ -20,14 +34,9 @@ end
 
 local _seenQids = {}
 
--- Classic has NO Blizzard coordinate source - GetQuestsOnMap answers an empty table forever
--- there and GetNextWaypointForMap does not exist - so a generated table is the only source on
--- that flavor. One packed number per quest: m*1e8 + floor(x*1e4)*1e4 + floor(y*1e4). The table
--- holds ONE point per quest, so a quest whose point is on another map gets no pin here.
---
--- ⛔ The GATE is the table's own presence, never a build number or a Has flag. Only the flavor
--- TOCs list the data file, so retail is untouched: this returns nil there and the Blizzard
--- path above is unchanged.
+-- Classic has no Blizzard coordinate source, so a generated table is the only one there. One
+-- packed number per quest: m*1e8 + floor(x*1e4)*1e4 + floor(y*1e4). The gate is the table's own
+-- presence, never a build number - only the flavor TOCs list it, so retail gets nil here.
 local function classicWaypoint(questID, mapID)
     local coords = ns.CLASSIC_QUEST_COORDS
     local packed = coords and coords[questID]
@@ -44,14 +53,156 @@ local function waypointFor(questID, mapID)
     return classicWaypoint(questID, mapID)
 end
 
+-- Every clustered place a quest can be advanced, nested by map so this is a direct hit rather
+-- than a scan. Same gate as the coord table, so it is nil on retail.
+local function spawnPoints(questID, mapID)
+    local byMap = ns.CLASSIC_QUEST_SPAWNS and ns.CLASSIC_QUEST_SPAWNS[questID]
+    return byMap and byMap[mapID]
+end
+
+-- The slider's far right means "draw them all", so it needs a number to sit at. Read by
+-- Options/TabGeneral.lua too, which is why it hangs off ns rather than being a file local.
+ns.MAPPOI_MAX_PINS = 250
+
+-- Applied here, not in the generator, so the table stays uncapped and the slider can still
+-- reach unlimited. Zone coverage peaks at 0.015 - raising it for tidiness measures worse.
+local PIN_SEPARATION = 0.015
+
+-- Map coordinates are 0-1 on both axes but the canvas is about 1002x668, so the same number is
+-- half again as much ground in x.
+local MAP_ASPECT = 1.5
+
+-- Grid rather than pairwise distance: one quest can offer over a thousand points on one map,
+-- and comparing each candidate against every accepted one is quadratic.
+local _spreadCells = {}
+local function spreadReset() wipe(_spreadCells) end
+local function spreadAccepts(x, y)
+    local cx = math.floor(x * MAP_ASPECT / PIN_SEPARATION)
+    local cy = math.floor(y / PIN_SEPARATION)
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            if _spreadCells[(cx + dx) * 4096 + (cy + dy)] then return false end
+        end
+    end
+    _spreadCells[cx * 4096 + cy] = true
+    return true
+end
+
+-- Returns nil for unlimited, not a huge number, so a caller cannot forget to special case a
+-- sentinel.
+local function pinLimit()
+    local DB = ns:GetSubsystem("DB")
+    local n = DB and DB.db.profile.map and DB.db.profile.map.pinCap
+    if type(n) ~= "number" then return 50 end
+    if n >= ns.MAPPOI_MAX_PINS then return nil end
+    return math.max(1, math.floor(n))
+end
+
+-- Shared scratch for PointsFor, which the world map and the minimap both call. Read the arrays
+-- before calling again.
+M._ptX, M._ptY, M._ptKind, M._ptMask = {}, {}, {}, {}
+
+-- The generator's kind values against the client's own objective `type` strings. Shared with
+-- Modules/Nameplates so one number never means two different objective types.
+ns.QUEST_KIND_TYPE = { [1] = "monster", [2] = "object", [3] = "item" }
+
+-- A point inside an instance carries its real kind plus this, so the pin marks the way in. The
+-- kind has to survive underneath - the objective index is numbered within that kind's bucket.
+ns.QUEST_KIND_ENTRANCE = 4
+function ns.QuestRealKind(kind)
+    if not kind then return nil end
+    return kind > ns.QUEST_KIND_ENTRANCE and (kind - ns.QUEST_KIND_ENTRANCE) or kind
+end
+function ns.QuestIsEntrance(kind)
+    return kind ~= nil and kind > ns.QUEST_KIND_ENTRANCE
+end
+
+-- The quest's objectives bucketed by type, in client order, so bit i of a point's mask indexes
+-- straight into the right one. Reused scratch - read it before the next call.
+local _byType = {}
+local function bucketObjectives(q)
+    wipe(_byType)
+    local objs = q and q.objectives
+    if not objs then return end
+    for i = 1, #objs do
+        local o = objs[i]
+        local t = o.type
+        if t then
+            local bucket = _byType[t]
+            if not bucket then bucket = {}; _byType[t] = bucket end
+            bucket[#bucket + 1] = o
+        end
+    end
+end
+
+-- Fails open. Before the quest log populates the client reports no objectives of this type, and
+-- hiding on that would empty the map during loading.
+local function maskWanted(mask, kind)
+    local bucket = _byType[ns.QUEST_KIND_TYPE[ns.QuestRealKind(kind)] or ""]
+    if not bucket or #bucket == 0 then return true end
+    local rest, i = mask, 0
+    while rest > 0 do
+        if rest % 2 == 1 then
+            local o = bucket[i + 1]
+            -- An index past what the client reported is not evidence the objective is done
+            if not o or not o.finished then return true end
+        end
+        rest, i = math.floor(rest / 2), i + 1
+    end
+    return false
+end
+
+function M:PointsFor(questID, mapID, q)
+    local X, Y, K, MK = self._ptX, self._ptY, self._ptKind, self._ptMask
+    local isComplete = q and q.isComplete
+
+    -- A finished quest wants the turn-in point, not the places you were farming.
+    local spawns = (not isComplete) and spawnPoints(questID, mapID)
+    if not spawns then
+        local x, y = waypointFor(questID, mapID)
+        if not x then return 0, 0, false end
+        X[1], Y[1], K[1], MK[1] = x, y, nil, nil
+        return 1, 0, false
+    end
+
+    bucketObjectives(q)
+    local limit = pinLimit()
+    local n, thinned = 0, 0
+    -- Per quest, so two different quests may still pin the same spot
+    spreadReset()
+    -- The list is stored densest first, so walking it in order is what makes a lower limit keep
+    -- the best locations. Never reorder it here.
+    for i = 1, #spawns do
+        if limit and n >= limit then break end
+        local v = spawns[i]
+        local mask = math.floor(v / 1e9)
+        local kind = math.floor(v % 1e9 / 1e8)
+        -- Judged before the separation grid, so a point for a finished objective cannot claim a
+        -- cell and crowd out one that is still wanted.
+        if maskWanted(mask, kind) then
+            local rest = v % 1e8
+            local x = math.floor(rest / 1e4) / 1e4
+            local y = (rest % 1e4) / 1e4
+            if spreadAccepts(x, y) then
+                n = n + 1
+                X[n], Y[n], K[n], MK[n] = x, y, kind, mask
+            else
+                thinned = thinned + 1
+            end
+        end
+    end
+    return n, thinned, true
+end
+
 -- Read by /eqsprobe mappoi. Three failures look identical from outside - never called, called
 -- and found nothing, called and drew pins that are not visible - and they share no fix.
 M._refreshes, M._pins, M._stage, M._mapID = 0, 0, "never ran", nil
+M._spawnPins, M._spawnThinned = 0, 0
 
 function providerMixin:_DoRefresh()
     self:RemoveAllData()
     M._refreshes = M._refreshes + 1
-    M._pins, M._mapID = 0, nil
+    M._pins, M._mapID, M._spawnPins, M._spawnThinned = 0, nil, 0, 0
 
     local DB = ns:GetSubsystem("DB")
     if DB and DB.db.profile.map and DB.db.profile.map.showQuestPins == false then
@@ -93,7 +244,8 @@ function providerMixin:_DoRefresh()
                     _seenQids[qid] = true
                     local q = Cache:Get(qid)
                     if q then
-                        map:AcquirePin(PIN_TEMPLATE, qid, x, y, q.isComplete)
+                        map:AcquirePin(PIN_TEMPLATE, qid, x, y, q.isComplete, mapID)
+                        record(qid, x, y)
                         M._pins = M._pins + 1
                     end
                 end
@@ -101,16 +253,20 @@ function providerMixin:_DoRefresh()
         end
     end
 
-    -- ⛔ This loop used to be gated on GetNextWaypointForMap, which is what made it dead on
-    -- Classic. waypointFor answers nil rather than raising when neither source has the quest,
-    -- so the gate is no longer needed and retail behaves identically.
+    -- Not gated on GetNextWaypointForMap, which is absent on Classic. waypointFor answers nil
+    -- when neither source has the quest, so no gate is needed.
     if Cache then
         for qid, q in pairs(Cache:All()) do
             if not _seenQids[qid] then
-                local x, y = waypointFor(qid, mapID)
-                if x then
-                    map:AcquirePin(PIN_TEMPLATE, qid, x, y, q.isComplete)
+                local n, thinned, fromSpawns = M:PointsFor(qid, mapID, q)
+                M._spawnThinned = M._spawnThinned + thinned
+                for i = 1, n do
+                    local x, y = M._ptX[i], M._ptY[i]
+                    map:AcquirePin(PIN_TEMPLATE, qid, x, y, q.isComplete, mapID,
+                                   M._ptKind[i], M._ptMask[i])
+                    record(qid, x, y, M._ptKind[i], M._ptMask[i])
                     M._pins = M._pins + 1
+                    if fromSpawns then M._spawnPins = M._spawnPins + 1 end
                 end
             end
         end

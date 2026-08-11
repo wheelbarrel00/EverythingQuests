@@ -1,0 +1,165 @@
+## Interface: 11509
+## Title: Everything Quests
+## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Classic Era support is limited and growing - see the What's New notice.
+## Author: Wheelbarrel00
+## Version: 1.39.0
+## Dependencies: EQObjectiveTracker
+## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
+## SavedVariablesPerCharacter: EverythingQuestsCharDB
+## IconTexture: Interface\AddOns\EverythingQuests\Media\Textures\eq-logo-v3
+## X-Curse-Project-ID: 1544648
+
+# Every file the retail TOC lists and this one does not is declared below with
+# '# check-toc: omit'. The gate errors on a stale directive, so an omission cannot rot into a
+# silent hole.
+
+# Retail-only subsystems. C_QuestLine and C_CampaignInfo do not exist on Era, and the authored
+# chain data is Midnight content, so the Chain Guide has neither an API nor anything to show.
+# check-toc: omit Modules/ChainGuide/Frame.lua
+# check-toc: omit Modules/ChainGuide/Database.lua
+# check-toc: omit Modules/ChainGuide/QuestLineSource.lua
+# check-toc: omit Modules/ChainGuide/CampaignSource.lua
+# check-toc: omit Modules/ChainGuide/Waypoint.lua
+# check-toc: omit Modules/ChainGuide/ChainView.lua
+# check-toc: omit Modules/ChainGuide/Characters.lua
+# check-toc: omit Modules/ChainGuide/History.lua
+# check-toc: omit Modules/ChainGuide/QuestMapButton.lua
+# check-toc: omit Modules/ChainGuide/MapPin.lua
+# check-toc: omit Modules/ChainGuide/MapPin.xml
+# check-toc: omit Modules/ChainGuide/MapPinProvider.lua
+# check-toc: omit Options/TabChainGuide.lua
+# check-toc: omit Data/QuestChains/_Index.lua
+# check-toc: omit Data/QuestChains/_QuestLineRouting.lua
+# check-toc: omit Data/QuestChains/_QuestCoords.lua
+# check-toc: omit Data/QuestChains/_Overlays.lua
+# check-toc: omit Data/QuestChains/_Overlays_Campaign.lua
+# check-toc: omit Data/QuestChains/_Overlays_Eversong.lua
+# check-toc: omit Data/QuestChains/_Overlays_Zulaman.lua
+# check-toc: omit Data/QuestChains/_Overlays_Harandar.lua
+# check-toc: omit Data/QuestChains/_Overlays_Voidstorm.lua
+# check-toc: omit Data/QuestChains/_Overlays_Revelations.lua
+# check-toc: omit Data/QuestChains/_Overlays_Val.lua
+
+# World quests do not exist in Classic content. The C_TaskQuest names are present on Era and
+# answer nothing, which is why the gate here is the TOC rather than a capability check.
+# check-toc: omit Modules/WorldQuests/Rewards.lua
+# check-toc: omit Modules/WorldQuests/Tooltip.lua
+# check-toc: omit Modules/WorldQuests/Pin.lua
+# check-toc: omit Modules/WorldQuests/Pin.xml
+# check-toc: omit Modules/WorldQuests/WatchPersist.lua
+# check-toc: omit Modules/WorldQuests/WorldMap.lua
+# check-toc: omit Modules/WorldQuests/ZoneMap.lua
+# check-toc: omit Modules/WorldQuests/Summary.lua
+# check-toc: omit Modules/WorldQuests/Panel.lua
+# check-toc: omit Modules/WorldQuests/Tab.lua
+# check-toc: omit Options/TabWorldQuests.lua
+
+# Quest History ports with degradations rather than cleanly - GetTitleForQuestID and
+# RequestLoadQuestByID are both absent, so a backfilled row can never fill in its own name.
+# Held back until that reads acceptably rather than shipped half working.
+# check-toc: omit Modules/History/Recorder.lua
+# check-toc: omit Modules/History/Frame.lua
+# check-toc: omit Modules/History/Session.lua
+# check-toc: omit Options/TabHistory.lua
+
+# Reached only through nil-guarded GetSubsystem calls from Options/Frame.lua, so their absence
+# skips the font and status bar pickers instead of erroring. Those pickers belong to the tracker
+# and history options, neither of which is listed here.
+# check-toc: omit Core/Media.lua
+# check-toc: omit Core/Profiler.lua
+# check-toc: omit Libs/LibSharedMedia-3.0/lib.xml
+
+# Reward tooltips for the world quest and history panels, neither of which is listed.
+# check-toc: omit Core/QuestRewards.lua
+
+# Nothing listed here uses either one. Core/Events.lua is a plain frame and C_Timer.
+# check-toc: omit Libs/AceEvent-3.0/AceEvent-3.0.xml
+# check-toc: omit Libs/AceTimer-3.0/AceTimer-3.0.xml
+
+# AceDB is for Core/DB.lua, and it needs CallbackHandler. LibMapPinHandler reads
+# MapCanvasMixin at FILE SCOPE, which is safe here only because /eqsprobe pins measured that
+# as a table on Era.
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\AceDB-3.0\AceDB-3.0.xml
+
+# LibDBIcon errors at FILE SCOPE if LibDataBroker is not already loaded, so this pair's order
+# is load bearing. Both are for the minimap button.
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+Libs\LibMapPinHandler\LibMapPinHandler.lua
+
+# HereBeDragons backs the minimap objective pins. HBD-2.0 needs CallbackHandler, listed above,
+# and HBD-Pins needs HBD-2.0, so this pair's order is load bearing. Both read WorldMapFrame and
+# MapCanvasDataProviderMixin at FILE SCOPE, which is safe here for the same reason
+# LibMapPinHandler is - /eqsprobe pins measured that stack present on Era.
+# Deliberately absent from the retail TOC - see the flavor-only directive there for why.
+Libs\HereBeDragons\HereBeDragons-2.0.lua
+Libs\HereBeDragons\HereBeDragons-Pins-2.0.lua
+
+Core\Init.lua
+
+# ns.Has and ns.Compat are read at file scope by Core/Cache.lua, so this loads before it
+Core\Compat.lua
+
+# enUS first - it creates ns.L and the fallback metatable the others layer onto.
+# Modules/MapPOI/Pin.lua reads ns.L at FILE SCOPE, so all four must precede it.
+Locales\enUS.lua
+Locales\frFR.lua
+Locales\ruRU.lua
+Locales\koKR.lua
+
+Core\DB.lua
+Core\Events.lua
+Core\Cache.lua
+Core\Util.lua
+
+# ns.Util.color is read at FILE SCOPE by Core/Dialog.lua and Options/Frame.lua, so Core/Util
+# precedes both. Dialog backs the Reset and profile prompts and the Discord link.
+Core\Dialog.lua
+Core\Changelog.lua
+
+Core\FlavorProbe.lua
+
+# Pin.lua defines EQQuestPinMixin, which Pin.xml names in its mixin= attribute, so the order
+# of these two is load bearing.
+Modules\MapPOI\Pin.lua
+Modules\MapPOI\Pin.xml
+Modules\MapPOI\Provider.lua
+
+# Measured working on Era: QuestAuto is 18 of 18 APIs and registers only events Classic knows,
+# Minimap calls no quest API at all, and EQOT's API module resolves for TrackerBridge.
+Modules\Minimap\Minimap.lua
+Modules\TrackerBridge.lua
+Modules\QuestAuto.lua
+
+# Reaches MapPOIProvider, ns.QuestPinTexture and ns.QuestPinObjectives at RUNTIME rather than
+# at file scope, so its position relative to Modules/MapPOI does not matter.
+Modules\Minimap\QuestPins.lua
+
+# Reads the mob table below at RUNTIME, not at file scope, so it is listed before the data.
+Modules\Nameplates\QuestIcons.lua
+
+# Options/Frame.lua registers /eqs and must precede the tabs, which call AddTab at FILE SCOPE.
+# Each tab section is gated on the subsystem it drives, so the tabs not listed here simply do
+# not appear and the controls for absent modules are skipped rather than left inert.
+Options\Frame.lua
+Options\TabGeneral.lua
+Options\TabAbout.lua
+
+# The Classic quest coordinate table. Listed here and NOT in the TBC TOC on purpose: the
+# dataset is Era quest data, so Outland would get no pins and the gap would look like a bug.
+Data\QuestCoords_Classic.lua
+
+# The objective spawn map - every clustered location a quest can be advanced at. Defines
+# ns.CLASSIC_QUEST_SPAWNS, a different global from the file above, so the two are a pair
+# rather than alternatives.
+Data\QuestSpawns_Classic.lua
+
+# questID -> the creatures that advance it. Nameplates inverts this to creature -> quest at
+# runtime over the quest log only, so nothing here is searched during play.
+Data\QuestNPCs_Classic.lua
+
+# Reads ns.Util.color at FILE SCOPE and opens the options window, so it follows both.
+Modules\WhatsNew.lua

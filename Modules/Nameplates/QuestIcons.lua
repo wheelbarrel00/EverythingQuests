@@ -6,6 +6,8 @@ local QI = ns:RegisterSubsystem("NameplateQuestIcons", {})
 local ICON_SIZE    = 24
 local DEFAULT_TEXT = 13
 local SPACING      = 3
+-- Slots built per plate, and the point past which scanning a unit stops paying for itself
+local MAX_ICON_SLOTS = 4
 
 local function cfg()
     local DB = ns:GetSubsystem("DB")
@@ -55,11 +57,24 @@ local function elvUILoaded()
     return (f and f("ElvUI")) and true or false
 end
 
-local activeQuests = {}
+local activeQuests = {}   -- quest title -> objective text -> entry, for the tooltip path
+local questObjList = {}   -- questID -> { entry, ... } in quest log order
+local questObjSlot = {}   -- questID -> objective type -> index within that type -> entry
+local npcQuests    = {}   -- creature id -> { { quest, slot, otype }, ... }
 local _logRows = {}
+
+-- The shipped kind maps onto the client's own objective type, which is what makes the index
+-- meaningful: "the 2nd item objective" rather than "the 2nd objective".
+-- Defined in Modules/MapPOI/Provider.lua and read HERE AT RUNTIME, not cached at file scope -
+-- the map pins index the same way off the same numbers, and a second copy could drift silently.
+-- Reading it late is what keeps the two files free of a load-order dependency.
+local function kindType(k) return ns.QUEST_KIND_TYPE and ns.QUEST_KIND_TYPE[k] end
 
 local function rebuildCache()
     wipe(activeQuests)
+    wipe(questObjList)
+    wipe(questObjSlot)
+    wipe(npcQuests)
     if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then
         return
     end
@@ -74,8 +89,18 @@ local function rebuildCache()
                     local _, tex = GetQuestLogSpecialItemInfo(i)
                     itemTexture = tex
                 end
-                local objMap
+                local objMap, objList, objSlot
+                local typeSeen = {}
                 for _, o in ipairs(objectives) do
+                    -- The slot counts EVERY objective of its type, finished ones included.
+                    -- Numbering only the incomplete ones would renumber the rest the moment one
+                    -- completed, and the mob table's index would point at the wrong objective.
+                    local otype = o.type
+                    local slot
+                    if otype then
+                        slot = typeSeen[otype] or 0
+                        typeSeen[otype] = slot + 1
+                    end
                     local text = (not o.finished) and o.text
                     if text and text ~= "" then
                         local entry
@@ -96,22 +121,110 @@ local function rebuildCache()
                             entry.itemTexture = itemTexture
                             objMap = objMap or {}
                             objMap[text] = entry
+                            objList = objList or {}
+                            objList[#objList + 1] = entry
                         end
                     end
+                    -- Recorded for EVERY objective, complete ones as false. A finished
+                    -- objective has to be a known blank rather than a gap, or a mob whose
+                    -- objective is already done falls through to the quest's first incomplete
+                    -- one and advertises something it does not drop.
+                    if slot then
+                        objSlot = objSlot or {}
+                        local byIdx = objSlot[otype]
+                        if not byIdx then byIdx = {}; objSlot[otype] = byIdx end
+                        byIdx[slot] = (text and text ~= "" and objMap and objMap[text]) or false
+                    end
                 end
-                if objMap then activeQuests[info.title] = objMap end
+                if objMap then
+                    activeQuests[info.title] = objMap
+                    questObjList[info.questID] = objList
+                    questObjSlot[info.questID] = objSlot
+                end
+            end
+        end
+    end
+
+    -- The mob table is inverted HERE, over the quest log only, never searched during play.
+    -- Shipped it is questID -> mobs, 5011 rows. A 25-quest log inverts to a few hundred
+    -- entries. Absent on retail, where the tooltip carries the mapping itself.
+    local mobsByQuest = ns.CLASSIC_QUEST_NPCS
+    if not mobsByQuest then return end
+    for questID in pairs(questObjList) do
+        local list = mobsByQuest[questID]
+        if list then
+            for i = 1, #list do
+                local v = list[i]
+                local creatureID = v % 10000000
+                local t = npcQuests[creatureID]
+                if not t then t = {}; npcQuests[creatureID] = t end
+                t[#t + 1] = {
+                    quest = questID,
+                    slot  = math.floor(v / 100000000),
+                    otype = kindType(math.floor((v % 100000000) / 10000000)),
+                }
             end
         end
     end
 end
 
 local _scanSeen = {}
+
+-- Field 6 of a unit GUID is the creature id. Vehicles share that id space and can carry
+-- objectives, so both prefixes are accepted and everything else - players, pets - is refused.
+local function creatureIDFromUnit(unit)
+    local guid = UnitGUID(unit)
+    if not (guid and ok(guid)) then return nil end
+    local kind, _, _, _, _, id = strsplit("-", guid)
+    if kind ~= "Creature" and kind ~= "Vehicle" then return nil end
+    return tonumber(id)
+end
+
+-- Each row names the ONE objective that mob serves, so a mob dropping one of four quest items
+-- claims one icon rather than four. The fallback matters: the client's objective order is only
+-- assumed to match the dataset's within a type, so where it does not line up this shows the
+-- quest's first incomplete objective instead of every one of them.
+local function scanByCreature(unit, out)
+    local creatureID = creatureIDFromUnit(unit)
+    local rows = creatureID and npcQuests[creatureID]
+    if not rows then return 0 end
+    wipe(_scanSeen)
+    local count = 0
+    for i = 1, #rows do
+        local row = rows[i]
+        local byType = row.otype and questObjSlot[row.quest]
+        local byIdx  = byType and byType[row.otype]
+        local entry
+        if byIdx then
+            -- false means that objective is already complete and this mob has nothing left to
+            -- offer here. Nil means the index ran past what the client reported. Both show
+            -- nothing, because guessing another objective is how a mob ends up advertising an
+            -- item it does not drop.
+            entry = byIdx[row.slot] or nil
+        else
+            -- The client reported no objectives of this type at all, so the index cannot be
+            -- lined up. The mob is still known to serve this quest, so show its first
+            -- incomplete objective rather than nothing.
+            local list = questObjList[row.quest]
+            entry = list and list[1]
+        end
+        if entry and not _scanSeen[entry] then
+            _scanSeen[entry] = true
+            count = count + 1
+            out[count] = entry
+            if count >= MAX_ICON_SLOTS then return count end
+        end
+    end
+    return count
+end
+
 local function scanInto(unit, out)
     wipe(out)
-    -- ⚠ Classic has no C_TooltipInfo.GetUnit, so this returns 0 and the icons never appear.
-    -- The replacement is a GameTooltip:SetUnit plus TextLeft<i>:GetText() scrape, not written
-    -- yet because whether a Classic unit tooltip carries quest lines at all is unmeasured.
-    if not ns.Has.TooltipDataUnit then return 0 end
+    -- A Classic unit tooltip carries NO quest lines at all - measured on a live client against
+    -- a mob with an active kill objective in progress, which returned only the name and level.
+    -- There is nothing to scrape, so the creature id is the route there. Retail keeps the
+    -- tooltip path, which needs no shipped table.
+    if not ns.Has.TooltipDataUnit then return scanByCreature(unit, out) end
     local data = C_TooltipInfo.GetUnit(unit)
     local lines = data and data.lines
     if not lines then return 0 end
@@ -168,8 +281,8 @@ local function getIconFrame(plate)
     f:SetFrameStrata("HIGH")
     f:SetSize(iconSize, iconSize)
     anchorFrame(f, plate, placement, offX, offY)
-    f.slots = { buildSlot(f, iconSize, textSize), buildSlot(f, iconSize, textSize),
-                buildSlot(f, iconSize, textSize), buildSlot(f, iconSize, textSize) }
+    f.slots = {}
+    for i = 1, MAX_ICON_SLOTS do f.slots[i] = buildSlot(f, iconSize, textSize) end
     plate.EQQuestIcons = f
     return f
 end

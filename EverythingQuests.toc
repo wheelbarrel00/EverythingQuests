@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Unified replacement for the Blizzard quest experience - world map overlays, nameplate quest icons, quest history, and a Midnight chain guide. The objective tracker installs alongside it as EQ Objective Tracker.
 ## Author: Wheelbarrel00
-## Version: 1.38.1
+## Version: 1.39.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -89,10 +89,28 @@ Modules\History\Frame.lua
 Modules\History\Session.lua
 
 # Data\QuestCoords_Classic.lua is Era quest data and no retail map uses those UiMapIDs, so it
-# is listed by the flavor TOCs ONLY. Those are gitignored, so CI sees neither them nor the
-# coverage they provide - this directive is what declares the hole instead of hiding it, and
-# tools/check_toc.py errors if it ever goes stale. It has to live HERE, in the tracked TOC.
+# is listed by the flavor TOCs ONLY. EverythingQuests_Vanilla.toc is tracked as of v1.39.0 and
+# provides that coverage, but the TBC one is still gitignored, so this directive is what
+# declares the hole rather than hiding it. tools/check_toc.py errors if it goes stale.
 # check-toc: flavor-only Data/QuestCoords_Classic.lua
+
+# Data\QuestSpawns_Classic.lua is the objective SPAWN map for the same flavors - every place a
+# quest can be advanced, rather than the one waypoint QuestCoords carries. Same reasoning, same
+# gate, and it defines a DIFFERENT global so the two load together rather than overwriting.
+# check-toc: flavor-only Data/QuestSpawns_Classic.lua
+
+# Modules\Minimap\QuestPins.lua draws the objective pins on the minimap and needs
+# HereBeDragons-Pins to do it. That library calls WorldMapFrame:AddDataProvider at FILE SCOPE, on
+# the REAL canvas, which is what LibMapPinHandler's shadow canvas exists to keep EQ off on retail
+# where the AreaPOI taint crash is live. So the library and its consumer are listed by the flavor
+# TOCs only. Retail safety rests on this file not being listed here, NOT on LibStub answering
+# nil - any retail user running another addon that embeds HereBeDragons has it loaded already.
+# check-toc: flavor-only Modules/Minimap/QuestPins.lua
+
+# Data\QuestNPCs_Classic.lua answers "which creatures advance this quest", which is what a
+# nameplate icon needs and what no Classic API reports - a unit tooltip there carries no quest
+# data at all, measured. Retail reads that from the tooltip and never loads this.
+# check-toc: flavor-only Data/QuestNPCs_Classic.lua
 
 # Data (registers chain definitions into ChainGuideDatabase)
 Data\QuestChains\_Index.lua

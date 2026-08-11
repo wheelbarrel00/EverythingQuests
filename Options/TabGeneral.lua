@@ -19,79 +19,168 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
     local h = Options:CreateSectionHeader(content, L["General"])
     h:SetPoint("TOPLEFT", 8, -8)
 
-    local function questPinsGet()
-        local DB = ns:GetSubsystem("DB")
-        return not DB or not DB.db.profile.map
-               or DB.db.profile.map.showQuestPins ~= false
+    -- Sections are skipped per flavor, which would break a chain of SetPoint(prev), so the
+    -- column walks a cursor carrying an absolute indent instead.
+    local prev, prevIndent = h, 0
+    local function place(widget, indent, gap)
+        indent = indent or 0
+        widget:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", indent - prevIndent, -gap)
+        prev, prevIndent = widget, indent
+        return widget
     end
-    local function questPinsSet(v)
-        local DB = ns:GetSubsystem("DB")
-        if DB then
-            DB.db.profile.map = DB.db.profile.map or {}
-            DB.db.profile.map.showQuestPins = v and true or false
-        end
+
+    local function refreshPins()
         local P = ns:GetSubsystem("MapPOIProvider")
         if P and P.provider and P.provider.RefreshAllData then
             P.provider:RefreshAllData()
         end
     end
-    local qpins = Options:CreateCheckbox(content,
-        L["Show quest pins on the world map"],
-        questPinsGet, questPinsSet,
-        L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Quests you haven't accepted yet keep the game's own yellow \"!\" markers; EQ does not change those. Uncheck this box and all of EQ's red markers go away."])
-    qpins:SetPoint("TOPLEFT", h, "BOTTOMLEFT", 0, -16)
 
-    local autoAccGet, autoAccSet = generalSetting("autoAcceptQuests")
-    local autoAcc = Options:CreateCheckbox(content,
-        L["Auto-accept quests"],
-        autoAccGet, autoAccSet,
-        L["Hold Alt to pause."])
-    autoAcc:SetPoint("TOPLEFT", qpins, "BOTTOMLEFT", 0, -2)
+    if ns:GetSubsystem("MapPOIProvider") then
+        local function questPinsGet()
+            local DB = ns:GetSubsystem("DB")
+            return not DB or not DB.db.profile.map
+                   or DB.db.profile.map.showQuestPins ~= false
+        end
+        local function questPinsSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.showQuestPins = v and true or false
+            end
+            refreshPins()
+        end
+        local qpins = Options:CreateCheckbox(content,
+            L["Show quest pins on the world map"],
+            questPinsGet, questPinsSet,
+            L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Quests you haven't accepted yet keep the game's own yellow \"!\" markers; EQ does not change those. Uncheck this box and all of EQ's red markers go away."])
+        place(qpins, 0, 16)
 
-    local autoTIGet, autoTISet = generalSetting("autoTurnInQuests")
-    local autoTI = Options:CreateCheckbox(content,
-        L["Auto-turn-in quests"],
-        autoTIGet, autoTISet,
-        L["Skips reward-choice screens."])
-    autoTI:SetPoint("TOPLEFT", autoAcc, "BOTTOMLEFT", 0, -2)
+        local function pinScaleGet()
+            local DB = ns:GetSubsystem("DB")
+            local s = DB and DB.db.profile.map and DB.db.profile.map.pinScale
+            return type(s) == "number" and s or 1.0
+        end
+        local function pinScaleSet(value)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.pinScale = value
+            end
+            refreshPins()
+        end
+        local pinScale = Options:CreateSlider(content, L["World map pin scale"],
+            0.5, 2.0, 0.05, pinScaleGet, pinScaleSet)
+        place(pinScale, 4, 6)
+        pinScale:SetWidth(280)
+        Options:AttachTooltip(pinScale, L["World map pin scale"],
+            L["Quest pins already grow as you zoom in and shrink as you zoom out. This scales that whole range, so raise it if the pins are hard to pick out on a large or high-resolution display."])
 
-    -- The tracker moved out to EQ Objective Tracker, which owns its own options panel. Every
-    -- setting that used to sit on this tab and on the deleted Tracker and Appearance tabs is
-    -- there now, so this points at it rather than leaving people hunting.
-    local trackerHeader = Options:CreateSectionHeader(content, L["Tracker"])
-    trackerHeader:SetPoint("TOPLEFT", autoTI, "BOTTOMLEFT", 0, -16)
+        local MAX_PINS = ns.MAPPOI_MAX_PINS or 250
+        local function pinCapGet()
+            local DB = ns:GetSubsystem("DB")
+            local n = DB and DB.db.profile.map and DB.db.profile.map.pinCap
+            return type(n) == "number" and n or 50
+        end
+        local function pinCapSet(value)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.pinCap = value
+            end
+            refreshPins()
+            -- The minimap reads the same pinCap, so without this it keeps the old set until an
+            -- unrelated quest event fires
+            local MM = ns:GetSubsystem("MinimapQuestPins")
+            if MM then MM:Rebuild() end
+        end
+        local pinCap = Options:CreateSlider(content, L["Objective pins per quest"],
+            25, MAX_PINS, 25, pinCapGet, pinCapSet,
+            function(v) return v >= MAX_PINS and L["No limit"] or ("%d"):format(v) end)
+        place(pinCap, 4, 6)
+        pinCap:SetWidth(280)
+        Options:AttachTooltip(pinCap, L["Objective pins per quest"],
+            L["How many places to mark for a single quest on one map. The busiest locations are kept first, so a lower number still points you somewhere useful. Slide all the way right for no limit at all - a few gathering quests can then put hundreds of markers on one map."])
+    end
 
-    local trackerBtn = Options:CreateYellowButton(content, L["Open Tracker Settings"], function()
-        local Bridge = ns:GetSubsystem("TrackerBridge")
-        if Bridge then Bridge:OpenTrackerOptions() end
-    end)
-    trackerBtn:SetPoint("TOPLEFT", trackerHeader, "BOTTOMLEFT", 0, -10)
-    Options:AttachTooltip(trackerBtn, L["Open Tracker Settings"],
-        L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."])
+    -- Its own section because minimap pins are a separate subsystem, not listed on every flavor
+    local MinimapPins = ns:GetSubsystem("MinimapQuestPins")
+    if MinimapPins then
+        local function minimapPinsGet()
+            local DB = ns:GetSubsystem("DB")
+            return not DB or not DB.db.profile.map
+                   or DB.db.profile.map.showMinimapPins ~= false
+        end
+        local function minimapPinsSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.showMinimapPins = v and true or false
+            end
+            MinimapPins:Rebuild()
+        end
+        local mmpins = Options:CreateCheckbox(content,
+            L["Show objective pins on the minimap"],
+            minimapPinsGet, minimapPinsSet,
+            L["Puts the same objective markers on the minimap as on the world map, for the zone you are standing in. They use the per-quest limit above. Hover one for the quest name and what it still needs."])
+        place(mmpins, 0, 16)
+    end
 
-    local eqIconGet, eqIconSet = generalSetting("showEQIcon")
-    local eqIcon = Options:CreateCheckbox(content,
-        L["Show Everything Quests icon on the tracker"],
-        eqIconGet,
-        function(value)
-            eqIconSet(value)
+    if ns:GetSubsystem("QuestAuto") then
+        local autoAccGet, autoAccSet = generalSetting("autoAcceptQuests")
+        local autoAcc = Options:CreateCheckbox(content,
+            L["Auto-accept quests"],
+            autoAccGet, autoAccSet,
+            L["Hold Alt to pause."])
+        place(autoAcc, 0, 6)
+
+        local autoTIGet, autoTISet = generalSetting("autoTurnInQuests")
+        local autoTI = Options:CreateCheckbox(content,
+            L["Auto-turn-in quests"],
+            autoTIGet, autoTISet,
+            L["Skips reward-choice screens."])
+        place(autoTI, 0, 2)
+    end
+
+
+    if ns:GetSubsystem("TrackerBridge") then
+        local trackerHeader = Options:CreateSectionHeader(content, L["Tracker"])
+        place(trackerHeader, 0, 16)
+
+        local trackerBtn = Options:CreateYellowButton(content, L["Open Tracker Settings"], function()
             local Bridge = ns:GetSubsystem("TrackerBridge")
-            if Bridge then Bridge:ApplyEQIcon() end
-        end,
-        L["Adds the Everything Quests logo at the top right of the tracker, which opens this options window. The tracker's own cogwheel opens the tracker's settings instead. You can also reach this window from the minimap button or by typing /eqs."])
-    eqIcon:SetPoint("TOPLEFT", trackerBtn, "BOTTOMLEFT", 0, -8)
+            if Bridge then Bridge:OpenTrackerOptions() end
+        end)
+        place(trackerBtn, 0, 10)
+        Options:AttachTooltip(trackerBtn, L["Open Tracker Settings"],
+            L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."])
 
-    local chainIconGet, chainIconSet = generalSetting("showChainGuideIcon")
-    local chainIcon = Options:CreateCheckbox(content,
-        L["Show Chain Guide icon on the tracker"],
-        chainIconGet,
-        function(value)
-            chainIconSet(value)
-            local Bridge = ns:GetSubsystem("TrackerBridge")
-            if Bridge then Bridge:ApplyChainIcon() end
-        end,
-        L["Adds a small chain icon beside the cogwheel at the top right of the tracker, which opens the Chain Guide."])
-    chainIcon:SetPoint("TOPLEFT", eqIcon, "BOTTOMLEFT", 0, -2)
+        local eqIconGet, eqIconSet = generalSetting("showEQIcon")
+        local eqIcon = Options:CreateCheckbox(content,
+            L["Show Everything Quests icon on the tracker"],
+            eqIconGet,
+            function(value)
+                eqIconSet(value)
+                local Bridge = ns:GetSubsystem("TrackerBridge")
+                if Bridge then Bridge:ApplyEQIcon() end
+            end,
+            L["Adds the Everything Quests logo at the top right of the tracker, which opens this options window. The tracker's own cogwheel opens the tracker's settings instead. You can also reach this window from the minimap button or by typing /eqs."])
+        place(eqIcon, 0, 8)
+
+        if ns:GetSubsystem("ChainGuide") then
+            local chainIconGet, chainIconSet = generalSetting("showChainGuideIcon")
+            local chainIcon = Options:CreateCheckbox(content,
+                L["Show Chain Guide icon on the tracker"],
+                chainIconGet,
+                function(value)
+                    chainIconSet(value)
+                    local Bridge = ns:GetSubsystem("TrackerBridge")
+                    if Bridge then Bridge:ApplyChainIcon() end
+                end,
+                L["Adds a small chain icon beside the cogwheel at the top right of the tracker, which opens the Chain Guide."])
+            place(chainIcon, 0, 2)
+        end
+    end
 
     local function owScaleGet()
         local DB = ns:GetSubsystem("DB")
@@ -104,7 +193,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         end
     end
     local owScale = Options:CreateSlider(content, L["Options Window Scale"], 0.7, 1.4, 0.05, owScaleGet, owScaleSet)
-    owScale:SetPoint("TOPLEFT", chainIcon, "BOTTOMLEFT", 0, -18)
+    place(owScale, 0, 18)
     owScale:SetWidth(280)
     Options:AttachTooltip(owScale, L["Options Window Scale"],
         L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."])
@@ -113,93 +202,97 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         owScale.slider:HookScript("OnMouseUp", function() Options:ApplyWindowScale() end)
     end
 
-    local WHATSNEW_MODES = {
-        { value = "popup", label = L["Popup window"] },
-        { value = "chat",  label = L["Chat link"] },
-        { value = "none",  label = L["None"] },
-    }
-    local function wnModeGet()
-        local DB = ns:GetSubsystem("DB")
-        return (DB and DB.db.global.whatsNewMode) or "popup"
-    end
-    local function wnModeSet(value)
-        local DB = ns:GetSubsystem("DB")
-        if DB then DB.db.global.whatsNewMode = value end
-    end
-    local wnMode = Options:CreateRadioGroup(content, L["After an update"],
-        WHATSNEW_MODES, wnModeGet, wnModeSet, 320, 14,
-        L["After an update"],
-        L["How Everything Quests tells you about new features: a Popup window, a quiet clickable Chat link in your chat frame, or None. New features always ship off until you turn them on."])
-    wnMode:SetPoint("TOPLEFT", owScale, "BOTTOMLEFT", 0, -12)
-
-    local function npLayoutSetting(key)
-        return
-            function()
-                local DB = ns:GetSubsystem("DB")
-                return DB and DB.db.profile.general[key]
-            end,
-            function(value)
-                local DB = ns:GetSubsystem("DB")
-                if DB then DB.db.profile.general[key] = value end
-                local QI = ns:GetSubsystem("NameplateQuestIcons")
-                if QI and QI.ApplyLayout then QI:ApplyLayout() end
-            end
+    if ns:GetSubsystem("WhatsNew") then
+        local WHATSNEW_MODES = {
+            { value = "popup", label = L["Popup window"] },
+            { value = "chat",  label = L["Chat link"] },
+            { value = "none",  label = L["None"] },
+        }
+        local function wnModeGet()
+            local DB = ns:GetSubsystem("DB")
+            return (DB and DB.db.global.whatsNewMode) or "popup"
+        end
+        local function wnModeSet(value)
+            local DB = ns:GetSubsystem("DB")
+            if DB then DB.db.global.whatsNewMode = value end
+        end
+        local wnMode = Options:CreateRadioGroup(content, L["After an update"],
+            WHATSNEW_MODES, wnModeGet, wnModeSet, 320, 14,
+            L["After an update"],
+            L["How Everything Quests tells you about new features: a Popup window, a quiet clickable Chat link in your chat frame, or None. New features always ship off until you turn them on."])
+        place(wnMode, 0, 12)
     end
 
-    local npHeader = Options:CreateSectionHeader(content, L["Nameplate Quest Icons"])
-    npHeader:SetPoint("TOPLEFT", wnMode, "BOTTOMLEFT", 0, -16)
+    if ns:GetSubsystem("NameplateQuestIcons") then
+        local function npLayoutSetting(key)
+            return
+                function()
+                    local DB = ns:GetSubsystem("DB")
+                    return DB and DB.db.profile.general[key]
+                end,
+                function(value)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then DB.db.profile.general[key] = value end
+                    local QI = ns:GetSubsystem("NameplateQuestIcons")
+                    if QI and QI.ApplyLayout then QI:ApplyLayout() end
+                end
+        end
 
-    local function npGet()
-        local QI = ns:GetSubsystem("NameplateQuestIcons")
-        return QI and QI.IsEnabled and QI:IsEnabled()
+        local npHeader = Options:CreateSectionHeader(content, L["Nameplate Quest Icons"])
+        place(npHeader, 0, 16)
+
+        local function npGet()
+            local QI = ns:GetSubsystem("NameplateQuestIcons")
+            return QI and QI.IsEnabled and QI:IsEnabled()
+        end
+        local function npSet(value)
+            local DB = ns:GetSubsystem("DB")
+            if DB then DB.db.profile.general.questNameplateIcons = value and true or false end
+            local QI = ns:GetSubsystem("NameplateQuestIcons")
+            if QI and QI.ApplyEnabled then QI:ApplyEnabled() end
+        end
+        local nameplates = Options:CreateCheckbox(content,
+            L["Quest icons on nameplates"],
+            npGet, npSet,
+            L["Shows the \"!\" + count on objective mobs."])
+        place(nameplates, 0, 10)
+
+        local NP_PLACEMENT = {
+            { value = "LEFT",   label = L["Left"] },
+            { value = "RIGHT",  label = L["Right"] },
+            { value = "TOP",    label = L["Above"] },
+            { value = "BOTTOM", label = L["Below"] },
+        }
+        local placeGet, placeSet = npLayoutSetting("npIconPlacement")
+        local npPlace = Options:CreateRadioGroup(content, L["Position"], NP_PLACEMENT, placeGet, placeSet, 260, nil,
+            L["Position"],
+            L["Where the quest icon + count sits relative to the enemy nameplate. Move it closer to the health bar to taste."])
+        place(npPlace, 0, 8)
+
+        local szGet, szSet = npLayoutSetting("npIconSize")
+        local npSize = Options:CreateSlider(content, L["Icon size"], 12, 48, 0.5, szGet, szSet)
+        place(npSize, 0, 12)
+        npSize:SetWidth(280)
+
+        local txtGet, txtSet = npLayoutSetting("npIconTextSize")
+        local npText = Options:CreateSlider(content, L["Count text size"], 8, 24, 0.5, txtGet, txtSet)
+        place(npText, 0, 16)
+        npText:SetWidth(280)
+
+        local offXGet, offXSet = npLayoutSetting("npIconOffsetX")
+        local npOffX = Options:CreateSlider(content, L["X offset"], -50, 50, 1, offXGet, offXSet)
+        place(npOffX, 0, 16)
+        npOffX:SetWidth(280)
+        Options:AttachTooltip(npOffX, L["X offset"],
+            L["Nudges the icon and count together left or right from the Position above, so you can slide them right up against the health bar."])
+
+        local offYGet, offYSet = npLayoutSetting("npIconOffsetY")
+        local npOffY = Options:CreateSlider(content, L["Y offset"], -50, 50, 1, offYGet, offYSet)
+        place(npOffY, 0, 16)
+        npOffY:SetWidth(280)
+        Options:AttachTooltip(npOffY, L["Y offset"],
+            L["Nudges the icon and count together up or down from the Position above (positive moves them up)."])
     end
-    local function npSet(value)
-        local DB = ns:GetSubsystem("DB")
-        if DB then DB.db.profile.general.questNameplateIcons = value and true or false end
-        local QI = ns:GetSubsystem("NameplateQuestIcons")
-        if QI and QI.ApplyEnabled then QI:ApplyEnabled() end
-    end
-    local nameplates = Options:CreateCheckbox(content,
-        L["Quest icons on nameplates"],
-        npGet, npSet,
-        L["Shows the \"!\" + count on objective mobs."])
-    nameplates:SetPoint("TOPLEFT", npHeader, "BOTTOMLEFT", 0, -10)
-
-    local NP_PLACEMENT = {
-        { value = "LEFT",   label = L["Left"] },
-        { value = "RIGHT",  label = L["Right"] },
-        { value = "TOP",    label = L["Above"] },
-        { value = "BOTTOM", label = L["Below"] },
-    }
-    local placeGet, placeSet = npLayoutSetting("npIconPlacement")
-    local npPlace = Options:CreateRadioGroup(content, L["Position"], NP_PLACEMENT, placeGet, placeSet, 260, nil,
-        L["Position"],
-        L["Where the quest icon + count sits relative to the enemy nameplate. Move it closer to the health bar to taste."])
-    npPlace:SetPoint("TOPLEFT", nameplates, "BOTTOMLEFT", 0, -8)
-
-    local szGet, szSet = npLayoutSetting("npIconSize")
-    local npSize = Options:CreateSlider(content, L["Icon size"], 12, 48, 0.5, szGet, szSet)
-    npSize:SetPoint("TOPLEFT", npPlace, "BOTTOMLEFT", 0, -12)
-    npSize:SetWidth(280)
-
-    local txtGet, txtSet = npLayoutSetting("npIconTextSize")
-    local npText = Options:CreateSlider(content, L["Count text size"], 8, 24, 0.5, txtGet, txtSet)
-    npText:SetPoint("TOPLEFT", npSize, "BOTTOMLEFT", 0, -16)
-    npText:SetWidth(280)
-
-    local offXGet, offXSet = npLayoutSetting("npIconOffsetX")
-    local npOffX = Options:CreateSlider(content, L["X offset"], -50, 50, 1, offXGet, offXSet)
-    npOffX:SetPoint("TOPLEFT", npText, "BOTTOMLEFT", 0, -16)
-    npOffX:SetWidth(280)
-    Options:AttachTooltip(npOffX, L["X offset"],
-        L["Nudges the icon and count together left or right from the Position above, so you can slide them right up against the health bar."])
-
-    local offYGet, offYSet = npLayoutSetting("npIconOffsetY")
-    local npOffY = Options:CreateSlider(content, L["Y offset"], -50, 50, 1, offYGet, offYSet)
-    npOffY:SetPoint("TOPLEFT", npOffX, "BOTTOMLEFT", 0, -16)
-    npOffY:SetWidth(280)
-    Options:AttachTooltip(npOffY, L["Y offset"],
-        L["Nudges the icon and count together up or down from the Position above (positive moves them up)."])
 
     local reset = Options:CreateYellowButton(content, L["Reset all settings"], function()
         local Dialog = ns:GetSubsystem("Dialog")
@@ -228,7 +321,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         })
     end)
     reset:SetSize(160, 24)
-    reset:SetPoint("TOPLEFT", npOffY, "BOTTOMLEFT", 0, -16)
+    place(reset, 0, 16)
 
     local profilesHeader = Options:CreateSectionHeader(content, L["Profiles"])
     profilesHeader:SetPoint("TOPLEFT", h, "TOPLEFT", 460, 0)
@@ -325,19 +418,21 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
     slashText:SetTextColor(0.92, 0.72, 0.02)
     slashText:SetText(L["/eqs\n/everythingquests\n\n|cff999999Both open this options window.|r\n\n/eqs whatsnew\n\n|cff999999Show what's new in the latest update.|r\n\n/eqs session\n\n|cff999999Show a recap of your current play session.|r"])
 
-    local function mmGet()
-        local DB = ns:GetSubsystem("DB")
-        return DB and not DB.char.minimap.hide
-    end
-    local function mmSet(value)
-        local DB = ns:GetSubsystem("DB")
-        if not DB then return end
-        DB.char.minimap.hide = not value
-        local LDBI = LibStub and LibStub("LibDBIcon-1.0", true)
-        if LDBI then
-            if value then LDBI:Show("EverythingQuests") else LDBI:Hide("EverythingQuests") end
+    if ns:GetSubsystem("Minimap") then
+        local function mmGet()
+            local DB = ns:GetSubsystem("DB")
+            return DB and not DB.char.minimap.hide
         end
+        local function mmSet(value)
+            local DB = ns:GetSubsystem("DB")
+            if not DB then return end
+            DB.char.minimap.hide = not value
+            local LDBI = LibStub and LibStub("LibDBIcon-1.0", true)
+            if LDBI then
+                if value then LDBI:Show("EverythingQuests") else LDBI:Hide("EverythingQuests") end
+            end
+        end
+        local mm = Options:CreateCheckbox(content, L["Show minimap button"], mmGet, mmSet)
+        mm:SetPoint("TOPLEFT", slashText, "BOTTOMLEFT", 0, -30)
     end
-    local mm = Options:CreateCheckbox(content, L["Show minimap button"], mmGet, mmSet)
-    mm:SetPoint("TOPLEFT", slashText, "BOTTOMLEFT", 0, -30)
 end)

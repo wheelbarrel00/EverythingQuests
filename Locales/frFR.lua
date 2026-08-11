@@ -25,6 +25,7 @@ local L = ns.L
 L["General"] = "Général"
 L["Show quest pins on the world map"] = "Marqueurs de quête sur la carte"
 L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Quests you haven't accepted yet keep the game's own yellow \"!\" markers; EQ does not change those. Uncheck this box and all of EQ's red markers go away."] = "Ce sont les marqueurs ronds rouges qu'Everything Quests indique sur la carte du monde pour les quêtes déjà présentes dans votre journal de quêtes. Un \"!\" rouge signifie \"Allez ici pour la prochaine étape de la quête.\". Un \"?\" rouge signifie \"cette quête est accomplie \226\128\148 venez ici pour la rendre.\" Les quêtes que vous n'avez pas encore accepté conservent le marqueur \"!\" jaune du jeu; EQ ne les change pas. Décochez cette case pour désactiver tous les marqueurs rouges d'EQ."
+L["World map pin scale"] = "Échelle des marqueurs sur la carte"
 L["Auto-accept quests"] = "Accepter les quêtes automatiquement"
 L["Hold Alt to pause."] = "Maintenez Alt pour suspendre."
 L["Auto-turn-in quests"] = "Rendre les quêtes automatiquement"
@@ -117,7 +118,6 @@ L["Reward"] = "Récompense"
 L["Faction"] = "Faction"
 L["A-Z"] = "A-Z"
 L["Sort zone quest list by"] = "Trier la liste des quêtes de la zone par"
-L["World map pin scale"] = "Échelle des marqueurs sur la carte"
 L["Filters apply immediately when the world map is open."] = "Les filtres s'appliquent immédiatement quand la carte du monde est ouverte"
 
 -- ─── Options/TabChainGuide.lua ───

@@ -1,10 +1,8 @@
 local _, ns = ...
 local L = ns.L
 
--- Everything Quests hands its tracker to EQ Objective Tracker and declares it as a required
--- dependency, so EQOT is always loaded and always loads FIRST. This puts EQ's own features
--- back onto the tracker: the Chain Guide header icon, the Get Directions entry on a quest's
--- right-click menu, and the route from EQ's options panel through to EQOT's.
+-- EQOT is a required dependency, so it is always loaded and always loads first. This puts EQ's
+-- own features back onto its tracker.
 local Bridge = ns:RegisterSubsystem("TrackerBridge", {})
 
 local CHAIN_ICON = "Interface\\AddOns\\EverythingQuests\\Media\\chain.tga"
@@ -16,17 +14,15 @@ local EQ_ICON    = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\eq-log
 local CHAIN_ORDER = 10
 local EQ_ORDER    = 20
 
--- Ordered to land between Focus (30) and Open in Map & Quest Log (40), which is where this sat
--- when EQ drew the menu itself.
+-- Lands between Focus (30) and Open in Map & Quest Log (40).
 local DIRECTIONS_ORDER = 35
 
 local function eqot()
     return _G.EQObjectiveTracker
 end
 
--- '## Dependencies:' checks the addon FOLDER and cannot express a minimum version, so an
--- older EQOT with no API module satisfies the dependency and still lands here nil. Disabling
--- EQOT is not the case to guard against - that stops EQ loading at all.
+-- '## Dependencies:' cannot express a minimum version, so an older EQOT with no API module
+-- satisfies it and still lands here nil.
 local function api()
     local T = eqot()
     local mod = T and T.GetModule and T:GetModule("API")
@@ -49,7 +45,8 @@ function Bridge:ApplyChainIcon()
     local A = api()
     if not A then return end
 
-    if not self:ChainIconEnabled() then
+    -- The Chain Guide is Midnight-only, so elsewhere the icon would sit there doing nothing.
+    if not self:ChainIconEnabled() or not ns:GetSubsystem("ChainGuide") then
         A:RemoveHeaderIcon("eq-chainguide")
         return
     end
@@ -71,9 +68,8 @@ function Bridge:EQIconEnabled()
     return not DB or DB.db.profile.general.showEQIcon ~= false
 end
 
--- The tracker's cogwheel opens the TRACKER's options now, so without this there is no icon on
--- the tracker that reaches Everything Quests. The minimap button still does, but a user who
--- hides minimap buttons would be left with only /eqs.
+-- The tracker's cogwheel opens EQOT's options, so without this there is no icon on the tracker
+-- that reaches Everything Quests.
 function Bridge:ApplyEQIcon()
     local A = api()
     if not A then return end
@@ -113,16 +109,18 @@ function Bridge:OnEnable()
         return
     end
 
-    A:AddMenuItem({
-        id         = "eq-directions",
-        providerID = "quests",
-        label      = L["Get Directions"],
-        order      = DIRECTIONS_ORDER,
-        onClick    = function(_, questID)
-            local WP = ns:GetSubsystem("ChainGuideWaypoint")
-            if WP and WP.GoTo then WP:GoTo(questID) end
-        end,
-    })
+    if ns:GetSubsystem("ChainGuideWaypoint") then
+        A:AddMenuItem({
+            id         = "eq-directions",
+            providerID = "quests",
+            label      = L["Get Directions"],
+            order      = DIRECTIONS_ORDER,
+            onClick    = function(_, questID)
+                local WP = ns:GetSubsystem("ChainGuideWaypoint")
+                if WP and WP.GoTo then WP:GoTo(questID) end
+            end,
+        })
+    end
 
     self:ApplyChainIcon()
     self:ApplyEQIcon()
