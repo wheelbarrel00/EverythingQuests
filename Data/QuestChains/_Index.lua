@@ -22,6 +22,7 @@ ns.CAT = {
     CURSE_OF_ULATEK   = 1107,
     VOID_ACROPOLIS    = 1108,
     SUNSTRIDER_OMNIUM = 1109,
+    COILED_ISLE       = 1110,
 }
 
 DBmod:RegisterCategory(ns.CAT.CAMPAIGN,         { expansion = ns.EXP_MIDNIGHT, name = "Midnight Campaign", mapIDs = {}, campaignID = 270, order = 10 })
@@ -34,3 +35,4 @@ DBmod:RegisterCategory(ns.CAT.ARATOR,           { expansion = ns.EXP_MIDNIGHT, n
 DBmod:RegisterCategory(ns.CAT.VOIDSTORM,        { expansion = ns.EXP_MIDNIGHT, name = "Voidstorm",      mapIDs = { 2405 }, order = 70 })
 DBmod:RegisterCategory(ns.CAT.SUNSTRIDER_OMNIUM, { expansion = ns.EXP_MIDNIGHT, name = "The Sunstrider Omnium", mapIDs = {}, order = 85 })
 DBmod:RegisterCategory(ns.CAT.VOID_ACROPOLIS,   { expansion = ns.EXP_MIDNIGHT, name = "Void Acropolis", mapIDs = { 2599 }, order = 90 })
+DBmod:RegisterCategory(ns.CAT.COILED_ISLE,      { expansion = ns.EXP_MIDNIGHT, name = "The Coiled Isle", mapIDs = { 2512 }, order = 95 })

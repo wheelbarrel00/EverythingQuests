@@ -3,25 +3,27 @@ ns.CHAINGUIDE_OVERLAYS = ns.CHAINGUIDE_OVERLAYS or {}
 
     ns.CHAINGUIDE_OVERLAYS[6050] = {
         layout = {
-            [92897] = { x = 1, y = 0  },
-            [92895] = { x = 1, y = 1  },
-            [92899] = { x = 1, y = 2  },
-            [92900] = { x = 1, y = 3  },
-            [92901] = { x = 1, y = 4  },
-            [92904] = { x = 1, y = 5  },
-            [92907] = { x = 1, y = 6  },
-            [92955] = { x = 1, y = 7  },
-            [92957] = { x = 0, y = 8  },
-            [92958] = { x = 2, y = 8  },
-            [92952] = { x = 1, y = 9  },
-            [92953] = { x = 0, y = 10 },
-            [92951] = { x = 2, y = 10 },
-            [92954] = { x = 1, y = 11 },
-            [93010] = { x = 1, y = 12 },
-            [93011] = { x = 1, y = 13 },
-            [93012] = { x = 1, y = 14 },
+            [98541] = { x = 1, y = 0  },
+            [92897] = { x = 1, y = 1  },
+            [92895] = { x = 1, y = 2  },
+            [92899] = { x = 1, y = 3  },
+            [92900] = { x = 1, y = 4  },
+            [92901] = { x = 1, y = 5  },
+            [92904] = { x = 1, y = 6  },
+            [92907] = { x = 1, y = 7  },
+            [92955] = { x = 1, y = 8  },
+            [92957] = { x = 0, y = 9  },
+            [92958] = { x = 2, y = 9  },
+            [92952] = { x = 1, y = 10 },
+            [92953] = { x = 0, y = 11 },
+            [92951] = { x = 2, y = 11 },
+            [92954] = { x = 1, y = 12 },
+            [93010] = { x = 1, y = 13 },
+            [93011] = { x = 1, y = 14 },
+            [93012] = { x = 1, y = 15 },
         },
         connections = {
+            [92897] = { 98541 },
             [92895] = { 92897 },
             [92899] = { 92895 },
             [92900] = { 92899 },
@@ -60,17 +62,3 @@ names[92954] = "Maisara Caverns: Master of Souls"
 names[93010] = "The Serpent Shrine"
 names[93011] = "Legacy of the Amani"
 names[93012] = "Dead End"
-names[90690] = "Charge of the Vanguard"
-names[88709] = "The Voidspire"
-names[92520] = "Wake of the Darkwell"
-names[88920] = "The Kaldorei"
-names[88942] = "The Elves are Going to War"
-names[88769] = "The Battle of the Bridge"
-names[90748] = "Quel'Danas"
-names[88710] = "March on Quel'Danas"
-
-ns.CHAINGUIDE_CURATED_ITEMS = ns.CHAINGUIDE_CURATED_ITEMS or {}
-ns.CHAINGUIDE_CURATED_ITEMS[6229] = { 90690, 88709, 92520 }
-ns.CHAINGUIDE_CURATED_ITEMS[6230] = { 88920, 88942 }
-ns.CHAINGUIDE_CURATED_ITEMS[6231] = { 88769 }
-ns.CHAINGUIDE_CURATED_ITEMS[6232] = { 90748, 88710 }

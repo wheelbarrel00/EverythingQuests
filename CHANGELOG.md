@@ -5,6 +5,23 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.40.0] - 2026-08-11
+
+Chain Guide coverage for patch 12.1's new zone, and a fix for four Curse of Ula'tek chapters that had been listing the wrong quests entirely.
+
+### New Features
+
+- **The Coiled Isle in the Chain Guide** - patch 12.1's new zone has its own category, covering all seven of its questlines: Bone Deep, Renown of Midnight, A Fiery Blast from the Past, Something Vile This Way Comes, Strange Friends in Odd Places, Ancient Anthropology, and Living Legend.
+
+### Bug Fixes
+
+- **Four Curse of Ula'tek chapters were listing the wrong quests** - An Island of Fangs, Ghosts of the Past, Original Sin and The Battle for Atal'Utek each showed a handful of quests that belong to The War of Light and Shadow instead of their own. The game reported no quests for those chapters when they were added in v1.37.0, and the stand-in list used in their place was wrong. The game supplies real data for them now, so they show their actual contents: 17, 6, 10 and 8 quests.
+- **Legacy of the Amani was missing its opening quest** - the chapter gained a new first quest in patch 12.1, and it drew off to the side of the chain instead of at the top of it.
+
+### Notes
+
+- The Call of the Void, patch 12.1's new chapter of The Curse of Ula'tek, appears on its own. The Chain Guide reads campaign chapters live from the game, so it needed no update to pick the new one up.
+
 ## [1.39.0] - 2026-08-10
 
 Everything Quests runs on Classic Era for the first time, and map markers got easier to read everywhere.

@@ -40,7 +40,7 @@ ns.QUESTLINE_ROUTING = {
     [5950] = { cat = ns.CAT.ZULAMAN, name = "A Venomous History" },
     [6044] = { cat = ns.CAT.ZULAMAN, name = "Beyond the Walls" },
     [5975] = { cat = ns.CAT.ZULAMAN, name = "Something Vile This Way Comes" },
-    [6045] = { cat = ns.CAT.ZULAMAN, name = "River Walkers of the Prowl" },
+    [6045] = { cat = ns.CAT.ZULAMAN, name = "River-Walkers of the Prowl" },
     [6052] = { cat = ns.CAT.ZULAMAN, name = "Bloodstains" },
     [5728] = { cat = ns.CAT.VOIDSTORM, name = "Into the Abyss" },
     [5729] = { cat = ns.CAT.VOIDSTORM, name = "The Night's Veil" },
@@ -80,14 +80,22 @@ ns.QUESTLINE_ROUTING = {
     [5932] = { cat = ns.CAT.HARANDAR, name = "Trials of the Shulka" },
     [5750] = { cat = ns.CAT.ARATOR, name = "The Path of Light" },
     [5751] = { cat = ns.CAT.ARATOR, name = "Regrets of the Past" },
-    -- Campaign 324 chapters - the Chain Guide skips them, but ZoneProgress needs them as the map 2424 denominator
+    [6272] = { cat = ns.CAT.VOID_ACROPOLIS, name = "Umbral Blitz" },
+    [6309] = { cat = ns.CAT.VOID_ACROPOLIS, name = "Assault and Strike Back: Val" },
+    [6275] = { cat = ns.CAT.SUNSTRIDER_OMNIUM, name = "The Sunstrider Omnium" },
+    -- 7 of the 15 questlines on map 2512. The other 8 route to Zul'Aman, which wins over the map that surfaced them.
+    [6114] = { cat = ns.CAT.COILED_ISLE, name = "Bone Deep" },
+    [6115] = { cat = ns.CAT.COILED_ISLE, name = "Renown of Midnight" },
+    [6128] = { cat = ns.CAT.COILED_ISLE, name = "A Fiery Blast from the Past" },
+    [6224] = { cat = ns.CAT.COILED_ISLE, name = "Something Vile This Way Comes" },
+    [6276] = { cat = ns.CAT.COILED_ISLE, name = "Strange Friends in Odd Places" },
+    [6277] = { cat = ns.CAT.COILED_ISLE, name = "Ancient Anthropology" },
+    [6302] = { cat = ns.CAT.COILED_ISLE, name = "Living Legend" },
+    -- Campaign 324 chapters. EnsureZoneChains early-returns for a campaign category, so only /eqs zonedump reads these.
     [6050] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "Legacy of the Amani" },
     [6229] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "An Island of Fangs" },
     [6230] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "Ghosts of the Past" },
     [6231] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "Original Sin" },
     [6232] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "The Battle for Atal'Utek" },
-    [6272] = { cat = ns.CAT.VOID_ACROPOLIS, name = "Umbral Blitz" },
-    [6309] = { cat = ns.CAT.VOID_ACROPOLIS, name = "Assault and Strike Back: Val" },
-    [6275] = { cat = ns.CAT.SUNSTRIDER_OMNIUM, name = "The Sunstrider Omnium" },
-    -- Campaign spines come live from C_CampaignInfo - only add a campaign questline here if ZoneProgress needs it
+    [6121] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "The Call of the Void" },
 }
