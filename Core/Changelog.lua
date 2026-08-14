@@ -2,6 +2,35 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.41.0", date = "2026-08-13",
+        sections = {
+            { head = "New Features", items = {
+                "Burning Crusade Classic support. Everything that works on Classic Era now works on TBC as well, with its own quest database covering Outland and the Blood Elf and Draenei starting zones as well as the old world. The two game versions read identically to the addon, so they share one implementation and differ only in their data. The Chain Guide, the World Quests panel and Quest History stay retail-only, exactly as on Era.",
+                "Markers for quests you can pick up, on Classic Era and Burning Crusade Classic. Every quest giver holding something for you is marked with a gold exclamation mark, filtered by your level, race, class and the quests you have already finished. One marker covers a whole quest giver, and hovering it lists everything that giver offers. There are checkboxes for it, and for hiding quests you have outleveled, under /eqs > General.",
+                "Turn-in markers on Classic Era and Burning Crusade Classic. A finished quest now points at the person who takes it instead of the field you farmed it in, on every map where it can be handed in. 475 quests hand in somewhere other than where their objective is, and every one of them used to be marked in the wrong place.",
+                "Items you buy are marked at the merchants who sell them, on Classic Era and Burning Crusade Classic. An objective item with no drop source used to produce no markers at all, so the quest fell back to a single point. 21 quests gain their first useful marker.",
+                "Hide quests by category, on Classic Era and Burning Crusade Classic. Dungeon and raid quests, repeatable quests and profession quests each get a checkbox that leaves them off the map. These only affect quests you have not picked up yet, because hiding something already in your log would make the map lie about what you still have to do.",
+                "A Map section in the options, holding the two marker ring toggles and the category filters.",
+                "The tracker's focused quest gets an arrow, on Classic Era and Burning Crusade Classic. Clicking a quest's icon in EQ Objective Tracker drops a TomTom arrow on it, and clicking it again clears it. Classic has no in-game waypoint, so the tracker announces the focus and Everything Quests places the arrow from its own database. Map markers and the tracker share one arrow, so using both retargets instead of leaving two behind.",
+                "Quest level and reward experience in the marker tooltip. The level goes in front of the title the way the quest log writes it, and the experience reward is listed underneath.",
+            } },
+            { head = "Improvements", items = {
+                "Countdown timers use your own language's abbreviations. The day, hour and minute suffixes now come from the game client instead of being hardcoded English, so Korean shows its own words and German shows T, Std and Min. English is unchanged.",
+                "The options window opens at the left edge of the screen. It is the same size as the tracker's own options window, and both used to open dead center and land exactly on top of each other.",
+                "Markers are smaller on continent and world maps, matching how the map itself scales down.",
+                "The world map timer text has an outline and a shadow, so it stays readable over bright terrain.",
+                "Two option descriptions were rewritten. The pin scale and quest pin tooltips had both stopped describing what the addon does.",
+            } },
+            { head = "Bug Fixes", items = {
+                "A finished quest was marked where you farmed it. The table it read holds the objective location for any quest that has one, so \"Ready to turn in\" appeared on farming grounds. The Tome of Divinity hands in at Stormwind and drew its turn-in marker on the Elwynn field it was farmed in.",
+                "Reward gold and experience read the wrong quest on the Classic versions. The game ignores the quest ID there and answers about whatever quest log entry is selected, so a tooltip could confidently report another quest's rewards.",
+            } },
+            { head = "Notes", items = {
+                "On Classic Era and Burning Crusade Classic the red ring behind quest markers now starts switched off. A zone there can draw hundreds of objective markers and the rings crowd each other, and the icons still tell the states apart on their own. Retail is unchanged. The checkbox is under /eqs > General > Map.",
+            } },
+        },
+    },
+    {
         version = "1.40.0", date = "2026-08-11",
         sections = {
             { head = "New Features", items = {

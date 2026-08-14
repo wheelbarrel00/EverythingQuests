@@ -17,12 +17,14 @@ end
 M._drawnN = 0
 M._drawnQ, M._drawnX, M._drawnY, M._drawnK, M._drawnM = {}, {}, {}, {}, {}
 
--- kind and mask ride along so an aggregated neighbour's tooltip names the objectives its own
--- nearest pin serves.
-local function record(qid, x, y, kind, mask)
+-- The quest list of an available-quest pin, which has no quest log entry for the tooltip to reach.
+-- Nil for every pin backed by the quest log, which is every pin on retail.
+M._drawnA = {}
+
+local function record(qid, x, y, kind, mask, avail)
     local n = M._drawnN + 1
     M._drawnN, M._drawnQ[n], M._drawnX[n], M._drawnY[n] = n, qid, x, y
-    M._drawnK[n], M._drawnM[n] = kind, mask
+    M._drawnK[n], M._drawnM[n], M._drawnA[n] = kind, mask, avail
 end
 
 function providerMixin:RemoveAllData()
@@ -53,15 +55,18 @@ local function waypointFor(questID, mapID)
     return classicWaypoint(questID, mapID)
 end
 
--- Every clustered place a quest can be advanced, nested by map so this is a direct hit rather
--- than a scan. Same gate as the coord table, so it is nil on retail.
 local function spawnPoints(questID, mapID)
     local byMap = ns.CLASSIC_QUEST_SPAWNS and ns.CLASSIC_QUEST_SPAWNS[questID]
     return byMap and byMap[mapID]
 end
 
--- The slider's far right means "draw them all", so it needs a number to sit at. Read by
--- Options/TabGeneral.lua too, which is why it hangs off ns rather than being a file local.
+-- Its own table because the single-point table stores the OBJECTIVE, so a finished quest read
+-- from there pins the field you farmed instead of the person waiting.
+local function turnInMaps(questID)
+    return ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID]
+end
+
+-- The slider's far right means draw them all, so it needs a number to sit at.
 ns.MAPPOI_MAX_PINS = 250
 
 -- Applied here, not in the generator, so the table stays uncapped and the slider can still
@@ -152,17 +157,43 @@ local function maskWanted(mask, kind)
     return false
 end
 
+-- The third return is a string, not a boolean, because /eqsprobe has to tell three sources apart
+-- that look identical on the map and share no cause when they go wrong.
 function M:PointsFor(questID, mapID, q)
     local X, Y, K, MK = self._ptX, self._ptY, self._ptKind, self._ptMask
     local isComplete = q and q.isComplete
 
-    -- A finished quest wants the turn-in point, not the places you were farming.
+    -- A finished quest wants the turn-in, not the places you were farming. Every finisher
+    -- location is drawn, not one picked point, because 176 quests hand in on more than one map
+    -- and choosing one of those leaves the other zone with no pin at all.
+    if isComplete then
+        local byMap = turnInMaps(questID)
+        if byMap then
+            -- The table knows this quest, so it is AUTHORITATIVE for every map, not just this
+            -- one. Falling through here let the single-point table answer with the OBJECTIVE
+            -- location instead - measured on 475 quests whose turn-in is in a different zone
+            -- from their objective. Quest 1787 hands in at Stormwind and drew "Ready to turn in"
+            -- on the Elwynn field it was farmed in.
+            local turnIn = byMap[mapID]
+            if not turnIn then return 0, 0, "none" end
+            for i = 1, #turnIn do
+                local v = turnIn[i]
+                local rest = v % 1e8
+                X[i], Y[i] = math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4
+                -- The kind rides along only so an entrance pin can be tinted and named. The
+                -- icon is the turn-in mark either way, chosen from isComplete.
+                K[i], MK[i] = math.floor(v / 1e8), nil
+            end
+            return #turnIn, 0, "turnin"
+        end
+    end
+
     local spawns = (not isComplete) and spawnPoints(questID, mapID)
     if not spawns then
         local x, y = waypointFor(questID, mapID)
-        if not x then return 0, 0, false end
+        if not x then return 0, 0, "none" end
         X[1], Y[1], K[1], MK[1] = x, y, nil, nil
-        return 1, 0, false
+        return 1, 0, "single"
     end
 
     bucketObjectives(q)
@@ -191,24 +222,25 @@ function M:PointsFor(questID, mapID, q)
             end
         end
     end
-    return n, thinned, true
+    return n, thinned, "spawn"
 end
 
 -- Read by /eqsprobe mappoi. Three failures look identical from outside - never called, called
 -- and found nothing, called and drew pins that are not visible - and they share no fix.
 M._refreshes, M._pins, M._stage, M._mapID = 0, 0, "never ran", nil
-M._spawnPins, M._spawnThinned = 0, 0
+M._spawnPins, M._spawnThinned, M._availPins, M._turnInPins = 0, 0, 0, 0
 
 function providerMixin:_DoRefresh()
     self:RemoveAllData()
     M._refreshes = M._refreshes + 1
     M._pins, M._mapID, M._spawnPins, M._spawnThinned = 0, nil, 0, 0
+    M._availPins, M._turnInPins = 0, 0
 
+    -- Owned pins only. Available quests have their own checkbox, which is what the option's
+    -- own tooltip promises, so this must not return early past the available block below.
     local DB = ns:GetSubsystem("DB")
-    if DB and DB.db.profile.map and DB.db.profile.map.showQuestPins == false then
-        M._stage = "off in options"
-        return
-    end
+    local ownedWanted = not (DB and DB.db.profile.map and DB.db.profile.map.showQuestPins == false)
+    M._ownedOff = not ownedWanted
 
     if not (WorldMapFrame and WorldMapFrame:IsShown()) then
         M._stage = "world map not shown"
@@ -230,7 +262,7 @@ function providerMixin:_DoRefresh()
     local Cache = ns:GetSubsystem("Cache")
     wipe(_seenQids)
 
-    local primary = C_QuestLog.GetQuestsOnMap and C_QuestLog.GetQuestsOnMap(mapID)
+    local primary = ownedWanted and C_QuestLog.GetQuestsOnMap and C_QuestLog.GetQuestsOnMap(mapID)
     if primary then
         for i = 1, #primary do
             local info = primary[i]
@@ -255,10 +287,10 @@ function providerMixin:_DoRefresh()
 
     -- Not gated on GetNextWaypointForMap, which is absent on Classic. waypointFor answers nil
     -- when neither source has the quest, so no gate is needed.
-    if Cache then
+    if Cache and ownedWanted then
         for qid, q in pairs(Cache:All()) do
             if not _seenQids[qid] then
-                local n, thinned, fromSpawns = M:PointsFor(qid, mapID, q)
+                local n, thinned, source = M:PointsFor(qid, mapID, q)
                 M._spawnThinned = M._spawnThinned + thinned
                 for i = 1, n do
                     local x, y = M._ptX[i], M._ptY[i]
@@ -266,9 +298,28 @@ function providerMixin:_DoRefresh()
                                    M._ptKind[i], M._ptMask[i])
                     record(qid, x, y, M._ptKind[i], M._ptMask[i])
                     M._pins = M._pins + 1
-                    if fromSpawns then M._spawnPins = M._spawnPins + 1 end
+                    if source == "spawn" then
+                        M._spawnPins = M._spawnPins + 1
+                    elseif source == "turnin" then
+                        M._turnInPins = M._turnInPins + 1
+                    end
                 end
             end
+        end
+    end
+
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    if Avail and Avail.PointsFor then
+        local n = Avail:PointsFor(mapID)
+        for i = 1, n do
+            local x, y = Avail._locX[i], Avail._locY[i]
+            local quests = Avail._locQuests[i]
+            -- Keyed on the first quest so the tooltip aggregation has a stable id per location.
+            -- The whole list travels alongside it, so nothing is lost by picking one.
+            map:AcquirePin(PIN_TEMPLATE, quests[1], x, y, false, mapID, nil, nil, quests)
+            record(quests[1], x, y, nil, nil, quests)
+            M._pins = M._pins + 1
+            M._availPins = M._availPins + 1
         end
     end
 end

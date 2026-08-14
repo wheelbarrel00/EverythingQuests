@@ -35,6 +35,15 @@ DB.defaults = {
             showMinimapPins  = true,
             pinScale         = 1.0,
             pinCap           = 50,
+            showAvailableQuests = true,
+            hideLowLevelQuests  = true,
+            -- showPinRing is deliberately absent. AceDB answers the default for an unset key, so
+            -- listing one here would hide the nil that Modules/MapPOI/Pin.lua needs to tell
+            -- "never chosen" apart from "switched off", and retail would lose its ring.
+            showAvailableRing   = false,
+            hideDungeonQuests    = false,
+            hideRepeatableQuests = false,
+            hideProfessionQuests = false,
         },
         history = {
             enabled   = true,

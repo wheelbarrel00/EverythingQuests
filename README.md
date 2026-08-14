@@ -1,6 +1,6 @@
 <h1 align="center">Everything Quests</h1>
 <p align="center">
-  <strong>A unified replacement for the Blizzard quest experience — objective tracker, world-map overlays, nameplate quest icons, an account-wide quest history, and a Midnight chain guide. Runs on retail and on Classic Era.</strong>
+  <strong>A unified replacement for the Blizzard quest experience — objective tracker, world-map overlays, nameplate quest icons, an account-wide quest history, and a Midnight chain guide. Runs on retail, Classic Era and Burning Crusade Classic.</strong>
 </p>
 <p align="center">
   <a href="https://ko-fi.com/wheelbarrel00"><img src="https://img.shields.io/badge/Support-Ko--fi-FF5E5B?style=flat-square&logo=ko-fi" alt="Support on Ko-fi" /></a>
@@ -9,7 +9,8 @@
   <a href="https://github.com/wheelbarrel00/EverythingQuests/releases"><img src="https://img.shields.io/github/v/release/wheelbarrel00/EverythingQuests?color=6D0501&label=Version&style=flat-square" alt="Version" /></a>
   <img src="https://img.shields.io/badge/WoW-Midnight%2012.1-8B0000?style=flat-square" alt="WoW Retail" />
   <img src="https://img.shields.io/badge/WoW-Classic%20Era%201.15-C69B6D?style=flat-square" alt="WoW Classic Era" />
-  <img src="https://img.shields.io/badge/Interface-120100%20%7C%2011509-333333?style=flat-square" alt="Interface" />
+  <img src="https://img.shields.io/badge/WoW-Burning%20Crusade%202.5-A330C9?style=flat-square" alt="WoW Burning Crusade Classic" />
+  <img src="https://img.shields.io/badge/Interface-120100%20%7C%2020506%20%7C%2011509-333333?style=flat-square" alt="Interface" />
   <a href="LICENSE"><img src="https://img.shields.io/github/license/wheelbarrel00/EverythingQuests?style=flat-square&color=333333" alt="License" /></a>
 </p>
 
@@ -17,7 +18,7 @@
 
 ## Overview
 
-Everything Quests is a complete replacement for Blizzard's quest tracking and quest log experience for **World of Warcraft: Midnight**, with limited support for **Classic Era**.
+Everything Quests is a complete replacement for Blizzard's quest tracking and quest log experience for **World of Warcraft: Midnight**, with limited support for **Classic Era** and **Burning Crusade Classic**.
 
 1. An on-screen **objective tracker** that replaces the default ObjectiveTrackerFrame, provided by [EQ Objective Tracker](https://www.curseforge.com/wow/addons/eq-objective-tracker) and installed automatically alongside this addon
 2. **Nameplate Quest Icons** — `!` + remaining count/percent on objective mobs in the 3D world
@@ -31,23 +32,26 @@ Open Options with **`/eqs`**, from the minimap button, from the Everything Quest
 
 ---
 
-## Classic Era support
+## Classic support
 
-Everything Quests has run on **Classic Era (1.15)** since v1.39.0. Support is deliberately partial: what ships is what was measured working on a live Era client, not the whole addon.
+Everything Quests has run on **Classic Era (1.15)** since v1.39.0 and on **Burning Crusade Classic (2.5)** since v1.41.0. Support is deliberately partial: what ships is what was measured working on a live client, not the whole addon.
 
-**Working on Classic Era**
+Era and TBC were measured identical across every game API the addon reads, so one implementation covers both. They differ only in their generated dataset — TBC ships its own, because Era quest data has nothing for Outland or for the Blood Elf and Draenei starting zones. Each flavor's TOC lists exactly one set; they define the same globals and are alternatives, never companions.
+
+**Working on Classic Era and TBC**
 
 - **Objective markers** on the world map and the minimap, drawn from a generated coordinate database rather than from the client, which exposes no quest coordinates at all
 - **Objective kind icons** — kill, loot, or interact — and dungeon objectives marked at the dungeon entrance
+- **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites and completion
 - **Nameplate quest icons**, resolved from the creature ID in the unit GUID, since a Classic unit tooltip carries no quest data
-- **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, and the **`/eqs`** options window (General and About tabs)
+- **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, the **focus arrow**, and the **`/eqs`** options window (General and About tabs)
 - All four bundled locales
 
 **Retail-only**
 
 The **Chain Guide** (`C_QuestLine` and `C_CampaignInfo` are absent, and the authored chain data is Midnight content), the **World Quests** panel (no world quests exist), and **Quest History** (`GetTitleForQuestID` and `RequestLoadQuestByID` are both absent, so a backfilled row could never resolve its own name).
 
-Each omission is declared by name in `EverythingQuests_Vanilla.toc` with a `# check-toc: omit` directive, and `tools/check_toc.py` errors if one goes stale.
+Each omission is declared by name in `EverythingQuests_Vanilla.toc` and `EverythingQuests_TBC.toc` with a `# check-toc: omit` directive, and `tools/check_toc.py` errors if one goes stale.
 
 **`/eqsprobe`** prints what the addon actually found on the running client and is the single most useful thing to attach to a Classic bug report.
 
@@ -55,7 +59,7 @@ Each omission is declared by name in `EverythingQuests_Vanilla.toc` with a `# ch
 
 ## About the tracker
 
-As of **v1.38.0** the objective tracker lives in its own addon, **[EQ Objective Tracker](https://www.curseforge.com/wow/addons/eq-objective-tracker)**. It is a required dependency and your addon manager installs it for you, so there is nothing extra to set up. It publishes for Classic Era as well.
+As of **v1.38.0** the objective tracker lives in its own addon, **[EQ Objective Tracker](https://www.curseforge.com/wow/addons/eq-objective-tracker)**. It is a required dependency and your addon manager installs it for you, so there is nothing extra to set up. It publishes for Classic Era and Burning Crusade Classic as well.
 
 Nothing was lost in the move. Existing users keep their position, size, fonts, colors, section order, filters and sorting, along with pinned quests, hidden quests, collapsed sections and saved world quest watches on every character — all carried across automatically on first login.
 
@@ -131,11 +135,13 @@ An account-wide log of every quest turn-in across every character. Open with `/e
 - **Backups** — History is snapshotted on logout so an empty or missing log can be restored automatically
 
 ### Map POI Overlays
-Custom quest pins on zone maps with the Everything-suite branded red ring (#6D0501) around the standard quest icon (gold `?` for turn-ins, white `!` for in-progress). Clicks super-track; right-click dismisses.
+Custom quest pins on zone maps. On retail the icon carries the Everything-suite branded red ring (#6D0501); on Classic the ring starts off, because a zone there can draw hundreds of pins. Clicks super-track, or set a TomTom waypoint where the game has no super-track; right-click dismisses.
 
-- **Aggregated tooltips** — hovering lists every quest whose nearest pin is within reach, nearest first, so overlapping pins stop hiding each other. The reach is measured in pin widths, so it stays a constant on-screen distance at any zoom
-- **Fixed size at every zoom** — `SetScalingLimits(1, s, s)` collapses Blizzard's zoom lerp to a constant. A scale slider and a per-quest pin limit live under `/eqs` → General
-- **On Classic** — pins come from `Data/QuestSpawns_Classic.lua`, marking every clustered location a quest can be advanced, with a per-quest minimum separation applied at read time so a low limit still spreads across the zone
+- **Aggregated tooltips** — hovering lists every quest whose nearest pin is within reach, nearest first, so overlapping pins stop hiding each other. The reach is measured in pin widths, so it stays a constant on-screen distance at any zoom. The tooltip carries the quest level, its objectives and its experience reward
+- **Fixed size at every zoom** — `SetScalingLimits(1, s, s)` collapses Blizzard's zoom lerp to a constant, with a per-map-type factor so continent and world maps draw smaller. A scale slider and a per-quest pin limit live under `/eqs` → General
+- **On Classic** — in-progress pins come from `Data/QuestSpawns_Classic.lua` and carry objective art rather than a `!`, marking every clustered location a quest can be advanced, with a per-quest minimum separation applied at read time so a low limit still spreads across the zone
+- **Turn-in pins on Classic** — a finished quest is placed from `Data/QuestTurnIn_Classic.lua`, at every map where it can be handed in. That table is authoritative once it knows a quest, because 475 quests hand in on a different map from their objective
+- **Available quest pins on Classic** — gold `!` markers for quests you can pick up but have not accepted, from `Data/QuestAvailable_Classic.lua`, gated on level, race, class, prerequisites and completion. Pins merge by location rather than by quest, and category filters under `/eqs` → General → Map leave dungeon, repeatable or profession quests off the map
 
 ### Minimap Objective Pins
 The same objective markers on the minimap, for the zone you are standing in, powered by HereBeDragons-Pins. Classic only, and keyed on `C_Map.GetBestMapForUnit` rather than the open world map. Pins are hover-only so clicks pass through to the minimap underneath.
@@ -175,7 +181,7 @@ LibDataBroker-powered launcher compatible with Titan Panel, ChocolateBar, ElvUI'
 | `/eqs discover [zone]` | Print quest-line discovery info for the current zone (optional hint) |
 | `/eqsprobe [section]` | Print what EQ found on the running client. Ships on every flavor |
 
-On Classic Era the Chain Guide, History and session commands resolve to nothing, since those subsystems are not loaded there.
+On Classic Era and Burning Crusade Classic the Chain Guide, History and session commands resolve to nothing, since those subsystems are not loaded there.
 
 Tracker settings have their own panel and commands — see `/eqot` and `/eqot status`.
 
@@ -220,7 +226,7 @@ Bindable from **Esc → Options → Key Bindings → AddOns → Everything Quest
 | **History** | Backfill from past completions, re-scan missing names, restore from backup, wipe history, view stats |
 | **About** | Version, changelog, credits, and links |
 
-Every section gates on the subsystem it drives rather than on a flavor check, so on Classic Era only General and About appear and no control is left inert. Tracker and appearance settings live in EQ Objective Tracker's own panel — the button at the top of the General tab opens it, or type `/eqot`.
+Every section gates on the subsystem it drives rather than on a flavor check, so on both Classic flavors only General and About appear and no control is left inert. Tracker and appearance settings live in EQ Objective Tracker's own panel — the button at the top of the General tab opens it, or type `/eqot`.
 
 ---
 
@@ -264,7 +270,7 @@ HereBeDragons is listed by the Classic TOC only. HBD-Pins calls `WorldMapFrame:A
 
 | Metric | Value |
 |---|---|
-| Interface version | 120100, 120007, 120005 (Midnight 12.1) and 11509 (Classic Era 1.15) |
+| Interface version | 120100, 120007, 120005 (Midnight 12.1), 20506 (Burning Crusade Classic 2.5) and 11509 (Classic Era 1.15) |
 | SavedVariables | `EverythingQuestsDB` (account), `EverythingQuestsCharDB` (character), `EverythingQuestsChainCache` (account), `EverythingQuestsHistory` (account), `EverythingQuestsHistoryBackups` (account) |
 | API compliance | Display-only by default — no taint. Auto-accept / auto-turn-in are opt-in and use insecure-only APIs (`C_GossipInfo`, `AcceptQuest`, `CompleteQuest`, `GetQuestReward`); Alt pauses them |
 
@@ -310,7 +316,7 @@ Modules register into Core subsystems at load time and listen for events through
 `tools/check_toc.py` runs in CI before packaging and enforces that every authored file is listed by a TOC, that a flavor TOC lists everything the retail TOC lists, and that the `## Version:` line agrees across every TOC on disk. Holes are declared, never waived:
 
 - `# check-toc: omit <path>` — a legitimate omission from a flavor TOC. A stale directive is an error
-- `# check-toc: flavor-only <path>` — a file no retail TOC lists. Must be declared in the retail TOC, because CI never sees the flavor ones
+- `# check-toc: flavor-only <path>` — a file no retail TOC lists. Must be declared in the retail TOC, which is the declaration of record
 - `# check-toc: scaffold` — exempts a whole TOC, and still reports the size of the gap on every run
 
 `tools/test_check_toc.py` is its self-test.
@@ -349,13 +355,13 @@ Please use the [GitHub Issues](https://github.com/wheelbarrel00/EverythingQuests
 - Any error messages from `/console scriptErrors 1`
 - Screenshot if applicable
 - For anything involving the tracker, the output of `/eqot status`
-- On Classic Era, the output of `/eqsprobe`
+- On Classic Era or Burning Crusade Classic, the output of `/eqsprobe`
 
 ---
 
 ## Roadmap
 
-- [ ] Burning Crusade Classic, then Mists of Pandaria Classic. Both need their own generated coordinate tables — the current dataset is Era quest data, so Outland would get nothing from it
+- [ ] Mists of Pandaria Classic, which needs its own generated dataset exactly as Burning Crusade Classic did
 - [ ] Close the gap on the 261 Classic objectives that still have no marker, which need hand-authored corrections because the upstream data has no location for them at all
 - [ ] Full chain coverage beyond Midnight (TWW, Dragonflight, older expansions)
 - [ ] WoWInterface and Wago publishing

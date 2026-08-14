@@ -5,6 +5,38 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.0] - 2026-08-13
+
+Burning Crusade Classic support, plus markers for quests you can pick up, markers for where a quest is handed in, and a Map section in the options to control them.
+
+### New Features
+
+- **Burning Crusade Classic support** - everything that works on Classic Era now works on TBC too, with its own quest database covering Outland and the Blood Elf and Draenei starting zones as well as the old world. Era and TBC read identically to the addon, so the two share one implementation and differ only in their data. The Chain Guide, World Quests panel and Quest History stay retail-only, exactly as on Era.
+- **Markers for quests you can pick up** (Classic Era and TBC) - every quest giver holding something for you is marked with a gold exclamation mark, filtered by your level, race, class and the quests you have already finished. One marker covers a whole quest giver, and hovering it lists everything that giver offers. There are checkboxes for it and for hiding quests you have outleveled under `/eqs` > General.
+- **Turn-in markers** (Classic Era and TBC) - a finished quest now points at the person who takes it instead of the field you farmed it in, on every map where it can be handed in. 475 quests hand in somewhere other than where their objective is, and every one of them used to be marked in the wrong place.
+- **Items you buy are marked at the merchants who sell them** (Classic Era and TBC) - an objective item with no drop source used to produce no markers at all, so the quest fell back to a single point. 21 quests gain their first useful marker.
+- **Hide quests by category** (Classic Era and TBC) - dungeon and raid quests, repeatable quests and profession quests each get a checkbox that leaves them off the map. These only affect quests you have not picked up yet; a quest in your log always keeps its markers.
+- **A Map section in the options**, holding the two marker ring toggles and the category filters.
+- **The tracker's focused quest gets an arrow** (Classic Era and TBC) - clicking a quest's icon in EQ Objective Tracker now drops a TomTom arrow on it, and clicking it again clears it. Classic has no in-game waypoint, so the tracker announces the focus and Everything Quests places the arrow from its own database. Map markers and the tracker share one arrow, so using both retargets instead of leaving two.
+- **Quest level and reward XP in the marker tooltip** - the level goes in front of the title the way the quest log writes it, and the experience reward is listed underneath.
+
+### Improvements
+
+- **Countdown timers use your own language's abbreviations** - the day, hour and minute suffixes now come from the game client instead of being hardcoded English, so Korean shows 일 / 시간 / 분 and German T / Std / Min. English is unchanged.
+- **The options window opens at the left edge of the screen** - it is the same size as the tracker's own options window and both used to open dead center, landing exactly on top of each other.
+- **Markers are smaller on continent and world maps**, matching how the map itself scales down.
+- **The world map timer text has an outline and a shadow**, so it stays readable over bright terrain.
+- **Two option descriptions were rewritten** - the pin scale and quest pin tooltips had both stopped describing what the addon does.
+
+### Bug Fixes
+
+- **A finished quest was marked where you farmed it** - the single-point table it read holds the objective location for any quest that has one, so "Ready to turn in" appeared on farming grounds. The Tome of Divinity hands in at Stormwind and drew its turn-in marker on the Elwynn field it was farmed in.
+- **Reward gold and experience read the wrong quest on Classic** - the game ignores the quest ID on that version and answers about whatever quest log entry is selected, so a tooltip could confidently report another quest's rewards.
+
+### Notes
+
+- On Classic Era and Burning Crusade Classic the red ring behind quest markers now starts switched off. A zone there can draw hundreds of objective markers and the rings crowd each other, and the icons still tell the states apart on their own. Retail is unchanged. The checkbox is under `/eqs` > General > Map.
+
 ## [1.40.0] - 2026-08-11
 
 Chain Guide coverage for patch 12.1's new zone, and a fix for four Curse of Ula'tek chapters that had been listing the wrong quests entirely.

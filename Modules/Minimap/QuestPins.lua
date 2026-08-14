@@ -21,10 +21,9 @@ local function acquire()
     if not f then
         f = CreateFrame("Frame", nil, _G.Minimap)
         f:SetSize(ICON_SIZE, ICON_SIZE)
-        -- Hover only. A mouse enabled frame over the minimap eats the click underneath it, which
-        -- would cost the tracking menu and the ping wherever a pin sits. SetMouseClickEnabled
-        -- keeps the tooltip and lets clicks through. Without it, take no mouse at all rather
-        -- than break the minimap.
+        -- A mouse enabled frame over the minimap eats the click underneath it, costing the
+        -- tracking menu and the ping wherever a pin sits, so take no mouse where the setter
+        -- is absent.
         if f.SetMouseClickEnabled then
             f:EnableMouse(true)
             f:SetMouseClickEnabled(false)
@@ -33,13 +32,18 @@ local function acquire()
         f.texture:SetAllPoints()
         f:SetScript("OnEnter", function(self)
             if not self.questID then return end
+            local tip = ns.Util.PinTooltip()
+            if self.avail then
+                tip:SetOwner(self, "ANCHOR_LEFT")
+                ns.QuestPinAvailable(tip, self.avail, true)
+                tip:Show()
+                return
+            end
             local Cache = ns:GetSubsystem("Cache")
             local q = Cache and Cache:Get(self.questID)
             if not q then return end
-            local tip = ns.Util.PinTooltip()
             tip:SetOwner(self, "ANCHOR_LEFT")
-            tip:SetText(q.title or ("Quest #" .. tostring(self.questID)), 1.0, 0.82, 0.0, 1, true)
-            -- Shared with the world map pin, so the two never name a location differently
+            tip:SetText(ns.QuestPinTitle(q, self.questID), 1.0, 0.82, 0.0, 1, true)
             ns.QuestPinObjectives(tip, q, self.kind, self.objMask)
             tip:Show()
         end)
@@ -58,7 +62,7 @@ local function releaseAll()
     if HBDP then HBDP:RemoveAllMinimapIcons(REF) end
     for i = #_active, 1, -1 do
         local f = _active[i]
-        f.questID, f.kind, f.objMask = nil, nil, nil
+        f.questID, f.kind, f.objMask, f.avail = nil, nil, nil, nil
         f:Hide()
         _active[i] = nil
         _pool[#_pool + 1] = f
@@ -101,9 +105,28 @@ function M:Rebuild()
             f.questID, f.kind, f.objMask = qid, Provider._ptKind[i], Provider._ptMask[i]
             f.texture:SetTexture(ns.QuestPinTexture(q.isComplete, f.kind))
             f.texture:SetVertexColor(ns.QuestPinTint(f.kind))
-            -- Answers false rather than raising when HereBeDragons has no world size for the
-            -- map. Counted so the probe can tell that apart from "no quests here".
+            -- AddMinimapIconMap answers false rather than raising when HereBeDragons has no
+            -- world size for the map.
             if HBDP:AddMinimapIconMap(REF, f, mapID, x, y, false, false) then
+                M._registered = M._registered + 1
+            else
+                M._rejected = M._rejected + 1
+                f:Hide()
+            end
+        end
+    end
+
+    -- Same producer as the world map, so the two cannot silently diverge.
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    if Avail and Avail.PointsFor then
+        local n = Avail:PointsFor(mapID)
+        for i = 1, n do
+            local quests = Avail._locQuests[i]
+            local f = acquire()
+            f.questID, f.kind, f.objMask, f.avail = quests[1], nil, nil, quests
+            f.texture:SetTexture(ns.QUEST_PIN_AVAILABLE_ICON)
+            f.texture:SetVertexColor(ns.QuestPinAvailableTint())
+            if HBDP:AddMinimapIconMap(REF, f, mapID, Avail._locX[i], Avail._locY[i], false, false) then
                 M._registered = M._registered + 1
             else
                 M._rejected = M._rejected + 1

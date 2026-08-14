@@ -30,13 +30,18 @@ function Options:Build()
     if self.frame then return end
     local f = CreateFrame("Frame", "EQOptionsFrame", UIParent, "BackdropTemplate")
     f:SetSize(1020, 720)
-    f:SetPoint("CENTER")
+    -- Left edge rather than CENTER, because the tracker's own options window is the same size and
+    -- also centers, so the two used to land exactly on top of each other.
+    f:SetPoint("LEFT", UIParent, "LEFT", 16, 0)
     f:SetFrameStrata("DIALOG")
     f:EnableMouse(true)
     f:SetMovable(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop",  f.StopMovingOrSizing)
+    -- No position is persisted, so without this a window dragged off screen stays there for the
+    -- rest of the session with nothing to drag it back by.
+    f:SetClampedToScreen(true)
     f:Hide()
 
     f:SetBackdrop({
@@ -55,7 +60,7 @@ function Options:Build()
 
     f.version = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.version:SetPoint("TOPRIGHT", -34, -14)
-    f.version:SetText("v" .. (ns.VERSION or "1.40.0"))
+    f.version:SetText("v" .. (ns.VERSION or "1.41.0"))
     f.version:SetTextColor(unpack(YELLOW))
 
     f.discord = CreateFrame("Button", nil, f)
@@ -760,7 +765,6 @@ function Options:CreateStatusBarDropdown(parent, label, options, getter, setter)
     return container
 end
 
--- formatter is for sliders whose end stop means something other than its number
 function Options:CreateSlider(parent, label, min, max, step, getter, setter, formatter)
     local container = CreateFrame("Frame", nil, parent)
     container:SetSize(220, 44)

@@ -54,7 +54,17 @@ end
 
 local _logRows = {}
 
+-- Survives a rebuild on purpose, because on Classic each answer costs a SelectQuestLogEntry and
+-- remembering them is what keeps the steady-state cost at zero. Dropped on level up, where a
+-- retail reward is rescaled and the cached figure would be stale for the rest of the session.
+local _rewardXP = {}
+
+-- Reading XP moves the quest log selection on Classic, and if that fires QUEST_LOG_UPDATE the
+-- refresh would re-enter this.
+local _sweeping = false
+
 local function fullRebuild()
+    if _sweeping then return end
     wipe(Cache.quests)
     wipe(Cache.headerOrder)
 
@@ -85,6 +95,8 @@ local function fullRebuild()
                     isComplete     = (C_QuestLog.IsComplete and C_QuestLog.IsComplete(id))
                                      or info.isComplete == 1
                                      or false,
+                    -- A failed quest can be taken again, so its giver is still worth marking.
+                    isFailed       = info.isComplete == -1,
                     isOnMap        = info.isOnMap,
                     isCampaign     = deriveIsCampaign(id, info),
                     isAutoComplete = info.isAutoComplete,
@@ -106,6 +118,15 @@ local function fullRebuild()
             end
         end
     end
+    -- After the rows are read, because on Classic this moves the quest log selection and the
+    -- walk above must not be running while it does.
+    _sweeping = true
+    pcall(ns.Compat.CollectRewardXP, rows, last, _rewardXP)
+    _sweeping = false
+    for id, q in pairs(Cache.quests) do
+        q.rewardXP = _rewardXP[id]
+    end
+
     for qid in pairs(firstSeen) do
         if not Cache.quests[qid] then firstSeen[qid] = nil end
     end
@@ -120,11 +141,8 @@ local function fullRebuild()
     Cache.dirtyObjectives = false
 end
 
--- Both of these moved to EQ Objective Tracker with the tracker itself. They are read back
--- rather than dropped because they gate the expensive objective refresh below, and MapPOI
--- still runs off this cache. Guarded because '## Dependencies:' cannot express a minimum
--- version, so an older EQOT satisfies it and answers nil here - which falls back to
--- refreshing everything rather than refreshing nothing.
+-- An older EQOT satisfies '## Dependencies:' with no filter API, so a nil answer here has to
+-- fall back to refreshing everything rather than refreshing nothing.
 local function trackerFilterState()
     local T = _G.EQObjectiveTracker
     local DB = T and T.GetModule and T:GetModule("DB")
@@ -185,11 +203,10 @@ function Cache:OnInitialize()
     Events:On("QUEST_ACCEPTED",   dirtyAll)
     Events:On("QUEST_REMOVED",    dirtyAll)
     Events:On("QUEST_TURNED_IN",  dirtyAll)
+    Events:On("PLAYER_LEVEL_UP",  function() wipe(_rewardXP); dirtyAll() end)
 
-    -- The cheap refresh below re-reads objectives but cannot learn that a quest became READY
-    -- TO TURN IN, because on Classic that flag lives on the quest log ROW and only the full
-    -- rebuild walks those. Without this the turn-in icon would not appear until the next
-    -- accept or hand-in. A Classic log is about 20 entries, so a full rebuild is cheap there.
+    -- On Classic the ready-to-turn-in flag lives on the quest log ROW, which only the full
+    -- rebuild walks. A Classic log is about 20 entries, so promoting to one is cheap there.
     local hasIsComplete = type(C_QuestLog) == "table"
                           and type(C_QuestLog.IsComplete) == "function"
 

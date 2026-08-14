@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Unified replacement for the Blizzard quest experience - world map overlays, nameplate quest icons, quest history, and a Midnight chain guide. The objective tracker installs alongside it as EQ Objective Tracker.
 ## Author: Wheelbarrel00
-## Version: 1.40.0
+## Version: 1.41.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -76,6 +76,7 @@ Modules\ChainGuide\MapPin.lua
 Modules\ChainGuide\MapPin.xml
 Modules\ChainGuide\MapPinProvider.lua
 
+Modules\QuestArrow.lua
 Modules\MapPOI\Pin.lua
 Modules\MapPOI\Pin.xml
 Modules\MapPOI\Provider.lua
@@ -89,15 +90,21 @@ Modules\History\Frame.lua
 Modules\History\Session.lua
 
 # Data\QuestCoords_Classic.lua is Era quest data and no retail map uses those UiMapIDs, so it
-# is listed by the flavor TOCs ONLY. EverythingQuests_Vanilla.toc is tracked as of v1.39.0 and
-# provides that coverage, but the TBC one is still gitignored, so this directive is what
-# declares the hole rather than hiding it. tools/check_toc.py errors if it goes stale.
+# is listed by the flavor TOCs ONLY. Both flavor TOCs are tracked now, so CI sees them and their
+# own listings satisfy coverage. The directive stays as the declaration of record, and
+# tools/check_toc.py errors if it goes stale.
 # check-toc: flavor-only Data/QuestCoords_Classic.lua
 
 # Data\QuestSpawns_Classic.lua is the objective SPAWN map for the same flavors - every place a
 # quest can be advanced, rather than the one waypoint QuestCoords carries. Same reasoning, same
 # gate, and it defines a DIFFERENT global so the two load together rather than overwriting.
 # check-toc: flavor-only Data/QuestSpawns_Classic.lua
+
+# Data\QuestTurnIn_Classic.lua is where each quest is HANDED IN, for the same flavors. Neither
+# table above can answer that - QuestSpawns holds objective locations and QuestCoords' single
+# point IS the objective for any quest that has one, so a finished quest was being pinned at the
+# field it was farmed in. Retail gets the turn-in from Blizzard's own waypoint.
+# check-toc: flavor-only Data/QuestTurnIn_Classic.lua
 
 # Modules\Minimap\QuestPins.lua draws the objective pins on the minimap and needs
 # HereBeDragons-Pins to do it. That library calls WorldMapFrame:AddDataProvider at FILE SCOPE, on
@@ -111,6 +118,32 @@ Modules\History\Session.lua
 # nameplate icon needs and what no Classic API reports - a unit tooltip there carries no quest
 # data at all, measured. Retail reads that from the tooltip and never loads this.
 # check-toc: flavor-only Data/QuestNPCs_Classic.lua
+
+# Data\QuestAvailable_Classic.lua answers "where can this quest be picked up, and may this
+# character pick it up" - the one question the client cannot answer for a quest that is not in the
+# log. Retail draws Blizzard's own markers for unaccepted quests and needs none of it.
+# check-toc: flavor-only Data/QuestAvailable_Classic.lua
+
+# Data\QuestCategory_Classic.lua says what KIND each quest is, which drives the map's category
+# filters. Retail reads the same thing live from GetQuestTagInfo, so it needs none of it.
+# check-toc: flavor-only Data/QuestCategory_Classic.lua
+
+# Modules\MapPOI\Available.lua is the only consumer of that table. Listed by the flavor TOCs only
+# for the same reason, and it self-gates on the table's presence as well.
+# check-toc: flavor-only Modules/MapPOI/Available.lua
+
+# The six files below are the TBC dataset. They define exactly the same globals as the six
+# _Classic files above and are ALTERNATIVES to them, never companions - EverythingQuests_TBC.toc
+# lists these and EverythingQuests_Vanilla.toc lists those, so no client ever loads both and no
+# global is ever written twice. TBC quest data is a superset of Era's, which is why TBC gets its
+# own set rather than reusing the Era files: those carry nothing for Outland or for the Blood Elf
+# and Draenei starting zones.
+# check-toc: flavor-only Data/QuestCoords_TBC.lua
+# check-toc: flavor-only Data/QuestSpawns_TBC.lua
+# check-toc: flavor-only Data/QuestTurnIn_TBC.lua
+# check-toc: flavor-only Data/QuestNPCs_TBC.lua
+# check-toc: flavor-only Data/QuestAvailable_TBC.lua
+# check-toc: flavor-only Data/QuestCategory_TBC.lua
 
 # Data (registers chain definitions into ChainGuideDatabase)
 Data\QuestChains\_Index.lua

@@ -1,12 +1,9 @@
 local _, ns = ...
 local L = ns.L
 
--- EQOT is a required dependency, so it is always loaded and always loads first. This puts EQ's
--- own features back onto its tracker.
 local Bridge = ns:RegisterSubsystem("TrackerBridge", {})
 
 local CHAIN_ICON = "Interface\\AddOns\\EverythingQuests\\Media\\chain.tga"
--- Same art as the minimap button, so the glyph already reads as "Everything Quests".
 local EQ_ICON    = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\eq-logo-v3.tga"
 
 -- Header icons lay out right to left from EQOT's cogwheel, so the chain sits beside the cog
@@ -102,6 +99,28 @@ function Bridge:OpenTrackerOptions()
     return false
 end
 
+-- The tracker announces its focused row but has no coordinates of its own, and EQ owns the
+-- quest database, so the arrow is placed here.
+function Bridge:ApplyFocusArrow()
+    local A = api()
+    if not (A and A.AddFocusListener) then return end
+    if not ns:GetSubsystem("QuestArrow") then return end
+
+    A:AddFocusListener({
+        id      = "eq-quest-arrow",
+        -- The id space is only a quest id for the quests provider. Anything else sharing the
+        -- announcement would place an arrow for whichever quest happened to share its number.
+        onFocus = function(providerID, entryID)
+            local Arrow = ns:GetSubsystem("QuestArrow")
+            if not Arrow or providerID ~= "quests" then return end
+            -- EQOT sends one announcement per change with no intervening clear, so a quest EQ
+            -- cannot place has to take the old arrow down. Leaving it points TomTom at one quest
+            -- while the tracker highlights another.
+            if not (entryID and Arrow:PointAtQuest(entryID)) then Arrow:Clear() end
+        end,
+    })
+end
+
 function Bridge:OnEnable()
     local A = api()
     if not A then
@@ -124,4 +143,5 @@ function Bridge:OnEnable()
 
     self:ApplyChainIcon()
     self:ApplyEQIcon()
+    self:ApplyFocusArrow()
 end

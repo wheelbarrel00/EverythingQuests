@@ -146,13 +146,18 @@ function QR:RenderRewards(tip, questID)
 
     local hasReward = false
 
-    local money = GetQuestLogRewardMoney and GetQuestLogRewardMoney(questID) or 0
+    -- MEASURED on Era: both of these IGNORE the questID and report whatever quest log entry is
+    -- SELECTED, so they are asked only where the argument is honored.
+    local byID = not (ns.Compat and ns.Compat.RewardXPNeedsSelection
+                      and ns.Compat.RewardXPNeedsSelection())
+
+    local money = (byID and GetQuestLogRewardMoney and GetQuestLogRewardMoney(questID)) or 0
     if money and money > 0 then
         tip:AddLine((GetCoinTextureString and GetCoinTextureString(money)) or tostring(money), 1, 1, 1)
         hasReward = true
     end
 
-    local xp = GetQuestLogRewardXP and GetQuestLogRewardXP(questID) or 0
+    local xp = (byID and GetQuestLogRewardXP and GetQuestLogRewardXP(questID)) or 0
     if xp and xp > 0 then
         tip:AddLine((L["%d XP"]):format(xp), 1, 1, 1)
         hasReward = true

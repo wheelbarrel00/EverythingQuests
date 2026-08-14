@@ -3,26 +3,35 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.39.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.39.0"
+local FEATURE_POPUP_VERSION = "1.41.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.41.0"
 
 local POPUP_BODY = [[
-|cffEBB706Everything Quests now runs on Classic Era|r
-This is the first release that works on |cffffffffClassic Era|r, and it is deliberately a limited one. What is in are the parts that have been tested in game on a live Era client: quest markers on the world map and the minimap, quest icons on nameplates, auto-accept and auto-turn-in, the minimap button, and the |cffffffff/eqs|r options window.
+|cffEBB706Everything Quests now runs on Burning Crusade Classic|r
+Everything that works on |cffffffffClassic Era|r works on |cffffffffTBC|r as well, with its own quest database covering |cffffffffOutland|r and the |cffffffffBlood Elf|r and |cffffffffDraenei|r starting zones as well as the old world. The Chain Guide, the World Quests panel and Quest History stay retail-only, exactly as they do on Era.
 
-Markers show every place a quest can be advanced rather than a single spot, and they tell you whether you are there to kill something, loot something, or use an object. Clicking one drops a |cffffffffTomTom|r arrow if you have TomTom installed. An objective that lives inside a dungeon is marked at the dungeon entrance instead, so you at least know which door to go through.
+|cffEBB706Classic: markers for quests you can pick up|r
+Every quest giver holding something for you now gets a gold |cffffffff!|r on the map, filtered by your level, race, class and the quests you have already finished. One marker covers a whole quest giver, so hovering it lists everything that giver offers rather than stacking a marker per quest.
 
-|cffEBB706What is not there yet|r
-The |cffffffffChain Guide|r, the |cffffffffWorld Quests|r panel and |cffffffffQuest History|r stay retail-only for now. |cffffffffBurning Crusade Classic|r and |cffffffffMists of Pandaria Classic|r are next in line, and more Classic features are actively being worked on.
+|cffEBB706Classic: a finished quest points at who takes it|r
+Turning a quest in used to send you back to the field you farmed it in. Everything Quests now marks the person who actually takes it, on every map where it can be handed in. This was wrong for |cffffffff475|r quests that hand in somewhere other than where their objective is.
 
-|cffEBB706Expect some rough edges|r
-A first release on a new game version will have problems that testing did not catch. If a marker sends you to the wrong place, an icon looks wrong, or anything throws an error, please report it on the |cffffffffDiscord|r or on |cffffffffGitHub|r. Typing |cffffffff/eqsprobe|r prints exactly what the addon found on your client, and pasting that into a report makes it far easier to act on.
+Items you |cffffffffbuy|r are also marked now, at the merchants who sell them, which gives 21 quests their first useful marker.
 
-|cffEBB706Map markers are easier to read, on every version|r
-Hovering a marker now lists every quest at that spot instead of only the top one, so markers sitting on top of each other no longer hide one another. Markers are also a fixed size at every zoom level now, rather than shrinking as you zoom out.
+|cffEBB706Classic: the tracker's focused quest gets an arrow|r
+Clicking a quest's icon in |cffffffffEQ Objective Tracker|r drops a TomTom arrow on it, and clicking it again clears it. Classic has no in-game waypoint of its own, so the tracker announces the focus and Everything Quests places the arrow from its own database. Map markers and the tracker share one arrow, so using both retargets instead of leaving two behind.
+
+|cffEBB706A Map section in the options|r
+|cffffffff/eqs|r > General has a new Map section holding the marker ring toggles, plus filters that leave dungeon and raid quests, repeatable quests or profession quests off the map. Those filters only touch quests you have |cffffffffnot|r picked up yet, because hiding one you are already carrying would make the map lie about what you still have to do.
+
+|cffEBB706One change worth knowing about|r
+On both Classic versions the red ring behind quest markers now starts |cffffffffswitched off|r. A single zone there can draw hundreds of markers and the rings crowd each other, and the icons still tell the states apart on their own. Retail is unchanged. If you want the ring back, it is a checkbox under |cffffffff/eqs|r > General > Map.
+
+|cffEBB706Everywhere|r
+Countdown timers now use your own language's abbreviations, taken from the game client rather than hardcoded English. Quest markers show the quest level and its experience reward in the tooltip. The options window opens at the left edge of the screen instead of landing on top of the tracker's own options window.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffZox|r (French) and |cffffffffMalevi4|r (Russian) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
+Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian) and |cfffffffflabrie75|r (Korean) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]

@@ -53,7 +53,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         local qpins = Options:CreateCheckbox(content,
             L["Show quest pins on the world map"],
             questPinsGet, questPinsSet,
-            L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Quests you haven't accepted yet keep the game's own yellow \"!\" markers; EQ does not change those. Uncheck this box and all of EQ's red markers go away."])
+            L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Uncheck this box and all of EQ's red markers go away. Quests you have not accepted yet are controlled separately."])
         place(qpins, 0, 16)
 
         local function pinScaleGet()
@@ -74,7 +74,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         place(pinScale, 4, 6)
         pinScale:SetWidth(280)
         Options:AttachTooltip(pinScale, L["World map pin scale"],
-            L["Quest pins already grow as you zoom in and shrink as you zoom out. This scales that whole range, so raise it if the pins are hard to pick out on a large or high-resolution display."])
+            L["Quest pins are drawn at a fixed size no matter how far the map is zoomed, and this sets that size. Raise it if the pins are hard to pick out on a large or high-resolution display."])
 
         local MAX_PINS = ns.MAPPOI_MAX_PINS or 250
         local function pinCapGet()
@@ -103,7 +103,54 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["How many places to mark for a single quest on one map. The busiest locations are kept first, so a lower number still points you somewhere useful. Slide all the way right for no limit at all - a few gathering quests can then put hundreds of markers on one map."])
     end
 
-    -- Its own section because minimap pins are a separate subsystem, not listed on every flavor
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    if Avail then
+        local function rebuildAvailable()
+            Avail:Invalidate()
+            refreshPins()
+            local MM = ns:GetSubsystem("MinimapQuestPins")
+            if MM then MM:Rebuild() end
+        end
+
+        local function availGet()
+            local DB = ns:GetSubsystem("DB")
+            return not DB or not DB.db.profile.map
+                   or DB.db.profile.map.showAvailableQuests ~= false
+        end
+        local function availSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.showAvailableQuests = v and true or false
+            end
+            rebuildAvailable()
+        end
+        local avail = Options:CreateCheckbox(content,
+            L["Show quests you can pick up"],
+            availGet, availSet,
+            L["Marks every quest giver who has something for you but is not in your quest log yet, with a gold ring around the exclamation mark so it reads apart from the quests you are already carrying. One marker covers a whole quest giver, and hovering it lists everything that giver offers. Quests are filtered by your level, race, class and the quests you have already finished. Holiday quests are left out, because nothing in the data says whether the holiday is running."])
+        place(avail, 0, 16)
+
+        local function lowGet()
+            local DB = ns:GetSubsystem("DB")
+            return not DB or not DB.db.profile.map
+                   or DB.db.profile.map.hideLowLevelQuests ~= false
+        end
+        local function lowSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.hideLowLevelQuests = v and true or false
+            end
+            rebuildAvailable()
+        end
+        local low = Options:CreateCheckbox(content,
+            L["Hide quests below your level"],
+            lowGet, lowSet,
+            L["Leaves out quests the game has already grayed out for you, using the game's own threshold rather than a fixed number of levels. On by default. Turn it off to see everything a quest giver has, including the quests you have outleveled."])
+        place(low, 16, 6)
+    end
+
     local MinimapPins = ns:GetSubsystem("MinimapQuestPins")
     if MinimapPins then
         local function minimapPinsGet()
@@ -140,6 +187,94 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             autoTIGet, autoTISet,
             L["Skips reward-choice screens."])
         place(autoTI, 0, 2)
+    end
+
+    if ns:GetSubsystem("MapPOIProvider") then
+        local mapHeader = Options:CreateSectionHeader(content, L["Map"])
+        place(mapHeader, 0, 16)
+
+        -- Asked of the pin's own resolver rather than read here, because an unset value means ON
+        -- on retail and OFF on Classic. A second copy of that rule would leave the box and the map
+        -- disagreeing, and only one of the two is on screen at a time.
+        local function pinRingGet()
+            return ns.QuestPinRingWanted and ns.QuestPinRingWanted(false) or false
+        end
+        local function pinRingSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.showPinRing = v and true or false
+            end
+            refreshPins()
+        end
+        local pinRing = Options:CreateCheckbox(content,
+            L["Show a ring around quest pins"],
+            pinRingGet, pinRingSet,
+            L["Draws the red circle behind every world map marker for a quest in your log, both the ones you are still working on and the ones that are ready to turn in. Turn it off for plain icons and a much quieter map when a zone is busy."])
+        place(pinRing, 0, 10)
+
+        if ns:GetSubsystem("AvailableQuests") then
+            local function availRingGet()
+                local DB = ns:GetSubsystem("DB")
+                return (DB and DB.db.profile.map and DB.db.profile.map.showAvailableRing) == true
+            end
+            local function availRingSet(v)
+                local DB = ns:GetSubsystem("DB")
+                if DB then
+                    DB.db.profile.map = DB.db.profile.map or {}
+                    DB.db.profile.map.showAvailableRing = v and true or false
+                end
+                refreshPins()
+                local MM = ns:GetSubsystem("MinimapQuestPins")
+                if MM then MM:Rebuild() end
+            end
+            local availRing = Options:CreateCheckbox(content,
+                L["Show a ring around quests you can pick up"],
+                availRingGet, availRingSet,
+                L["Draws the gold circle behind the exclamation mark of every quest giver who has something for you. Off by default. The mark itself still tells these apart from the quests you are already carrying, because those use their own objective art or the turn-in mark instead."])
+            place(availRing, 0, 6)
+        end
+    end
+
+    if Avail and ns.CLASSIC_QUEST_CATEGORY then
+        local function rebuildAvailable()
+            Avail:Invalidate()
+            refreshPins()
+            local MM = ns:GetSubsystem("MinimapQuestPins")
+            if MM then MM:Rebuild() end
+        end
+
+        -- Each box HIDES its category, so the stored value is the filter rather than the content.
+        -- nil therefore reads as "show it" and an existing profile is unchanged.
+        local function categoryOption(key, label, tooltip)
+            local box = Options:CreateCheckbox(content, label,
+                function()
+                    local DB = ns:GetSubsystem("DB")
+                    return (DB and DB.db.profile.map and DB.db.profile.map[key]) == true
+                end,
+                function(v)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then
+                        DB.db.profile.map = DB.db.profile.map or {}
+                        DB.db.profile.map[key] = v and true or false
+                    end
+                    rebuildAvailable()
+                end,
+                tooltip)
+            place(box, 16, 6)
+        end
+
+        local filterHeader = Options:CreateSectionHeader(content, L["Hide these quests on the map"])
+        place(filterHeader, 0, 14)
+        Options:AttachTooltip(filterHeader, L["Hide these quests on the map"],
+            L["These only affect the markers for quests you have NOT picked up yet. A quest already in your log always keeps its markers, because hiding something you are carrying would make the map lie about what you still have to do."])
+
+        categoryOption("hideDungeonQuests", L["Dungeon and raid quests"],
+            L["Leaves out quests that are sorted into a dungeon or a raid. Most are picked up inside the instance or from a quest giver at its door, so they clutter the outdoor map without helping you while you are questing in the world."])
+        categoryOption("hideRepeatableQuests", L["Repeatable quests"],
+            L["Leaves out the quests you can hand in over and over, usually a turn-in for reputation or a common trade good. They never stop being offered, so they stay on the map forever once you can see them."])
+        categoryOption("hideProfessionQuests", L["Profession quests"],
+            L["Leaves out quests that require a trade skill, such as a Blacksmithing or Alchemy specialization. Everything Quests cannot read your skill levels on this version of the game, so these are offered even when you have not trained the profession they need."])
     end
 
 

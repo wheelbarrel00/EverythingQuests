@@ -7,6 +7,9 @@ local Pin = EQQuestPinMixin
 local ICON_QUEST_AVAILABLE = "Interface\\GossipFrame\\AvailableQuestIcon"
 local ICON_QUEST_TURNIN    = "Interface\\GossipFrame\\ActiveQuestIcon"
 
+-- Named for the minimap so a missing kind cannot pass as a working available pin.
+ns.QUEST_PIN_AVAILABLE_ICON = ICON_QUEST_AVAILABLE
+
 -- SetTexture fails silently on a missing path, so EQ ships its own art rather than depending on
 -- a client texture per flavor. Keys are the generator's kind values, 1=slay 2=object 3=loot.
 local MEDIA = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\"
@@ -21,12 +24,19 @@ local KIND_ICON = {
 local RING_ATLAS = "worldquest-emissary-ring"
 local _ringAtlas
 
--- Shared with the minimap pins, so a symbol never means one thing on the world map and
--- another on the minimap.
 function ns.QuestPinTexture(isComplete, kind)
     return (isComplete and ICON_QUEST_TURNIN)
            or (kind and KIND_ICON[ns.QuestRealKind and ns.QuestRealKind(kind) or kind])
            or ICON_QUEST_AVAILABLE
+end
+
+local AVAILABLE_RING = { 1.0, 0.82, 0.0 }
+local OWNED_RING     = { 0.635, 0.0, 0.039 }
+
+-- The minimap draws no ring, so without this an unaccepted quest and a carried one with no
+-- spawn row are the same white exclamation mark on the same minimap.
+function ns.QuestPinAvailableTint()
+    return AVAILABLE_RING[1], AVAILABLE_RING[2], AVAILABLE_RING[3], 1
 end
 
 -- An entrance pin keeps the objective's own icon but is tinted, so it cannot be read as "the
@@ -48,6 +58,34 @@ local function userScale()
     return math.max(SCALE_MIN, math.min(SCALE_MAX, s))
 end
 
+-- Smaller pins on the maps that cover more ground. Keyed on the map's TYPE, never on zoom: the
+-- pin is deliberately a fixed size at every zoom level, and the continent map is where that
+-- reads worst. Enum.UIMapType - 0 Cosmic, 1 World, 2 Continent. Anything else keeps full size.
+local MAP_TYPE_SCALE = { [0] = 0.85, [1] = 0.85, [2] = 0.9 }
+
+-- A map's type never changes, and this is asked once per pin acquired - 333 times on a busy
+-- Westfall refresh.
+local _typeScale = {}
+
+local function mapTypeScale(mapID)
+    if not mapID then return 1 end
+    local cached = _typeScale[mapID]
+    if cached then return cached end
+    local s = 1
+    -- GetMapInfo answers nil for a map id the client does not know, so full size is the safe miss.
+    if C_Map and C_Map.GetMapInfo then
+        local ok, info = pcall(C_Map.GetMapInfo, mapID)
+        if ok and type(info) == "table" then
+            s = MAP_TYPE_SCALE[info.mapType] or 1
+        end
+    end
+    _typeScale[mapID] = s
+    return s
+end
+
+-- Read by /eqsprobe so it measures the real factor instead of reimplementing it.
+ns.MapPinTypeScale = mapTypeScale
+
 local function ringAtlas()
     if _ringAtlas == nil then
         local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(RING_ATLAS)
@@ -56,32 +94,44 @@ local function ringAtlas()
     return _ringAtlas
 end
 
-local _lastWaypoint
+-- Unset has to keep meaning ON or every retail user loses a ring they have always had. Classic
+-- ships it off because a zone there draws hundreds of pins. Gated on the table, not a build number.
+local function ownedRingDefault()
+    return ns.CLASSIC_QUEST_SPAWNS == nil
+end
+
+-- Read by Options/TabGeneral.lua too. One implementation, or the checkbox and the pin disagree
+-- about an unset value while only one of them is on screen.
+local function ringWanted(avail)
+    local DB = ns:GetSubsystem("DB")
+    local map = DB and DB.db.profile.map
+    if avail then
+        return (map and map.showAvailableRing) == true
+    end
+    local v = map and map.showPinRing
+    if v == nil then return ownedRingDefault() end
+    return v == true
+end
+
+ns.QuestPinRingWanted = ringWanted
 
 -- Classic has no Blizzard waypoint of any kind, so TomTom is the only arrow available there.
--- Every call is pcall'd because this reaches into another addon whose API can move.
+-- The waypoint slot lives in QuestArrow rather than here so this and the tracker's focused row
+-- share one arrow instead of each keeping its own and stacking a second on top of the first.
 local function tomtomFocus(pin)
-    local TomTom = _G.TomTom
-    if not (TomTom and TomTom.AddWaypoint and pin.mapID and pin.mapX and pin.mapY) then
-        return false
-    end
-
-    -- One at a time, so a click retargets instead of stacking arrows.
-    if _lastWaypoint and TomTom.RemoveWaypoint then
-        pcall(TomTom.RemoveWaypoint, TomTom, _lastWaypoint)
-        _lastWaypoint = nil
-    end
+    local Arrow = ns:GetSubsystem("QuestArrow")
+    -- Asked before the cache lookup below, which can drive a full quest log refresh. Without
+    -- it a player with no TomTom pays for that on every pin click and gets no arrow anyway.
+    if not (Arrow and Arrow:Available()) then return false end
 
     local Cache = ns:GetSubsystem("Cache")
     local q = Cache and Cache:Get(pin.questID)
-    -- persistent, minimap and world are left unset so TomTom's own profile decides them.
-    local ok, uid = pcall(TomTom.AddWaypoint, TomTom, pin.mapID, pin.mapX, pin.mapY, {
-        title = q and q.title or nil,
-        from  = "Everything Quests",
-        crazy = true,
-    })
-    if ok then _lastWaypoint = uid end
-    return ok
+    local title = q and q.title
+    if not title and pin.avail then
+        local Avail = ns:GetSubsystem("AvailableQuests")
+        title = Avail and Avail:Title(pin.questID)
+    end
+    return Arrow:Set(pin.mapID, pin.mapX, pin.mapY, title)
 end
 
 -- PIN_FRAME_LEVEL_QUEST_PING is undefined on Era, where GetValidFrameLevel answers 2000 for it
@@ -107,8 +157,6 @@ local function frameLevelManager(map)
     return mgr
 end
 
--- Returns the chosen type, a level to force, and whether to leave the level to Blizzard.
---
 -- Deferral keys on the FIRST preference only, the type Blizzard's own quest pins use. Accepting
 -- any defined preference defers on Era, which defines SUPER_TRACKED_QUEST at 2750 while
 -- AREA_POI_BANNER sits at 2757 - straight back under the layers that buried the pins.
@@ -161,7 +209,6 @@ function Pin:ApplyFrameLevel()
         _level = (not typeIsDefined) and (forced or FALLBACK_LEVEL) or nil
         _resolved = true
     end
-    -- Nothing to force means the client defines our type and places it correctly itself
     if _level == nil then
         if MapCanvasPinMixin.ApplyFrameLevel then
             MapCanvasPinMixin.ApplyFrameLevel(self)
@@ -176,22 +223,27 @@ function Pin:ApplyFrameLevel()
 end
 
 function Pin:OnLoad()
+    -- Identifies an EQ pin to /eqsprobe on every flavor. eqWantedLevel cannot do it: it is nil
+    -- by design wherever EQ defers to the client, which is exactly retail.
+    self.eqPin = true
     self:UseFrameLevelType(FRAME_LEVEL_PREFERENCE[1])
     self:SetScalingLimits(1, 1, 1)
     self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 end
 
-function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask)
+function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask, avail)
     self.questID    = questID
     self.isComplete = isComplete
     self.kind       = kind
     self.objMask    = objMask
+    self.avail      = avail
     self.mapX, self.mapY, self.mapID = x, y, mapID
     self:SetPosition(x, y)
 
     -- Both limits are the same value on purpose. ApplyCurrentScale lerps between them, so equal
-    -- limits give a fixed size at every zoom. Set per acquire so a pooled pin sees a new setting.
-    local s = userScale()
+    -- limits give a fixed size at every zoom. Set per acquire so a pooled pin sees a new setting,
+    -- and so a pin reused on a different map picks up that map's type factor.
+    local s = userScale() * mapTypeScale(mapID)
     self:SetScalingLimits(1, s, s)
     if self.ApplyCurrentScale then self:ApplyCurrentScale() end
 
@@ -200,17 +252,25 @@ function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask)
     if _levelType then self:UseFrameLevelType(_levelType) end
 
     if self.ring then
-        local atlas = ringAtlas()
+        local atlas = ringWanted(avail) and ringAtlas()
         if atlas then
+            local c = avail and AVAILABLE_RING or OWNED_RING
             self.ring:SetAtlas(atlas)
-            self.ring:SetVertexColor(0.635, 0.0, 0.039, 1)       -- #a2000a
+            self.ring:SetVertexColor(c[1], c[2], c[3], 1)
             self.ring:Show()
         else
             self.ring:Hide()
         end
     end
-    self.icon:SetTexture(ns.QuestPinTexture(isComplete, kind))
-    self.icon:SetVertexColor(ns.QuestPinTint(kind))
+    -- An available pin passes no kind, and QuestPinTexture's own fallback for a missing kind is
+    -- this same icon, so the two cases would be indistinguishable. Asked for by name instead.
+    if avail then
+        self.icon:SetTexture(ICON_QUEST_AVAILABLE)
+        self.icon:SetVertexColor(1, 1, 1, 1)
+    else
+        self.icon:SetTexture(ns.QuestPinTexture(isComplete, kind))
+        self.icon:SetVertexColor(ns.QuestPinTint(kind))
+    end
     self.numberText:SetText("")
 
     -- AcquirePin does not auto-Show
@@ -219,6 +279,7 @@ end
 
 function Pin:OnReleased()
     self.questID, self.isComplete, self.kind, self.objMask = nil, nil, nil, nil
+    self.avail = nil
     self.mapX, self.mapY, self.mapID = nil, nil, nil
     self.icon:SetTexture(nil)
     self.numberText:SetText("")
@@ -255,24 +316,28 @@ local function nearbyQuests(pin)
 
     wipe(_nearMin)
     wipe(_nearAt)
-    local Q, X, Y = Provider._drawnQ, Provider._drawnX, Provider._drawnY
+    local Q, X, Y, A = Provider._drawnQ, Provider._drawnX, Provider._drawnY, Provider._drawnA
+    -- An available pin stands for a LOCATION, not a quest, and it is recorded under only the
+    -- first of the several quests offered there. Keying those by quest id would collapse two
+    -- different givers that happen to share a quest, and silently drop the other givers' quests.
+    -- The quest list table is its own identity, so it keys the location exactly.
+    local hoveredKey = pin.avail or pin.questID
     for i = 1, Provider._drawnN do
-        local qid = Q[i]
-        if qid and qid ~= pin.questID then
+        local key = A[i] or Q[i]
+        if key and key ~= hoveredKey then
             local dx, dy = (X[i] - hx) * cw, (Y[i] - hy) * ch
             local d = dx * dx + dy * dy
-            if d <= reachSq and (not _nearMin[qid] or d < _nearMin[qid]) then
-                _nearMin[qid] = d
-                -- which pin won, so its own kind and mask can name the objectives
-                _nearAt[qid] = i
+            if d <= reachSq and (not _nearMin[key] or d < _nearMin[key]) then
+                _nearMin[key] = d
+                _nearAt[key] = i
             end
         end
     end
 
-    -- A quest contributes at most one entry here, so this list is a handful of rows and never
+    -- Each key contributes at most one entry here, so this list is a handful of rows and never
     -- worth table.sort.
     local n = 0
-    for qid, d in pairs(_nearMin) do
+    for key, d in pairs(_nearMin) do
         local pos = n + 1
         for i = 1, n do
             if d < _nearD[i] then pos = i break end
@@ -281,7 +346,8 @@ local function nearbyQuests(pin)
             _nearQ[i + 1], _nearD[i + 1] = _nearQ[i], _nearD[i]
             _nearIdx[i + 1] = _nearIdx[i]
         end
-        _nearQ[pos], _nearD[pos], _nearIdx[pos] = qid, d, _nearAt[qid]
+        local at = _nearAt[key]
+        _nearQ[pos], _nearD[pos], _nearIdx[pos] = Q[at], d, at
         n = n + 1
     end
     return n
@@ -292,17 +358,47 @@ function Pin:NearbyQuestCount()
     return nearbyQuests(self)
 end
 
--- A pin names the objectives its own location serves, per the mask, not every unfinished
--- objective on the quest. No mask means fall back to all of them, which is the retail path.
+-- The client can report every objective finished without flagging the quest complete, which left
+-- the tooltip a bare title. A quest with none at all can only be judged by isComplete - a
+-- delivery quest genuinely has zero for its whole life.
+function ns.QuestIsDone(q)
+    if q.isComplete then return true end
+    local objs = q.objectives
+    if not objs or #objs == 0 then return false end
+    for i = 1, #objs do
+        if not objs[i].finished then return false end
+    end
+    return true
+end
+
+function ns.QuestPinTitle(q, questID)
+    local title = q and q.title or ("Quest #" .. tostring(questID))
+    local level = q and q.level
+    if type(level) == "number" and level > 0 then
+        return ("[%d] %s"):format(level, title)
+    end
+    return title
+end
+
 function ns.QuestPinObjectives(tip, q, kind, mask)
-    if q.isComplete then
+    local isEntrance = ns.QuestIsEntrance and ns.QuestIsEntrance(kind)
+
+    -- Read from the Cache, never asked for here: on Classic the reward call reports whatever
+    -- quest log entry is SELECTED, so fetching it on hover would move the player's quest log.
+    if type(q.rewardXP) == "number" and q.rewardXP > 0 then
+        local n = BreakUpLargeNumbers and BreakUpLargeNumbers(q.rewardXP) or tostring(q.rewardXP)
+        tip:AddLine((L["%s XP"]):format(n), 0.7, 0.7, 0.7)
+    end
+
+    if ns.QuestIsDone(q) then
         tip:AddLine(L["Ready to turn in"], 0.4, 0.85, 0.4)
+        if isEntrance then tip:AddLine(L["Dungeon entrance"], 0.5, 0.75, 1.0) end
         return
     end
     local objs = q.objectives
     if not objs then return end
 
-    if ns.QuestIsEntrance and ns.QuestIsEntrance(kind) then
+    if isEntrance then
         tip:AddLine(L["Dungeon entrance"], 0.5, 0.75, 1.0)
     end
 
@@ -330,36 +426,88 @@ function ns.QuestPinObjectives(tip, q, kind, mask)
     end
 end
 
+-- One giver offers up to 27 quests and a faire ground 36, which uncapped is a tooltip taller
+-- than the screen.
+local TOOLTIP_MAX_AT_LOCATION = 5
+
+-- The start-point kinds the generator emits: 1 an NPC offers it, 2 an object does, 3 an item that
+-- starts it drops here. These are SOURCES of a quest, not the objective kinds in QUEST_KIND_TYPE.
+local START_ITEM = 3
+
+function ns.QuestPinAvailable(tip, quests, isFirstLine)
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    if not (Avail and quests) then return end
+    local n = #quests
+    local shown = (n > TOOLTIP_MAX_AT_LOCATION) and TOOLTIP_MAX_AT_LOCATION or n
+    for i = 1, shown do
+        local qid = quests[i]
+        local title = Avail:Title(qid)
+        if i == 1 and isFirstLine then
+            tip:SetText(title, 1.0, 0.82, 0.0, 1, true)
+        else
+            tip:AddLine(title, 1.0, 0.82, 0.0, true)
+        end
+        local level = Avail:QuestLevel(qid)
+        local line = level and (L["Level %d"]):format(level) or L["Available quest"]
+        if Avail:IsRepeatable(qid) then
+            line = line .. " - " .. L["Repeatable quest"]
+        end
+        tip:AddLine(line, 0.6, 0.85, 0.6)
+    end
+    if n > shown then
+        tip:AddLine((L["and %d more"]):format(n - shown), 0.6, 0.6, 0.6)
+    end
+    if quests.startKind == START_ITEM then
+        tip:AddLine(L["Starts from an item that drops here"], 0.7, 0.7, 0.7)
+    end
+end
+
 function Pin:OnMouseEnter()
     if not self.questID then return end
     local Cache = ns:GetSubsystem("Cache")
-    local q = Cache:Get(self.questID)
-    if not q then return end
+    local q = (not self.avail) and Cache:Get(self.questID) or nil
+    if not (q or self.avail) then return end
 
     -- Private tooltip, not GameTooltip - sharing GameTooltip seeds our taint onto it and the next AreaPOI tooltip crashes on it
     local tip = ns.Util.PinTooltip()
     tip:SetOwner(self, "ANCHOR_RIGHT")
-    tip:SetText(q.title or ("Quest #" .. tostring(self.questID)),
-                        1.0, 0.82, 0.0, 1, true)
-    if q.zone   then tip:AddLine(q.zone, 0.7, 0.7, 0.7) end
-    ns.QuestPinObjectives(tip, q, self.kind, self.objMask)
+    if self.avail then
+        ns.QuestPinAvailable(tip, self.avail, true)
+    else
+        tip:SetText(ns.QuestPinTitle(q, self.questID), 1.0, 0.82, 0.0, 1, true)
+        if q.zone   then tip:AddLine(q.zone, 0.7, 0.7, 0.7) end
+        ns.QuestPinObjectives(tip, q, self.kind, self.objMask)
+    end
 
     local Provider = ns:GetSubsystem("MapPOIProvider")
     local n = nearbyQuests(self)
+
+    -- Counted before anything is written, because the overflow line promises a number. Counting
+    -- neighbours and then skipping the ones that cannot be rendered makes that number a lie.
+    local total = 0
+    for i = 1, n do
+        local at = _nearIdx[i]
+        if (at and Provider._drawnA[at]) or Cache:Get(_nearQ[i]) then total = total + 1 end
+    end
+
     local shown = 0
     for i = 1, n do
-        local other = Cache:Get(_nearQ[i])
-        if other then
+        local at = _nearIdx[i]
+        local availList = at and Provider._drawnA[at]
+        local other = (not availList) and Cache:Get(_nearQ[i]) or nil
+        if availList or other then
             if shown >= TOOLTIP_MAX_EXTRA then
                 tip:AddLine(" ")
-                tip:AddLine((L["and %d more"]):format(n - shown), 0.6, 0.6, 0.6)
+                tip:AddLine((L["and %d more"]):format(total - shown), 0.6, 0.6, 0.6)
                 break
             end
             tip:AddLine(" ")
-            tip:AddLine(other.title or ("Quest #" .. tostring(_nearQ[i])), 1.0, 0.82, 0.0, true)
-            local at = _nearIdx[i]
-            ns.QuestPinObjectives(tip, other,
-                                  at and Provider._drawnK[at], at and Provider._drawnM[at])
+            if availList then
+                ns.QuestPinAvailable(tip, availList)
+            else
+                tip:AddLine(ns.QuestPinTitle(other, _nearQ[i]), 1.0, 0.82, 0.0, true)
+                ns.QuestPinObjectives(tip, other, Provider._drawnK[at], Provider._drawnM[at])
+            end
             shown = shown + 1
         end
     end
@@ -377,6 +525,8 @@ end
 function Pin:OnClick(button)
     if not self.questID then return end
     if button == "RightButton" then
+        -- The quest log has no entry to open for a quest you have not accepted
+        if self.avail then return end
         if C_AddOns and C_AddOns.LoadAddOn then
             C_AddOns.LoadAddOn("Blizzard_QuestLog")
         end

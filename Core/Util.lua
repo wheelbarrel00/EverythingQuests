@@ -15,13 +15,51 @@ Util.color = {
     dim           = { 0.50,  0.50,  0.50,  1.00 },
 }
 
+-- The client ships its own localized one-letter time abbreviations, so these need no locale key
+-- and come out right in every client language rather than only the four EQ ships. Korean renders
+-- them as a full word, which is why a hardcoded "d" was unreadable there.
+-- Decimal 30 is octal 36 and hex 1e, so a string that mangles the conversion cannot reproduce
+-- these digits. Checking the caller's own number instead would pass "1005ff" for 5, because
+-- octal and decimal agree below 8.
+local ABBR_CONTROL = 30
+local abbrUsable = {}
+
+local function timeAbbr(globalName, fallback, n)
+    local fmt = _G[globalName]
+    if type(fmt) == "string" then
+        local usable = abbrUsable[globalName]
+        if usable == nil then
+            -- pcall only catches a RAISE, and a locale carrying a stray percent formats without
+            -- raising - "100% off" reads its "% o" as an octal conversion and turns 30 into 10036ff.
+            local ok, probe = pcall(string.format, fmt, ABBR_CONTROL)
+            usable = ok and type(probe) == "string"
+                     and probe:find(tostring(ABBR_CONTROL), 1, true) ~= nil
+            abbrUsable[globalName] = usable
+        end
+        if usable then
+            local ok, s = pcall(string.format, fmt, n)
+            if ok and type(s) == "string" then return s end
+        end
+    end
+    return fallback:format(n)
+end
+
+-- English ships "%d d", so without stripping the space between number and unit EQ's "30m"
+-- silently became "30 m".
+local function timeAbbrTight(globalName, fallback, n)
+    return (timeAbbr(globalName, fallback, n):gsub("(%d)%s+(%a)", "%1%2"))
+end
+
 function Util.FmtDuration(secs)
     secs = math.max(0, math.floor(secs or 0))
     local h = math.floor(secs / 3600)
     local m = math.floor((secs % 3600) / 60)
-    if h > 0 then return ("%dh %dm"):format(h, m) end
-    if m > 0 then return ("%dm"):format(m) end
-    return ("%ds"):format(secs)
+    if h > 0 then
+        return timeAbbrTight("HOUR_ONELETTER_ABBR", "%dh", h) .. " "
+               .. timeAbbrTight("MINUTE_ONELETTER_ABBR", "%dm", m)
+    end
+    if m > 0 then return timeAbbrTight("MINUTE_ONELETTER_ABBR", "%dm", m) end
+    return timeAbbrTight("SECOND_ONELETTER_ABBR", "%ds", secs)
 end
 
 function Util.WQTimeColor(mins)
@@ -34,17 +72,20 @@ end
 
 function Util.WQTimeShort(mins)
     if not mins or mins <= 0 then return "" end
-    if mins < 60   then return ("%dm"):format(mins) end
-    if mins < 1440 then return ("%dh"):format(math.floor(mins / 60)) end
-    return ("%dd"):format(math.floor(mins / 1440))
+    if mins < 60   then return timeAbbrTight("MINUTE_ONELETTER_ABBR", "%dm", mins) end
+    if mins < 1440 then return timeAbbrTight("HOUR_ONELETTER_ABBR", "%dh", math.floor(mins / 60)) end
+    return timeAbbrTight("DAY_ONELETTER_ABBR", "%dd", math.floor(mins / 1440))
 end
 
 function Util.WQTimeLong(mins)
     if not mins or mins <= 0 then return ns.L["Expired"] end
     local h = math.floor(mins / 60)
     local m = mins - h * 60
-    if h > 0 then return ("%dh %dm"):format(h, m) end
-    return ("%dm"):format(m)
+    if h > 0 then
+        return timeAbbrTight("HOUR_ONELETTER_ABBR", "%dh", h) .. " "
+               .. timeAbbrTight("MINUTE_ONELETTER_ABBR", "%dm", m)
+    end
+    return timeAbbrTight("MINUTE_ONELETTER_ABBR", "%dm", m)
 end
 
 local function progressRepl(have, need)

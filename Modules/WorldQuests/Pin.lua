@@ -22,6 +22,20 @@ function Pin:OnLoad()
     self:UseFrameLevelType("PIN_FRAME_LEVEL_QUEST_PING")
     self:SetScalingLimits(1, 0.6, 1.4)
     self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+
+    -- The label sits on the map art, where bright terrain swallows it without an outline and
+    -- shadow.
+    local path, size, flags = self.timeText:GetFont()
+    if path and size then
+        self.timeText:SetFont(path, size, "OUTLINE")
+        -- Read back rather than trusting the return. A font that does not take leaves the string
+        -- BLANK, which is worse than no outline, and the return value differs across flavors.
+        if not self.timeText:GetFont() then
+            self.timeText:SetFont(path, size, flags)
+        end
+    end
+    self.timeText:SetShadowColor(0, 0, 0, 1)
+    self.timeText:SetShadowOffset(1, -1)
 end
 
 -- Required empty stub - the canvas calls this on every pin and its absence trips the assert at MapCanvas.lua:280

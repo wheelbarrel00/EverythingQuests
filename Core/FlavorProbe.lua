@@ -1,7 +1,7 @@
 local _, ns = ...
 
--- Cross-flavor measurement command. Probed globals go through _G with a variable name so a
--- new one needs no .luacheckrc entry, and nothing here may become a runtime branch.
+-- Probed globals go through _G with a variable name so a new one needs no .luacheckrc entry,
+-- and nothing here may become a runtime branch.
 
 local Probe = {}
 ns.FlavorProbe = Probe
@@ -61,11 +61,23 @@ local function nearestStored(questID, gotX, gotY, mapID)
         if not best or d < best then best, source = d, tag end
     end
 
+    -- Gated on the stored map, the same way Provider's own reader is. Without that a quest whose
+    -- single point lives in another zone entirely becomes the nearest candidate and the pin is
+    -- reported as misplaced against a coordinate that could never have drawn it.
     local coords = ns.CLASSIC_QUEST_COORDS
     local packed = coords and coords[questID]
-    if packed then
+    if packed and (not mapID or math.floor(packed / 1e8) == mapID) then
         local rest = packed % 1e8
         consider(math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4, "single-point")
+    end
+
+    local turnIn = ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID]
+    local tList = turnIn and mapID and turnIn[mapID]
+    if tList then
+        for i = 1, #tList do
+            local rest = tList[i] % 1e8
+            consider(math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4, "turn-in")
+        end
     end
 
     local byMap = ns.CLASSIC_QUEST_SPAWNS and ns.CLASSIC_QUEST_SPAWNS[questID]
@@ -80,6 +92,17 @@ local function nearestStored(questID, gotX, gotY, mapID)
             end
         end
     end
+
+    local avail = ns.CLASSIC_QUEST_AVAILABLE
+    local aList = avail and avail.start and avail.start[questID]
+    aList = aList and mapID and aList[mapID]
+    if aList then
+        for i = 1, #aList do
+            local rest = aList[i] % 1e8
+            consider(math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4, "available")
+        end
+    end
+
     return best, source
 end
 
@@ -94,8 +117,6 @@ local function emit(list, per)
     end
 end
 
--- Existence answers "yes" for a stub the client kept with no system behind it, so anything
--- load bearing is called here and its real returns printed.
 -- Takes the function itself. A LibStub library is never a global, so resolving one by _G path
 -- prints ABSENT for a function that is right there.
 local function dumpCall(label, fn, ...)
@@ -186,7 +207,6 @@ local function collectQuests(limit)
     return ids, titles, "none"
 end
 
--- Modules/MapPOI, the Chain Guide waypoint and Get Directions all start here.
 function Probe:Map()
     out("map and coordinates")
 
@@ -387,8 +407,6 @@ local OBJECTIVE_FIELDS = {
     "text", "type", "finished", "numFulfilled", "numRequired",
 }
 
--- The questions that gate the port. Every one of these is a CALL, because each has already
--- been shown to be unanswerable by asking whether a name exists.
 function Probe:Port()
     out("port blockers - called, not merely looked up")
 
@@ -577,16 +595,51 @@ local PIN_METHODS = {
     "OnAcquired", "OnReleased",
 }
 
--- Every row of both generated tables falls in this one contiguous UiMapID block, 46 distinct
--- ids. A client that cannot resolve them places every pin nowhere.
-local COORD_MAP_MIN, COORD_MAP_MAX = 1411, 1459
-
 local function decodePacked(v)
     return math.floor(v / 1e8), math.floor(v % 1e8 / 1e4) / 1e4, (v % 1e4) / 1e4
 end
 
--- Assuming the data exists, this asks the other half - whether the canvas EQ hangs its pins
--- on exists on this flavor.
+-- Read out of the tables this TOC actually loaded rather than hardcoded. Era and TBC ship
+-- different datasets against the same globals - Era is one block in 1411-1459, TBC adds
+-- Outland and the new starting zones up at 1941-1957 - and a fixed range would report the
+-- other flavor's ids as unresolved on a client that is perfectly healthy.
+local _coordMaps
+
+local function coordMapIDs()
+    if _coordMaps then return _coordMaps end
+    local seen = {}
+    local coords = ns.CLASSIC_QUEST_COORDS
+    if type(coords) == "table" then
+        for _, packed in pairs(coords) do seen[math.floor(packed / 1e8)] = true end
+    end
+    for _, tbl in ipairs({ ns.CLASSIC_QUEST_SPAWNS, ns.CLASSIC_QUEST_TURNIN,
+                           ns.CLASSIC_QUEST_AVAILABLE and ns.CLASSIC_QUEST_AVAILABLE.start }) do
+        if type(tbl) == "table" then
+            for _, byMap in pairs(tbl) do
+                if type(byMap) == "table" then
+                    for mapID in pairs(byMap) do seen[mapID] = true end
+                end
+            end
+        end
+    end
+    _coordMaps = {}
+    for id in pairs(seen) do _coordMaps[#_coordMaps + 1] = id end
+    table.sort(_coordMaps)
+    return _coordMaps
+end
+
+local function mapBlocks(ids)
+    local parts, s, p = {}, nil, nil
+    for i = 1, #ids do
+        local m = ids[i]
+        if not s then s, p = m, m
+        elseif m == p + 1 then p = m
+        else parts[#parts + 1] = (s == p) and tostring(s) or (s .. "-" .. p); s, p = m, m end
+    end
+    if s then parts[#parts + 1] = (s == p) and tostring(s) or (s .. "-" .. p) end
+    return table.concat(parts, ", ")
+end
+
 function Probe:Pins()
     out("map canvas and pin surface - what Modules/MapPOI rides on")
 
@@ -691,28 +744,34 @@ function Probe:Pins()
          okPin and "" or (" - " .. tostring(err):sub(1, 50)),
          _G["EQQuestPinMixin"] and "loaded" or "ABSENT, MapPOI is not in this TOC")
 
-    -- The dataset half. Not "does C_Map exist" - does this client resolve the specific
-    -- UiMapIDs the generated table stores.
-    line("UiMapIDs %d-%d, the block the Classic coordinate table uses:", COORD_MAP_MIN, COORD_MAP_MAX)
+    local mapIDs = coordMapIDs()
+    -- Hoisted, because the per-quest decode below names maps with it too.
     local getMapInfo = resolve("C_Map.GetMapInfo")
-    if type(getMapInfo) ~= "function" then
-        line("  C_Map.GetMapInfo: ABSENT - no map id can be validated on this client")
+    if #mapIDs == 0 then
+        line("UiMapIDs: no coordinate table is loaded, so there is no block to validate.")
     else
-        local resolved, dead, sample = 0, {}, {}
-        for id = COORD_MAP_MIN, COORD_MAP_MAX do
-            local ok, info = pcall(getMapInfo, id)
-            if ok and type(info) == "table" and info.name then
-                resolved = resolved + 1
-                if #sample < 6 then sample[#sample + 1] = ("%d=%s"):format(id, info.name) end
-            else
-                dead[#dead + 1] = tostring(id)
+        line("UiMapIDs actually stored by this TOC's data (%d ids): %s",
+             #mapIDs, mapBlocks(mapIDs))
+        if type(getMapInfo) ~= "function" then
+            line("  C_Map.GetMapInfo: ABSENT - no map id can be validated on this client")
+        else
+            local resolved, dead, sample = 0, {}, {}
+            for i = 1, #mapIDs do
+                local id = mapIDs[i]
+                local ok, info = pcall(getMapInfo, id)
+                if ok and type(info) == "table" and info.name then
+                    resolved = resolved + 1
+                    if #sample < 6 then sample[#sample + 1] = ("%d=%s"):format(id, info.name) end
+                else
+                    dead[#dead + 1] = tostring(id)
+                end
             end
-        end
-        line("  resolved %d of %d", resolved, COORD_MAP_MAX - COORD_MAP_MIN + 1)
-        emit(sample, 2)
-        if #dead > 0 then
-            line("  UNRESOLVED (%d) - any quest stored against these gets no pin:", #dead)
-            emit(dead, 6)
+            line("  resolved %d of %d", resolved, #mapIDs)
+            emit(sample, 2)
+            if #dead > 0 then
+                line("  UNRESOLVED (%d) - any quest stored against these gets no pin:", #dead)
+                emit(dead, 6)
+            end
         end
     end
 
@@ -740,8 +799,6 @@ function Probe:Pins()
     end
 end
 
--- Nothing here looks a name up. It walks the provider's own decisions and counts them, so the
--- stage that reports zero is the stage that is wrong.
 function Probe:MapPOI()
     out("Modules/MapPOI - why a pin did or did not appear")
 
@@ -764,6 +821,20 @@ function Probe:MapPOI()
         line("_DoRefresh early-returns while the map is CLOSED. Re-run with it OPEN.")
     end
 
+    -- Pins shrink on the maps that cover more ground, keyed on map TYPE. A factor of 1 because
+    -- this is a zone map and a factor of 1 because the client answered nothing are the same
+    -- number and different problems, so the type is printed beside it.
+    if target then
+        local info = C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(target)
+        local mapType = type(info) == "table" and info.mapType or nil
+        line("map type=%s (0 cosmic, 1 world, 2 continent, 3 zone)  pin size factor=%s",
+             tostring(mapType),
+             tostring(ns.MapPinTypeScale and ns.MapPinTypeScale(target) or "n/a"))
+        if mapType == nil then
+            line("  the client reported NO map type, so the factor fell back to full size")
+        end
+    end
+
     line("1. is the provider attached at all:")
     local MP = ns:GetSubsystem("MapPOIProvider")
     if not MP then
@@ -774,11 +845,19 @@ function Probe:MapPOI()
          type(MP.provider), type(MP.shadow))
     line("  _DoRefresh ran %s time(s), last stage %q, last mapID=%s, pins acquired=%s",
          tostring(MP._refreshes), tostring(MP._stage), tostring(MP._mapID), tostring(MP._pins))
-    -- Splits the pin count by source. "12 pins" from the single-point table and "12 pins" from
-    -- the spawn map are different states with different causes, and they read identically above.
-    line("  ...of those from the objective SPAWN map=%s, single-point/Blizzard=%s",
-         tostring(MP._spawnPins),
-         tostring((MP._pins or 0) - (MP._spawnPins or 0)))
+    if MP._ownedOff then
+        line("  NOTE: \"Show quest pins on the world map\" is OFF, so pins for quests you are")
+        line("  carrying are suppressed. Available quest pins have their own checkbox and are")
+        line("  unaffected, so a non-zero available count below is correct here.")
+    end
+    -- Available pins are their own term rather than a remainder, or they are all attributed to
+    -- the single-point path and read as the spawn table failing for that many quests.
+    line("  ...of those from the objective SPAWN map=%s, TURN-IN table=%s, available quests=%s, single-point/Blizzard=%s",
+         tostring(MP._spawnPins), tostring(MP._turnInPins), tostring(MP._availPins),
+         tostring((MP._pins or 0) - (MP._spawnPins or 0) - (MP._availPins or 0)
+                  - (MP._turnInPins or 0)))
+    line("  turn-in table loaded=%s  quests in it=%s",
+         tostring(ns.CLASSIC_QUEST_TURNIN ~= nil), tostring(countKeys(ns.CLASSIC_QUEST_TURNIN)))
     -- Thinned counts points the minimum separation rejected. Zero here with a high spawn count
     -- means the spread filter is not running, which reads identically to "nothing to thin".
     line("  spawn points thinned by minimum separation=%s", tostring(MP._spawnThinned))
@@ -794,7 +873,6 @@ function Probe:MapPOI()
     elseif MP._refreshes == 0 then
         line("  the refresh NEVER RAN. Nothing downstream of it can be the cause.")
     elseif (MP._pins or 0) > 0 then
-        -- Worded as a conditional because it cannot know what is on screen.
         line("  pins WERE acquired. IF you cannot see any, that makes it a DRAW problem and")
         line("  not a data one - suspect the frame level in 2 below. If you can see them,")
         line("  this line means nothing.")
@@ -850,11 +928,8 @@ function Probe:MapPOI()
                                                  rows[i].lvl)
             end
             emit(top, 2)
-            -- `ours` is the manager's answer for the NAME Pin.lua asks for. Where the client
-            -- defines that name EQ defers to Blizzard entirely. Where it does not, EQ forces one
-            -- above the highest definition. Judging the undefined-name fallback printed a flat
-            -- "32 types sit above us" beside section 4's "level 2800 and it stuck", which is one
-            -- report disagreeing with itself.
+            -- Judging the undefined-name fallback printed a flat "32 types sit above us" beside
+            -- section 4's "level 2800 and it stuck", which is one report disagreeing with itself.
             if type(ours) == "number" then
                 line("  the NAME resolves to %d, and %d defined type(s) sit above that.",
                      ours, above)
@@ -994,8 +1069,18 @@ function Probe:MapPOI()
     end
     line("  enumerated %d pin(s), %d shown", n, drawn)
     if n == 0 then
-        line("  the pool is EMPTY even though AcquirePin was called - the pins are being")
-        line("  released again, so suspect a second refresh calling RemoveAllData.")
+        -- Split on whether anything was ever acquired. An empty pool after a refresh that
+        -- acquired NOTHING is section 3's answer, not a release bug, and saying otherwise sends
+        -- the reader hunting a defect that is not there.
+        if not MP or (MP._pins or 0) == 0 then
+            line("  nothing was acquired in the first place, so there is nothing to release.")
+            line("  Section 3 above says why - on a continent or world map the honest answer is")
+            line("  that the data stores zone rows only, and zero pins is CORRECT there.")
+        else
+            line("  the pool is EMPTY even though AcquirePin was called %d time(s) - the pins are",
+                 MP._pins)
+            line("  being released again, so suspect a second refresh calling RemoveAllData.")
+        end
         return
     end
 
@@ -1011,8 +1096,6 @@ function Probe:MapPOI()
              tostring(firstPin.questID), okAgg and tostring(cnt) or "RAISED")
     end
 
-    -- Both premises are measured rather than reasoned about - whether the pins' anchor frame is
-    -- the object GetCanvas() answers, and what ApplyPinPosition really multiplies by.
     line("5. the two premises behind the offset arithmetic:")
     if firstPin then
         local _, rel = firstPin:GetPoint(1)
@@ -1147,11 +1230,17 @@ function Probe:MapPOI()
         local pinParent = (firstPin.GetParent and firstPin:GetParent()) or canvas
         local okKids, kidErr = pcall(function()
             local kids = { pinParent:GetChildren() }
-            local over, overShown = 0, 0
+            local over, overShown, ours = 0, 0, 0
             for i = 1, #kids do
                 local k = kids[i]
                 local lvl = (k.GetFrameLevel and k:GetFrameLevel()) or -1
-                if lvl >= pinLevel then
+                -- EQ's own pins all sit at the same forced level, so counting them here reported
+                -- "something IS above them" for a map covered in nothing but our own pins.
+                -- Keyed on eqPin, not eqWantedLevel, which is nil wherever EQ defers to the
+                -- client and would leave this whole exclusion dead on retail.
+                if lvl >= pinLevel and k.eqPin then
+                    ours = ours + 1
+                elseif lvl >= pinLevel then
                     over = over + 1
                     local vis = k.IsShown and k:IsShown()
                     if vis then overShown = overShown + 1 end
@@ -1165,9 +1254,10 @@ function Probe:MapPOI()
                     end
                 end
             end
-            line("     %d of %d sibling frame(s) under %s sit at or above level %d, %d shown",
+            line("     %d of %d sibling frame(s) under %s sit at or above level %d, %d shown"
+                 .. "  (EQ's own pins excluded: %d)",
                  over, #kids, (pinParent.GetName and pinParent:GetName()) or "unnamed",
-                 pinLevel, overShown)
+                 pinLevel, overShown, ours)
             if overShown == 0 then
                 line("     nothing shown above the pins among their own siblings. That does not")
                 line("     rule out a cover from a higher strata elsewhere, only from here.")
@@ -1220,8 +1310,6 @@ function Probe:MapPOI()
         if nowMatch == checked and checked > 0 then
             line("  every pin is where the data says it should be. Nothing to fix here.")
         elseif moved == 0 then
-            -- Do not blame ApplyPinPosition here - section 5 measures it directly. If pins fail
-            -- this check, suspect the comparison first.
             line("  re-applying moved nothing, so the anchors were already settled. If some")
             line("  pins read NOT A STORED POINT, check section 5's direct ApplyPinPosition")
             line("  reading BEFORE suspecting the placement - the comparison has been the bug")
@@ -1499,6 +1587,23 @@ local TEMPLATES = {
 function Probe:UI()
     out("font objects and frame templates")
 
+    -- EQ renders every countdown through these rather than a hardcoded d/h/m, so what the client
+    -- carries IS what a player sees. Korean spells them out as words, which is why the old
+    -- hardcoded letters were unreadable there.
+    line("0. the client's own time abbreviations, and what EQ renders from them:")
+    for _, name in ipairs({ "DAY_ONELETTER_ABBR", "HOUR_ONELETTER_ABBR",
+                            "MINUTE_ONELETTER_ABBR", "SECOND_ONELETTER_ABBR" }) do
+        line("  %-22s %s", name, val(resolve(name)))
+    end
+    local U = ns.Util
+    if U and U.WQTimeShort then
+        line("  WQTimeShort  2 days=%q  5 hours=%q  30 mins=%q",
+             U.WQTimeShort(2880), U.WQTimeShort(300), U.WQTimeShort(30))
+        line("  WQTimeLong   90 mins=%q     FmtDuration 3725s=%q",
+             U.WQTimeLong(90), U.FmtDuration(3725))
+        line("  A bare number with no unit means the global was missing AND the fallback ran.")
+    end
+
     local host = CreateFrame("Frame")
     host:Hide()
 
@@ -1541,7 +1646,7 @@ function Probe:Misc()
     end
 
     local addons = {}
-    for _, name in ipairs({ "EQObjectiveTracker", "Questie", "TomTom", "ElvUI" }) do
+    for _, name in ipairs({ "EQObjectiveTracker", "TomTom", "ElvUI" }) do
         addons[#addons + 1] = ("%s=%s"):format(name, tostring(_G[name] ~= nil))
     end
     line("globals: %s", table.concat(addons, "  "))
@@ -1621,16 +1726,18 @@ function Probe:Minimap()
                  HBD.GetWorldCoordinatesFromZone, HBD, 0.5, 0.5, here)
     end
 
-    -- The same 1411-1459 block section pins validates against C_Map, asked of HBD instead. HBD
+    -- The same map ids section pins validates against C_Map, asked of HBD instead. HBD
     -- converting them is a separate question from whether the client names them.
-    line("5. the dataset's map block, 1411-1459, through HereBeDragons:")
-    if HBD and HBD.GetWorldCoordinatesFromZone then
+    local mapIDs = coordMapIDs()
+    line("5. the dataset's own map ids (%d), through HereBeDragons: %s",
+         #mapIDs, mapBlocks(mapIDs))
+    if HBD and HBD.GetWorldCoordinatesFromZone and #mapIDs > 0 then
         local okIDs, badIDs = 0, {}
-        for id = 1411, 1459 do
-            local x = HBD:GetWorldCoordinatesFromZone(0.5, 0.5, id)
-            if x then okIDs = okIDs + 1 else badIDs[#badIDs + 1] = tostring(id) end
+        for i = 1, #mapIDs do
+            local x = HBD:GetWorldCoordinatesFromZone(0.5, 0.5, mapIDs[i])
+            if x then okIDs = okIDs + 1 else badIDs[#badIDs + 1] = tostring(mapIDs[i]) end
         end
-        line("  convertible: %d of 49", okIDs)
+        line("  convertible: %d of %d", okIDs, #mapIDs)
         if #badIDs > 0 then
             line("  NOT convertible - every quest whose spawns land here gets no minimap pin:")
             emit(badIDs, 8)
@@ -1688,8 +1795,269 @@ function Probe:Media()
     line("  Magenta visible but EQ art not = the file is the problem, not the drawing.")
 end
 
+-- Quests you have not accepted. Nothing on screen can tell "this character cannot take that
+-- quest" apart from "the gate that would have decided it never ran", so every gate reports
+-- separately whether it was ABLE to run, and the rejections are counted by reason.
+function Probe:Available()
+    out("available quest pins")
+
+    line("1. EQ's module and its data:")
+    local A = ns:GetSubsystem("AvailableQuests")
+    if not A then
+        line("  AvailableQuests subsystem ABSENT - Modules/MapPOI/Available.lua is not listed by")
+        line("  this TOC. On retail that is correct: Blizzard draws its own available markers.")
+        return
+    end
+    local D = ns.CLASSIC_QUEST_AVAILABLE
+    if not D then
+        line("  the module is loaded but ns.CLASSIC_QUEST_AVAILABLE is NIL - the data file is")
+        line("  not listed by this TOC, so nothing can be drawn")
+        return
+    end
+    -- countKeys answers the string "n/a" for a non-table, so these are %s rather than %d
+    line("  quests with a start point=%s  with names=%s", countKeys(D.start), countKeys(D.names))
+    line("  gate rows: pre=%s preAll=%s excl=%s chain=%s parent=%s minRep=%s",
+         countKeys(D.pre), countKeys(D.preAll), countKeys(D.excl),
+         countKeys(D.chain), countKeys(D.parent), countKeys(D.minRep))
+
+    line("2. this character, as the gates read it:")
+    -- Read through the same calls the module uses, not restated, so a wrong reading here is the
+    -- same wrong reading the pins get.
+    local raceName, raceToken, raceID = UnitRace("player")
+    local className, classToken, classID = UnitClass("player")
+    line("  level=%s  race=%s/%s/%s  class=%s/%s/%s",
+         tostring(UnitLevel("player")),
+         tostring(raceName), tostring(raceToken), tostring(raceID),
+         tostring(className), tostring(classToken), tostring(classID))
+    if type(raceID) ~= "number" or type(classID) ~= "number" then
+        line("  one of the numeric ids is missing, so the module falls back to the token table.")
+        line("  If BOTH routes miss, it draws nothing rather than offering the other faction's quests.")
+    end
+
+    line("3. the gates that need a live client call:")
+    -- GetQuestsCompleted answers a SET, so # finds a border of 0 and says nothing
+    local completed = {}
+    if type(_G.GetQuestsCompleted) == "function" then
+        pcall(_G.GetQuestsCompleted, completed)
+        line("  GetQuestsCompleted: present, %s completed quest(s)", countKeys(completed))
+    else
+        line("  GetQuestsCompleted: ABSENT - falls back to IsQuestFlaggedCompleted per quest")
+    end
+    local green = resolve("GetQuestGreenRange")
+    if green then
+        local ok, r = pcall(green, "player")
+        line("  GetQuestGreenRange: present, returns %s -> quests below level %s are hidden",
+             tostring(ok and r), tostring(ok and type(r) == "number" and (UnitLevel("player") - r)))
+    else
+        line("  GetQuestGreenRange: ABSENT - the low level filter cannot judge, so it hides NOTHING")
+    end
+    local repByID = resolve("GetFactionInfoByID")
+    line("  reputation: C_Reputation.GetFactionDataByID=%s  GetFactionInfoByID=%s",
+         (C_Reputation and type(C_Reputation.GetFactionDataByID) == "function") and "present" or "absent",
+         repByID and "present" or "absent")
+    line("  A reputation gate that cannot be read shows the quest rather than hiding it.")
+    line("  requiredSkill is SHIPPED but never enforced - no reliable skill id lookup here.")
+
+    line("4. the last pass:")
+    -- The pass is lazy, so on a cold run these counters are still at zero and would read as
+    -- "every quest was ruled out" rather than "nothing has been computed yet".
+    A:All()
+    line("  stage=%q  quests considered=%s  AVAILABLE=%s",
+         tostring(A._stage), tostring(A._resolved), tostring(A._availableN))
+    line("  gates that actually ran: raceClass=%s trivial=%s reputation=%s",
+         tostring(A._gatesRun.raceClass), tostring(A._gatesRun.trivial),
+         tostring(A._gatesRun.reputation))
+    local reasons = {}
+    for why, n in pairs(A._reason) do reasons[#reasons + 1] = ("%s=%d"):format(why, n) end
+    table.sort(reasons)
+    line("  ruled out by: %s", #reasons > 0 and table.concat(reasons, "  ") or "nothing")
+
+    line("5. on the map the player is standing in:")
+    local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    if not mapID then
+        line("  no map for the player")
+        return
+    end
+    local n = A:PointsFor(mapID)
+    local totalQuests = 0
+    for i = 1, n do totalQuests = totalQuests + #A._locQuests[i] end
+    line("  mapID=%s  pins=%d  quests behind them=%d", tostring(mapID), n, totalQuests)
+    line("  Pins are merged BY LOCATION, so more quests than pins is correct - one giver with")
+    line("  several quests is one pin. Equal counts everywhere means the merge is not running.")
+    -- A category filter that is ON but whose table never loaded reads exactly like a filter that
+    -- matched nothing, and the two have completely different causes.
+    line("  category table loaded=%s  quests in it=%s",
+         tostring(ns.CLASSIC_QUEST_CATEGORY ~= nil), tostring(countKeys(ns.CLASSIC_QUEST_CATEGORY)))
+    do
+        local DB = ns:GetSubsystem("DB")
+        local map = DB and DB.db.profile.map
+        line("  filters: dungeon/raid=%s repeatable=%s profession=%s",
+             tostring(map and map.hideDungeonQuests == true),
+             tostring(map and map.hideRepeatableQuests == true),
+             tostring(map and map.hideProfessionQuests == true))
+    end
+    line("6. what the WORLD MAP last drew, which is a different question:")
+    local P = ns:GetSubsystem("MapPOIProvider")
+    if not P then
+        line("  MapPOIProvider subsystem ABSENT")
+        return
+    end
+    -- Section 5 asks the producer directly and always answers. This asks what was last DRAWN,
+    -- and _DoRefresh returns before drawing anything when the map is closed. Reporting the two
+    -- as one number made a shut map read as a draw bug.
+    line("  last stage=%q  mapID=%s  available=%s of %s pin(s)",
+         tostring(P._stage), tostring(P._mapID),
+         tostring(P._availPins), tostring(P._pins))
+    -- The stage string alone. _mapID is nil for every early return, so including it here claimed
+    -- a shut map for "provider has no canvas" and "canvas has no mapID" too.
+    if P._stage == "world map not shown" then
+        line("  The world map was CLOSED, so 0 pins and mapID=nil are the correct readings here")
+        line("  and say nothing about drawing. Open the world map on a ZONE map, then rerun.")
+    elseif P._mapID == nil and P._stage ~= "ran" then
+        line("  The refresh returned early at the stage above, so these numbers say nothing")
+        line("  about drawing. That stage is the thing to explain, not the pin count.")
+    elseif not (WorldMapFrame and WorldMapFrame:IsShown()) then
+        line("  The world map is closed NOW, so these are the numbers from when it last was.")
+    end
+end
+
+-- MUTATES: it moves the selected quest log entry and puts it back. Run it with the Blizzard
+-- quest log CLOSED.
+function Probe:XP()
+    out("quest reward XP - does the argument mean anything on this flavor")
+
+    line("1. what exists at all:")
+    present({
+        "GetQuestLogRewardXP", "GetQuestLogRewardMoney", "GetNumQuestLogRewards",
+        "SelectQuestLogEntry", "GetQuestLogSelection",
+        "C_QuestLog.SetSelectedQuest", "C_QuestLog.GetSelectedQuest",
+        "C_QuestLog.GetQuestRewardXP", "GetQuestLogRewardTitle",
+    })
+
+    -- Index AND questID, because the selection is set by INDEX while EQ's call passes an ID.
+    -- collectQuests answers ids only, so the walk is repeated here rather than guessed at.
+    local rows = {}
+    local flatTitle = resolve("GetQuestLogTitle")
+    local getInfo   = resolve("C_QuestLog.GetInfo")
+    for i = 1, MAX_LOG_SCAN do
+        local idx, qid, title
+        if type(flatTitle) == "function" then
+            local ok, t1, _, _, isHeader, _, _, _, questID = pcall(flatTitle, i)
+            if not ok or t1 == nil then break end
+            if not isHeader and questID and questID ~= 0 then idx, qid, title = i, questID, t1 end
+        elseif type(getInfo) == "function" then
+            local ok, info = pcall(getInfo, i)
+            if not ok or type(info) ~= "table" then break end
+            if not info.isHeader and info.questID and info.questID ~= 0 then
+                idx, qid, title = i, info.questID, info.title
+            end
+        else
+            break
+        end
+        if idx then
+            rows[#rows + 1] = { idx = idx, qid = qid, title = title }
+            if #rows >= 2 then break end
+        end
+    end
+
+    line("2. the two quest log rows this test uses:")
+    for i = 1, #rows do
+        line("  index %s  questID %s  %q", tostring(rows[i].idx), tostring(rows[i].qid),
+             tostring(rows[i].title))
+    end
+    if #rows < 2 then
+        line("  NEED TWO quests in the log to tell the two shapes apart. Pick up another and rerun.")
+        return
+    end
+
+    local xpFn     = resolve("GetQuestLogRewardXP")
+    local moneyFn  = resolve("GetQuestLogRewardMoney")
+    local selectFn = resolve("SelectQuestLogEntry")
+    local getSel   = resolve("GetQuestLogSelection")
+    if type(xpFn) ~= "function" then
+        line("GetQuestLogRewardXP is ABSENT - nothing below can be measured on this flavor.")
+        return
+    end
+
+    -- Asking twice, once for the number and once for the text, would double every reading against
+    -- the API under test, and the two calls could disagree.
+    local function ask(...)
+        local n, packed = countAndPack(pcall(xpFn, ...))
+        if not packed[1] then return nil, ("RAISED %s"):format(tostring(packed[2])) end
+        return packed[2], ("%d value(s), [1]=%s"):format(n - 1, val(packed[2]))
+    end
+
+    local before = nil
+    if type(getSel) == "function" then
+        local ok, sel = pcall(getSel)
+        if ok then before = sel end
+    end
+    line("  selection before the test: %s", tostring(before))
+
+    line("3. WITHOUT touching the selection:")
+    local a0, a0Text = ask(rows[1].qid)
+    line("  GetQuestLogRewardXP(%d) -> %s", rows[1].qid, a0Text)
+    local b0, b0Text = ask(rows[2].qid)
+    line("  GetQuestLogRewardXP(%d) -> %s", rows[2].qid, b0Text)
+    local _, n0Text = ask()
+    line("  GetQuestLogRewardXP()   -> %s", n0Text)
+
+    local a1, b1, aNo, bNo
+    if type(selectFn) == "function" then
+        line("4. WITH the selection moved to each quest in turn:")
+        pcall(selectFn, rows[1].idx)
+        local aText, aNoText
+        a1, aText = ask(rows[1].qid)
+        aNo, aNoText = ask()
+        line("  selected index %d: with id -> %s", rows[1].idx, aText)
+        line("                     no arg  -> %s", aNoText)
+        pcall(selectFn, rows[2].idx)
+        local bText, bNoText
+        b1, bText = ask(rows[2].qid)
+        bNo, bNoText = ask()
+        line("  selected index %d: with id -> %s", rows[2].idx, bText)
+        line("                     no arg  -> %s", bNoText)
+        if before then
+            pcall(selectFn, before)
+            line("  selection restored to %s", tostring(before))
+        else
+            line("  selection was NOT restored - GetQuestLogSelection gave nothing to restore to")
+        end
+    else
+        line("4. SelectQuestLogEntry is ABSENT, so the selection half cannot be tested here.")
+    end
+
+    dumpCall("  GetQuestLogRewardMoney(first questID)", moneyFn, rows[1].qid)
+
+    -- Every number above is printed raw, so this reading can be checked rather than trusted.
+    line("5. what that means:")
+    -- Three equal answers is what an argument-honouring client returns when the two quests award
+    -- the same XP, and is every reading at max level, so it is not on its own a verdict. The
+    -- chain below is the discriminator: only a moving selection proves the argument is ignored.
+    if a0 ~= nil and b0 ~= nil and a0 ~= b0 then
+        line("  the ARGUMENT is respected - two ids gave %s and %s with no selection change.",
+             tostring(a0), tostring(b0))
+        line("  Core/QuestRewards.lua's GetQuestLogRewardXP(questID) is correct on this flavor.")
+    elseif aNo ~= nil and bNo ~= nil and aNo ~= bNo then
+        line("  the SELECTION drives it - the no-arg call answered %s then %s as the selection moved.",
+             tostring(aNo), tostring(bNo))
+        line("  Passing a questID is meaningless here. Reading XP costs a SelectQuestLogEntry,")
+        line("  which moves the player's own quest log, so it must be saved and restored.")
+    elseif a0 == 0 and b0 == 0 and (aNo == 0 or aNo == nil) then
+        line("  everything answered 0. At MAX LEVEL a quest awards no XP, so this is expected")
+        line("  there and says nothing about the signature. Rerun below max level.")
+    else
+        line("  INCONCLUSIVE. The two quests may simply award the same XP (%s vs %s).",
+             tostring(a0), tostring(b0))
+        line("  Rerun with two quests of clearly different levels.")
+    end
+    line("  a1/b1 with id under matching selection: %s / %s", tostring(a1), tostring(b1))
+end
+
 local SECTIONS = {
     media   = Probe.Media,
+    xp      = Probe.XP,
+    available = Probe.Available,
     map     = Probe.Map,
     poi     = Probe.POI,
     pins    = Probe.Pins,
@@ -1728,17 +2096,18 @@ function Probe:Run(msg)
         return
     end
     if which ~= "" then
-        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, flare, quest, port, tooltip, events, ui, misc, or none for all",
+        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, available, flare, quest, port, tooltip, xp, events, ui, misc, or none for all",
             which)
         return
     end
     out("EQ %s - full flavor probe", tostring(ns.VERSION))
-    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "quest", "events", "ui" }) do
+    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "available", "quest", "events", "ui" }) do
         runSection(self, name, SECTIONS[name])
     end
-    -- tooltip, mappoi and flare are left out on purpose. Each needs setup first, so a blind run
-    -- would report the missing setup as a missing capability, and flare also mutates live pins.
-    out("run /eqsprobe tooltip separately with a quest mob targeted, and /eqsprobe mappoi with the world map OPEN")
+    -- tooltip, mappoi, flare and xp are left out on purpose. Each needs setup first, so a blind
+    -- run would report the missing setup as a missing capability. flare mutates live pins, and
+    -- xp mutates the selected quest log entry.
+    out("run /eqsprobe tooltip separately with a quest mob targeted, /eqsprobe mappoi with the world map OPEN, and /eqsprobe xp with TWO quests in the log")
 end
 
 SLASH_EQSPROBE1 = "/eqsprobe"

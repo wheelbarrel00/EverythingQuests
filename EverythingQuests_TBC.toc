@@ -1,6 +1,6 @@
-## Interface: 11509
+## Interface: 20506
 ## Title: Everything Quests
-## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Classic Era support is limited and growing - see the What's New notice.
+## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Burning Crusade Classic support is limited and growing - see the What's New notice.
 ## Author: Wheelbarrel00
 ## Version: 1.41.0
 ## Dependencies: EQObjectiveTracker
@@ -9,11 +9,15 @@
 ## IconTexture: Interface\AddOns\EverythingQuests\Media\Textures\eq-logo-v3
 ## X-Curse-Project-ID: 1544648
 
+# This file mirrors EverythingQuests_Vanilla.toc module for module. Era 1.15.9 and TBC 2.5.6
+# were measured identical across every game API this addon reads, so the only differences are
+# the interface number and the six Data files, which carry TBC quest data rather than Era.
+
 # Every file the retail TOC lists and this one does not is declared below with
 # '# check-toc: omit'. The gate errors on a stale directive, so an omission cannot rot into a
 # silent hole.
 
-# Retail-only subsystems. C_QuestLine and C_CampaignInfo do not exist on Era, and the authored
+# Retail-only subsystems. C_QuestLine and C_CampaignInfo do not exist on TBC, and the authored
 # chain data is Midnight content, so the Chain Guide has neither an API nor anything to show.
 # check-toc: omit Modules/ChainGuide/Frame.lua
 # check-toc: omit Modules/ChainGuide/Database.lua
@@ -40,8 +44,8 @@
 # check-toc: omit Data/QuestChains/_Overlays_Revelations.lua
 # check-toc: omit Data/QuestChains/_Overlays_Val.lua
 
-# World quests do not exist in Classic content. The C_TaskQuest names are present on Era and
-# answer nothing, which is why the gate here is the TOC rather than a capability check.
+# World quests do not exist in TBC content. The C_TaskQuest names are present and answer
+# nothing, which is why the gate here is the TOC rather than a capability check.
 # check-toc: omit Modules/WorldQuests/Rewards.lua
 # check-toc: omit Modules/WorldQuests/Tooltip.lua
 # check-toc: omit Modules/WorldQuests/Pin.lua
@@ -78,7 +82,7 @@
 
 # AceDB is for Core/DB.lua, and it needs CallbackHandler. LibMapPinHandler reads
 # MapCanvasMixin at FILE SCOPE, which is safe here only because /eqsprobe pins measured that
-# as a table on Era.
+# as a table on TBC.
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 Libs\AceDB-3.0\AceDB-3.0.xml
@@ -92,8 +96,7 @@ Libs\LibMapPinHandler\LibMapPinHandler.lua
 
 # HereBeDragons backs the minimap objective pins. HBD-2.0 needs CallbackHandler, listed above,
 # and HBD-Pins needs HBD-2.0, so this pair's order is load bearing. Both read WorldMapFrame and
-# MapCanvasDataProviderMixin at FILE SCOPE, which is safe here for the same reason
-# LibMapPinHandler is - /eqsprobe pins measured that stack present on Era.
+# MapCanvasDataProviderMixin at FILE SCOPE.
 # Deliberately absent from the retail TOC - see the flavor-only directive there for why.
 Libs\HereBeDragons\HereBeDragons-2.0.lua
 Libs\HereBeDragons\HereBeDragons-Pins-2.0.lua
@@ -134,8 +137,9 @@ Modules\MapPOI\Provider.lua
 # so its position relative to the Data block below does not matter.
 Modules\MapPOI\Available.lua
 
-# Measured working on Era: QuestAuto is 18 of 18 APIs and registers only events Classic knows,
-# Minimap calls no quest API at all, and EQOT's API module resolves for TrackerBridge.
+# Measured working on Era, and TBC reads identically: QuestAuto is 18 of 18 APIs and registers
+# only events this client knows, Minimap calls no quest API at all, and EQOT's API module
+# resolves for TrackerBridge.
 Modules\Minimap\Minimap.lua
 Modules\TrackerBridge.lua
 Modules\QuestAuto.lua
@@ -154,34 +158,36 @@ Options\Frame.lua
 Options\TabGeneral.lua
 Options\TabAbout.lua
 
-# The Era quest coordinate table. The TBC TOC lists its own Data\QuestCoords_TBC.lua instead,
-# which defines the SAME global - one flavor's set per TOC, never both, or whichever loaded
-# second would silently win.
-Data\QuestCoords_Classic.lua
+# The six Data files below are the TBC dataset and define exactly the same globals as the Era
+# files the Vanilla TOC lists. They are ALTERNATIVES to those, never companions - one flavor's
+# set per TOC, or whichever loaded second would silently win. TBC quest data is a superset of
+# Era's, so it covers the vanilla zones as well as Outland and the Blood Elf and Draenei
+# starting zones, which Era data has nothing for.
+Data\QuestCoords_TBC.lua
 
 # The objective spawn map - every clustered location a quest can be advanced at. Defines
 # ns.CLASSIC_QUEST_SPAWNS, a different global from the file above, so the two are a pair
 # rather than alternatives.
-Data\QuestSpawns_Classic.lua
+Data\QuestSpawns_TBC.lua
 
 # Where each quest is HANDED IN. The table above answers where a quest is ADVANCED, and the
 # single point in QuestCoords is the OBJECTIVE for any quest that has one, so neither of them
 # can place a finished quest's pin. Defines ns.CLASSIC_QUEST_TURNIN.
-Data\QuestTurnIn_Classic.lua
+Data\QuestTurnIn_TBC.lua
 
 # questID -> the creatures that advance it. Nameplates inverts this to creature -> quest at
 # runtime over the quest log only, so nothing here is searched during play.
-Data\QuestNPCs_Classic.lua
+Data\QuestNPCs_TBC.lua
 
 # Where each quest can be PICKED UP, plus the level, race, class, prerequisite and chain gates
 # that decide whether this character may pick it up. Defines its own global, so it is a companion
 # to the three tables above rather than an alternative to any of them.
-Data\QuestAvailable_Classic.lua
+Data\QuestAvailable_TBC.lua
 
 # What KIND of quest each one is - dungeon or raid, repeatable, world event, class, profession -
 # so the map can filter by category. Derived from the dump, because the client's own
 # GetQuestTagInfo answers only for quests it already knows.
-Data\QuestCategory_Classic.lua
+Data\QuestCategory_TBC.lua
 
 # Reads ns.Util.color at FILE SCOPE and opens the options window, so it follows both.
 Modules\WhatsNew.lua

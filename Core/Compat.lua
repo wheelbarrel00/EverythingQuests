@@ -45,11 +45,15 @@ end
 
 -- Classic has no C_QuestLog.GetInfo, so this flat global is its only row source. Positions
 -- 1, 4, 6 and 8 are measured live - the 1.12 layout wikis label "Classic Era" is wrong here.
+-- Position 2 is taken from the same modern layout those four confirm. It is NOT self checking:
+-- positions 3, 7, 8 and 10 are numbers too, so an off by one renders a confident wrong level.
+-- Confirm it with /eqsprobe port section 1b before trusting it.
 local function flatRow(i)
-    local title, _, _, isHeader, _, isComplete, _, questID = _G.GetQuestLogTitle(i)
+    local title, level, _, isHeader, _, isComplete, _, questID = _G.GetQuestLogTitle(i)
     if title == nil then return nil end
     return {
         title      = title,
+        level      = type(level) == "number" and level or nil,
         isHeader   = isHeader and true or false,
         questID    = questID,
         isComplete = isComplete,
@@ -104,4 +108,56 @@ function Compat.CompletedQuestIDs(out)
 
     table.sort(out)
     return out, n
+end
+
+-- MEASURED on Era: GetQuestLogRewardXP IGNORES its argument and reports whatever quest log
+-- entry is SELECTED. Existence is identical on both flavors, so the split cannot be a Has flag.
+function Compat.RewardXPNeedsSelection()
+    return type(_G.C_QuestLog) ~= "table" or type(_G.C_QuestLog.GetInfo) ~= "function"
+end
+
+-- NEVER call this from a mouseover. Each answer costs a SelectQuestLogEntry on Classic, which
+-- moves the player's own quest log, so only rows missing from out are asked about.
+function Compat.CollectRewardXP(rows, last, out)
+    local getXP = _G.GetQuestLogRewardXP
+    if type(getXP) ~= "function" then return false end
+
+    local function want(info)
+        return info and not info.isHeader and info.questID and out[info.questID] == nil
+    end
+
+    if not Compat.RewardXPNeedsSelection() then
+        for i = 1, last do
+            local info = rows[i]
+            if want(info) then
+                local ok, xp = pcall(getXP, info.questID)
+                if ok and type(xp) == "number" then out[info.questID] = xp end
+            end
+        end
+        return true
+    end
+
+    local selectEntry = _G.SelectQuestLogEntry
+    if type(selectEntry) ~= "function" then return false end
+
+    local before
+    if type(_G.GetQuestLogSelection) == "function" then
+        local ok, sel = pcall(_G.GetQuestLogSelection)
+        if ok then before = sel end
+    end
+
+    local moved = false
+    for i = 1, last do
+        local info = rows[i]
+        if want(info) and pcall(selectEntry, i) then
+            moved = true
+            local ok, xp = pcall(getXP)
+            if ok and type(xp) == "number" then out[info.questID] = xp end
+        end
+    end
+
+    -- Restored even when a row raised, or the quest log is left pointing somewhere the player
+    -- did not put it.
+    if moved and before then pcall(selectEntry, before) end
+    return true
 end

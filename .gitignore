@@ -27,11 +27,8 @@ docs/
 __pycache__/
 *.pyc
 
-# The TBC TOC is still a probe scaffold - it loads Core/Init.lua and Core/FlavorProbe.lua and
-# nothing else. The packager derives a CurseForge game version from every TOC it packages, so
-# committing this would advertise TBC support for an addon that only runs a probe there.
-# DELETE THIS LINE when it lists a real, tested addon and that claim is one we can stand behind.
-#
-# EverythingQuests_Vanilla.toc is tracked as of v1.39.0. Classic Era support is limited but
-# real and tested in game, and the TOC declares every omission rather than claiming coverage.
-EverythingQuests_TBC.toc
+# EverythingQuests_Vanilla.toc is tracked as of v1.39.0 and EverythingQuests_TBC.toc as of
+# v1.41.0. Both flavors are limited but real and tested in game, and each TOC declares every
+# omission rather than claiming coverage. Nothing here is ignored any more - the packager
+# derives a CurseForge game version from every TOC it packages, and both claims are ones we
+# can stand behind.
