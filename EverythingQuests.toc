@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Unified replacement for the Blizzard quest experience - world map overlays, nameplate quest icons, quest history, and a Midnight chain guide. The objective tracker installs alongside it as EQ Objective Tracker.
 ## Author: Wheelbarrel00
-## Version: 1.41.0
+## Version: 1.42.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -33,6 +33,7 @@ Locales\enUS.lua
 Locales\frFR.lua
 Locales\ruRU.lua
 Locales\koKR.lua
+Locales\zhCN.lua
 
 Core\DB.lua
 Core\Events.lua
@@ -131,6 +132,12 @@ Modules\History\Session.lua
 # Modules\MapPOI\Available.lua is the only consumer of that table. Listed by the flavor TOCs only
 # for the same reason, and it self-gates on the table's presence as well.
 # check-toc: flavor-only Modules/MapPOI/Available.lua
+
+# The Quest Browser looks a quest up in the tables above, which is the only place that answer
+# exists on Classic. Retail can already open any quest in Blizzard's own quest log and map, so
+# there is nothing here for it to add and no data for it to read.
+# check-toc: flavor-only Modules/QuestBrowser/Data.lua
+# check-toc: flavor-only Modules/QuestBrowser/Frame.lua
 
 # The six files below are the TBC dataset. They define exactly the same globals as the six
 # _Classic files above and are ALTERNATIVES to them, never companions - EverythingQuests_TBC.toc

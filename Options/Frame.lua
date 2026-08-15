@@ -60,7 +60,7 @@ function Options:Build()
 
     f.version = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.version:SetPoint("TOPRIGHT", -34, -14)
-    f.version:SetText("v" .. (ns.VERSION or "1.41.0"))
+    f.version:SetText("v" .. (ns.VERSION or "1.42.0"))
     f.version:SetTextColor(unpack(YELLOW))
 
     f.discord = CreateFrame("Button", nil, f)
@@ -820,6 +820,14 @@ local function eqSlashHandler(msg)
     elseif msg == "history" then
         local HF = ns:GetSubsystem("HistoryFrame")
         if HF and HF.Toggle then HF:Toggle() end
+        return
+    elseif msg == "quests" or msg:match("^quests%s") then
+        local QB = ns:GetSubsystem("QuestBrowser")
+        if not (QB and QB.Available and QB:Available()) then
+            print(L["|cffEBB706EQ|r: the quest browser needs the Classic quest data, which this version of the game does not load."])
+            return
+        end
+        QB:Search(msg:match("^quests%s+(.+)$"))
         return
     elseif msg == "session" then
         local Sess = ns:GetSubsystem("Session")

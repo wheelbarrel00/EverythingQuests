@@ -44,8 +44,9 @@ Era and TBC were measured identical across every game API the addon reads, so on
 - **Objective kind icons** — kill, loot, or interact — and dungeon objectives marked at the dungeon entrance
 - **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites and completion
 - **Nameplate quest icons**, resolved from the creature ID in the unit GUID, since a Classic unit tooltip carries no quest data
+- **The Quest Browser** — look up almost any quest in the game, including ones never picked up, with its level, race and class requirements, start and turn-in locations, prerequisites, and the reason it is not available yet. `/eqs quests`, or right-click a gold marker
 - **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, the **focus arrow**, and the **`/eqs`** options window (General and About tabs)
-- All four bundled locales
+- All five bundled locales
 
 **Retail-only**
 
@@ -330,6 +331,7 @@ Everything Quests ships bundled translations — on a matching game client the i
 - **French (frFR)** — by **Zox**
 - **Russian (ruRU)** — by **Malevi4**
 - **Korean (koKR)** — by **labrie75**
+- **Simplified Chinese (zhCN)**
 
 Translations for Everything Quests and EQ Objective Tracker are maintained together in **[EverythingLocales](https://github.com/wheelbarrel00/EverythingLocales)**. The `Locales/` files in this repo are generated from it, so translation pull requests belong there rather than here. Contributions for more languages are very welcome.
 

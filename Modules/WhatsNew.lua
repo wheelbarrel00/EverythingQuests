@@ -3,35 +3,26 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.41.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.41.0"
+local FEATURE_POPUP_VERSION = "1.42.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.42.0"
 
 local POPUP_BODY = [[
-|cffEBB706Everything Quests now runs on Burning Crusade Classic|r
-Everything that works on |cffffffffClassic Era|r works on |cffffffffTBC|r as well, with its own quest database covering |cffffffffOutland|r and the |cffffffffBlood Elf|r and |cffffffffDraenei|r starting zones as well as the old world. The Chain Guide, the World Quests panel and Quest History stay retail-only, exactly as they do on Era.
+|cffEBB706Classic: look a quest up before you pick it up|r
+The new |cffffffffQuest Browser|r answers the one thing the game itself cannot tell you on Classic: what a quest is, before you have ever accepted it. It covers almost every quest in the game. Search by name or by quest number, or put |cffffffff"quotes"|r around a name for an exact match.
 
-|cffEBB706Classic: markers for quests you can pick up|r
-Every quest giver holding something for you now gets a gold |cffffffff!|r on the map, filtered by your level, race, class and the quests you have already finished. One marker covers a whole quest giver, so hovering it lists everything that giver offers rather than stacking a marker per quest.
+Each quest shows its level, its race and class requirements, where it starts, where its objectives are, where it is handed in, what has to be finished before it, and if you cannot take it yet, |cffffffffthe reason why|r.
 
-|cffEBB706Classic: a finished quest points at who takes it|r
-Turning a quest in used to send you back to the field you farmed it in. Everything Quests now marks the person who actually takes it, on every map where it can be handed in. This was wrong for |cffffffff475|r quests that hand in somewhere other than where their objective is.
+|cffEBB706Three ways in|r
+Type |cffffffff/eqs quests|r, use the button under |cffffffff/eqs|r > General, or |cffffffffright-click|r a gold quest marker on the map. That right-click did nothing before, because a quest you have not accepted has no quest log entry to open.
 
-Items you |cffffffffbuy|r are also marked now, at the merchants who sell them, which gives 21 quests their first useful marker.
+|cffEBB706It is clickable throughout|r
+Clicking a location opens the map there and drops a waypoint on it. Clicking a listed prerequisite or follow-up jumps to that quest, so you can walk most chains without typing anything.
 
-|cffEBB706Classic: the tracker's focused quest gets an arrow|r
-Clicking a quest's icon in |cffffffffEQ Objective Tracker|r drops a TomTom arrow on it, and clicking it again clears it. Classic has no in-game waypoint of its own, so the tracker announces the focus and Everything Quests places the arrow from its own database. Map markers and the tracker share one arrow, so using both retargets instead of leaving two behind.
-
-|cffEBB706A Map section in the options|r
-|cffffffff/eqs|r > General has a new Map section holding the marker ring toggles, plus filters that leave dungeon and raid quests, repeatable quests or profession quests off the map. Those filters only touch quests you have |cffffffffnot|r picked up yet, because hiding one you are already carrying would make the map lie about what you still have to do.
-
-|cffEBB706One change worth knowing about|r
-On both Classic versions the red ring behind quest markers now starts |cffffffffswitched off|r. A single zone there can draw hundreds of markers and the rings crowd each other, and the icons still tell the states apart on their own. Retail is unchanged. If you want the ring back, it is a checkbox under |cffffffff/eqs|r > General > Map.
-
-|cffEBB706Everywhere|r
-Countdown timers now use your own language's abbreviations, taken from the game client rather than hardcoded English. Quest markers show the quest level and its experience reward in the tooltip. The options window opens at the left edge of the screen instead of landing on top of the tracker's own options window.
+|cffEBB706Simplified Chinese|r
+Everything Quests now ships |cffffffffzhCN|r translations alongside French, Russian and Korean. French and Russian are complete again, covering everything added in this release.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian) and |cfffffffflabrie75|r (Korean) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
+Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian) and |cfffffffflabrie75|r (Korean) for keeping Everything Quests translated, to the contributor who brought Simplified Chinese over Discord, and to everyone who sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]
@@ -112,9 +103,19 @@ function WN:Build()
     f.title:SetText(POPUP_TITLE)
     f.title:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
 
+    -- The bottom of the window is three stacked rows, and the scroll region has to clear all of
+    -- them. Derived from the row heights rather than written as one more independent number,
+    -- because that is what let the checkbox drift on top of the last line of text.
+    local BUTTON_ROW_Y  = 12
+    local BUTTON_H      = 28
+    local CHECK_H       = 22
+    local ROW_GAP       = 6
+    local CHECK_ROW_Y   = BUTTON_ROW_Y + BUTTON_H + ROW_GAP
+    local SCROLL_BOTTOM = CHECK_ROW_Y + CHECK_H + ROW_GAP
+
     local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT",     14, -44)
-    scroll:SetPoint("BOTTOMRIGHT", -34, 50)
+    scroll:SetPoint("BOTTOMRIGHT", -34, SCROLL_BOTTOM)
 
     local body = CreateFrame("Frame", nil, scroll)
     body:SetSize(scroll:GetWidth(), 1)
@@ -135,8 +136,8 @@ function WN:Build()
     end
 
     f.openBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
-    f.openBtn:SetSize(180, 28)
-    f.openBtn:SetPoint("BOTTOMLEFT", 16, 12)
+    f.openBtn:SetSize(180, BUTTON_H)
+    f.openBtn:SetPoint("BOTTOMLEFT", 16, BUTTON_ROW_Y)
     local openBg = f.openBtn:CreateTexture(nil, "BACKGROUND")
     openBg:SetAllPoints()
     openBg:SetColorTexture(0.10, 0.10, 0.10, 0.95)
@@ -151,8 +152,8 @@ function WN:Build()
     end)
 
     f.gotBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
-    f.gotBtn:SetSize(120, 28)
-    f.gotBtn:SetPoint("BOTTOMRIGHT", -16, 12)
+    f.gotBtn:SetSize(120, BUTTON_H)
+    f.gotBtn:SetPoint("BOTTOMRIGHT", -16, BUTTON_ROW_Y)
     local gotBg = f.gotBtn:CreateTexture(nil, "BACKGROUND")
     gotBg:SetAllPoints()
     gotBg:SetColorTexture(HEADER_RED[1], HEADER_RED[2], HEADER_RED[3], 0.95)
@@ -163,8 +164,8 @@ function WN:Build()
     f.gotBtn:SetScript("OnClick", dismiss)
 
     f.discordBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
-    f.discordBtn:SetHeight(28)
-    f.discordBtn:SetPoint("BOTTOM", 0, 12)
+    f.discordBtn:SetHeight(BUTTON_H)
+    f.discordBtn:SetPoint("BOTTOM", 0, BUTTON_ROW_Y)
     local dBg = f.discordBtn:CreateTexture(nil, "BACKGROUND")
     dBg:SetAllPoints()
     dBg:SetColorTexture(0.10, 0.10, 0.10, 0.95)
@@ -184,8 +185,8 @@ function WN:Build()
     f.close:SetScript("OnClick", dismiss)
 
     f.dontShow = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
-    f.dontShow:SetSize(22, 22)
-    f.dontShow:SetPoint("BOTTOMLEFT", 14, 44)
+    f.dontShow:SetSize(CHECK_H, CHECK_H)
+    f.dontShow:SetPoint("BOTTOMLEFT", 14, CHECK_ROW_Y)
     f.dontShow.text = f.dontShow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.dontShow.text:SetPoint("LEFT", f.dontShow, "RIGHT", 2, 0)
     f.dontShow.text:SetText(L["Don't show these again"])

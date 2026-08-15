@@ -149,6 +149,21 @@ local function countReason(key)
     M._reason[key] = (M._reason[key] or 0) + 1
 end
 
+-- The refusal reasons double as the Quest Browser's explanation for a single quest, so they are
+-- returned rather than counted at the point of refusal. Counting them here keeps /eqsprobe
+-- available's sum-to-total invariant, which is what proves each quest is refused by exactly one
+-- gate, while one quest can be asked the same question without touching the counters.
+local REASON_COMPLETED   = "completed"
+local REASON_IN_LOG      = "in your quest log"
+local REASON_HOLIDAY     = "holiday quest"
+local REASON_RACE_CLASS  = "race or class"
+local REASON_REQ_LEVEL   = "too low level"
+local REASON_LOW_LEVEL   = "low level"
+local REASON_PREREQ      = "prerequisite"
+local REASON_LATER_STEP  = "later step done"
+local REASON_BRANCH      = "took another branch"
+local REASON_REPUTATION  = "reputation"
+
 -- Category bits, matching Data/QuestCategory_Classic.lua. The event bit is deliberately not read
 -- here: a holiday quest is already refused outright further down, because nothing in the data
 -- says whether the holiday is running.
@@ -194,55 +209,53 @@ end
 
 -- Ordered cheapest first, because every check below the masks walks a list.
 local function isAvailable(questID, D, hideLowLevel, floor)
-    if _permaNo[questID] then countReason("race or class") return false end
+    if _permaNo[questID] then return false, REASON_RACE_CLASS end
 
     local gates = D.gates[questID]
     if not gates then return false end
 
     local hiddenBy = categoryHidden(questID)
-    if hiddenBy then countReason(hiddenBy) return false end
+    if hiddenBy then return false, hiddenBy end
 
     local flags = math.floor(gates % 1e9 / 1e8)
     local repeatable = (flags % (SF_REPEATABLE + SF_REPEATABLE)) >= SF_REPEATABLE
 
     -- A repeatable quest comes back after it is completed, so completion only rules out the rest
-    if isCompleted(questID) and not repeatable then countReason("completed") return false end
+    if isCompleted(questID) and not repeatable then return false, REASON_COMPLETED end
 
     local inLog, failed = logState(questID)
-    if inLog and not failed then countReason("in your quest log") return false end
+    if inLog and not failed then return false, REASON_IN_LOG end
 
     -- Nothing in the base data says whether a world event is running, and a holiday quest pinned
     -- year round is a confident lie. Hidden outright, which costs the pin during the holiday.
-    if (flags % (SF_EVENT + SF_EVENT)) >= SF_EVENT then countReason("holiday quest") return false end
+    if (flags % (SF_EVENT + SF_EVENT)) >= SF_EVENT then return false, REASON_HOLIDAY end
 
     local races = math.floor(gates % 1e8 / 1e4)
     if not hasBit(races, _raceBit) then
         _permaNo[questID] = true
-        countReason("race or class")
-        return false
+        return false, REASON_RACE_CLASS
     end
     local classes = gates % 1e4
     if not hasBit(classes, _classBit) then
         _permaNo[questID] = true
-        countReason("race or class")
-        return false
+        return false, REASON_RACE_CLASS
     end
     M._gatesRun.raceClass = true
 
     local reqLevel = math.floor(gates / 1e11)
-    if reqLevel > 0 and _level < reqLevel then countReason("too low level") return false end
+    if reqLevel > 0 and _level < reqLevel then return false, REASON_REQ_LEVEL end
 
     if hideLowLevel and floor then
         local questLevel = math.floor(gates % 1e11 / 1e9)
-        if questLevel > 0 and questLevel < floor then countReason("low level") return false end
+        if questLevel > 0 and questLevel < floor then return false, REASON_LOW_LEVEL end
     end
 
     local pre = D.pre[questID]
     if pre then
-        if not anyCompleted(pre) then countReason("prerequisite") return false end
+        if not anyCompleted(pre) then return false, REASON_PREREQ end
     else
         local preAll = D.preAll[questID]
-        if preAll and not allCompleted(preAll) then countReason("prerequisite") return false end
+        if preAll and not allCompleted(preAll) then return false, REASON_PREREQ end
     end
 
     -- The parent has to be ACTIVE, not merely done - these are the steps of an escort or a
@@ -250,13 +263,13 @@ local function isAvailable(questID, D, hideLowLevel, floor)
     local parent = D.parent[questID]
     if parent then
         local parentInLog = logState(parent)
-        if not parentInLog then countReason("prerequisite") return false end
+        if not parentInLog then return false, REASON_PREREQ end
     end
 
     local nextID = D.chain[questID]
     if nextID then
         local nextInLog = logState(nextID)
-        if nextInLog or isCompleted(nextID) then countReason("later step done") return false end
+        if nextInLog or isCompleted(nextID) then return false, REASON_LATER_STEP end
     end
 
     local excl = D.excl[questID]
@@ -264,21 +277,53 @@ local function isAvailable(questID, D, hideLowLevel, floor)
         for i = 1, #excl do
             local other = excl[i]
             local otherInLog = logState(other)
-            if otherInLog or isCompleted(other) then countReason("took another branch") return false end
+            if otherInLog or isCompleted(other) then return false, REASON_BRANCH end
         end
     end
 
-    if repFails(D.minRep[questID], true) then countReason("reputation") return false end
-    if repFails(D.maxRep[questID], false) then countReason("reputation") return false end
+    if repFails(D.minRep[questID], true) then return false, REASON_REPUTATION end
+    if repFails(D.maxRep[questID], false) then return false, REASON_REPUTATION end
 
     return true
 end
 
 local _available = {}
-local _built = false
+local _built, _prepared = false, false
+local _hideLowLevel, _floor
 
 function M:Invalidate()
-    _built = false
+    _built, _prepared = false, false
+end
+
+-- Everything the gate reads about the PLAYER rather than about a quest. Shared with Explain so
+-- that asking about one quest and asking about all of them cannot diverge on the player state.
+-- _prepared is what keeps a caller asking about one quest at a time from re-reading the whole
+-- quest log per question, which a details panel does once per prerequisite.
+local function preparePass()
+    refreshCategoryMask()
+
+    -- Forces the cache's own refresh once, up front. logState reads Cache.quests directly, which
+    -- skips that refresh, so without this a cold login reads an empty log and every quest already
+    -- in it is offered again.
+    local Cache = ns:GetSubsystem("Cache")
+    if Cache and Cache.All then Cache:All() end
+
+    readPlayer()
+    if not (_raceBit and _classBit) then return false end
+    readCompleted()
+    -- Set here rather than inside the loop, so it means "the masks were readable" rather than
+    -- "at least one quest survived them" - the second says nothing on a pass that rejected all.
+    M._gatesRun.raceClass = true
+
+    local DB = ns:GetSubsystem("DB")
+    local map = DB and DB.db.profile.map
+    -- Compared against false, not tested for truthiness, so a profile written before this option
+    -- existed reads as ON, which is what the checkbox shows for the same nil.
+    _hideLowLevel = not (map and map.hideLowLevelQuests == false)
+    _floor = _hideLowLevel and trivialFloor() or nil
+    M._gatesRun.trivial = (_floor ~= nil)
+    _prepared = true
+    return true
 end
 
 function M:Rebuild()
@@ -300,35 +345,19 @@ function M:Rebuild()
         return
     end
 
-    refreshCategoryMask()
-
-    -- Forces the cache's own refresh once, up front. logState reads Cache.quests directly below,
-    -- which skips that refresh, so without this a cold login reads an empty log and every quest
-    -- already in it is offered again.
-    local Cache = ns:GetSubsystem("Cache")
-    if Cache and Cache.All then Cache:All() end
-
-    readPlayer()
-    if not (_raceBit and _classBit) then
+    if not preparePass() then
         M._stage = "player race or class did not resolve"
         return
     end
-    readCompleted()
-    -- Set here rather than inside the loop, so it means "the masks were readable" rather than
-    -- "at least one quest survived them" - the second says nothing on a pass that rejected all.
-    M._gatesRun.raceClass = true
-
-    -- Compared against false, not tested for truthiness, so a profile written before this option
-    -- existed reads as ON, which is what the checkbox shows for the same nil.
-    local hideLowLevel = not (map and map.hideLowLevelQuests == false)
-    local floor = hideLowLevel and trivialFloor() or nil
-    M._gatesRun.trivial = (floor ~= nil)
 
     for questID in pairs(D.gates) do
         M._resolved = M._resolved + 1
-        if isAvailable(questID, D, hideLowLevel, floor) then
+        local ok, why = isAvailable(questID, D, _hideLowLevel, _floor)
+        if ok then
             _available[questID] = true
             M._availableN = M._availableN + 1
+        elseif why then
+            countReason(why)
         end
     end
     M._stage = "ran"
@@ -381,6 +410,112 @@ function M:IsRepeatable(questID)
     return (flags % (SF_REPEATABLE + SF_REPEATABLE)) >= SF_REPEATABLE
 end
 
+function M:NeedsWorldEvent(questID)
+    local D = data()
+    local gates = D and D.gates[questID]
+    if not gates then return false end
+    local flags = math.floor(gates % 1e9 / 1e8)
+    return (flags % (SF_EVENT + SF_EVENT)) >= SF_EVENT
+end
+
+-- The race and class masks, undecoded. Handing out the raw mask keeps the packing decoded in one
+-- place while leaving the bit-to-name mapping to whoever wants to render it. Zero means no gate.
+function M:RaceMask(questID)
+    local D = data()
+    local gates = D and D.gates[questID]
+    if not gates then return nil end
+    return math.floor(gates % 1e8 / 1e4)
+end
+
+function M:ClassMask(questID)
+    local D = data()
+    local gates = D and D.gates[questID]
+    if not gates then return nil end
+    return gates % 1e4
+end
+
+-- The two state reads the gate itself performs, so a caller asking about one quest cannot
+-- disagree with the map about whether it is done or already taken.
+function M:IsCompleted(questID)
+    ensure()
+    if not _prepared then preparePass() end
+    return isCompleted(questID)
+end
+
+function M:InLog(questID)
+    ensure()
+    -- Same guard IsCompleted needs, and for the same reason: logState reads Cache.quests
+    -- directly, and only preparePass forces the refresh that fills it. Without this a caller
+    -- asking before any pass has run reads an empty log and reports you are carrying nothing.
+    if not _prepared then preparePass() end
+    return logState(questID)
+end
+
+function M:Data()
+    return data()
+end
+
+-- kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4). The low eight digits are the coordinate pair, the
+-- high slot is what the table stores above it, which differs per table. rest is returned because
+-- it is what pins merge on - two givers at one spot are one pin.
+local function decodeStart(v)
+    local rest = v % 1e8
+    return math.floor(v / 1e8), math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4, rest
+end
+
+-- Every place this quest can be picked up, across all maps. PointsFor answers the different
+-- question of what to draw on one open map.
+function M:StartsFor(questID, out)
+    local D = data()
+    local byMap = D and D.start[questID]
+    if not byMap then return 0 end
+    local n = 0
+    for mapID, list in pairs(byMap) do
+        for i = 1, #list do
+            local kind, x, y = decodeStart(list[i])
+            n = n + 1
+            out[n] = { mapID = mapID, x = x, y = y, kind = kind }
+        end
+    end
+    return n
+end
+
+-- skillLineID*1e4 + requiredValue. The id has no name lookup on this client, so only the fact
+-- that a profession is required can be rendered - see the note in the generator.
+function M:SkillGate(questID)
+    local D = data()
+    local v = D and D.skill[questID]
+    if not v then return nil end
+    return math.floor(v / 1e4), v % 1e4
+end
+
+-- factionID*1e6 + standing, for the minimum and maximum reputation gates alike.
+-- Written as a branch rather than an and/or chain: 221 quests carry a minimum and no maximum,
+-- and `(which == "max") and D.maxRep[id] or D.minRep[id]` answers the MINIMUM for every one of
+-- them, because a nil on the left of the `or` falls through.
+function M:RepGate(questID, which)
+    local D = data()
+    if not D then return nil end
+    local v
+    if which == "max" then v = D.maxRep[questID] else v = D.minRep[questID] end
+    if not v then return nil end
+    return math.floor(v / 1e6), v % 1e6
+end
+
+-- Asks the SAME gate the map pass asks, for one quest. Returns true, or false plus the reason it
+-- was refused. A second implementation would let the browser and the map disagree about a quest
+-- while both looked right on their own, which is the failure this shape exists to prevent.
+function M:Explain(questID)
+    local D = data()
+    if not (D and questID and D.gates[questID]) then return nil end
+    ensure()
+    if _available[questID] then return true end
+    -- The pass can return before reading the player at all - the option being off is the common
+    -- case - and the browser still owes an answer, so the player state is read on demand.
+    if not _prepared and not preparePass() then return nil end
+    return isAvailable(questID, D, _hideLowLevel, _floor)
+end
+
 -- The cap bounds points per quest, where the worst item started quest offers 1,161 on one map.
 -- Locations merge below because one giver can offer 27 quests and a pin each would stack them.
 local MAX_PER_QUEST = 4
@@ -407,14 +542,10 @@ function M:PointsFor(mapID)
             -- locations rather than arbitrary ones. Never reorder here.
             for i = 1, #list do
                 if taken >= MAX_PER_QUEST then break end
-                local v = list[i]
-                local kind = math.floor(v / 1e8)
-                local rest = v % 1e8
-                local key = rest
+                local kind, x, y, key = decodeStart(list[i])
                 local slot = _byCoord[key]
                 if not slot then
-                    slot = { x = math.floor(rest / 1e4) / 1e4, y = (rest % 1e4) / 1e4,
-                             kind = kind, quests = {} }
+                    slot = { x = x, y = y, kind = kind, quests = {} }
                     _byCoord[key] = slot
                     _order[#_order + 1] = key
                 elseif kind < slot.kind then

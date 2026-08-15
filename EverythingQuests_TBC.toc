@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Burning Crusade Classic support is limited and growing - see the What's New notice.
 ## Author: Wheelbarrel00
-## Version: 1.41.0
+## Version: 1.42.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -107,11 +107,12 @@ Core\Init.lua
 Core\Compat.lua
 
 # enUS first - it creates ns.L and the fallback metatable the others layer onto.
-# Modules/MapPOI/Pin.lua reads ns.L at FILE SCOPE, so all four must precede it.
+# Modules/MapPOI/Pin.lua reads ns.L at FILE SCOPE, so every locale must precede it.
 Locales\enUS.lua
 Locales\frFR.lua
 Locales\ruRU.lua
 Locales\koKR.lua
+Locales\zhCN.lua
 
 Core\DB.lua
 Core\Events.lua
@@ -136,6 +137,12 @@ Modules\MapPOI\Provider.lua
 # Quests you have NOT accepted. Reads its data table at RUNTIME and self-gates on its presence,
 # so its position relative to the Data block below does not matter.
 Modules\MapPOI\Available.lua
+
+# Look up any quest, accepted or not. Data.lua asks Available.lua for everything that involves a
+# packed field, so the two never decode the same number apart. Frame.lua reads ns.L and
+# ns.Util.color at FILE SCOPE, which is why this pair follows the locales and Core\Util.lua.
+Modules\QuestBrowser\Data.lua
+Modules\QuestBrowser\Frame.lua
 
 # Measured working on Era, and TBC reads identically: QuestAuto is 18 of 18 APIs and registers
 # only events this client knows, Minimap calls no quest API at all, and EQOT's API module

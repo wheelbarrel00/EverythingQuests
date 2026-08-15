@@ -2,6 +2,22 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.42.0", date = "2026-08-15",
+        sections = {
+            { head = "New Features", items = {
+                "The Quest Browser, on Classic Era and Burning Crusade Classic. Look up almost any quest in the game, including the ones you have never picked up, which is the one thing the game itself cannot tell you there. Search by name or by quest number, or put quotes around a name for an exact match. Each quest shows its level, its race and class requirements, where it starts, where its objectives are and where it is handed in, what has to be finished before it, and if you cannot take it yet, the reason why. Open it with /eqs quests, from the button under /eqs > General, or by right-clicking a gold quest marker on the map.",
+                "The browser is clickable throughout. Clicking a location opens the map there and drops a waypoint on it, and clicking a listed prerequisite or follow-up jumps to that quest, so most chains can be walked without typing anything.",
+                "Simplified Chinese. The addon now ships zhCN translations alongside French, Russian and Korean.",
+            } },
+            { head = "Improvements", items = {
+                "French and Russian are complete again. Both cover every phrase in the addon, including everything added in this release.",
+            } },
+            { head = "Bug Fixes", items = {
+                "The \"Don't show these again\" checkbox on this window overlapped the last line of text. The text area and the checkbox were positioned independently, so a long enough release note ran underneath it.",
+            } },
+        },
+    },
+    {
         version = "1.41.0", date = "2026-08-13",
         sections = {
             { head = "New Features", items = {

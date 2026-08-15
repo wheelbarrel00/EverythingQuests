@@ -18,6 +18,7 @@ local COMMANDS = {
     { cmd = "/eqs",          desc = L["Open or close the options window"] },
     { cmd = "/eqs chain",    desc = L["Open the Chain Guide"], sub = "ChainGuide" },
     { cmd = "/eqs history",  desc = L["Open the Quest History window"], sub = "HistoryFrame" },
+    { cmd = "/eqs quests",   desc = L["Look up almost any quest in the game"], sub = "QuestBrowser" },
     { cmd = "/eqs session",  desc = L["Recap your current play session in chat"], sub = "Session" },
     { cmd = "/eqs discover", desc = L["List the current zone's quest chains in chat"], sub = "ChainGuideQuestLineSource" },
     { cmd = "/eqs whatsnew", desc = L["Show the What's New popup again"], sub = "WhatsNew" },

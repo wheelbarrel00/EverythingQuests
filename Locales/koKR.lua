@@ -354,6 +354,9 @@ L["first time seeing |cffffffff%s|r - added %d past completion%s (no dates; futu
 L["Quest history loaded empty; restored a backup from %s (%d entries)."] = "퀘스트 기록이 비어 있어 %s의 백업을 복원했습니다 (%d개 항목)."
 L["Quest history for %s was missing; restored a backup from %s (%d entries)."] = "%s의 퀘스트 기록이 없어 %s의 백업을 복원했습니다 (%d개 항목)."
 
+-- ─── Modules/QuestBrowser/Frame.lua ───
+L["Profession"] = "전문기술"
+
 -- ─── Modules/TrackerBridge.lua ───
 L["EQ Objective Tracker is not loaded, so the tracker is unavailable."] = "EQ Objective Tracker가 로드되지 않아 추적기를 사용할 수 없습니다."
 L["Open the Chain Guide"] = "연계 가이드 열기"

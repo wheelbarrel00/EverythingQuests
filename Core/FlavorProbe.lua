@@ -2054,10 +2054,107 @@ function Probe:XP()
     line("  a1/b1 with id under matching selection: %s / %s", tostring(a1), tostring(b1))
 end
 
+-- The browser is the only place a quest the player has never accepted is described, so when one
+-- reads wrong there is nothing on screen to say whether the DATA is missing, the QUERY dropped
+-- it, or the gate refused it. Each of those three is reported separately.
+function Probe:QuestBrowser()
+    out("quest browser")
+
+    local QB = ns:GetSubsystem("QuestBrowser")
+    local QBD = ns:GetSubsystem("QuestBrowserData")
+    if not (QB and QBD) then
+        line("  QuestBrowser subsystem ABSENT - Modules/QuestBrowser/ is not listed by this TOC.")
+        line("  On retail that is correct: Blizzard's own quest log already describes any quest.")
+        return
+    end
+    line("1. the data behind it:")
+    line("  QuestBrowserData:Loaded()=%s", tostring(QBD:Loaded()))
+    if not QBD:Loaded() then
+        line("  the modules loaded but the Classic tables did not - see /eqsprobe available")
+        return
+    end
+    line("  window built=%s  shown=%s  selected=%s",
+         tostring(QB.frame ~= nil),
+         tostring(QB.frame ~= nil and QB.frame:IsShown() or false),
+         tostring(QB._selected))
+
+    line("2. an empty query, which is every quest the table names:")
+    local rows, matched = QBD:Query({ limit = 5 })
+    line("  matched=%s  rows returned=%s", tostring(matched), tostring(#rows))
+    for i = 1, #rows do
+        line("  [%s] %s  level=%s", tostring(rows[i].id), tostring(rows[i].name), tostring(rows[i].level))
+    end
+    -- Query hands back a table it REUSES, so section 3's query below empties this one. Section 4
+    -- reads this id rather than rows[1], which by then belongs to a different query.
+    local firstID = rows[1] and rows[1].id
+    -- A zero here with a loaded table means the QUERY is at fault, not the data, and those two
+    -- look identical from the window.
+    if matched == 0 then
+        line("  ZERO with a loaded table - the query is dropping everything, not the data")
+    end
+
+    line("3. the map the player is standing on:")
+    local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    if mapID then
+        local _, here = QBD:Query({ mapID = mapID, limit = 1 })
+        line("  mapID=%s name=%s  quests starting here=%s",
+             tostring(mapID), tostring(QBD:ZoneName(mapID)), tostring(here))
+        line("  This counts quests that START here, not quests that mention the zone. Zero on an")
+        line("  INSTANCE map is correct - no instance map is in the data. Zero in a CAPITAL is not:")
+        line("  the capitals carry the largest start counts in the whole table.")
+    else
+        line("  no map for the player")
+    end
+
+    line("4. one full record, so every decode is exercised at once:")
+    local pick = QB._selected or firstID
+    local r = pick and QBD:Record(pick)
+    if not r then
+        line("  no record for %s", tostring(pick))
+        return
+    end
+    line("  #%s %q  level=%s  requires=%s", tostring(r.id), tostring(r.name),
+         tostring(r.level), tostring(r.reqLevel))
+    line("  available=%s  reason=%s  completed=%s  inLog=%s",
+         tostring(r.available), tostring(r.reason), tostring(r.completed), tostring(r.inLog))
+    line("  races=%s  classes=%s",
+         r.races and table.concat(r.races, "/") or "any",
+         r.classes and table.concat(r.classes, "/") or "any")
+    line("  starts=%s  objective maps=%s  turn-in maps=%s",
+         tostring(r.starts and #r.starts or 0),
+         tostring(r.objectives and #r.objectives or 0),
+         tostring(r.turnIn and #r.turnIn or 0))
+    if r.starts then
+        for i = 1, math.min(3, #r.starts) do
+            local s = r.starts[i]
+            line("   start on %s (%s) at %.4f, %.4f kind=%s",
+                 tostring(s.mapID), tostring(QBD:ZoneName(s.mapID)), s.x, s.y, tostring(s.kind))
+        end
+    end
+
+    line("5. the gate and the window have to agree:")
+    local A = ns:GetSubsystem("AvailableQuests")
+    if A then
+        line("  map pass stage=%q", tostring(A._stage))
+        local gateSays = A:IsAvailable(r.id)
+        line("  AvailableQuests:IsAvailable=%s  record.available=%s", tostring(gateSays), tostring(r.available))
+        -- IsAvailable reads the map pass's result set, which is EMPTY by design when the option
+        -- is off. Judging the two equal there condemns the one behavior the harness proves right.
+        if A._stage == "ran" then
+            line("  MATCH=%s", tostring(gateSays == (r.available == true)))
+            line("  A mismatch means the browser and the map pins are answering from different code.")
+        else
+            line("  NOT COMPARED - the map pass did not run, so IsAvailable is empty for every")
+            line("  quest BY DESIGN. Only the browser's own answer means anything in this state.")
+        end
+    end
+end
+
 local SECTIONS = {
     media   = Probe.Media,
     xp      = Probe.XP,
     available = Probe.Available,
+    questbrowser = Probe.QuestBrowser,
     map     = Probe.Map,
     poi     = Probe.POI,
     pins    = Probe.Pins,
@@ -2096,12 +2193,12 @@ function Probe:Run(msg)
         return
     end
     if which ~= "" then
-        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, available, flare, quest, port, tooltip, xp, events, ui, misc, or none for all",
+        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, available, questbrowser, flare, quest, port, tooltip, xp, events, ui, misc, or none for all",
             which)
         return
     end
     out("EQ %s - full flavor probe", tostring(ns.VERSION))
-    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "available", "quest", "events", "ui" }) do
+    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "available", "questbrowser", "quest", "events", "ui" }) do
         runSection(self, name, SECTIONS[name])
     end
     -- tooltip, mappoi, flare and xp are left out on purpose. Each needs setup first, so a blind

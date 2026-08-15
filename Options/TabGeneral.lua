@@ -277,6 +277,21 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["Leaves out quests that require a trade skill, such as a Blacksmithing or Alchemy specialization. Everything Quests cannot read your skill levels on this version of the game, so these are offered even when you have not trained the profession they need."])
     end
 
+    do
+        local QB = ns:GetSubsystem("QuestBrowser")
+        if QB and QB.Available and QB:Available() then
+            local browserHeader = Options:CreateSectionHeader(content, L["Quest Browser"])
+            place(browserHeader, 0, 16)
+
+            local browserBtn = Options:CreateYellowButton(content, L["Open Quest Browser"], function()
+                local B = ns:GetSubsystem("QuestBrowser")
+                if B then B:Open() end
+            end)
+            place(browserBtn, 0, 12)
+            Options:AttachTooltip(browserBtn, L["Quest Browser"],
+                L["Look up almost any quest in the game, including ones you have never picked up. Shows the level and race and class requirements, where it starts and turns in, what has to be finished first, and why you cannot take it yet. Also on /eqs quests, or right-click a gold quest marker on the map."])
+        end
+    end
 
     if ns:GetSubsystem("TrackerBridge") then
         local trackerHeader = Options:CreateSectionHeader(content, L["Tracker"])

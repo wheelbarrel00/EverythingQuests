@@ -462,6 +462,16 @@ function ns.QuestPinAvailable(tip, quests, isFirstLine)
     end
 end
 
+-- Deliberately NOT part of the builder above. That one is shared with the minimap, whose pins
+-- are created click-through on purpose, and with an owned pin merely listing an available
+-- neighbour - neither can honor a right-click, so only the caller that can may promise it.
+local function addBrowserHint(tip)
+    local QB = ns:GetSubsystem("QuestBrowser")
+    if QB and QB.Available and QB:Available() then
+        tip:AddLine(L["Right-click for quest details"], 0.5, 0.75, 1.0)
+    end
+end
+
 function Pin:OnMouseEnter()
     if not self.questID then return end
     local Cache = ns:GetSubsystem("Cache")
@@ -473,6 +483,7 @@ function Pin:OnMouseEnter()
     tip:SetOwner(self, "ANCHOR_RIGHT")
     if self.avail then
         ns.QuestPinAvailable(tip, self.avail, true)
+        addBrowserHint(tip)
     else
         tip:SetText(ns.QuestPinTitle(q, self.questID), 1.0, 0.82, 0.0, 1, true)
         if q.zone   then tip:AddLine(q.zone, 0.7, 0.7, 0.7) end
@@ -525,8 +536,13 @@ end
 function Pin:OnClick(button)
     if not self.questID then return end
     if button == "RightButton" then
-        -- The quest log has no entry to open for a quest you have not accepted
-        if self.avail then return end
+        -- The quest log has no entry to open for a quest you have not accepted, so the browser
+        -- takes that click instead - it is the only thing that can describe an unaccepted quest.
+        if self.avail then
+            local QB = ns:GetSubsystem("QuestBrowser")
+            if QB and QB.Available and QB:Available() then QB:Open(self.questID) end
+            return
+        end
         if C_AddOns and C_AddOns.LoadAddOn then
             C_AddOns.LoadAddOn("Blizzard_QuestLog")
         end

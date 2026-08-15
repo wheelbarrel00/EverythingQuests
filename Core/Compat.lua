@@ -44,10 +44,10 @@ local function walk(out, getRow, reported)
 end
 
 -- Classic has no C_QuestLog.GetInfo, so this flat global is its only row source. Positions
--- 1, 4, 6 and 8 are measured live - the 1.12 layout wikis label "Classic Era" is wrong here.
--- Position 2 is taken from the same modern layout those four confirm. It is NOT self checking:
--- positions 3, 7, 8 and 10 are numbers too, so an off by one renders a confident wrong level.
--- Confirm it with /eqsprobe port section 1b before trusting it.
+-- 1, 2, 4, 6 and 8 are all measured live now - the 1.12 layout wikis label "Classic Era" is
+-- wrong here. Position 2 was the last one taken from a signature and is CONFIRMED as the level
+-- by /eqsprobe port on Era 1.15.9: row 2 read title Goldtooth, [2]=8, [8]=87, and the shipped
+-- quest data independently puts quest 87 at level 8. Header rows read 0 there, as they should.
 local function flatRow(i)
     local title, level, _, isHeader, _, isComplete, _, questID = _G.GetQuestLogTitle(i)
     if title == nil then return nil end
