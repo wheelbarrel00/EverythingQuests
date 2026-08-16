@@ -26,7 +26,8 @@ Everything Quests is a complete replacement for Blizzard's quest tracking and qu
 4. A standalone **Chain Guide** window for browsing Midnight quest chains
 5. An account-wide **Quest History** log with six views and a backfill of past completions
 6. Branded **Quest POI** overlays on zone maps, and on Classic, objective spawn markers on both the world map and the minimap
-7. Optional **auto-accept / auto-turn-in** for quest dialogs (Alt to pause)
+7. A **Quest Browser** on Classic, for looking up almost any quest in the game before you accept it
+8. Optional **auto-accept / auto-turn-in** for quest dialogs (Alt to pause)
 
 Open Options with **`/eqs`**, from the minimap button, from the Everything Quests icon on the tracker, or via **Game Menu → Options → AddOns → Everything Quests**.
 
@@ -147,6 +148,17 @@ Custom quest pins on zone maps. On retail the icon carries the Everything-suite 
 ### Minimap Objective Pins
 The same objective markers on the minimap, for the zone you are standing in, powered by HereBeDragons-Pins. Classic only, and keyed on `C_Map.GetBestMapForUnit` rather than the open world map. Pins are hover-only so clicks pass through to the minimap underneath.
 
+### Quest Browser
+Classic Era and Burning Crusade Classic only. A search-and-details window over EQ's own generated quest tables, answering the one thing a Classic client cannot: what a quest is before you have ever accepted it.
+
+- **Search** by name substring, by quest ID, or `"quoted"` for a whole-title match. The scan runs against the shipped English titles, because the client can only name a quest it has already seen; the row you see uses the client's own wording where it knows it
+- **Details** — quest level, required level, race and class gates, category, every map it starts / has objectives / turns in on, prerequisites (any-of vs all-of), follow-ups, exclusions, and skill and reputation gates
+- **The reason it is unavailable** comes from `AvailableQuests:Explain`, the *same* gate that decides which gold markers are drawn. There is deliberately one implementation — a second copy would let the window and the map disagree while both looked right
+- **Clickable throughout** — a location opens the world map there and sets a TomTom waypoint; a prerequisite or follow-up navigates to that quest. References the data cannot describe render as plain text rather than a dead link
+- **Entry points** — `/eqs quests [text]`, the button under `/eqs` > General, or right-clicking a gold available-quest marker, which previously did nothing
+- **Coverage is not total.** It reads the `names`/`gates` tables (3,794 Era / 5,652 TBC) while the coordinate tables cover more, so 357 Era and 508 TBC quests EQ pins on the map are not in the browser
+- `/eqsprobe questbrowser` reports the data, a live query, the player's zone, one full decoded record, and whether the browser and the map pins agree
+
 ### Auto-Quest Dialogs
 Optional, opt-in handlers for quest gossip and detail screens. Both default OFF.
 
@@ -174,6 +186,7 @@ LibDataBroker-powered launcher compatible with Titan Panel, ChocolateBar, ElvUI'
 | `/eqs` | Toggle Options |
 | `/everythingquests` | Toggle Options (alias) |
 | `/eqs chain` | Toggle the Chain Guide window |
+| `/eqs quests [text]` | Open the Quest Browser, optionally with a search. Classic Era and TBC only |
 | `/eqs history` | Toggle the Quest History window |
 | `/eqs about` | Open Options on the About tab |
 | `/eqs session` | Show a recap of your current play session (quests, XP, gold, time) |
@@ -182,7 +195,7 @@ LibDataBroker-powered launcher compatible with Titan Panel, ChocolateBar, ElvUI'
 | `/eqs discover [zone]` | Print quest-line discovery info for the current zone (optional hint) |
 | `/eqsprobe [section]` | Print what EQ found on the running client. Ships on every flavor |
 
-On Classic Era and Burning Crusade Classic the Chain Guide, History and session commands resolve to nothing, since those subsystems are not loaded there.
+On Classic Era and Burning Crusade Classic the Chain Guide, History and session commands resolve to nothing, since those subsystems are not loaded there. `/eqs quests` is the reverse: it is Classic-only, because retail already opens any quest in Blizzard's own quest log.
 
 Tracker settings have their own panel and commands — see `/eqot` and `/eqot status`.
 
@@ -202,7 +215,7 @@ Tracker settings have their own panel and commands — see `/eqot` and `/eqot st
 | `/eqs zonedump [zone]` | Dump the zone-progress routing table and its live counts |
 | `/eqs profile [show \| reset \| mem on \| mem off \| memhog \| auto on \| auto off \| auto list]` | Built-in profiler with hot-path auto-instrument |
 
-`/eqsprobe` sections: `media`, `map`, `poi`, `pins`, `minimap`, `mappoi`, `flare`, `quest`, `port`, `tooltip`, `events`, `ui`, `misc`. No argument runs all except `tooltip`, `mappoi` and `flare`, each of which needs something set up first — and `flare` mutates live frames, so `/reload` after using it.
+`/eqsprobe` sections: `media`, `map`, `poi`, `pins`, `minimap`, `available`, `questbrowser`, `mappoi`, `flare`, `quest`, `port`, `tooltip`, `xp`, `events`, `ui`, `misc`. No argument runs all except `tooltip`, `mappoi`, `flare` and `xp`, each of which needs something set up first — and `flare` and `xp` both mutate state, so `/reload` after using `flare`.
 
 ---
 
