@@ -254,6 +254,26 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             trackedGet, trackedSet,
             L["Leaves out the markers for any quest in your log that you have untracked, so a busy zone shows only what you are actually working on. Off by default. Quests you have not picked up yet are not affected, because there is nothing to have tracked."])
         place(tracked, 0, 6)
+
+        local function fadeGet()
+            local DB = ns:GetSubsystem("DB")
+            return (DB and DB.db.profile.map and DB.db.profile.map.fadePinsOverPlayer) == true
+        end
+        local function fadeSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.fadePinsOverPlayer = v and true or false
+            end
+            -- Applied at once rather than waiting up to a tick, so the box and the map agree
+            -- while the player is looking at both.
+            if ns.QuestPinApplyFade then ns.QuestPinApplyFade() end
+        end
+        local fade = Options:CreateCheckbox(content,
+            L["Fade markers that cover your position"],
+            fadeGet, fadeSet,
+            L["Makes any marker sitting on top of your own arrow see-through, so you can still find yourself on a zone that is drawing hundreds of them. Off by default. The markers are still there and still answer the mouse, they are only dimmed while you are standing under them."])
+        place(fade, 0, 6)
     end
 
     if ns:GetSubsystem("MapCoords") then

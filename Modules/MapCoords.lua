@@ -103,6 +103,12 @@ local function playerPositionOn(mapID)
     return x, y
 end
 
+-- Shared with Modules/MapPOI/Pin.lua's player fade. ONE implementation, because the 0,0 case
+-- above is exactly what a second copy would leave out - a pin fade written against a raw
+-- GetPlayerMapPosition would fade the top-left corner of every instance map.
+-- Reached at RUNTIME by its consumers, so TOC order does not matter.
+ns.PlayerPositionOn = playerPositionOn
+
 -- The cursor is in SCREEN units and the canvas in its own, so each has to be divided by its own
 -- effective scale before they can be compared. Comparing them raw is the mistake that has cost
 -- this project a round before.

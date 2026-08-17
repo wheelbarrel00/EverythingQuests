@@ -67,7 +67,7 @@ read_globals = {
     "GetQuestLogRewardXP",
     "HaveQuestData", "HaveQuestRewardData", "GetQuestLogQuestText",
     "AcceptQuest", "DeclineQuest", "CompleteQuest", "GetNumQuestChoices", "GetQuestReward",
-    "GetNumActiveQuests", "GetNumAvailableQuests", "GetActiveTitle",
+    "GetNumActiveQuests", "GetNumAvailableQuests", "GetActiveTitle", "GetAvailableTitle",
     "SelectActiveQuest", "SelectAvailableQuest",
     "GetQuestDifficultyColor", "GetQuestTagInfo",
     "OpenAchievementFrameToAchievement", "RemoveTrackedAchievement", "GetTrackedAchievements",

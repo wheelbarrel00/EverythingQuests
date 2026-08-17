@@ -231,6 +231,117 @@ function Pin:OnLoad()
     self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 end
 
+-- Pins sitting on top of the player arrow fade, so a busy zone does not bury where you are.
+-- The radius is in PIN WIDTHS like the tooltip reach, not map coordinates - the pin divides out
+-- canvas zoom, so this stays a constant SCREEN distance instead of swallowing the map zoomed out.
+local FADE_RADIUS_PINS = 1.5
+local FADE_ALPHA       = 0.3
+local FADE_PERIOD      = 0.15
+ns.MAPPOI_FADE_RADIUS_PINS = FADE_RADIUS_PINS
+
+-- Neither flavor can enumerate the canvas: ExecuteOnAllPins is absent on Era, EnumerateAllPins on
+-- retail. Acquired pins record themselves instead, which needs no client support at all.
+local _live = {}
+local _fadeTicker, _fadedN = nil, 0
+
+local function fadeWanted()
+    local DB = ns:GetSubsystem("DB")
+    return (DB and DB.db.profile.map and DB.db.profile.map.fadePinsOverPlayer) == true
+end
+
+local function unfade(pin)
+    if pin._eqFaded then
+        pin:SetAlpha(1)
+        pin._eqFaded = nil
+    end
+end
+
+local function clearFade()
+    for pin in pairs(_live) do unfade(pin) end
+    _fadedN = 0
+end
+
+-- Every unreadable case restores FULL alpha rather than leaving pins dimmed. A pin stuck at 0.3
+-- reads as broken art, and unlike a missing pin there is nothing on screen to explain it.
+local function applyPlayerFade()
+    if not fadeWanted() then clearFade() return 0 end
+
+    local anyPin = next(_live)
+    if not anyPin then _fadedN = 0 return 0 end
+
+    local map    = anyPin.GetMap and anyPin:GetMap()
+    local canvas = map and map.GetCanvas and map:GetCanvas()
+    if type(canvas) ~= "table" or type(canvas.GetWidth) ~= "function" then clearFade() return 0 end
+    local cw, ch = canvas:GetWidth(), canvas:GetHeight()
+    if not (cw and ch) or cw <= 0 or ch <= 0 then clearFade() return 0 end
+
+    -- Asked against the map the PINS are drawn on, not C_Map.GetBestMapForUnit. Those disagree the
+    -- moment the map is scrolled to another zone, and the player's own coordinates on a zone they
+    -- are not standing in would fade an unrelated corner of it. GetPlayerMapPosition answers nil
+    -- for a map the player is not on, which is what makes scrolling away simply stop fading.
+    -- Written as an if. `local px, py = fn and fn(id)` truncates the pair to ONE value, because
+    -- the result of `and` is adjusted to a single result, so py would always be nil and the fade
+    -- would never fire. Same family as the `true and nil` collapse recorded elsewhere.
+    if not ns.PlayerPositionOn then clearFade() return 0 end
+    local px, py = ns.PlayerPositionOn(anyPin.mapID)
+    if not (px and py) then clearFade() return 0 end
+
+    local reach = (anyPin:GetWidth() or 0) * (anyPin:GetScale() or 1) * FADE_RADIUS_PINS
+    if reach <= 0 then clearFade() return 0 end
+    local reachSq = reach * reach
+
+    local faded = 0
+    for pin in pairs(_live) do
+        local x, y = pin.mapX, pin.mapY
+        local near = false
+        if x and y then
+            -- Canvas units per axis, so the reach is a circle on SCREEN. The canvas is about
+            -- 1002x668, so the same coordinate delta is half again as much ground in x.
+            local dx, dy = (x - px) * cw, (y - py) * ch
+            near = (dx * dx + dy * dy) <= reachSq
+        end
+        if near then
+            if not pin._eqFaded then
+                pin:SetAlpha(FADE_ALPHA)
+                pin._eqFaded = true
+            end
+            faded = faded + 1
+        else
+            unfade(pin)
+        end
+    end
+    _fadedN = faded
+    return faded
+end
+
+ns.QuestPinApplyFade = applyPlayerFade
+
+-- Read by /eqsprobe mappoi. A fade that is switched off and one that found nothing under the
+-- player draw the identical map.
+function ns.QuestPinFadeState()
+    local live = 0
+    for _ in pairs(_live) do live = live + 1 end
+    return fadeWanted(), _fadedN, live
+end
+
+local function startFadeTicker()
+    if _fadeTicker then return end
+    if not (C_Timer and C_Timer.NewTicker) then return end
+    _fadeTicker = C_Timer.NewTicker(FADE_PERIOD, function()
+        -- Self-cancelling on an empty pool rather than hooked to the map's show and hide. Re-arming
+        -- costs one acquire, and this cannot outlive the pins the way a hook can outlive a frame.
+        if not next(_live) then
+            if _fadeTicker then _fadeTicker:Cancel() end
+            _fadeTicker = nil
+            _fadedN = 0
+            return
+        end
+        local wm = _G["WorldMapFrame"]
+        if wm and wm.IsShown and not wm:IsShown() then return end
+        applyPlayerFade()
+    end)
+end
+
 function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask, avail)
     self.questID    = questID
     self.isComplete = isComplete
@@ -273,6 +384,13 @@ function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask, avail)
     end
     self.numberText:SetText("")
 
+    -- A POOLED pin carries the alpha its previous quest ended with, exactly as it carries a stale
+    -- ring. Cleared per acquire so a reused pin never starts dimmed on a pin that is nowhere near
+    -- the player, and re-evaluated by the ticker on its own schedule.
+    unfade(self)
+    _live[self] = true
+    startFadeTicker()
+
     -- AcquirePin does not auto-Show
     self:Show()
 end
@@ -281,6 +399,8 @@ function Pin:OnReleased()
     self.questID, self.isComplete, self.kind, self.objMask = nil, nil, nil, nil
     self.avail = nil
     self.mapX, self.mapY, self.mapID = nil, nil, nil
+    _live[self] = nil
+    unfade(self)
     self.icon:SetTexture(nil)
     self.numberText:SetText("")
 end

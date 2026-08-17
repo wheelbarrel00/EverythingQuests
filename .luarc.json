@@ -68,6 +68,7 @@
     "GameTooltip",
     "GameTooltip_Hide",
     "GetActiveTitle",
+    "GetAvailableTitle",
     "GetAddOnMemoryUsage",
     "GetAutoQuestPopUp",
     "GetCVar",

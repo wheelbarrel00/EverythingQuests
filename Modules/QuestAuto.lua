@@ -18,6 +18,24 @@ local function paused()
     return GetTime() < _declineLockUntil
 end
 
+-- Index 1 is not always the one to take, and reading avail[1] ALONE meant one unusable first row
+-- blocked auto-accept entirely while good rows sat behind it.
+-- A trivial quest is still accepted when it is the only offer, so this can only ever change WHICH
+-- quest is taken, never whether one is. Where the client carries no isTrivial field every row
+-- reads non-trivial and this degrades to "the first usable index", which is still the fix.
+local function firstOffer(avail)
+    local fallback
+    for i = 1, #avail do
+        local q = avail[i]
+        local id = q and q.questID
+        if id then
+            if not q.isTrivial then return id end
+            fallback = fallback or id
+        end
+    end
+    return fallback
+end
+
 local function onGossipShow()
     if paused() then return end
     if not C_GossipInfo then return end
@@ -37,9 +55,8 @@ local function onGossipShow()
 
     if autoAcceptOn() and C_GossipInfo.GetAvailableQuests then
         local avail = C_GossipInfo.GetAvailableQuests()
-        if avail and avail[1] and avail[1].questID then
-            C_GossipInfo.SelectAvailableQuest(avail[1].questID)
-        end
+        local pick = avail and firstOffer(avail)
+        if pick then C_GossipInfo.SelectAvailableQuest(pick) end
     end
 end
 
@@ -59,6 +76,16 @@ local function onQuestGreeting()
 
     if autoAcceptOn() and GetNumAvailableQuests and SelectAvailableQuest then
         local n = GetNumAvailableQuests() or 0
+        -- No trivial flag is read here. GetAvailableQuestInfo's positional return has not been
+        -- MEASURED on this client, and guessing a signature is how flatRow nearly shipped wrong.
+        -- Walking past rows the client cannot name is the part that needs no signature.
+        for i = 1, n do
+            local title = GetAvailableTitle and GetAvailableTitle(i)
+            if title and title ~= "" then
+                SelectAvailableQuest(i)
+                return
+            end
+        end
         if n >= 1 then SelectAvailableQuest(1) end
     end
 end

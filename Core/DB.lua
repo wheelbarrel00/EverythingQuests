@@ -46,6 +46,7 @@ DB.defaults = {
             hideRepeatableQuests = false,
             hideProfessionQuests = false,
             onlyTrackedPins      = false,
+            fadePinsOverPlayer   = false,
             showMapCoords        = true,
             showMinimapCoords    = false,
             coordPrecision       = 1,

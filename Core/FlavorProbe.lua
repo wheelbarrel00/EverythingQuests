@@ -979,6 +979,22 @@ function Probe:MapPOI()
         trackedSourceReadings()
     end
 
+    if ns.QuestPinFadeState then
+        local fadeOn, fadedN, liveN = ns.QuestPinFadeState()
+        line("  fade markers over the player=%s   pin(s) currently dimmed=%d of %d live",
+             tostring(fadeOn), fadedN, liveN)
+        if fadeOn then
+            -- Every unreadable case restores full alpha, so a switched-on fade dimming nothing is
+            -- ambiguous between "you are not standing on a pin" and "the position never resolved".
+            local px, py
+            if ns.PlayerPositionOn then px, py = ns.PlayerPositionOn(MP._mapID) end
+            line("    player position on the OPEN map %s: %s",
+                 tostring(MP._mapID),
+                 px and ("%.4f, %.4f"):format(px, py)
+                     or "nil - not this map, or an instance. Nothing is dimmed, correctly.")
+        end
+    end
+
     -- The tooltip aggregates off this record, not the canvas, so a count below pins acquired
     -- means an AcquirePin site missed its record() call.
     line("  pins recorded for tooltip aggregation=%s  (must equal pins acquired above)",
