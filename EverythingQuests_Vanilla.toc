@@ -154,6 +154,15 @@ Modules\Minimap\QuestPins.lua
 # Reads the mob table below at RUNTIME, not at file scope, so it is listed before the data.
 Modules\Nameplates\QuestIcons.lua
 
+# Quest lines on the game's own unit and item tooltips. It asks QuestIcons for the objective
+# cache rather than building a second one, and reaches it at RUNTIME, so its position relative
+# to that file does not matter.
+Modules\Tooltips\QuestTooltips.lua
+
+# The cursor and player coordinate readout on the world map and under the minimap.
+# Reads ns.L at FILE SCOPE, so every locale must precede it.
+Modules\MapCoords.lua
+
 # Options/Frame.lua registers /eqs and must precede the tabs, which call AddTab at FILE SCOPE.
 # Each tab section is gated on the subsystem it drives, so the tabs not listed here simply do
 # not appear and the controls for absent modules are skipped rather than left inert.

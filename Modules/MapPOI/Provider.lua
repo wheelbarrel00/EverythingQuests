@@ -157,11 +157,35 @@ local function maskWanted(mask, kind)
     return false
 end
 
+-- Owned pins only. A quest you have untracked is one you have deliberately set aside, so its
+-- markers are noise on a zone that already draws hundreds. Available quests are untouched - they
+-- are not in the log, so there is nothing to have tracked.
+-- Tri-state ON PURPOSE. Core/Cache.lua leaves isWatched nil when the client has no
+-- GetQuestWatchType at all, and false only when it answered "not tracked". Treating those the
+-- same would empty the map on a client that cannot tell, so nil SHOWS the pin.
+function ns.QuestPinTracked(q)
+    local DB = ns:GetSubsystem("DB")
+    if (DB and DB.db.profile.map and DB.db.profile.map.onlyTrackedPins) ~= true then
+        return true
+    end
+    if q == nil or q.isWatched == nil then return true end
+    return q.isWatched == true
+end
+
+-- Read by /eqsprobe mappoi. A filter that hid nothing and a filter that is switched off draw the
+-- identical map.
+M._untrackedHidden = 0
+
 -- The third return is a string, not a boolean, because /eqsprobe has to tell three sources apart
 -- that look identical on the map and share no cause when they go wrong.
 function M:PointsFor(questID, mapID, q)
     local X, Y, K, MK = self._ptX, self._ptY, self._ptKind, self._ptMask
     local isComplete = q and q.isComplete
+
+    if not ns.QuestPinTracked(q) then
+        M._untrackedHidden = M._untrackedHidden + 1
+        return 0, 0, "none"
+    end
 
     -- A finished quest wants the turn-in, not the places you were farming. Every finisher
     -- location is drawn, not one picked point, because 176 quests hand in on more than one map
@@ -234,7 +258,7 @@ function providerMixin:_DoRefresh()
     self:RemoveAllData()
     M._refreshes = M._refreshes + 1
     M._pins, M._mapID, M._spawnPins, M._spawnThinned = 0, nil, 0, 0
-    M._availPins, M._turnInPins = 0, 0
+    M._availPins, M._turnInPins, M._untrackedHidden = 0, 0, 0
 
     -- Owned pins only. Available quests have their own checkbox, which is what the option's
     -- own tooltip promises, so this must not return early past the available block below.
@@ -275,6 +299,11 @@ function providerMixin:_DoRefresh()
                 if type(x) == "number" and type(y) == "number" then
                     _seenQids[qid] = true
                     local q = Cache:Get(qid)
+                    -- This loop does not go through PointsFor, so the same gate is asked here
+                    if q and not ns.QuestPinTracked(q) then
+                        M._untrackedHidden = M._untrackedHidden + 1
+                        q = nil
+                    end
                     if q then
                         map:AcquirePin(PIN_TEMPLATE, qid, x, y, q.isComplete, mapID)
                         record(qid, x, y)

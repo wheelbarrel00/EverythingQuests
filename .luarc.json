@@ -188,6 +188,7 @@
     "UnitClass",
     "UnitFactionGroup",
     "UnitGUID",
+    "UnitExists",
     "UnitLevel",
     "UnitName",
     "UnitOnTaxi",

@@ -16,6 +16,15 @@ ns.Has = Has
 Has.QuestDataRequest = method(C_QuestLog, "RequestLoadQuestByID")
 Has.TooltipDataUnit  = method(C_TooltipInfo, "GetUnit")
 
+-- MEASURED 2026-08-16, with the retail control that makes it conclusive.
+-- C_MapExplorationInfo.GetExploredAreaIDsAtPosition is PRESENT on Era 1.15.9 and answers nil for
+-- every position, including the ground the player is standing on in an outdoor zone. Retail
+-- answers a table of area ids at explored points and nil at unexplored ones on the same call
+-- shape, and it DISCRIMINATES between them, which is what proves the call is right and the
+-- Classic client is the hollow one. No flag is defined for it: a hide-unexplored-markers option
+-- was built against it and removed, because the only flavor where EQ draws enough pins for it
+-- to matter is the flavor that cannot answer.
+
 local Compat = {}
 ns.Compat = Compat
 
@@ -76,6 +85,38 @@ function Compat.CollectQuestLog(out)
         reported = tonumber(n) or 0
     end
     return out, walk(out, flatRow, reported)
+end
+
+-- Where the tracked set lives on Classic, resolved in ONE place because the reader below and
+-- the repaint in Modules/TrackerBridge.lua must never disagree about which object owns it.
+-- Absent on retail, where the module is not in EQOT's TOC and C_QuestLog answers instead.
+function Compat.TrackedSet()
+    local T = _G.EQObjectiveTracker
+    local TS = T and T.GetModule and T:GetModule("TrackedSet")
+    return (type(TS) == "table" and type(TS.IsTracked) == "function") and TS or nil
+end
+
+-- MEASURED 2026-08-16 on Era 1.15.9, by /eqsprobe mappoi printing all three sources side by side
+-- on the same 14 quests. C_QuestLog.GetQuestWatchType is ABSENT, the same namespace gap that
+-- takes GetInfo. The pre-namespace global IsQuestWatched(logIndex) IS present and answered FALSE
+-- for every quest in the log, including the ten the player had tracked, and GetNumQuestWatches()
+-- read 0 in the same run.
+-- The cause is not a bad call. EQ Objective Tracker OWNS the tracked set on this flavor and
+-- empties Blizzard's list behind every add to dodge its five-quest cap, so that list is empty by
+-- design and answering from it is a confident wrong answer that hides every owned pin. Reading
+-- it is strictly worse than answering nothing. EQOT is the only thing that knows, so it is asked.
+-- Returns nil where nothing can answer, and a caller must treat nil as "cannot tell" and SHOW
+-- the quest - collapsing nil into "not tracked" is the same emptied map by another route.
+function Compat.IsQuestWatched(questID)
+    if method(C_QuestLog, "GetQuestWatchType") then
+        return C_QuestLog.GetQuestWatchType(questID) ~= nil
+    end
+    local TS = Compat.TrackedSet()
+    if TS then
+        local ok, tracked = pcall(TS.IsTracked, TS, questID)
+        if ok then return tracked end
+    end
+    return nil
 end
 
 -- Sorted so a caller that caps the result keeps the same subset each run. The flat global

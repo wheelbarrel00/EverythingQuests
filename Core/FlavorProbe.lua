@@ -799,6 +799,96 @@ function Probe:Pins()
     end
 end
 
+-- Which source can answer "is this quest tracked", asked of all three at once on the same
+-- quests. RAW returns first and the verdict last, because the two have disagreed here before:
+-- a source that answers false for EVERY quest reads as a working filter and is a broken one.
+local function trackedSourceReadings()
+    local Cache = ns:GetSubsystem("Cache")
+    if not (Cache and Cache.All) then
+        line("    no Cache to read, so the tracked sources cannot be compared")
+        return
+    end
+
+    local watchType = resolve("C_QuestLog.GetQuestWatchType")
+    local bare      = resolve("IsQuestWatched")
+    local byID      = resolve("GetQuestLogIndexByID")
+    local TS        = ns.Compat.TrackedSet()
+    local numWatch  = resolve("GetNumQuestWatches")
+
+    line("    SOURCES  C_QuestLog.GetQuestWatchType=%s  bare IsQuestWatched=%s  EQOT TrackedSet=%s",
+         type(watchType), type(bare), TS and "present" or "absent")
+    line("    EQ READS: %s",
+         (type(watchType) == "function" and "C_QuestLog.GetQuestWatchType")
+         or (TS and "EQOT TrackedSet:IsTracked") or "nothing - every quest is cannot-tell")
+    if type(numWatch) == "function" then
+        local ok, n = pcall(numWatch)
+        line("    GetNumQuestWatches() raw=%s", ok and tostring(n) or "RAISED")
+        line("      0 here while EQOT shows tracked quests means Blizzard's list is not the set")
+    end
+
+    local rows, agree, disagree, bareTrue, tsTrue, tsKnown = 0, 0, 0, 0, 0, 0
+    local total = 0
+    for id, q in pairs(Cache:All()) do
+        total = total + 1
+        local wt, bw, ts, idx
+        if type(watchType) == "function" then
+            local ok, v = pcall(watchType, id)
+            wt = ok and (v ~= nil) or nil
+        end
+        -- Resolved here rather than cached on the quest. EQ stopped reading the bare global, so
+        -- carrying a log index around for its sake would be a field with no consumer.
+        if type(byID) == "function" then
+            local ok, v = pcall(byID, id)
+            if ok and v and v ~= 0 then idx = v end
+        end
+        if type(bare) == "function" and idx then
+            local ok, v = pcall(bare, idx)
+            if ok then bw = v and true or false end
+        end
+        if TS and TS.IsTracked then
+            local ok, v = pcall(TS.IsTracked, TS, id)
+            if ok then ts = v end
+        end
+        if bw then bareTrue = bareTrue + 1 end
+        if ts ~= nil then tsKnown = tsKnown + 1 end
+        if ts then tsTrue = tsTrue + 1 end
+        if bw ~= nil and ts ~= nil then
+            if bw == ts then agree = agree + 1 else disagree = disagree + 1 end
+        end
+        if rows < 10 then
+            rows = rows + 1
+            line("    raw q=%-6s idx=%-4s watchType=%-5s bareIsQuestWatched=%-5s EQOT=%-5s  EQ reads=%s",
+                 tostring(id), tostring(idx), tostring(wt), tostring(bw),
+                 tostring(ts), tostring(q.isWatched))
+        end
+    end
+    if total > rows then line("    ...%d more quest(s) not printed", total - rows) end
+
+    line("    TOTALS  quests=%d  bare says tracked=%d  EQOT says tracked=%d of %d it knows",
+         total, bareTrue, tsTrue, tsKnown)
+
+    -- The bare column is kept as a REGRESSION WATCH, not as a candidate. EQ deliberately does
+    -- not read it - Core/Compat.lua records the measurement - and these two lines are what make
+    -- that decision re-checkable on a client nobody has run this on yet.
+    if disagree > 0 then
+        line("    the bare global and EQOT DISAGREE on %d quest(s), agree on %d. Expected on this",
+             disagree, agree)
+        line("      flavor: EQOT owns the gesture and keeps Blizzard's list empty. EQ asks EQOT.")
+    end
+    if type(bare) == "function" and total > 0 and bareTrue == 0 and tsTrue > 0 then
+        line("    the bare global calls EVERY quest untracked while EQOT names %d tracked. That is",
+             tsTrue)
+        line("      the emptied list, and reading it would hide every owned pin. Do not wire it up.")
+    end
+    if TS and tsKnown == 0 and total > 0 then
+        line("    EQOT knows none of them yet - its set is nil until its provider seeds it or the")
+        line("      player first toggles, and nil means SHOW. Not a fault.")
+    elseif not TS then
+        line("    NO EQOT TrackedSet here. On Classic that leaves nothing able to answer, so every")
+        line("      quest reads cannot-tell and the filter correctly hides nothing.")
+    end
+end
+
 function Probe:MapPOI()
     out("Modules/MapPOI - why a pin did or did not appear")
 
@@ -861,6 +951,34 @@ function Probe:MapPOI()
     -- Thinned counts points the minimum separation rejected. Zero here with a high spawn count
     -- means the spread filter is not running, which reads identically to "nothing to thin".
     line("  spawn points thinned by minimum separation=%s", tostring(MP._spawnThinned))
+    -- Switched off and hiding nothing draw the identical map. The tri-state matters here: a
+    -- client with no GetQuestWatchType leaves isWatched nil and every pin is kept, which reads
+    -- exactly like the option being off.
+    local DB = ns:GetSubsystem("DB")
+    local onlyTracked = (DB and DB.db.profile.map and DB.db.profile.map.onlyTrackedPins) == true
+    -- Refusals, not pins removed. A refused quest may store no point on the open map at all, so
+    -- reading this as "4 pins vanished" overstates it - section 3 has the on-this-map count.
+    line("  only markers for tracked quests=%s   quest(s) refused by it=%s",
+         tostring(onlyTracked), tostring(MP._untrackedHidden))
+    if onlyTracked then
+        local Cache = ns:GetSubsystem("Cache")
+        local watched, untracked, unknown = 0, 0, 0
+        if Cache and Cache.All then
+            for _, q in pairs(Cache:All()) do
+                if q.isWatched == nil then unknown = unknown + 1
+                elseif q.isWatched then watched = watched + 1
+                else untracked = untracked + 1 end
+            end
+        end
+        line("    of the quests in Cache: tracked=%d untracked=%d CANNOT TELL=%d",
+             watched, untracked, unknown)
+        if unknown > 0 then
+            line("    a cannot-tell quest is SHOWN, which is the fail-open working. Read the raw")
+            line("    rows below before concluding anything about WHY it cannot tell.")
+        end
+        trackedSourceReadings()
+    end
+
     -- The tooltip aggregates off this record, not the canvas, so a count below pins acquired
     -- means an AcquirePin site missed its record() call.
     line("  pins recorded for tooltip aggregation=%s  (must equal pins acquired above)",
@@ -1437,8 +1555,183 @@ end
 
 -- The Nameplates rewire rests on a CONTENT question no capability probe can answer: does a
 -- Classic unit tooltip carry quest title and objective lines for your own quests at all?
+-- What EQ WRITES onto a tooltip, as opposed to what it can read off one. An installed route
+-- that never fires reads exactly like a route that was never installed, and the two share no
+-- fix, so the call counts are printed beside the installation.
+local function tooltipWriteRoute()
+    out("tooltip lines EQ adds - Modules/Tooltips/QuestTooltips.lua")
+
+    local processor = resolve("TooltipDataProcessor")
+    local enumType  = resolve("Enum.TooltipDataType")
+    line("TooltipDataProcessor: %s   AddTooltipPostCall: %s",
+         type(processor), type(processor) == "table" and type(processor.AddTooltipPostCall) or "n/a")
+    line("Enum.TooltipDataType.Unit=%s .Item=%s",
+         val(type(enumType) == "table" and enumType.Unit),
+         val(type(enumType) == "table" and enumType.Item))
+    local gt = _G["GameTooltip"]
+    line("GameTooltip:HookScript=%s  GetUnit=%s  GetItem=%s",
+         type(gt) == "table" and type(gt.HookScript) or "no GameTooltip",
+         type(gt) == "table" and type(gt.GetUnit) or "n/a",
+         type(gt) == "table" and type(gt.GetItem) or "n/a")
+
+    local QT = ns:GetSubsystem("QuestTooltips")
+    if not QT then
+        line("QuestTooltips subsystem NOT loaded - this TOC does not list the module")
+        return
+    end
+    line("route installed: %s", tostring(QT.route))
+    if QT.route == "none" then
+        line("  nothing installed. Either the option is off or neither route resolved above.")
+    end
+    if type(QT.hooks) == "table" then
+        local names = {}
+        for k in pairs(QT.hooks) do names[#names + 1] = k end
+        table.sort(names)
+        for i = 1, #names do
+            line("  hook %-34s %s", names[i], tostring(QT.hooks[names[i]]))
+        end
+    end
+    -- Counters only, with no verdict. They tick on a HOVER, and the live test below is what
+    -- actually decides whether the route works - an earlier version judged these against an
+    -- instruction that asked the reader to TARGET a mob, which never renders a tooltip.
+    line("unit tooltips rendered so far=%d, EQ added %d line(s)", QT.unitCalls or 0, QT.unitLines or 0)
+    line("item tooltips rendered so far=%d, EQ added %d line(s)", QT.itemCalls or 0, QT.itemLines or 0)
+
+    -- The unit half is gated on the Classic mob table because retail's own tooltip already
+    -- carries these lines. Say so, or a retail run reads as the feature being broken.
+    line("mob table loaded: %s  (nil = unit lines are OFF here BY DESIGN, retail has its own)",
+         tostring(ns.CLASSIC_QUEST_NPCS ~= nil))
+
+    local QI = ns:GetSubsystem("NameplateQuestIcons")
+    if QI and QI.CacheHeld then
+        local indexed = QI.IndexedItemNames and QI:IndexedItemNames() or 0
+        line("shared objective cache held: %s   item names indexed: %d",
+             tostring(QI:CacheHeld()), indexed)
+        -- Printed only when it applies. Stating "0 indexed means ..." beside a count of 10
+        -- reads as the reported value rather than as the note it is.
+        if indexed == 0 then
+            line("  0 with the cache held means no quest in your log wants an item.")
+        end
+    else
+        line("shared objective cache: NameplateQuestIcons not loaded, so both halves are inert")
+    end
+end
+
+-- Calls the thing instead of reasoning about it. A passive counter cannot tell "the hook is
+-- dead" from "you have not hovered anything yet", and this project has lost rounds to exactly
+-- that shape of guess. Driving a real render answers it in one line.
+local function tooltipLiveTest()
+    local QT = ns:GetSubsystem("QuestTooltips")
+    local gt = _G["GameTooltip"]
+    if not QT then return end
+    if type(gt) ~= "table" or type(gt.SetOwner) ~= "function" then
+        line("no GameTooltip to drive - the live test cannot run")
+        return
+    end
+
+    out("live hook test - EQ drives a real tooltip rather than waiting for you to hover one")
+    local parent = _G["UIParent"]
+
+    local unitsBefore, unitLinesBefore = QT.unitCalls or 0, QT.unitLines or 0
+    local unitExists = resolve("UnitExists")
+    local driveUnit
+    if type(unitExists) == "function" then
+        -- mouseover is usually gone by the time a slash command is typed, but it costs nothing
+        if unitExists("target") then driveUnit = "target"
+        elseif unitExists("mouseover") then driveUnit = "mouseover" end
+    end
+
+    if driveUnit then
+        pcall(gt.SetOwner, gt, parent, "ANCHOR_NONE")
+        pcall(gt.ClearLines, gt)
+        local ok = pcall(gt.SetUnit, gt, driveUnit)
+        local fired = (QT.unitCalls or 0) > unitsBefore
+        line("SetUnit(%s): call %s, hook fired=%s, EQ added %d line(s)",
+             driveUnit, ok and "ok" or "RAISED", tostring(fired),
+             (QT.unitLines or 0) - unitLinesBefore)
+        if not fired then
+            line("  the unit hook did NOT fire. That is the ROUTE, not the data - the other")
+            line("  route above is the fix. Data problems show as fired=true with 0 lines.")
+        elseif ns.CLASSIC_QUEST_NPCS == nil then
+            line("  0 lines is CORRECT here - retail writes its own unit quest lines.")
+        end
+        pcall(gt.Hide, gt)
+    elseif unitsBefore > 0 then
+        -- The counters printed above already settle this. Reporting only "no target" would
+        -- leave the reader hunting for a proof this section has already handed them.
+        line("SetUnit: no target - and none needed. %d unit tooltip(s) have already rendered",
+             unitsBefore)
+        line("  and EQ added %d line(s) to them, so the unit hook DOES fire on this client.",
+             unitLinesBefore)
+    else
+        line("SetUnit: no target, and no unit tooltip has rendered yet, so the unit hook is")
+        line("  still unproven. Target any mob and run this again.")
+    end
+
+    -- The item half needs an item the quest log actually wants, so the bags are searched for
+    -- one rather than asking the reader to find it. Reports the search separately from the
+    -- result, because "no such item" is not a failure.
+    local getNum  = resolve("C_Container.GetContainerNumSlots") or resolve("GetContainerNumSlots")
+    local getLink = resolve("C_Container.GetContainerItemLink") or resolve("GetContainerItemLink")
+    local QI = ns:GetSubsystem("NameplateQuestIcons")
+    if not (type(getNum) == "function" and type(getLink) == "function"
+            and QI and QI.ItemObjectives and type(gt.SetBagItem) == "function") then
+        line("SetBagItem: no container API to search the bags with")
+        return
+    end
+
+    local scratch, foundBag, foundSlot, foundName = {}, nil, nil, nil
+    for bag = 0, 4 do
+        local okN, slots = pcall(getNum, bag)
+        for slot = 1, (okN and tonumber(slots) or 0) do
+            local okL, link = pcall(getLink, bag, slot)
+            local name = okL and type(link) == "string" and link:match("|h%[(.-)%]|h")
+            if name and QI:ItemObjectives(name, scratch) > 0 then
+                foundBag, foundSlot, foundName = bag, slot, name
+                break
+            end
+        end
+        if foundBag then break end
+    end
+
+    if not foundBag then
+        line("SetBagItem: nothing in your bags matches an objective, so there is nothing here")
+        line("  to drive. That is a missing ITEM, not a missing hook.")
+        if (QT.itemCalls or 0) > 0 then
+            line("  %d item tooltip(s) have already rendered and EQ added %d line(s), so the",
+                 QT.itemCalls or 0, QT.itemLines or 0)
+            line("  item hook fires either way.")
+        end
+        -- Names the items rather than saying "loot one" - the index already knows them, and
+        -- the reader should not have to work out which quest to go and advance.
+        local wanted = {}
+        local n = QI.WantedItems and QI:WantedItems(wanted, 6) or 0
+        if n > 0 then
+            line("  loot any ONE of these, then hover it in your bags and run this again:")
+            for i = 1, n do line("    %s", tostring(wanted[i])) end
+        end
+        return
+    end
+
+    local itemsBefore, itemLinesBefore = QT.itemCalls or 0, QT.itemLines or 0
+    pcall(gt.SetOwner, gt, parent, "ANCHOR_NONE")
+    pcall(gt.ClearLines, gt)
+    local okI = pcall(gt.SetBagItem, gt, foundBag, foundSlot)
+    local firedI = (QT.itemCalls or 0) > itemsBefore
+    line("SetBagItem(%d,%d) %q: call %s, hook fired=%s, EQ added %d line(s)",
+         foundBag, foundSlot, tostring(foundName), okI and "ok" or "RAISED",
+         tostring(firedI), (QT.itemLines or 0) - itemLinesBefore)
+    if not firedI then
+        line("  the item hook did NOT fire, and that item IS wanted by a quest in your log,")
+        line("  so the match is not the fault. The route is.")
+    end
+    pcall(gt.Hide, gt)
+end
+
 function Probe:Tooltip()
-    out("unit tooltip scrape - target a mob you have a quest for first")
+    tooltipWriteRoute()
+    tooltipLiveTest()
+    out("unit tooltip scrape - MOUSE OVER a quest mob, or target one, before this section")
 
     local unitExists = resolve("UnitExists")
     local unitName   = resolve("UnitName")
@@ -2202,8 +2495,9 @@ function Probe:Run(msg)
         runSection(self, name, SECTIONS[name])
     end
     -- tooltip, mappoi, flare and xp are left out on purpose. Each needs setup first, so a blind
-    -- run would report the missing setup as a missing capability. flare mutates live pins, and
-    -- xp mutates the selected quest log entry.
+    -- run would report the missing setup as a missing capability. flare mutates live pins, xp
+    -- mutates the selected quest log entry, and tooltip drives GameTooltip through a render to
+    -- prove its hook fired - transient, but it is still a live frame being written to.
     out("run /eqsprobe tooltip separately with a quest mob targeted, /eqsprobe mappoi with the world map OPEN, and /eqsprobe xp with TWO quests in the log")
 end
 

@@ -100,8 +100,7 @@ local function fullRebuild()
                     isOnMap        = info.isOnMap,
                     isCampaign     = deriveIsCampaign(id, info),
                     isAutoComplete = info.isAutoComplete,
-                    isWatched      = C_QuestLog.GetQuestWatchType
-                                     and C_QuestLog.GetQuestWatchType(id) ~= nil,
+                    isWatched      = ns.Compat.IsQuestWatched(id),
                     tagID          = getTagID(id),
                     classification = (C_QuestInfoSystem
                                       and C_QuestInfoSystem.GetQuestClassification
@@ -159,8 +158,7 @@ end
 local function refreshDynamicFields()
     local onlyWatched, pinnedSet = trackerFilterState()
     for id, q in pairs(Cache.quests) do
-        local watched = C_QuestLog.GetQuestWatchType
-                        and C_QuestLog.GetQuestWatchType(id) ~= nil
+        local watched = ns.Compat.IsQuestWatched(id)
         q.isWatched = watched
         q.isCampaign = deriveIsCampaign(id)
         if watched or not onlyWatched or (pinnedSet and pinnedSet[id]) then
@@ -194,6 +192,13 @@ end
 function Cache:All()
     refresh()
     return self.quests
+end
+
+-- The tracked set on Classic lives in EQOT's saved variables and answers to no game event, so a
+-- toggle there has to say so itself. Objective-level is enough - refreshDynamicFields recomputes
+-- isWatched for every cached quest, and nothing else about the quest moved.
+function Cache:InvalidateWatched()
+    Cache.dirtyObjectives = true
 end
 
 function Cache:OnInitialize()

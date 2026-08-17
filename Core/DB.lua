@@ -16,6 +16,7 @@ DB.defaults = {
             npIconTextSize  = 13,
             npIconOffsetX   = 0,
             npIconOffsetY   = 0,
+            questTooltips   = true,
         },
         worldQuests = {
             enabled = true,
@@ -44,6 +45,10 @@ DB.defaults = {
             hideDungeonQuests    = false,
             hideRepeatableQuests = false,
             hideProfessionQuests = false,
+            onlyTrackedPins      = false,
+            showMapCoords        = true,
+            showMinimapCoords    = false,
+            coordPrecision       = 1,
         },
         history = {
             enabled   = true,

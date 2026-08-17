@@ -91,7 +91,7 @@ read_globals = {
     -- additional API surfaced by luacheck across the full codebase
     "debugprofilestop", "UpdateAddOnMemoryUsage", "GetAddOnMemoryUsage",
     "GetServerTime", "IsInInstance", "IsShiftKeyDown", "IsMouseButtonDown", "SetCursor",
-    "UnitIsPlayer", "UnitCanAttack", "C_NamePlate", "C_TooltipInfo", "C_ContentTracking",
+    "UnitIsPlayer", "UnitCanAttack", "UnitExists", "C_NamePlate", "C_TooltipInfo", "C_ContentTracking",
     "GetInventorySlotInfo", "GetInventoryItemLink", "GetItemInfoInstant",
     "GetQuestLogItemLink", "GetQuestLogChoiceInfo", "GetNumQuestLogChoices",
     "GetQuestLogSpecialItemInfo", "GetQuestLogSpecialItemCooldown", "IsQuestLogSpecialItemInRange",

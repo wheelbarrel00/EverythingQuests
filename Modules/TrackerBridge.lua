@@ -121,6 +121,39 @@ function Bridge:ApplyFocusArrow()
     })
 end
 
+-- The "only markers for tracked quests" filter reads EQOT's tracked set, and that set answers to
+-- no game event, so the map would sit stale until an unrelated quest event wandered by.
+function Bridge:ApplyTrackedRepaint()
+    -- OnDirty carries no id and cannot be unregistered, unlike AddFocusListener, so a second
+    -- registration is permanent and every toggle would repaint twice.
+    if self._trackedRepaint then return end
+    local TS = ns.Compat.TrackedSet()
+    if not (TS and type(TS.OnDirty) == "function") then return end
+    self._trackedRepaint = true
+
+    -- EQOT seeds its set on first login by writing every quest in the log in one synchronous
+    -- loop, which is one dirty call per quest. A zero delay coalesces that whole burst into a
+    -- single repaint without needing to know how many quests are in the log.
+    local pending = false
+    local function repaint()
+        pending = false
+        local Cache = ns:GetSubsystem("Cache")
+        if Cache then Cache:InvalidateWatched() end
+        local P = ns:GetSubsystem("MapPOIProvider")
+        if P and P.provider and P.provider.RefreshAllData then
+            P.provider:RefreshAllData()
+        end
+        local MM = ns:GetSubsystem("MinimapQuestPins")
+        if MM and MM.Rebuild then MM:Rebuild() end
+    end
+
+    pcall(TS.OnDirty, TS, function()
+        if pending then return end
+        pending = true
+        C_Timer.After(0, repaint)
+    end)
+end
+
 function Bridge:OnEnable()
     local A = api()
     if not A then
@@ -144,4 +177,5 @@ function Bridge:OnEnable()
     self:ApplyChainIcon()
     self:ApplyEQIcon()
     self:ApplyFocusArrow()
+    self:ApplyTrackedRepaint()
 end

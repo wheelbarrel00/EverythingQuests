@@ -234,6 +234,86 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
                 L["Draws the gold circle behind the exclamation mark of every quest giver who has something for you. Off by default. The mark itself still tells these apart from the quests you are already carrying, because those use their own objective art or the turn-in mark instead."])
             place(availRing, 0, 6)
         end
+
+        local function trackedGet()
+            local DB = ns:GetSubsystem("DB")
+            return (DB and DB.db.profile.map and DB.db.profile.map.onlyTrackedPins) == true
+        end
+        local function trackedSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.onlyTrackedPins = v and true or false
+            end
+            refreshPins()
+            local MM = ns:GetSubsystem("MinimapQuestPins")
+            if MM then MM:Rebuild() end
+        end
+        local tracked = Options:CreateCheckbox(content,
+            L["Only show markers for quests you are tracking"],
+            trackedGet, trackedSet,
+            L["Leaves out the markers for any quest in your log that you have untracked, so a busy zone shows only what you are actually working on. Off by default. Quests you have not picked up yet are not affected, because there is nothing to have tracked."])
+        place(tracked, 0, 6)
+    end
+
+    if ns:GetSubsystem("MapCoords") then
+        local coordsHeader = Options:CreateSectionHeader(content, L["Coordinates"])
+        place(coordsHeader, 0, 16)
+
+        local function coordSetting(key, default)
+            return
+                function()
+                    local DB = ns:GetSubsystem("DB")
+                    local v = DB and DB.db.profile.map and DB.db.profile.map[key]
+                    if v == nil then return default end
+                    return v == true
+                end,
+                function(value)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then
+                        DB.db.profile.map = DB.db.profile.map or {}
+                        DB.db.profile.map[key] = value and true or false
+                    end
+                    local MC = ns:GetSubsystem("MapCoords")
+                    if MC then MC:ApplyEnabled() end
+                end
+        end
+
+        local mapCoordGet, mapCoordSet = coordSetting("showMapCoords", true)
+        local mapCoord = Options:CreateCheckbox(content,
+            L["Show coordinates on the world map"],
+            mapCoordGet, mapCoordSet,
+            L["Puts a small readout in the bottom left of the world map with the position your mouse is pointing at, and your own position when you are looking at the zone you are standing in. Turn it off if another addon already shows coordinates there."])
+        place(mapCoord, 0, 12)
+
+        local mmCoordGet, mmCoordSet = coordSetting("showMinimapCoords", false)
+        local mmCoord = Options:CreateCheckbox(content,
+            L["Show coordinates under the minimap"],
+            mmCoordGet, mmCoordSet,
+            L["Puts your own position just below the minimap so it is readable without opening the map. Off by default, because many interface addons already put something there."])
+        place(mmCoord, 0, 6)
+
+        local function precGet()
+            local DB = ns:GetSubsystem("DB")
+            local n = DB and DB.db.profile.map and DB.db.profile.map.coordPrecision
+            return type(n) == "number" and n or 1
+        end
+        local function precSet(value)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.coordPrecision = value
+            end
+            local MC = ns:GetSubsystem("MapCoords")
+            if MC then MC:Refresh() end
+        end
+        local prec = Options:CreateSlider(content, L["Coordinate decimals"],
+            0, 2, 1, precGet, precSet,
+            function(v) return ("%d"):format(v) end)
+        place(prec, 4, 10)
+        prec:SetWidth(280)
+        Options:AttachTooltip(prec, L["Coordinate decimals"],
+            L["How precise the numbers are. Zero is whole numbers, which is enough to find a spot on the map. Two is what most quest guides quote."])
     end
 
     if Avail and ns.CLASSIC_QUEST_CATEGORY then
@@ -275,6 +355,26 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["Leaves out the quests you can hand in over and over, usually a turn-in for reputation or a common trade good. They never stop being offered, so they stay on the map forever once you can see them."])
         categoryOption("hideProfessionQuests", L["Profession quests"],
             L["Leaves out quests that require a trade skill, such as a Blacksmithing or Alchemy specialization. Everything Quests cannot read your skill levels on this version of the game, so these are offered even when you have not trained the profession they need."])
+    end
+
+    if ns:GetSubsystem("QuestTooltips") then
+        local tipHeader = Options:CreateSectionHeader(content, L["Tooltips"])
+        place(tipHeader, 0, 16)
+
+        local tipBox = Options:CreateCheckbox(content,
+            L["Show quest progress on tooltips"],
+            function()
+                local DB = ns:GetSubsystem("DB")
+                return not DB or DB.db.profile.general.questTooltips ~= false
+            end,
+            function(v)
+                local DB = ns:GetSubsystem("DB")
+                if DB then DB.db.profile.general.questTooltips = v and true or false end
+                local QT = ns:GetSubsystem("QuestTooltips")
+                if QT then QT:ApplyEnabled() end
+            end,
+            L["Adds the quest name and what it still needs to the tooltips you already see in the game. Hovering an item in your bags tells you which quest wants it and how many are still missing. On Classic, hovering an enemy also tells you which quest it counts toward, which the game itself never says there. Only quests already in your log are listed, and nothing is added to a tooltip that has nothing to say."])
+        place(tipBox, 0, 12)
     end
 
     do

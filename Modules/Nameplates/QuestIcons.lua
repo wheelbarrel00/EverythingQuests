@@ -61,7 +61,40 @@ local activeQuests = {}   -- quest title -> objective text -> entry, for the too
 local questObjList = {}   -- questID -> { entry, ... } in quest log order
 local questObjSlot = {}   -- questID -> objective type -> index within that type -> entry
 local npcQuests    = {}   -- creature id -> { { quest, slot, otype }, ... }
+local itemQuests   = {}   -- lowercased item name -> { entry, ... }
 local _logRows = {}
+
+-- Trailing separators, compared whole rather than through a character class. A class would
+-- split the multi byte full width colon into three bytes and could eat the tail of a real
+-- character in any language that uses one.
+local NAME_SEPARATORS = { ":", "\239\188\154" }
+
+-- An item objective's text is the item's own name followed by its count, in the client's own
+-- language, so the name is taken from the text rather than from a shipped table. The count is
+-- stripped first and the separator second, because the separator is the part that varies by
+-- language while "n/n" does not. The whole name has to match and not a substring, or "Okra"
+-- would claim every tooltip whose item merely contains it.
+local function objectiveItemName(text)
+    local name, found = text:gsub("%s*%d+%s*/%s*%d+%s*$", "")
+    if found == 0 then return text end
+    name = name:gsub("%s+$", "")
+    for i = 1, #NAME_SEPARATORS do
+        local sep = NAME_SEPARATORS[i]
+        if name:sub(-#sep) == sep then
+            name = name:sub(1, -#sep - 1):gsub("%s+$", "")
+            break
+        end
+    end
+    if name == "" then return text end
+    return name
+end
+
+local function indexItem(text, entry)
+    local key = objectiveItemName(text):lower()
+    local list = itemQuests[key]
+    if not list then list = {}; itemQuests[key] = list end
+    list[#list + 1] = entry
+end
 
 -- The shipped kind maps onto the client's own objective type, which is what makes the index
 -- meaningful: "the 2nd item objective" rather than "the 2nd objective".
@@ -75,6 +108,7 @@ local function rebuildCache()
     wipe(questObjList)
     wipe(questObjSlot)
     wipe(npcQuests)
+    wipe(itemQuests)
     if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then
         return
     end
@@ -119,10 +153,16 @@ local function rebuildCache()
                         if entry then
                             entry.type        = objType(text, itemTexture)
                             entry.itemTexture = itemTexture
+                            -- Carried so the tooltip lines name the objective off the SAME
+                            -- entry the plate counts. A second derivation would let a mob's
+                            -- nameplate and its tooltip disagree while both looked right.
+                            entry.text        = text
+                            entry.title       = info.title
                             objMap = objMap or {}
                             objMap[text] = entry
                             objList = objList or {}
                             objList[#objList + 1] = entry
+                            if otype == "item" then indexItem(text, entry) end
                         end
                     end
                     -- Recorded for EVERY objective, complete ones as false. A finished
@@ -412,13 +452,86 @@ local function onQuestLogUpdate()
     end
 end
 
-local REGISTERED = {
+-- Split because the cache outlived its first consumer. The nameplate icons and the tooltip
+-- lines both read it, and either one can be switched off while the other is on.
+local CACHE_EVENTS = {
+    QUEST_LOG_UPDATE = onQuestLogUpdate,
+    QUEST_ACCEPTED   = onQuestLogUpdate,
+    QUEST_REMOVED    = onQuestLogUpdate,
+}
+local PLATE_EVENTS = {
     NAME_PLATE_UNIT_ADDED   = onPlateAdded,
     NAME_PLATE_UNIT_REMOVED = onPlateRemoved,
-    QUEST_LOG_UPDATE        = onQuestLogUpdate,
-    QUEST_ACCEPTED          = onQuestLogUpdate,
-    QUEST_REMOVED           = onQuestLogUpdate,
 }
+
+-- ONE cache serves both consumers. A second copy would let a mob's nameplate and its tooltip
+-- describe the same objective differently, with each looking correct on its own.
+local _holders, _holderCount = {}, 0
+
+function QI:HoldCache(id, want)
+    local Events = ns:GetSubsystem("Events")
+    if not Events then return end
+    want = want and true or false
+    -- Counted rather than derived from the table, so a consumer calling twice with the same
+    -- answer cannot leave the events registered once and released twice.
+    if (_holders[id] and true or false) == want then return end
+    _holders[id] = want or nil
+    _holderCount = _holderCount + (want and 1 or -1)
+
+    if want and _holderCount == 1 then
+        for event, fn in pairs(CACHE_EVENTS) do Events:On(event, fn) end
+        rebuildCache()
+    elseif (not want) and _holderCount == 0 then
+        for event, fn in pairs(CACHE_EVENTS) do Events:Off(event, fn) end
+        wipe(activeQuests)
+        wipe(questObjList)
+        wipe(questObjSlot)
+        wipe(npcQuests)
+        wipe(itemQuests)
+    end
+end
+
+-- The same scan the plates run, so the tooltip names the objective the icon is counting.
+function QI:UnitObjectives(unit, out)
+    if not unit then wipe(out); return 0 end
+    return scanInto(unit, out)
+end
+
+-- Every quest waiting on this item, matched on the client's own objective text so it is right
+-- in every language without a shipped name table.
+function QI:ItemObjectives(itemName, out)
+    wipe(out)
+    if type(itemName) ~= "string" or itemName == "" then return 0 end
+    local list = itemQuests[itemName:lower()]
+    if not list then return 0 end
+    for i = 1, #list do out[i] = list[i] end
+    return #list
+end
+
+-- Read by /eqsprobe tooltip. An empty index and an unheld cache look identical from outside.
+function QI:CacheHeld()
+    return _holderCount > 0
+end
+function QI:IndexedItemNames()
+    local n = 0
+    for _ in pairs(itemQuests) do n = n + 1 end
+    return n
+end
+
+-- The objective text rather than the index key, because the key is lowercased for matching and
+-- /eqsprobe has to name an item the player can actually go and look for.
+function QI:WantedItems(out, max)
+    local n = 0
+    for _, list in pairs(itemQuests) do
+        local e = list[1]
+        if e and e.text then
+            n = n + 1
+            out[n] = e.text
+            if max and n >= max then return n end
+        end
+    end
+    return n
+end
 
 function QI:IsEnabled()
     local DB = ns:GetSubsystem("DB")
@@ -432,11 +545,12 @@ function QI:ApplyEnabled()
     if on == self.enabled then return end
     self.enabled = on
 
+    self:HoldCache("nameplates", on)
+
     local Events = ns:GetSubsystem("Events")
     if not Events then return end
     if on then
-        for event, fn in pairs(REGISTERED) do Events:On(event, fn) end
-        rebuildCache()
+        for event, fn in pairs(PLATE_EVENTS) do Events:On(event, fn) end
         if C_NamePlate and C_NamePlate.GetNamePlates then
             for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
                 local unit = plate.namePlateUnitToken
@@ -445,7 +559,7 @@ function QI:ApplyEnabled()
         end
         refreshAllPlates("ENABLE")
     else
-        for event, fn in pairs(REGISTERED) do Events:Off(event, fn) end
+        for event, fn in pairs(PLATE_EVENTS) do Events:Off(event, fn) end
         for unit in pairs(activePlates) do
             local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unit)
             hideFrame(plate)
