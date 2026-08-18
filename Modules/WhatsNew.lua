@@ -3,26 +3,31 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.42.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.42.0"
+local FEATURE_POPUP_VERSION = "1.43.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.43.0"
 
 local POPUP_BODY = [[
-|cffEBB706Classic: look a quest up before you pick it up|r
-The new |cffffffffQuest Browser|r answers the one thing the game itself cannot tell you on Classic: what a quest is, before you have ever accepted it. It covers almost every quest in the game. Search by name or by quest number, or put |cffffffff"quotes"|r around a name for an exact match.
+|cffEBB706Quest information on the tooltips you already hover|r
+Hover an item in your bags and it now tells you |cffffffffwhich quest wants it|r and how many you still need. On Classic, hovering an enemy tells you which quest it counts toward and what is left, which the game there never says at all.
 
-Each quest shows its level, its race and class requirements, where it starts, where its objectives are, where it is handed in, what has to be finished before it, and if you cannot take it yet, |cffffffffthe reason why|r.
+Nothing is added to a tooltip that has nothing to say. On retail the enemy half is left alone, because the game already writes those lines itself.
 
-|cffEBB706Three ways in|r
-Type |cffffffff/eqs quests|r, use the button under |cffffffff/eqs|r > General, or |cffffffffright-click|r a gold quest marker on the map. That right-click did nothing before, because a quest you have not accepted has no quest log entry to open.
+|cffaaaaaaThe bag item half has been tested on Classic but not on retail. If it looks wrong there, please let me know.|r
 
-|cffEBB706It is clickable throughout|r
-Clicking a location opens the map there and drops a waypoint on it. Clicking a listed prerequisite or follow-up jumps to that quest, so you can walk most chains without typing anything.
+|cffEBB706Coordinates, on the map and under the minimap|r
+The world map now shows the spot your |cffffffffmouse|r is pointing at, and |cffffffffyour own position|r when you are looking at the zone you are standing in. There is a matching readout under the minimap, off by default, and a slider for how many decimals to show.
 
-|cffEBB706Simplified Chinese|r
-Everything Quests now ships |cffffffffzhCN|r translations alongside French, Russian and Korean. French and Russian are complete again, covering everything added in this release.
+|cffEBB706Two ways to quiet a busy map|r
+|cffffffffOnly show markers for quests you are tracking|r leaves out the markers for anything in your log you have untracked, so a crowded zone shows only what you are working on. |cffffffffFade markers that cover your position|r makes any marker sitting on top of your own arrow see-through so you can still find yourself. Both are off by default and both live under |cffffffff/eqs|r > General.
+
+|cffEBB706Auto-accept picks the right quest|r
+At a quest giver offering several, auto-accept now takes the first quest it can |cffffffffactually accept|r rather than whatever sits at the top of the list, and passes over a trivial grey quest when a real one is on offer.
+
+|cffEBB706Traditional Chinese|r
+Everything Quests now ships |cffffffffzhTW|r translations alongside French, Russian, Korean and Simplified Chinese.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian) and |cfffffffflabrie75|r (Korean) for keeping Everything Quests translated, to the contributor who brought Simplified Chinese over Discord, and to everyone who sends reports and suggestions.
+Thanks to |cffffffffAIR|r for reporting that |cffffffffGet Directions|r could set no waypoint and say nothing about it, which is fixed in this release. Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian) and |cfffffffflabrie75|r (Korean) for keeping Everything Quests translated, to |cffffffffBNS333|r (Traditional Chinese) and |cffffffffKeriaovo|r (Simplified Chinese), and to everyone who sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]

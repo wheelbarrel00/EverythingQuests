@@ -530,6 +530,8 @@ L[" for the many features, fixes, and reports that keep shaping Everything Quest
 L[" for the many hours spent translating Everything Quests into French."] = true
 L[" for the many hours spent translating Everything Quests into Russian."] = true
 L[" for the many hours spent translating Everything Quests into Korean."] = true
+L[" for the many hours spent translating Everything Quests into Simplified Chinese."] = true
+L[" for the many hours spent translating Everything Quests into Traditional Chinese."] = true
 L["Changelog"] = true
 L["Older versions are on CurseForge"] = true
 

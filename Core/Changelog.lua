@@ -2,6 +2,24 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.43.0", date = "2026-08-17",
+        sections = {
+            { head = "New Features", items = {
+                "Quest progress on tooltips. Hovering an item in your bags tells you which quest wants it and how many you still need. On Classic, hovering an enemy tells you which quest it counts toward and what is left, which the game there never says. Nothing is added to a tooltip that has nothing to say. Note: the bag item half has been tested on Classic but not on retail, so if it looks wrong there please let me know.",
+                "Coordinates on the world map, showing the spot your mouse is pointing at and your own position when you are looking at the zone you are standing in. There is a matching readout under the minimap, off by default, and a slider for how many decimals to show.",
+                "Only show markers for quests you are tracking. Leaves out the map markers for any quest in your log you have untracked, so a busy zone shows only what you are working on. Off by default.",
+                "Fade markers that cover your position. Markers sitting on top of your own arrow become see-through so you can still find yourself on a crowded zone. Off by default, and the markers still answer the mouse.",
+                "Traditional Chinese, contributed by BNS333. The addon now ships zhTW translations alongside French, Russian, Korean and Simplified Chinese.",
+            } },
+            { head = "Improvements", items = {
+                "Auto-accept picks the right quest at a busy quest giver. It takes the first quest it can actually accept rather than whatever sits at the top of the list, and passes over a trivial grey quest when a real one is on offer. A trivial quest is still accepted when it is the only thing there.",
+            } },
+            { head = "Bug Fixes", items = {
+                "\"Get Directions\" looked like it did nothing on a quest already in your log. It set a waypoint only when TomTom was installed and the game knew where your next objective was, and said nothing in either other case. It now prints the coordinates when you have no TomTom, and otherwise tells you the quest is super-tracked but the game has given no position to point at. Reported by AIR.",
+            } },
+        },
+    },
+    {
         version = "1.42.0", date = "2026-08-15",
         sections = {
             { head = "New Features", items = {

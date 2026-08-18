@@ -131,9 +131,8 @@ function Bridge:ApplyTrackedRepaint()
     if not (TS and type(TS.OnDirty) == "function") then return end
     self._trackedRepaint = true
 
-    -- EQOT seeds its set on first login by writing every quest in the log in one synchronous
-    -- loop, which is one dirty call per quest. A zero delay coalesces that whole burst into a
-    -- single repaint without needing to know how many quests are in the log.
+    -- The set fires once per quest it changes, so a pass that writes many in one frame arrives as
+    -- a burst. A zero delay coalesces whatever lands in that frame into a single repaint.
     local pending = false
     local function repaint()
         pending = false

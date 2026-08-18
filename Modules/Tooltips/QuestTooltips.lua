@@ -118,7 +118,7 @@ end
 
 -- Blizzard removed the OnTooltipSetUnit and OnTooltipSetItem scripts in the 10.0.2 tooltip
 -- rewrite and replaced them with TooltipDataProcessor. Classic kept the scripts and has neither
--- TooltipDataProcessor nor C_TooltipInfo, the same shape Core/Compat.lua already measured
+-- TooltipDataProcessor nor C_TooltipInfo, which is why Core/Compat.lua feature-detects
 -- there, so presence decides the route rather than a build number.
 local function installModern()
     local P = _G["TooltipDataProcessor"]

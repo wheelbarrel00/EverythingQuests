@@ -822,8 +822,8 @@ local function trackedSourceReadings()
          or (TS and "EQOT TrackedSet:IsTracked") or "nothing - every quest is cannot-tell")
     if type(numWatch) == "function" then
         local ok, n = pcall(numWatch)
-        -- Raw only, with NO verdict hung on it. This reads 0 on Era in every state, including
-        -- while IsQuestWatched answers true for a quest, so it cannot prove the list is empty.
+        -- Raw only, with NO verdict hung on it. EQOT measured this reading 0 on 1.15.9 even while
+        -- RemoveQuestWatch was flipping IsQuestWatched, so a 0 here proves nothing on its own.
         line("    GetNumQuestWatches() raw=%s   (0 in every state on Era - not evidence by itself)",
              ok and tostring(n) or "RAISED")
     end

@@ -93,7 +93,7 @@ function Compat.TrackedSet()
 end
 
 -- MEASURED 2026-08-16 on Era 1.15.9 by /eqsprobe mappoi: GetQuestWatchType is absent, and the
--- pre-namespace IsQuestWatched(logIndex) answered FALSE for all 14 quests while EQOT named 9 of
+-- pre-namespace IsQuestWatched(logIndex) answered FALSE for all 14 quests while EQOT named 10 of
 -- them tracked. EQOT owns the tracked set on this flavor and empties Blizzard's list behind every
 -- add, so reading that global hides every owned pin - a confident wrong answer, worse than none.
 -- Do not wire it back up.

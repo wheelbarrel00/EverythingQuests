@@ -3,8 +3,8 @@ local L = ns.L
 
 local M = ns:RegisterSubsystem("MapCoords", {})
 
--- Fast enough that the cursor readout tracks the mouse rather than trailing it. The player
--- readout costs one call and rides along.
+-- Fast enough that the cursor readout tracks the mouse rather than trailing it, which is what
+-- sets the rate. The player readout rides the same tick.
 local INTERVAL = 0.05
 
 local FONT_SIZE = 12

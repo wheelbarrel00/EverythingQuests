@@ -239,8 +239,8 @@ local FADE_ALPHA       = 0.3
 local FADE_PERIOD      = 0.15
 ns.MAPPOI_FADE_RADIUS_PINS = FADE_RADIUS_PINS
 
--- Neither flavor can enumerate the canvas: ExecuteOnAllPins is absent on Era, EnumerateAllPins on
--- retail. Acquired pins record themselves instead, which needs no client support at all.
+-- No ONE enumeration call works on both: Era has EnumerateAllPins and not ExecuteOnAllPins, retail
+-- the reverse. Acquired pins record themselves instead, which needs neither.
 local _live = {}
 local _fadeTicker, _fadedN = nil, 0
 

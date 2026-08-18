@@ -344,7 +344,8 @@ Everything Quests ships bundled translations — on a matching game client the i
 - **French (frFR)** — by **Zox**
 - **Russian (ruRU)** — by **Malevi4**
 - **Korean (koKR)** — by **labrie75**
-- **Simplified Chinese (zhCN)**
+- **Simplified Chinese (zhCN)** — by **Keriaovo**
+- **Traditional Chinese (zhTW)** — by **BNS333**
 
 Translations for Everything Quests and EQ Objective Tracker are maintained together in **[EverythingLocales](https://github.com/wheelbarrel00/EverythingLocales)**. The `Locales/` files in this repo are generated from it, so translation pull requests belong there rather than here. Contributions for more languages are very welcome.
 

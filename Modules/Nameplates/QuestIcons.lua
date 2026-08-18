@@ -184,7 +184,8 @@ local function rebuildCache()
     end
 
     -- The mob table is inverted HERE, over the quest log only, never searched during play.
-    -- Shipped it is questID -> mobs, 5011 rows. A 25-quest log inverts to a few hundred
+    -- Shipped it is questID -> mobs, and the row count differs per flavor. A 25-quest log
+    -- inverts to a few hundred
     -- entries. Absent on retail, where the tooltip carries the mapping itself.
     local mobsByQuest = ns.CLASSIC_QUEST_NPCS
     if not mobsByQuest then return end

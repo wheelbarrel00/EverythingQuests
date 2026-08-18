@@ -189,8 +189,8 @@ function W:_goToInLog(questID, title)
     if wm and wx and wy then
         self:SetWaypoint(wm, wx, wy, title)
     else
-        -- Silence read as a dead button. The client answers no position for an objective in
-        -- another zone or one that is not a place at all, and neither is a failure worth hiding.
+        -- Silence read as a dead button. The client returning no position is a normal answer, not
+        -- a failure, and saying so beats a click that appears to do nothing.
         print(("|cffEBB706EQ|r: |cffffffff%s|r is super-tracked and the map is open, but the game has not given a position for its next objective, so there is no arrow to set."):format(
             title or "Quest"))
     end

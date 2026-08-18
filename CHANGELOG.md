@@ -5,6 +5,26 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.0] - 2026-08-17
+
+Quest information on the tooltips you already hover, coordinates on the map and minimap, and two new ways to quiet a busy map. Plus Traditional Chinese.
+
+### New Features
+
+- **Quest progress on tooltips** - hovering an item in your bags now tells you which quest wants it and how many you still need. On Classic, hovering an enemy tells you which quest it counts toward and what is left, which the game there never says. Nothing is added to a tooltip that has nothing to say, and the enemy half is left alone on retail because the game already writes those lines itself. Note: the bag item half has been tested on Classic but not on retail, so if it looks wrong there please let me know.
+- **Coordinates on the world map** - a readout in the bottom left showing the spot your mouse is pointing at, and your own position when you are looking at the zone you are standing in. There is a matching readout under the minimap, off by default, and a slider for how many decimals to show.
+- **Only show markers for quests you are tracking** - leaves out the map markers for any quest in your log you have untracked, so a busy zone shows only what you are actually working on. Off by default. Quests you have not picked up yet are unaffected, because there is nothing to have untracked.
+- **Fade markers that cover your position** - markers sitting on top of your own arrow become see-through so you can still find yourself on a zone drawing hundreds of them. Off by default. The markers stay where they are and still answer the mouse.
+- **Traditional Chinese (zhTW)** - the addon now ships zhTW translations alongside French, Russian, Korean and Simplified Chinese, contributed by BNS333.
+
+### Improvements
+
+- **Auto-accept picks the right quest at a busy quest giver** - it now takes the first quest it can actually accept rather than whatever sits at the top of the list, and passes over a trivial grey quest when there is a real one on offer. A trivial quest is still accepted when it is the only thing there.
+
+### Bug Fixes
+
+- **"Get Directions" looked like it did nothing** - on a quest already in your log it set a waypoint only when TomTom was installed and the game knew where your next objective was, and said nothing at all in either other case. It now prints the coordinates when you have no TomTom, the same as it always did for a quest you have not accepted yet, and otherwise tells you the quest has been super-tracked but the game has given no position to point at. Reported by AIR.
+
 ## [1.42.0] - 2026-08-15
 
 The Quest Browser: look up almost any quest in the game on Classic Era and Burning Crusade Classic, including the ones you have never picked up. Plus Simplified Chinese translations.

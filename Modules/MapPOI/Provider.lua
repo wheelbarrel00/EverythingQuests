@@ -178,8 +178,8 @@ end
 -- counter bumped inside the producer climbs past the size of the quest log.
 M._untrackedHidden = 0
 
--- The third return is a string, not a boolean, because /eqsprobe has to tell four sources apart
--- that look identical on the map and share no cause when they go wrong.
+-- The third return is a string, not a boolean, because /eqsprobe has to tell the pin sources apart
+-- when they look identical on the map, and tell a refusal from an empty result.
 function M:PointsFor(questID, mapID, q)
     local X, Y, K, MK = self._ptX, self._ptY, self._ptKind, self._ptMask
     local isComplete = q and q.isComplete
