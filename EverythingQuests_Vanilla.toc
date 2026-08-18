@@ -110,6 +110,7 @@ Locales\frFR.lua
 Locales\ruRU.lua
 Locales\koKR.lua
 Locales\zhCN.lua
+Locales\zhTW.lua
 
 Core\DB.lua
 Core\Events.lua
