@@ -49,6 +49,17 @@ L["Show a ring around quest pins"] = true
 L["Draws the red circle behind every world map marker for a quest in your log, both the ones you are still working on and the ones that are ready to turn in. Turn it off for plain icons and a much quieter map when a zone is busy."] = true
 L["Show a ring around quests you can pick up"] = true
 L["Draws the gold circle behind the exclamation mark of every quest giver who has something for you. Off by default. The mark itself still tells these apart from the quests you are already carrying, because those use their own objective art or the turn-in mark instead."] = true
+L["Only show markers for quests you are tracking"] = true
+L["Leaves out the markers for any quest in your log that you have untracked, so a busy zone shows only what you are actually working on. Off by default. Quests you have not picked up yet are not affected, because there is nothing to have tracked."] = true
+L["Fade markers that cover your position"] = true
+L["Makes any marker sitting on top of your own arrow see-through, so you can still find yourself on a zone that is drawing hundreds of them. Off by default. The markers are still there and still answer the mouse, they are only dimmed while you are standing under them."] = true
+L["Coordinates"] = true
+L["Show coordinates on the world map"] = true
+L["Puts a small readout in the bottom left of the world map with the position your mouse is pointing at, and your own position when you are looking at the zone you are standing in. Turn it off if another addon already shows coordinates there."] = true
+L["Show coordinates under the minimap"] = true
+L["Puts your own position just below the minimap so it is readable without opening the map. Off by default, because many interface addons already put something there."] = true
+L["Coordinate decimals"] = true
+L["How precise the numbers are. Zero is whole numbers, which is enough to find a spot on the map. Two is what most quest guides quote."] = true
 L["Hide these quests on the map"] = true
 L["These only affect the markers for quests you have NOT picked up yet. A quest already in your log always keeps its markers, because hiding something you are carrying would make the map lie about what you still have to do."] = true
 L["Dungeon and raid quests"] = true
@@ -57,6 +68,9 @@ L["Repeatable quests"] = true
 L["Leaves out the quests you can hand in over and over, usually a turn-in for reputation or a common trade good. They never stop being offered, so they stay on the map forever once you can see them."] = true
 L["Profession quests"] = true
 L["Leaves out quests that require a trade skill, such as a Blacksmithing or Alchemy specialization. Everything Quests cannot read your skill levels on this version of the game, so these are offered even when you have not trained the profession they need."] = true
+L["Tooltips"] = true
+L["Show quest progress on tooltips"] = true
+L["Adds the quest name and what it still needs to the tooltips you already see in the game. Hovering an item in your bags tells you which quest wants it and how many are still missing. On Classic, hovering an enemy also tells you which quest it counts toward, which the game itself never says there. Only quests already in your log are listed, and nothing is added to a tooltip that has nothing to say."] = true
 L["Quest Browser"] = true
 L["Open Quest Browser"] = true
 L["Look up almost any quest in the game, including ones you have never picked up. Shows the level and race and class requirements, where it starts and turns in, what has to be finished first, and why you cannot take it yet. Also on /eqs quests, or right-click a gold quest marker on the map."] = true
@@ -382,6 +396,10 @@ L["Press Ctrl+A to select all, then Ctrl+C to copy."] = true
 L["first time seeing |cffffffff%s|r - added %d past completion%s (no dates; future turn-ins are dated)."] = true
 L["Quest history loaded empty; restored a backup from %s (%d entries)."] = true
 L["Quest history for %s was missing; restored a backup from %s (%d entries)."] = true
+
+-- ─── Modules/MapCoords.lua ───
+L["Cursor"] = true
+L["Player"] = true
 
 -- ─── Modules/MapPOI/Pin.lua ───
 L["%s XP"] = true
