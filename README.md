@@ -27,7 +27,9 @@ Everything Quests is a complete replacement for Blizzard's quest tracking and qu
 5. An account-wide **Quest History** log with six views and a backfill of past completions
 6. Branded **Quest POI** overlays on zone maps, and on Classic, objective spawn markers on both the world map and the minimap
 7. A **Quest Browser** on Classic, for looking up almost any quest in the game before you accept it
-8. Optional **auto-accept / auto-turn-in** for quest dialogs (Alt to pause)
+8. **Quest progress on game tooltips** — a bag item names the quest that wants it and how many are still missing
+9. **Coordinate readouts** on the world map and under the minimap, for the cursor and for your own position
+10. Optional **auto-accept / auto-turn-in** for quest dialogs (Alt to pause)
 
 Open Options with **`/eqs`**, from the minimap button, from the Everything Quests icon on the tracker, or via **Game Menu → Options → AddOns → Everything Quests**.
 
@@ -46,8 +48,11 @@ Era and TBC were measured identical across every game API the addon reads, so on
 - **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites and completion
 - **Nameplate quest icons**, resolved from the creature ID in the unit GUID, since a Classic unit tooltip carries no quest data
 - **The Quest Browser** — look up almost any quest in the game, including ones never picked up, with its level, race and class requirements, start and turn-in locations, prerequisites, and the reason it is not available yet. `/eqs quests`, or right-click a gold marker
+- **Quest progress on tooltips** — a bag item names the quest that wants it and what is still missing, and on Classic an enemy names the quest it counts toward, which the client there never does
+- **Coordinates** on the world map and under the minimap, with a slider for how many decimals to show
+- **Two ways to quiet a busy map**, both off by default: leave out markers for quests you have untracked, and fade markers sitting on top of your own position
 - **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, the **focus arrow**, and the **`/eqs`** options window (General and About tabs)
-- All five bundled locales
+- All six bundled locales
 
 **Retail-only**
 
