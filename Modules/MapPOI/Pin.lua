@@ -279,9 +279,8 @@ local function applyPlayerFade()
     -- moment the map is scrolled to another zone, and the player's own coordinates on a zone they
     -- are not standing in would fade an unrelated corner of it. GetPlayerMapPosition answers nil
     -- for a map the player is not on, which is what makes scrolling away simply stop fading.
-    -- Written as an if. `local px, py = fn and fn(id)` truncates the pair to ONE value, because
-    -- the result of `and` is adjusted to a single result, so py would always be nil and the fade
-    -- would never fire. Same family as the `true and nil` collapse recorded elsewhere.
+    -- An if, not `local px, py = fn and fn(id)` - that truncates the pair to one value, so py is
+    -- always nil and the fade never fires.
     if not ns.PlayerPositionOn then clearFade() return 0 end
     local px, py = ns.PlayerPositionOn(anyPin.mapID)
     if not (px and py) then clearFade() return 0 end

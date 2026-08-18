@@ -89,8 +89,13 @@ local function onUnit(tooltip)
     if alreadyAdded(tooltip, guid) then return end
 
     local n = QI:UnitObjectives(unit, _entries)
-    QT.unitLines = QT.unitLines + addLines(tooltip, n)
-    stamp(tooltip, guid)
+    local added = addLines(tooltip, n)
+    QT.unitLines = QT.unitLines + added
+    -- Only a pass that ADDED something may stamp. Stamping a zero-add records the tooltip's own
+    -- base count, and the next render of the same unit produces that identical count, so
+    -- alreadyAdded reads base >= base and refuses to look again. The quest would then never
+    -- appear on a mob whose tooltip was seen before the quest was accepted.
+    if added > 0 then stamp(tooltip, guid) end
 end
 
 local function onItem(tooltip)
@@ -106,8 +111,9 @@ local function onItem(tooltip)
     if alreadyAdded(tooltip, name) then return end
 
     local n = QI:ItemObjectives(name, _entries)
-    QT.itemLines = QT.itemLines + addLines(tooltip, n)
-    stamp(tooltip, name)
+    local added = addLines(tooltip, n)
+    QT.itemLines = QT.itemLines + added
+    if added > 0 then stamp(tooltip, name) end
 end
 
 -- Blizzard removed the OnTooltipSetUnit and OnTooltipSetItem scripts in the 10.0.2 tooltip

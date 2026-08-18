@@ -18,11 +18,10 @@ local function paused()
     return GetTime() < _declineLockUntil
 end
 
--- Index 1 is not always the one to take, and reading avail[1] ALONE meant one unusable first row
--- blocked auto-accept entirely while good rows sat behind it.
--- A trivial quest is still accepted when it is the only offer, so this can only ever change WHICH
--- quest is taken, never whether one is. Where the client carries no isTrivial field every row
--- reads non-trivial and this degrades to "the first usable index", which is still the fix.
+-- Reading avail[1] ALONE meant one unusable first row blocked auto-accept entirely while good rows
+-- sat behind it, so this walks. A trivial quest is deferred to a real one but still accepted when
+-- it is the only offer, and a client carrying no isTrivial field reads every row as non-trivial
+-- and degrades to the first usable index.
 local function firstOffer(avail)
     local fallback
     for i = 1, #avail do

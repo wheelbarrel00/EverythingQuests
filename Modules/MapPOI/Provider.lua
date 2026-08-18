@@ -160,9 +160,9 @@ end
 -- Owned pins only. A quest you have untracked is one you have deliberately set aside, so its
 -- markers are noise on a zone that already draws hundreds. Available quests are untouched - they
 -- are not in the log, so there is nothing to have tracked.
--- Tri-state ON PURPOSE. Core/Cache.lua leaves isWatched nil when the client has no
--- GetQuestWatchType at all, and false only when it answered "not tracked". Treating those the
--- same would empty the map on a client that cannot tell, so nil SHOWS the pin.
+-- Tri-state ON PURPOSE. isWatched is nil when NOTHING could answer - no C_QuestLog.GetQuestWatchType
+-- on this client and no EQOT tracked set either - and false only when a source said "not tracked".
+-- Treating those the same would empty the map on a client that cannot tell, so nil SHOWS the pin.
 function ns.QuestPinTracked(q)
     local DB = ns:GetSubsystem("DB")
     if (DB and DB.db.profile.map and DB.db.profile.map.onlyTrackedPins) ~= true then
@@ -173,18 +173,19 @@ function ns.QuestPinTracked(q)
 end
 
 -- Read by /eqsprobe mappoi. A filter that hid nothing and a filter that is switched off draw the
--- identical map.
+-- identical map. Counted by _DoRefresh from the third return, never in PointsFor itself -
+-- Modules/Minimap/QuestPins.lua calls PointsFor too and nothing resets this on that path, so a
+-- counter bumped inside the producer climbs past the size of the quest log.
 M._untrackedHidden = 0
 
--- The third return is a string, not a boolean, because /eqsprobe has to tell three sources apart
+-- The third return is a string, not a boolean, because /eqsprobe has to tell four sources apart
 -- that look identical on the map and share no cause when they go wrong.
 function M:PointsFor(questID, mapID, q)
     local X, Y, K, MK = self._ptX, self._ptY, self._ptKind, self._ptMask
     local isComplete = q and q.isComplete
 
     if not ns.QuestPinTracked(q) then
-        M._untrackedHidden = M._untrackedHidden + 1
-        return 0, 0, "none"
+        return 0, 0, "untracked"
     end
 
     -- A finished quest wants the turn-in, not the places you were farming. Every finisher
@@ -320,6 +321,9 @@ function providerMixin:_DoRefresh()
         for qid, q in pairs(Cache:All()) do
             if not _seenQids[qid] then
                 local n, thinned, source = M:PointsFor(qid, mapID, q)
+                if source == "untracked" then
+                    M._untrackedHidden = M._untrackedHidden + 1
+                end
                 M._spawnThinned = M._spawnThinned + thinned
                 for i = 1, n do
                     local x, y = M._ptX[i], M._ptY[i]
@@ -395,4 +399,8 @@ function M:OnEnable()
     Events:On("QUEST_REMOVED",          refresh)
     Events:On("QUEST_TURNED_IN",        refresh)
     Events:On("SUPER_TRACKING_CHANGED", refresh)
+    -- The only thing that announces a watch change on RETAIL, where the tracked-pin filter reads
+    -- C_QuestLog.GetQuestWatchType. Classic has its answer from TrackerBridge instead, because
+    -- EQOT owns the tracked set there and this event never fires for it.
+    Events:On("QUEST_WATCH_LIST_CHANGED", refresh)
 end

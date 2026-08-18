@@ -109,9 +109,9 @@ end
 -- Reached at RUNTIME by its consumers, so TOC order does not matter.
 ns.PlayerPositionOn = playerPositionOn
 
--- The cursor is in SCREEN units and the canvas in its own, so each has to be divided by its own
--- effective scale before they can be compared. Comparing them raw is the mistake that has cost
--- this project a round before.
+-- GetCursorPosition answers in SCREEN units while GetLeft and GetWidth are already in the canvas's
+-- own units, so ONLY the cursor is divided by the effective scale. Dividing the canvas side too
+-- looks symmetrical and breaks the subtraction.
 local function cursorPositionOn(canvas)
     if not (canvas and canvas.GetEffectiveScale and _G["GetCursorPosition"]) then return nil end
     local scale = canvas:GetEffectiveScale()

@@ -183,8 +183,16 @@ function W:_goToInLog(questID, title)
         end
     end
     local wm, wx, wy = liveWaypoint(questID)
-    if TomTom and TomTom.AddWaypoint and wm and wx and wy then
+    -- No TomTom test here. SetWaypoint already branches on it and prints the coordinates when it
+    -- is absent, and gating on TomTom first made that message unreachable from this path while
+    -- the not-in-log path printed it - the same click said different things about the same quest.
+    if wm and wx and wy then
         self:SetWaypoint(wm, wx, wy, title)
+    else
+        -- Silence read as a dead button. The client answers no position for an objective in
+        -- another zone or one that is not a place at all, and neither is a failure worth hiding.
+        print(("|cffEBB706EQ|r: |cffffffff%s|r is super-tracked and the map is open, but the game has not given a position for its next objective, so there is no arrow to set."):format(
+            title or "Quest"))
     end
     openMap(wm or (C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")))
     return true

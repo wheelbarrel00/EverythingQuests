@@ -153,9 +153,7 @@ local function rebuildCache()
                         if entry then
                             entry.type        = objType(text, itemTexture)
                             entry.itemTexture = itemTexture
-                            -- Carried so the tooltip lines name the objective off the SAME
-                            -- entry the plate counts. A second derivation would let a mob's
-                            -- nameplate and its tooltip disagree while both looked right.
+                            -- Carried for the tooltip, which names the objective off this entry
                             entry.text        = text
                             entry.title       = info.title
                             objMap = objMap or {}
@@ -472,8 +470,8 @@ function QI:HoldCache(id, want)
     local Events = ns:GetSubsystem("Events")
     if not Events then return end
     want = want and true or false
-    -- Counted rather than derived from the table, so a consumer calling twice with the same
-    -- answer cannot leave the events registered once and released twice.
+    -- This early return is what makes a repeated call safe, not the counter below it. Removing it
+    -- lets one consumer asking twice register the events once and release them twice.
     if (_holders[id] and true or false) == want then return end
     _holders[id] = want or nil
     _holderCount = _holderCount + (want and 1 or -1)

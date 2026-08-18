@@ -822,8 +822,10 @@ local function trackedSourceReadings()
          or (TS and "EQOT TrackedSet:IsTracked") or "nothing - every quest is cannot-tell")
     if type(numWatch) == "function" then
         local ok, n = pcall(numWatch)
-        line("    GetNumQuestWatches() raw=%s", ok and tostring(n) or "RAISED")
-        line("      0 here while EQOT shows tracked quests means Blizzard's list is not the set")
+        -- Raw only, with NO verdict hung on it. This reads 0 on Era in every state, including
+        -- while IsQuestWatched answers true for a quest, so it cannot prove the list is empty.
+        line("    GetNumQuestWatches() raw=%s   (0 in every state on Era - not evidence by itself)",
+             ok and tostring(n) or "RAISED")
     end
 
     local rows, agree, disagree, bareTrue, tsTrue, tsKnown = 0, 0, 0, 0, 0, 0
@@ -867,9 +869,8 @@ local function trackedSourceReadings()
     line("    TOTALS  quests=%d  bare says tracked=%d  EQOT says tracked=%d of %d it knows",
          total, bareTrue, tsTrue, tsKnown)
 
-    -- The bare column is kept as a REGRESSION WATCH, not as a candidate. EQ deliberately does
-    -- not read it - Core/Compat.lua records the measurement - and these two lines are what make
-    -- that decision re-checkable on a client nobody has run this on yet.
+    -- The bare column is kept as a REGRESSION WATCH, not as a candidate. EQ deliberately does not
+    -- read it, and printing it keeps that decision re-checkable on a client nobody has run yet.
     if disagree > 0 then
         line("    the bare global and EQOT DISAGREE on %d quest(s), agree on %d. Expected on this",
              disagree, agree)
@@ -951,13 +952,12 @@ function Probe:MapPOI()
     -- Thinned counts points the minimum separation rejected. Zero here with a high spawn count
     -- means the spread filter is not running, which reads identically to "nothing to thin".
     line("  spawn points thinned by minimum separation=%s", tostring(MP._spawnThinned))
-    -- Switched off and hiding nothing draw the identical map. The tri-state matters here: a
-    -- client with no GetQuestWatchType leaves isWatched nil and every pin is kept, which reads
-    -- exactly like the option being off.
+    -- Switched off and hiding nothing draw the identical map, and so does a client where no source
+    -- could answer, which leaves isWatched nil and keeps every pin. The rows below separate them.
     local DB = ns:GetSubsystem("DB")
     local onlyTracked = (DB and DB.db.profile.map and DB.db.profile.map.onlyTrackedPins) == true
     -- Refusals, not pins removed. A refused quest may store no point on the open map at all, so
-    -- reading this as "4 pins vanished" overstates it - section 3 has the on-this-map count.
+    -- section 3 has the on-this-map count.
     line("  only markers for tracked quests=%s   quest(s) refused by it=%s",
          tostring(onlyTracked), tostring(MP._untrackedHidden))
     if onlyTracked then
@@ -1595,9 +1595,19 @@ local function tooltipWriteRoute()
         line("QuestTooltips subsystem NOT loaded - this TOC does not list the module")
         return
     end
+    -- Printed BEFORE any route verdict. A switched-off option and a dead hook look identical from
+    -- every counter below, and an earlier version sent the reader hunting TooltipDataProcessor on
+    -- a healthy client because this line was missing.
+    local DB = ns:GetSubsystem("DB")
+    local optionOn = not DB or DB.db.profile.general.questTooltips ~= false
+    line("option 'Show quest progress on tooltips': %s", optionOn and "ON" or "OFF")
     line("route installed: %s", tostring(QT.route))
     if QT.route == "none" then
-        line("  nothing installed. Either the option is off or neither route resolved above.")
+        if not optionOn then
+            line("  nothing installed because the OPTION IS OFF. That is not a route problem.")
+        else
+            line("  nothing installed, and the option is on, so neither route above resolved.")
+        end
     end
     if type(QT.hooks) == "table" then
         local names = {}
@@ -1623,8 +1633,8 @@ local function tooltipWriteRoute()
         local indexed = QI.IndexedItemNames and QI:IndexedItemNames() or 0
         line("shared objective cache held: %s   item names indexed: %d",
              tostring(QI:CacheHeld()), indexed)
-        -- Printed only when it applies. Stating "0 indexed means ..." beside a count of 10
-        -- reads as the reported value rather than as the note it is.
+        -- Gated, because printing what a zero would mean beside a non-zero count reads as the
+        -- reported value rather than as the note it is.
         if indexed == 0 then
             line("  0 with the cache held means no quest in your log wants an item.")
         end
@@ -1665,9 +1675,12 @@ local function tooltipLiveTest()
         line("SetUnit(%s): call %s, hook fired=%s, EQ added %d line(s)",
              driveUnit, ok and "ok" or "RAISED", tostring(fired),
              (QT.unitLines or 0) - unitLinesBefore)
-        if not fired then
-            line("  the unit hook did NOT fire. That is the ROUTE, not the data - the other")
-            line("  route above is the fix. Data problems show as fired=true with 0 lines.")
+        if not fired and QT.route == "none" then
+            line("  the hook did not fire because NOTHING IS INSTALLED - see the route line at the")
+            line("  top of this section. Switch the option on before reading this as a defect.")
+        elseif not fired then
+            line("  the unit hook did NOT fire while a route IS installed. That is the ROUTE, not")
+            line("  the data. Data problems show as fired=true with 0 lines.")
         elseif ns.CLASSIC_QUEST_NPCS == nil then
             line("  0 lines is CORRECT here - retail writes its own unit quest lines.")
         end
@@ -1737,7 +1750,9 @@ local function tooltipLiveTest()
     line("SetBagItem(%d,%d) %q: call %s, hook fired=%s, EQ added %d line(s)",
          foundBag, foundSlot, tostring(foundName), okI and "ok" or "RAISED",
          tostring(firedI), (QT.itemLines or 0) - itemLinesBefore)
-    if not firedI then
+    if not firedI and QT.route == "none" then
+        line("  nothing is installed - see the route line at the top. Not a route defect.")
+    elseif not firedI then
         line("  the item hook did NOT fire, and that item IS wanted by a quest in your log,")
         line("  so the match is not the fault. The route is.")
     end
@@ -1895,6 +1910,20 @@ local TEMPLATES = {
 
 function Probe:UI()
     out("font objects and frame templates")
+
+    local MC = ns:GetSubsystem("MapCoords")
+    if MC then
+        -- A blank readout has two unrelated causes that look identical on screen: the updater
+        -- never ran, or it ran and could not resolve a position. The stage and the counts split
+        -- them, and the last rendered text is what the player is actually looking at.
+        line("MapCoords stage=%s  map updates=%s  minimap updates=%s",
+             tostring(MC._stage), tostring(MC._mapUpdates), tostring(MC._minimapUpdates))
+        line("  last rendered   map=%s  minimap=%s",
+             MC._lastMapText and ("%q"):format(MC._lastMapText) or "nil",
+             MC._lastMinimapText and ("%q"):format(MC._lastMinimapText) or "nil")
+    else
+        line("MapCoords: not loaded by this TOC")
+    end
 
     -- EQ renders every countdown through these rather than a hardcoded d/h/m, so what the client
     -- carries IS what a player sees. Korean spells them out as words, which is why the old
