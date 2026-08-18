@@ -17,9 +17,13 @@ local L = ns.L
 L["General"] = "通用"
 L["Tracker"] = "追蹤框"
 L["Options Window Scale"] = "設定視窗縮放"
+L["Popup window"] = "彈出視窗"
+L["Chat link"] = "聊天連結"
 L["None"] = "無"
+L["After an update"] = "更新之後"
 L["Left"] = "左側"
 L["Right"] = "右側"
+L["Position"] = "位置"
 L["Reset all settings"] = "重置全部設置"
 L["Reset"] = "重置"
 L["Cancel"] = "取消"
@@ -65,12 +69,19 @@ L["Ready to turn in"] = "待提交"
 L["Options"] = "設定"
 
 -- ─── Modules/History/Frame.lua ───
+L["Export"] = "導出"
 L["Quests"] = "任務"
 L["Campaign"] = "戰役"
+L["Name"] = "名稱"
 L["Type"] = "類型"
 
 -- ─── Modules/QuestBrowser/Frame.lua ───
 L["Profession"] = "專業"
+
+-- ─── Modules/WhatsNew.lua ───
+L["Open Options"] = "開啟選項"
+L["Got it"] = "了解"
+L["Don't show these again"] = "不再顯示"
 
 -- ─── Modules/WorldQuests/Pin.lua ───
 L["Untrack Quest"] = "停止追蹤任務"
@@ -88,6 +99,9 @@ L["CurseForge"] = "CurseForge"
 L["GitHub"] = "GitHub"
 L["Report a Bug"] = "提交Bug反饋"
 L["Commands"] = "命令"
+L["Tutorials"] = "教學"
+L["Video tutorials are coming soon."] = "影片教學即將推出。"
+L["More Add-ons by Wheelbarrel00"] = "Wheelbarrel00 的其他插件"
 L["Thanks"] = "致謝"
 L["Changelog"] = "更新日誌"
 L["Older versions are on CurseForge"] = "舊版本可在 CurseForge 獲取"
