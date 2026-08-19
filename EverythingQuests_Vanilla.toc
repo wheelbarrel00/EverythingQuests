@@ -111,6 +111,7 @@ Locales\ruRU.lua
 Locales\koKR.lua
 Locales\zhCN.lua
 Locales\zhTW.lua
+Locales\deDE.lua
 
 Core\DB.lua
 Core\Events.lua
