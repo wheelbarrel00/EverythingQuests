@@ -532,6 +532,7 @@ L[" for the many hours spent translating Everything Quests into Russian."] = tru
 L[" for the many hours spent translating Everything Quests into Korean."] = true
 L[" for the many hours spent translating Everything Quests into Simplified Chinese."] = true
 L[" for the many hours spent translating Everything Quests into Traditional Chinese."] = true
+L[" for the many hours spent translating Everything Quests into German."] = true
 L["Changelog"] = true
 L["Older versions are on CurseForge"] = true
 

@@ -2,6 +2,18 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.43.1", date = "2026-08-19",
+        sections = {
+            { head = "New Features", items = {
+                "German, contributed by Stonetwist. The addon now ships deDE translations alongside French, Russian, Korean, Simplified Chinese and Traditional Chinese.",
+            } },
+            { head = "Improvements", items = {
+                "Every bundled language now covers the whole addon. French, Russian, Korean, Simplified Chinese, Traditional Chinese and German are all complete, so nothing falls back to English on a matching client any more.",
+                "If something in your language reads oddly or is not formatted properly, let me know and I will fix it.",
+            } },
+        },
+    },
+    {
         version = "1.43.0", date = "2026-08-17",
         sections = {
             { head = "New Features", items = {

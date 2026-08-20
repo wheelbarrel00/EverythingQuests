@@ -204,6 +204,8 @@ ns:GetSubsystem("Options"):AddTab("about", L["About"], function(content)
         .. L[" for the many hours spent translating Everything Quests into Simplified Chinese."] .. CLOSE)
     body(WHITE .. L["Special thanks to "] .. GOLD .. "BNS333" .. CLOSE .. WHITE
         .. L[" for the many hours spent translating Everything Quests into Traditional Chinese."] .. CLOSE)
+    body(WHITE .. L["Special thanks to "] .. GOLD .. "Stonetwist" .. CLOSE .. WHITE
+        .. L[" for the many hours spent translating Everything Quests into German."] .. CLOSE)
     gap(10)
 
     header(L["Changelog"])

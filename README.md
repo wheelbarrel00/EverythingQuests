@@ -52,7 +52,7 @@ Era and TBC were measured identical across every game API the addon reads, so on
 - **Coordinates** on the world map and under the minimap, with a slider for how many decimals to show
 - **Two ways to quiet a busy map**, both off by default: leave out markers for quests you have untracked, and fade markers sitting on top of your own position
 - **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, the **focus arrow**, and the **`/eqs`** options window (General and About tabs)
-- All six bundled locales
+- All bundled locales
 
 **Retail-only**
 
@@ -301,7 +301,7 @@ EverythingQuests/
 ├── Bindings.xml                      # Keybinding declarations
 ├── Core/                             # Init, Compat, DB, Events, Profiler, Cache, Util,
 │                                     #   Media, Dialog, QuestRewards, Changelog, FlavorProbe
-├── Locales/                          # enUS, frFR, ruRU, koKR (generated)
+├── Locales/                          # enUS plus the bundled translations (generated)
 ├── Libs/                             # Bundled libraries
 ├── Modules/
 │   ├── Minimap/                      # LibDataBroker launcher + Classic objective pins
@@ -351,6 +351,7 @@ Everything Quests ships bundled translations — on a matching game client the i
 - **Korean (koKR)** — by **labrie75**
 - **Simplified Chinese (zhCN)** — by **Keriaovo**
 - **Traditional Chinese (zhTW)** — by **BNS333**
+- **German (deDE)** — by **Stonetwist**
 
 Translations for Everything Quests, EQ Objective Tracker and Cooldown Master are maintained together in **[EverythingLocales](https://github.com/wheelbarrel00/EverythingLocales)**. The `Locales/` files in this repo are generated from it, so translation pull requests belong there rather than here. Contributions for more languages are very welcome.
 

@@ -5,6 +5,19 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.1] - 2026-08-19
+
+German joins the bundled languages, and every language is now complete.
+
+### New Features
+
+- **German (deDE)** - the addon now ships German translations alongside French, Russian, Korean, Simplified Chinese and Traditional Chinese, contributed by Stonetwist.
+
+### Improvements
+
+- **Every bundled language now covers the whole addon.** French, Russian, Korean, Simplified Chinese, Traditional Chinese and German are all at 100%, so nothing falls back to English on a matching client any more. Since v1.43.0 that is 406 new phrases in Traditional Chinese, 104 in Korean, 75 in Simplified Chinese, and 19 each in French and Russian.
+- If something in your language reads oddly or is not formatted properly, let me know and I will fix it.
+
 ## [1.43.0] - 2026-08-17
 
 Quest information on the tooltips you already hover, coordinates on the map and minimap, and two new ways to quiet a busy map. Plus Traditional Chinese.
