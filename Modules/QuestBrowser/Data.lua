@@ -338,7 +338,8 @@ function QB:Record(questID)
         r.starts = order
     end
 
-    r.objectives = pointList(ns.CLASSIC_QUEST_SPAWNS and ns.CLASSIC_QUEST_SPAWNS[questID], {})
+    local spawns = ns.Compat and ns.Compat.ClassicSpawns and ns.Compat.ClassicSpawns()
+    r.objectives = pointList(spawns and spawns[questID], {})
     r.turnIn     = pointList(ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID], {})
 
     -- preQuestSingle is ANY of, and is consulted INSTEAD of preQuestGroup rather than alongside

@@ -80,7 +80,8 @@ local function nearestStored(questID, gotX, gotY, mapID)
         end
     end
 
-    local byMap = ns.CLASSIC_QUEST_SPAWNS and ns.CLASSIC_QUEST_SPAWNS[questID]
+    local spawnsTbl = ns.Compat and ns.Compat.ClassicSpawns and ns.Compat.ClassicSpawns()
+    local byMap = spawnsTbl and spawnsTbl[questID]
     if byMap then
         local list = mapID and byMap[mapID]
         if list then
@@ -612,8 +613,14 @@ local function coordMapIDs()
     if type(coords) == "table" then
         for _, packed in pairs(coords) do seen[math.floor(packed / 1e8)] = true end
     end
-    for _, tbl in ipairs({ ns.CLASSIC_QUEST_SPAWNS, ns.CLASSIC_QUEST_TURNIN,
-                           ns.CLASSIC_QUEST_AVAILABLE and ns.CLASSIC_QUEST_AVAILABLE.start }) do
+    -- Appended rather than listed, because ipairs stops at the first nil and a failed spawn
+    -- build would silently drop the turn-in and available tables with it.
+    local sources = {}
+    local spawnsAll = ns.Compat and ns.Compat.ClassicSpawns and ns.Compat.ClassicSpawns()
+    sources[#sources + 1] = spawnsAll
+    sources[#sources + 1] = ns.CLASSIC_QUEST_TURNIN
+    sources[#sources + 1] = ns.CLASSIC_QUEST_AVAILABLE and ns.CLASSIC_QUEST_AVAILABLE.start
+    for _, tbl in ipairs(sources) do
         if type(tbl) == "table" then
             for _, byMap in pairs(tbl) do
                 if type(byMap) == "table" then
@@ -999,8 +1006,16 @@ function Probe:MapPOI()
     -- means an AcquirePin site missed its record() call.
     line("  pins recorded for tooltip aggregation=%s  (must equal pins acquired above)",
          tostring(MP._drawnN))
-    line("  spawn table loaded=%s  quests in it=%s",
-         tostring(ns.CLASSIC_QUEST_SPAWNS ~= nil), tostring(countKeys(ns.CLASSIC_QUEST_SPAWNS)))
+    -- Read BEFORE the loader runs, or this reports the state the probe itself just created.
+    -- countKeys still needs the BUILT table, so the two readings are taken separately.
+    local wasBuilt = ns.CLASSIC_QUEST_SPAWNS ~= nil
+    local spawnsNow = ns.Compat and ns.Compat.ClassicSpawns and ns.Compat.ClassicSpawns()
+    line("  spawn data present=%s  built before this section=%s  builds ok=%s  quests=%s",
+         tostring(ns.HAS_CLASSIC_SPAWNS == true), tostring(wasBuilt),
+         tostring(spawnsNow ~= nil), tostring(countKeys(spawnsNow)))
+    if wasBuilt then
+        line("  (a full /eqsprobe and any world map draw both build it, so true is expected here)")
+    end
     -- "never ran" and "cannot tell" are different claims and only one of them is evidence.
     if MP._refreshes == nil then
         line("  (no counters on this Provider.lua - it predates this diagnostic)")
@@ -1709,8 +1724,10 @@ local function tooltipLiveTest()
         return
     end
 
+    -- Bag 5 is the retail reagent bag, where the herbs and ore a "collect N" quest wants are
+    -- routed. The section below scans it too, and two ranges in one section contradict.
     local scratch, foundBag, foundSlot, foundName = {}, nil, nil, nil
-    for bag = 0, 4 do
+    for bag = 0, 5 do
         local okN, slots = pcall(getNum, bag)
         for slot = 1, (okN and tonumber(slots) or 0) do
             local okL, link = pcall(getLink, bag, slot)
@@ -1759,9 +1776,229 @@ local function tooltipLiveTest()
     pcall(gt.Hide, gt)
 end
 
+-- GetBagItem returns the client's OWN lines without rendering, so it reads what Blizzard writes
+-- with no EQ involvement. EQ only annotates an item whose NAME is a live objective, so a bag
+-- full of quest items can still drive nothing.
+local function tooltipBlizzardBagLines()
+    local getNum  = resolve("C_Container.GetContainerNumSlots") or resolve("GetContainerNumSlots")
+    local getLink = resolve("C_Container.GetContainerItemLink") or resolve("GetContainerItemLink")
+    local getQ    = resolve("C_Container.GetContainerItemQuestInfo")
+                    or resolve("GetContainerItemQuestInfo")
+    local getBag  = resolve("C_TooltipInfo.GetBagItem")
+
+    out("what BLIZZARD already writes on a bag quest item - decides if onItem needs a gate")
+    -- The client tags its own quest lines, so the tag is the authoritative signal and the text
+    -- heuristics below are only a fallback. Modules/Nameplates/QuestIcons.lua measured these two
+    -- on a live client, which is also why onUnit is gated off on retail.
+    local LT = _G["Enum"] and _G["Enum"].TooltipDataLineType
+    local Q_TITLE = (LT and LT.QuestTitle) or 17
+    local Q_OBJ   = (LT and LT.QuestObjective) or 8
+    line("line types: QuestTitle=%s QuestObjective=%s (%s)",
+         tostring(Q_TITLE), tostring(Q_OBJ),
+         LT and "from Enum.TooltipDataLineType" or "numeric fallback, Enum absent")
+    if type(getBag) ~= "function" then
+        line("C_TooltipInfo.GetBagItem: ABSENT on this client, so this section cannot run.")
+        line("  That is expected on Classic, where EQ owns the unit lines anyway.")
+        return
+    end
+    if not (type(getNum) == "function" and type(getLink) == "function") then
+        line("no container API to search the bags with")
+        return
+    end
+
+    local titles = {}
+    local collect = ns.Compat and ns.Compat.CollectQuestLog
+    if type(collect) == "function" then
+        local rows = {}
+        -- CollectQuestLog returns the table FIRST and the highest index filled second, so
+        -- through pcall the index is the third value. Reading the second gives the table.
+        local okC, _t, last = pcall(collect, rows)
+        for i = 1, (okC and tonumber(last) or 0) do
+            local r = rows[i]
+            -- Headers carry a title too, and a zone name matching a tooltip line would read as
+            -- a quest title and manufacture a duplication verdict.
+            if r and not r.isHeader and r.title and r.title ~= "" then titles[r.title] = true end
+        end
+    end
+
+    -- A quest STARTER can report isQuestItem=false, so either signal counts. The DECISIVE case
+    -- is an item whose NAME matches a live objective, the only thing onItem annotates, and such
+    -- an item is often not flagged at all. Candidates are bucketed here and the objective ones
+    -- inspected first below, or the print cap spends itself on starters while the verdict claims
+    -- evidence that never reached the screen.
+    local QI = ns:GetSubsystem("NameplateQuestIcons")
+    local indexedNames = (QI and QI.IndexedItemNames) and QI:IndexedItemNames() or 0
+    local scratch = {}
+    local objCand, otherCand = {}, {}
+    local seen, items, sample, objSeen = 0, 0, nil, 0
+    for bag = 0, 5 do
+        local okN, slots = pcall(getNum, bag)
+        for slot = 1, (okN and tonumber(slots) or 0) do
+            local okL, link = pcall(getLink, bag, slot)
+            local name = okL and type(link) == "string" and link:match("|h%[(.-)%]|h")
+            local isQuest, questID
+            local isObjective = false
+            if name and QI and QI.ItemObjectives then
+                isObjective = QI:ItemObjectives(name, scratch) > 0
+            end
+            if name then
+                items = items + 1
+                if type(getQ) == "function" then
+                    local okQ, info = pcall(getQ, bag, slot)
+                    if okQ then
+                        if type(info) == "table" then
+                            isQuest, questID, sample = info.isQuestItem, info.questID,
+                                sample or ("table isQuestItem=" .. tostring(info.isQuestItem)
+                                           .. " questID=" .. tostring(info.questID)
+                                           .. " isActive=" .. tostring(info.isActive))
+                        else
+                            isQuest = info
+                            sample = sample or (type(info) .. " " .. tostring(info))
+                        end
+                    else
+                        sample = sample or "RAISED"
+                    end
+                end
+            end
+            if name and isObjective then objSeen = objSeen + 1 end
+            if name and (isQuest or questID or isObjective) then
+                seen = seen + 1
+                local into = isObjective and objCand or otherCand
+                into[#into + 1] = { bag = bag, slot = slot, name = name,
+                                    questID = questID, isObjective = isObjective }
+            end
+        end
+    end
+
+    -- A bare "none found" cannot tell a genuinely empty bag from a detector asking the wrong
+    -- question, so the raw readings go beside the count.
+    if seen == 0 then
+        line("no quest items found. RAW: %d item(s) scanned in bags 0-5, quest info API %s",
+             items, type(getQ) == "function" and "present" or "ABSENT")
+        line("  first reading it returned: %s", tostring(sample))
+        line("  objective index holds %d item name(s), cache held=%s", indexedNames,
+             tostring(QI and QI.CacheHeld and QI:CacheHeld()))
+        if indexedNames == 0 then
+            line("  the index is EMPTY, so no item could have matched an objective whatever")
+            line("  you were carrying. That is a held-cache question, not a bag question.")
+        end
+        if items > 0 and type(getQ) ~= "function" then
+            line("  the bags are NOT empty, so this is a MISSING API and not a missing item.")
+        elseif items > 0 then
+            line("  the bags are NOT empty, so either nothing carries quest info or the")
+            line("  detector is wrong. Compare the reading above against a '!' item.")
+        end
+        return
+    end
+
+    local SHOW_CAP, LINE_CAP = 6, 14
+    local shown, objShown, objVerdicts = 0, 0, 0
+    local function inspect(c)
+        shown = shown + 1
+        if c.isObjective then objShown = objShown + 1 end
+        local okD, data = pcall(getBag, c.bag, c.slot)
+        local rows = (okD and type(data) == "table") and data.lines or nil
+        line("[%d] %s  questID=%s  bag=%d slot=%d%s", shown, tostring(c.name),
+             tostring(c.questID), c.bag, c.slot,
+             c.isObjective and "  MATCHES AN OBJECTIVE - this is the decisive one" or "")
+        if not rows then
+            line("    GetBagItem returned no lines")
+            return
+        end
+        local flagged, typed = 0, 0
+        local read = math.min(#rows, LINE_CAP)
+        for i = 1, read do
+            local t = rows[i] and rows[i].leftText
+            local ty = rows[i] and rows[i].type
+            if type(t) == "string" and t ~= "" then
+                -- A starter item usually shares its name with the quest it starts, so line 1
+                -- would otherwise read as the item duplicating a quest title.
+                local isOwnName = (t == c.name)
+                local isQuestTyped = (ty == Q_TITLE or ty == Q_OBJ)
+                local prog = t:match("%d+%s*/%s*%d+") and " has COUNT" or ""
+                local ttl  = (titles[t] and not isOwnName) and " is a QUEST TITLE" or ""
+                if isQuestTyped then typed = typed + 1 end
+                if prog ~= "" or ttl ~= "" then flagged = flagged + 1 end
+                line("    type=%s %s%s%s%s", tostring(ty), t, prog, ttl,
+                     isQuestTyped and "  CLIENT TAGGED THIS A QUEST LINE" or "")
+            end
+        end
+        -- Quest lines sit near the BOTTOM of an item tooltip, so a truncated read cannot prove
+        -- there are NONE. It can still prove there is one: a line found inside the window is a
+        -- positive reading that the unread lines cannot overturn, so only the negative verdict
+        -- is refused here.
+        if read < #rows then
+            line("    read %d of %d line(s), so the lines below the stats were not seen", read, #rows)
+            if typed == 0 and flagged == 0 then
+                line("    NO VERDICT: nothing found in what was read, and that does not mean none.")
+                return
+            end
+        end
+        -- Counted where a verdict is actually PRINTED, not where an item was inspected. An item
+        -- that reached no verdict is not evidence, and the DECISIVE line points at these lines.
+        if c.isObjective then objVerdicts = objVerdicts + 1 end
+        if typed > 0 and c.isObjective then
+            line("    VERDICT: the client TAGS %d line(s) here as quest lines on", typed)
+            line("    an item EQ annotates. EQ would DUPLICATE. onItem needs a gate.")
+        elseif typed > 0 then
+            line("    VERDICT: the client tags %d quest line(s) here, but EQ never", typed)
+            line("    annotates this item - it is not an objective. No clash.")
+        elseif flagged > 0 and c.isObjective then
+            line("    VERDICT: the client writes quest text on an item EQ DOES")
+            line("    annotate, so EQ would DUPLICATE it. onItem needs a gate.")
+        elseif flagged > 0 then
+            line("    VERDICT: the client writes quest text here, but EQ never")
+            line("    annotates this item - it is not an objective. No clash.")
+        elseif c.isObjective then
+            line("    VERDICT: no quest title and no count from the client on an")
+            line("    item EQ DOES annotate. Nothing to duplicate. No gate needed.")
+        else
+            line("    VERDICT: no quest title and no count in the client's own")
+            line("    lines for this item, so EQ has nothing to duplicate here.")
+        end
+    end
+
+    for i = 1, #objCand do
+        if shown >= SHOW_CAP then break end
+        inspect(objCand[i])
+    end
+    for i = 1, #otherCand do
+        if shown >= SHOW_CAP then break end
+        inspect(otherCand[i])
+    end
+
+    line("%d candidate(s) of %d item(s) scanned, %d inspected, %d of those objective items.",
+         seen, items, shown, objShown)
+    if objSeen > objShown then
+        line("  %d further objective item(s) were found but not inspected - the cap is %d.",
+             objSeen - objShown, SHOW_CAP)
+    end
+    if objVerdicts > 0 then
+        line("DECISIVE: %d objective item(s) above reached a verdict, which is exactly what",
+             objVerdicts)
+        line("  onItem annotates. Those VERDICT lines settle whether onItem needs a flavor gate.")
+    elseif objShown > 0 then
+        line("NOT DECISIVE. %d objective item(s) were inspected but none reached a verdict, so", objShown)
+        line("  there is nothing above that settles the question. Read the NO VERDICT lines.")
+    else
+        line("NOT DECISIVE YET. No item whose NAME matches a live objective was inspected, and")
+        line("  onItem annotates nothing else. So the verdicts above show what the client writes")
+        line("  on the WRONG class of item.")
+        line("  objective index holds %d item name(s), cache held=%s", indexedNames,
+             tostring(QI and QI.CacheHeld and QI:CacheHeld()))
+        if indexedNames == 0 then
+            line("  The index is EMPTY, so the detector could not have matched anything whatever")
+            line("  you were carrying. Fix that before concluding the bags are wrong.")
+        else
+            line("  Carry an objective item and run this again.")
+        end
+    end
+end
+
 function Probe:Tooltip()
     tooltipWriteRoute()
     tooltipLiveTest()
+    tooltipBlizzardBagLines()
     out("unit tooltip scrape - MOUSE OVER a quest mob, or target one, before this section")
 
     local unitExists = resolve("UnitExists")
@@ -2369,7 +2606,7 @@ function Probe:XP()
 
     -- Every number above is printed raw, so this reading can be checked rather than trusted.
     line("5. what that means:")
-    -- Three equal answers is what an argument-honouring client returns when the two quests award
+    -- Three equal answers is what an argument-honoring client returns when the two quests award
     -- the same XP, and is every reading at max level, so it is not on its own a verdict. The
     -- chain below is the discriminator: only a moving selection proves the argument is ignored.
     if a0 ~= nil and b0 ~= nil and a0 ~= b0 then

@@ -1,5 +1,9 @@
 {
   "runtime.version": "Lua 5.1",
+  "workspace.ignoreDir": [
+    "Data",
+    "docs"
+  ],
   "diagnostics.unusedLocalExclude": [
     "_*"
   ],
@@ -81,6 +85,7 @@
     "GetItemInfo",
     "GetItemInfoInstant",
     "GetItemQualityColor",
+    "GetBuildInfo",
     "GetLocale",
     "GetMinimapShape",
     "GetMinimapZoneText",

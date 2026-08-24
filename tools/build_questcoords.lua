@@ -477,6 +477,10 @@ local ids = {}
 for id in pairs(quests) do ids[#ids + 1] = id end
 table.sort(ids)
 
+-- The assignment is a named constant because the shipped file wraps the constructor that
+-- follows it into a long string, and the wrap has to find where the body starts.
+local SPAWNS_ASSIGN = "ns.CLASSIC_QUEST_SPAWNS = {\n"
+
 if mode == "spawns" then
     local emitted, sQuests, sPairs, widest, shared = 0, 0, 0, 0, 0
     local parts = {
@@ -493,7 +497,7 @@ if mode == "spawns" then
         "--         x = floor(rest/1e4)/1e4, y = (rest%1e4)/1e4\n",
         "-- Each list is ordered densest first. The reader draws the first N, so the order is\n",
         "-- what makes a pin limit keep the N best locations instead of N arbitrary ones.\n",
-        "ns.CLASSIC_QUEST_SPAWNS = {\n",
+        SPAWNS_ASSIGN,
     }
     local expect = {}
 
@@ -531,8 +535,11 @@ if mode == "spawns" then
                         rest = math.floor(rest / 2)
                     end
                     if bits > 1 then shared = shared + 1 end
-                    nums[j] = ("%.0f"):format(mask * 1000000000 + kind * 100000000 + xi * 10000 + yi)
-                    mine[j] = { x = xi / 10000, y = yi / 10000, k = kind, oim = mask }
+                    local packed = mask * 1000000000 + kind * 100000000 + xi * 10000 + yi
+                    nums[j] = ("%.0f"):format(packed)
+                    -- v is the packed number itself. The wrap check below compares it exactly
+                    -- and in order, which a decoded x/y/kind cannot do.
+                    mine[j] = { x = xi / 10000, y = yi / 10000, k = kind, oim = mask, v = packed }
                     emitted = emitted + 1
                 end
                 expect[id] = expect[id] or {}
@@ -582,12 +589,83 @@ if mode == "spawns" then
         io.stderr:write(("-- verified %d point(s) by reload, max drift %.6f\n"):format(seen, worst))
     end
 
-    io.write(text)
+    -- Measured on real Lua 5.1.5 (docs/classic-pilot/measure_datastring.lua): the client scans
+    -- one string token at file load instead of the table constructor, 119 ms -> 16 ms on Era
+    -- (556,774 entries) and 158 ms -> 17 ms on TBC (724,037). The constructor still has to be
+    -- parsed, so this is a DEFERRAL and not a saving - total CPU rises 16 to 22 ms across runs.
+    -- It moves off login to the first caller, which on Classic is the minimap pin pass a moment
+    -- after PLAYER_ENTERING_WORLD, not the first world map open.
+    local assignAt = assert(text:find(SPAWNS_ASSIGN, 1, true), "could not find the assignment")
+    assert(not text:find(SPAWNS_ASSIGN, assignAt + #SPAWNS_ASSIGN, true),
+           "the assignment appears more than once, so the slice is ambiguous")
+    local head = text:sub(1, assignAt - 1)
+    local bodyText = "{\n" .. text:sub(assignAt + #SPAWNS_ASSIGN)
+
+    -- A long string is unusable if the payload contains its own terminator. The ASSEMBLED string
+    -- is what has to be scanned: a body ending in "]" plus exactly this many equals signs carries
+    -- no terminator of its own, yet closes the string early once the trailing "]" is appended.
+    local eq = "=="
+    local closeAt = #bodyText + 8   -- "return " is 7 characters, so the closer starts here
+    while ("return " .. bodyText .. "]" .. eq .. "]"):find("]" .. eq .. "]", 1, true) < closeAt do
+        eq = eq .. "="
+    end
+
+    local outText = head
+        .. "-- Shipped as a long string, not a table. Reach it through Compat.ClassicSpawns(),\n"
+        .. "-- which builds it on first use. ns.HAS_CLASSIC_SPAWNS answers the flavor question.\n"
+        .. "ns.HAS_CLASSIC_SPAWNS = true\n"
+        .. ("ns.CLASSIC_QUEST_SPAWNS_SRC = [%s[return %s]%s]\n"):format(eq, bodyText, eq)
+
+    -- Proves the WRAP, which is a claim the reload check above does not make. Values are
+    -- compared exactly and IN ORDER: a checksum is order insensitive, so it cannot see the
+    -- densest-first ordering the reader's prefix depends on being disturbed.
+    local function verifyWrap(candidate, label)
+        local probe = {}
+        assert(loadstring(candidate, "shipped"))("EQ", probe)
+        assert(probe.HAS_CLASSIC_SPAWNS == true, label .. ": lost the presence flag")
+        assert(probe.CLASSIC_QUEST_SPAWNS == nil,
+               label .. ": must NOT build the table at load - that is the whole point")
+        local src = assert(probe.CLASSIC_QUEST_SPAWNS_SRC, label .. ": defined no source string")
+        local built = assert(loadstring(src, "deferred"))()
+        local seen = 0
+        for qid, maps in pairs(built) do
+            local orig = assert(expect[qid], label .. ": invented quest " .. qid)
+            for m, list in pairs(maps) do
+                local om = assert(orig[m],
+                    ("%s: invented map %d for quest %d"):format(label, m, qid))
+                assert(#list == #om,
+                    ("%s: row count changed for quest %d map %d"):format(label, qid, m))
+                for j = 1, #list do
+                    assert(list[j] == om[j].v,
+                        ("%s: quest %d map %d row %d is %s, expected %s")
+                        :format(label, qid, m, j, tostring(list[j]), tostring(om[j].v)))
+                    seen = seen + 1
+                end
+            end
+        end
+        for qid, maps in pairs(expect) do
+            assert(built[qid], label .. ": dropped quest " .. qid)
+            for m in pairs(maps) do
+                assert(built[qid][m],
+                    ("%s: dropped map %d for quest %d"):format(label, m, qid))
+            end
+        end
+        assert(seen == emitted, label .. ": point count changed")
+    end
+
+    verifyWrap(outText, "wrapped form")
+    -- io.write expands every \n to \r\n on Windows, so the bytes the client parses are NOT the
+    -- bytes checked above. Verify the form that actually ships.
+    verifyWrap((outText:gsub("\n", "\r\n")), "shipped CRLF form")
+    io.stderr:write(("-- long-string wrap verified LF and CRLF: %d point(s), delimiter [%s[\n")
+        :format(emitted, eq))
+
+    io.write(outText)
     io.stderr:write(("-- mode=spawns grid=%.3f UNCAPPED zone=%s | quests=%d emitted=%d quest-map pairs=%d widest=%d bytes=%d\n")
-        :format(SPAWN_GRID, tostring(zoneFilter or "all"), sQuests, emitted, sPairs, widest, #text))
+        :format(SPAWN_GRID, tostring(zoneFilter or "all"), sQuests, emitted, sPairs, widest, #outText))
     io.stderr:write(("-- %d point(s) serve MORE THAN ONE objective (%.1f%%) - each of those is a\n")
         :format(shared, shared / math.max(1, emitted) * 100))
-    io.stderr:write("-- pin a single objective index would have mislabelled or hidden\n")
+    io.stderr:write("-- pin a single objective index would have mislabeled or hidden\n")
     return
 end
 

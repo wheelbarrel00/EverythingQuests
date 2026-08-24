@@ -95,9 +95,10 @@ local function ringAtlas()
 end
 
 -- Unset has to keep meaning ON or every retail user loses a ring they have always had. Classic
--- ships it off because a zone there draws hundreds of pins. Gated on the table, not a build number.
+-- ships it off because a zone there draws hundreds of pins. Reads the FLAG, not the table: the
+-- table is built on first use, so a nil test would answer retail on Classic until the first draw.
 local function ownedRingDefault()
-    return ns.CLASSIC_QUEST_SPAWNS == nil
+    return not ns.HAS_CLASSIC_SPAWNS
 end
 
 -- Read by Options/TabGeneral.lua too. One implementation, or the checkbox and the pin disagree
@@ -409,7 +410,7 @@ end
 local TOOLTIP_RADIUS_PINS = 1.0
 ns.MAPPOI_TOOLTIP_RADIUS_PINS = TOOLTIP_RADIUS_PINS
 
--- Beyond this many neighbouring quests the tooltip is taller than it is useful.
+-- Beyond this many neighboring quests the tooltip is taller than it is useful.
 local TOOLTIP_MAX_EXTRA = 4
 
 local _nearQ, _nearD, _nearMin, _nearAt, _nearIdx = {}, {}, {}, {}, {}
@@ -583,7 +584,7 @@ end
 
 -- Deliberately NOT part of the builder above. That one is shared with the minimap, whose pins
 -- are created click-through on purpose, and with an owned pin merely listing an available
--- neighbour - neither can honor a right-click, so only the caller that can may promise it.
+-- neighbor - neither can honor a right-click, so only the caller that can may promise it.
 local function addBrowserHint(tip)
     local QB = ns:GetSubsystem("QuestBrowser")
     if QB and QB.Available and QB:Available() then
@@ -613,7 +614,7 @@ function Pin:OnMouseEnter()
     local n = nearbyQuests(self)
 
     -- Counted before anything is written, because the overflow line promises a number. Counting
-    -- neighbours and then skipping the ones that cannot be rendered makes that number a lie.
+    -- neighbors and then skipping the ones that cannot be rendered makes that number a lie.
     local total = 0
     for i = 1, n do
         local at = _nearIdx[i]

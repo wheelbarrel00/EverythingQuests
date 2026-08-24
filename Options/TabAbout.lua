@@ -25,10 +25,15 @@ local COMMANDS = {
     { cmd = "/eqs about",    desc = L["Open this About tab"] },
 }
 
+-- name is rendered raw, not through L[], so adding a row here costs no locale key.
+-- The 180 offset on the CurseForge link is the name column width - keep names short enough.
 local OTHER_ADDONS = {
     { name = "Everything Delves",
       cf   = "https://www.curseforge.com/wow/addons/everything-delves",
       gh   = "https://github.com/wheelbarrel00/EverythingDelves" },
+    { name = "Cooldown Master",
+      cf   = "https://www.curseforge.com/wow/addons/cooldown-master",
+      gh   = "https://github.com/wheelbarrel00/CooldownMaster" },
     { name = "Loot Pro",
       cf   = "https://www.curseforge.com/wow/addons/loot-pro",
       gh   = "https://github.com/wheelbarrel00/LootPro" },
@@ -127,14 +132,27 @@ ns:GetSubsystem("Options"):AddTab("about", L["About"], function(content)
     title:SetTextColor(0.635, 0.000, 0.039)   -- #a2000a brand red
     Y = Y - 28
 
+    -- The client names its own version, because a hardcoded one is a translated key and went
+    -- two patches stale while also naming the wrong game on both Classic flavors
+    local clientVer = "?"
+    if type(_G.GetBuildInfo) == "function" then
+        local okBuild, v = pcall(GetBuildInfo)
+        if okBuild and type(v) == "string" and v ~= "" then clientVer = v end
+    end
+
     local sub = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     sub:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
     sub:SetText(GOLD .. "v" .. ver .. CLOSE
         .. MUTED .. "    " .. L["by Wheelbarrel00"]
-        .. "    -    " .. L["for WoW Midnight (12.0.x)"] .. CLOSE)
+        .. "    -    " .. L["for WoW %s"]:format(clientVer) .. CLOSE)
     Y = Y - 22
 
-    body(WHITE .. L["A unified replacement for the Blizzard quest experience: a custom tracker, world-map overlays, quest history, and a Midnight chain guide."] .. CLOSE)
+    -- Gated on the subsystem it names, like COMMANDS above, so neither flavor is described
+    -- with features its TOC does not load
+    body(WHITE .. (ns:GetSubsystem("ChainGuide")
+        and L["A unified replacement for the Blizzard quest experience: a custom tracker, world-map overlays, quest history, and a Midnight chain guide."]
+        or L["A unified replacement for the Blizzard quest experience: a custom tracker, objective markers on the map and minimap, nameplate quest icons, and a browser for the quests you have not picked up yet."])
+        .. CLOSE)
     gap(10)
 
     local links = {

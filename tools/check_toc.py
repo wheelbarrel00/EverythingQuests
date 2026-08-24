@@ -43,7 +43,7 @@ Its own coverage is not waived, only moved: on a tree that has a flavor TOC, at 
 must actually list the file. Where no flavor TOC is on disk it is reported as NOT CHECKED by
 name, alongside the TOCs themselves.
 
-⚠ The packager copies the whole checkout, so a flavor-only file ships inside the retail zip
+The packager copies the whole checkout, so a flavor-only file ships inside the retail zip
 too. It costs disk there and nothing else - no retail TOC loads it.
 
 TOCs that .gitignore hides are reported as NOT CHECKED when they are absent from disk, so

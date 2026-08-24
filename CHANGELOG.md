@@ -5,6 +5,19 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.2] - 2026-08-23
+
+Some incorrect information fixed on the About tab, and a faster addon load on Classic Era and Burning Crusade Classic.
+
+### Bug Fixes
+
+- **Fixed some incorrect info on the About tab.** It now reads the game version from the game itself, and on Classic Era and Burning Crusade Classic it describes the map and minimap markers, the nameplate icons and the Quest Browser.
+
+### Improvements
+
+- **The addon finishes loading sooner on Classic Era and Burning Crusade Classic.** The objective location database is the largest thing Everything Quests carries, and it was being read in full every time you logged in or reloaded. It is now left packed until something needs it, which takes about 110ms off the load on Classic Era and about 150ms on Burning Crusade Classic. It is unpacked the first time markers are drawn, usually a moment after you enter the world, so this moves the work off the loading screen rather than removing it. Nothing about the markers themselves changes, and retail is unaffected because it never loaded that database in the first place.
+- **Cooldown Master has been added to the add-on list on the About tab**, alongside Everything Delves and Loot Pro.
+
 ## [1.43.1] - 2026-08-19
 
 German joins the bundled languages, and every language is now complete.
@@ -373,7 +386,7 @@ Make the tracker yours: reorder its sections however you like, move the World Qu
 
 ## [1.28.0] - 2026-06-27
 
-A new Chain Guide questline — **The Sunstrider Omnium** — plus quest-giver map pins for it and Void Acropolis, a fresh addon icon, a tracker layout fix so sections no longer crowd together, and correct "Ritual Site" labelling. Missed a previous version? Every release's notes are in the About tab's changelog (`/eqs` > About).
+A new Chain Guide questline — **The Sunstrider Omnium** — plus quest-giver map pins for it and Void Acropolis, a fresh addon icon, a tracker layout fix so sections no longer crowd together, and correct "Ritual Site" labeling. Missed a previous version? Every release's notes are in the About tab's changelog (`/eqs` > About).
 
 ### New Features
 
@@ -430,7 +443,7 @@ Header bars get more style — a vertical-gradient option and soft, feathered ed
 ### New Features
 
 - **Header bar styles & soft edges** — The Appearance tab's header bar now offers two styles — Header Bar 1 (a horizontal gradient) and Header Bar 2 (a vertical gradient) — plus a Soft edges option that feathers the bar's top, left, and right edges so it blends into the UI instead of sitting in a hard box. An Edge Softness slider tunes how soft those edges are. Thanks to Malevi4 for the requests.
-- **Reset to Defaults (Appearance)** — A new button at the top of the Appearance tab restores only the appearance settings (fonts, colours, shadows, header bar, scroll-bar skin, zone-bar look) to their defaults, leaving filters, sections, sounds, and the zone bar's saved position untouched.
+- **Reset to Defaults (Appearance)** — A new button at the top of the Appearance tab restores only the appearance settings (fonts, colors, shadows, header bar, scroll-bar skin, zone-bar look) to their defaults, leaving filters, sections, sounds, and the zone bar's saved position untouched.
 
 ### Improvements
 
@@ -452,7 +465,7 @@ The clickable quest-item button on a tracked quest moved to the left of the ques
 
 ### New Features
 
-- **Header bars** — A new "Header bar" option in the Appearance tab draws a coloured gradient bar behind each section header (Quests, Campaign, World Quests, and so on), for a look closer to Blizzard's default tracker. Off by default, with Bar Color and Bar Height controls.
+- **Header bars** — A new "Header bar" option in the Appearance tab draws a colored gradient bar behind each section header (Quests, Campaign, World Quests, and so on), for a look closer to Blizzard's default tracker. Off by default, with Bar Color and Bar Height controls.
 
 ### Improvements
 

@@ -194,3 +194,21 @@ function Compat.CollectRewardXP(rows, last, out)
     if moved and before then pcall(selectEntry, before) end
     return true
 end
+
+-- Call this rather than indexing ns.CLASSIC_QUEST_SPAWNS. Lua 5.1 has no __pairs, so a lazy
+-- table cannot be made transparent - an iterating reader would silently see it empty.
+-- Use ns.HAS_CLASSIC_SPAWNS for the flavor question, never the table.
+-- See tools/build_questcoords.lua for why the data ships as a string.
+function Compat.ClassicSpawns()
+    if not ns.CLASSIC_QUEST_SPAWNS then
+        local src = ns.CLASSIC_QUEST_SPAWNS_SRC
+        if not src then return nil end
+        local chunk = loadstring(src)
+        local ok, built = pcall(chunk)
+        -- A failure here must not retry on every pin drawn, so the source is dropped either way
+        ns.CLASSIC_QUEST_SPAWNS_SRC = nil
+        if not (ok and type(built) == "table") then return nil end
+        ns.CLASSIC_QUEST_SPAWNS = built
+    end
+    return ns.CLASSIC_QUEST_SPAWNS
+end

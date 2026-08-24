@@ -7,7 +7,7 @@ reuse the existing skull.tga, so a kill objective shows the same symbol on a nam
 on the map.
 
 Output format is matched to skull.tga exactly, byte layout included: uncompressed true
-colour TGA (type 2), 128x128, 32bpp BGRA, descriptor 0x08 meaning origin at top-left with
+color TGA (type 2), 128x128, 32bpp BGRA, descriptor 0x08 meaning origin at top-left with
 8 alpha bits. WoW rejects a bottom-up origin here, which is what descriptor 0x08 pins down.
 
 No third-party imaging library on purpose, so this runs anywhere Python does.
@@ -92,8 +92,8 @@ def render(shape, detail=None):
                         hits += 1
             alpha[py * SIZE + px] = hits * 255 // (SS * SS)
 
-    # A cheap dark rim: a pixel whose 5x5 neighbourhood contains transparency is near the
-    # boundary, so it blends toward the outline colour. Doing it here rather than in the
+    # A cheap dark rim: a pixel whose 5x5 neighborhood contains transparency is near the
+    # boundary, so it blends toward the outline color. Doing it here rather than in the
     # shape functions keeps the shapes readable as plain geometry.
     rows = []
     for py in range(SIZE):
@@ -128,7 +128,7 @@ def render(shape, detail=None):
             row += bytes((rgb[2], rgb[1], rgb[0], a))              # BGRA
         rows.append(bytes(row))
 
-    # ⛔ BOTTOM-UP. Descriptor 0x08 leaves bit 5 clear, which declares a BOTTOM-LEFT origin, so
+    # BOTTOM-UP. Descriptor 0x08 leaves bit 5 clear, which declares a BOTTOM-LEFT origin, so
     # the first row in the file is the BOTTOM of the image. Writing rows top-down under that
     # header renders the icon vertically mirrored - the coin bag came out as a hot air balloon,
     # and a PNG preview that assumed top-down agreed with the mistake instead of catching it.
@@ -141,8 +141,8 @@ def write_tga(path, pixels):
     header = struct.pack(
         "<BBBHHBHHHHBB",
         0,      # id length
-        0,      # no colour map
-        2,      # uncompressed true colour
+        0,      # no color map
+        2,      # uncompressed true color
         0, 0, 0,
         0, 0,   # origin
         SIZE, SIZE,

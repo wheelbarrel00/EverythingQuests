@@ -2,6 +2,18 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.43.2", date = "2026-08-23",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "Fixed some incorrect info on the About tab. It now reads the game version from the game itself, and on Classic Era and Burning Crusade Classic it describes the map and minimap markers, the nameplate icons and the Quest Browser.",
+            } },
+            { head = "Improvements", items = {
+                "The addon finishes loading sooner on Classic Era and Burning Crusade Classic. The objective location database is the largest thing Everything Quests carries, and it was being read in full every login. It is now left packed until something needs it, which takes about 110ms off the load on Classic Era and about 150ms on Burning Crusade Classic. It is unpacked the first time markers are drawn, usually a moment after you enter the world, so the work moves off the loading screen rather than disappearing. Nothing about the markers changes, and retail is unaffected because it never loaded that database in the first place.",
+                "Cooldown Master has been added to the add-on list on the About tab, alongside Everything Delves and Loot Pro.",
+            } },
+        },
+    },
+    {
         version = "1.43.1", date = "2026-08-19",
         sections = {
             { head = "New Features", items = {
@@ -386,7 +398,7 @@ ns.Changelog = {
         sections = {
             { head = "New Features", items = {
                 "Header bar styles & soft edges (Appearance tab) — choose Header Bar 1 (a horizontal gradient) or Header Bar 2 (a vertical gradient), and turn on Soft edges to feather the bar's top, left, and right edges so it blends into the UI. An Edge Softness slider tunes how soft the edges are. Thanks to Malevi4 for the requests.",
-                "Reset to Defaults (Appearance tab) — restores just the appearance settings (fonts, colours, shadows, header bar, scroll-bar skin, zone-bar look) to defaults, leaving filters, sections, sounds, and the zone bar's position untouched.",
+                "Reset to Defaults (Appearance tab) — restores just the appearance settings (fonts, colors, shadows, header bar, scroll-bar skin, zone-bar look) to defaults, leaving filters, sections, sounds, and the zone bar's position untouched.",
             } },
             { head = "Improvements", items = {
                 "The Appearance tab now scrolls inside the Options window, so it no longer runs off the bottom of the screen.",
@@ -404,7 +416,7 @@ ns.Changelog = {
         version = "1.24.0", date = "2026-06-22",
         sections = {
             { head = "New Features", items = {
-                "Header bars (Appearance tab) — an optional coloured gradient bar behind each section header (Quests, Campaign, World Quests, and so on) for a look closer to Blizzard's default tracker. Off by default, with Bar Color and Bar Height controls.",
+                "Header bars (Appearance tab) — an optional colored gradient bar behind each section header (Quests, Campaign, World Quests, and so on) for a look closer to Blizzard's default tracker. Off by default, with Bar Color and Bar Height controls.",
             } },
             { head = "Improvements", items = {
                 "The clickable quest-item button moved to the left of the quest icon, where it's easier to reach, and is slightly bigger; its red border was removed so it's just the icon.",

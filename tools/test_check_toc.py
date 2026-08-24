@@ -207,7 +207,7 @@ case(
 # --- must fire ---------------------------------------------------------------------------
 
 # The regression the directive answers. Green locally, where the flavor TOC listing the file
-# is on disk; red on the release tag, where it is not.
+# is on disk. It goes red on the release tag, where it is not.
 case(
     "a Classic-only data file with no directive fails in a simulated CI checkout",
     1,

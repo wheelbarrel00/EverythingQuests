@@ -48,12 +48,21 @@ jobs:
           fi
 
       - name: Check TOC file lists
-        # The flavor TOCs are gitignored while they are Phase 0 scaffolds, so this run only
-        # sees the retail TOC and says so. It is still worth having here: a TOC that lists a
-        # file the tag does not carry packages a zip that errors on load.
+        # All three TOCs are tracked now, so this sees the full picture. It is worth having
+        # here because a TOC that lists a file the tag does not carry packages a zip that
+        # errors on load.
         run: |
           python3 tools/test_check_toc.py
           python3 tools/check_toc.py
+
+      - name: Check locale format specifiers
+        # A bad specifier raises in string.format for that language only, so it ships green
+        # and breaks for the players who cannot read the changelog explaining it. The locale
+        # list is derived from the retail TOC, because the hand-maintained one this replaces
+        # went stale and reported zero failures while checking four of six languages.
+        run: |
+          python3 tools/test_check_locale_format.py mutate
+          python3 tools/check_locale_format.py
 
       - name: Build per-release changelog
         run: awk '/^## / { if (seen) exit; seen=1 } seen' CHANGELOG.md > .release_changelog.md

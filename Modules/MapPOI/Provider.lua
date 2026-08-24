@@ -12,7 +12,7 @@ function providerMixin:OnAdded(mapCanvas)
     mapCanvas:SetPinTemplateType(PIN_TEMPLATE, "BUTTON")
 end
 
--- Every pin this provider draws, so a hovered pin can aggregate its neighbours without
+-- Every pin this provider draws, so a hovered pin can aggregate its neighbors without
 -- enumerating the canvas - ExecuteOnAllPins and RegisterPin are both absent on Era.
 M._drawnN = 0
 M._drawnQ, M._drawnX, M._drawnY, M._drawnK, M._drawnM = {}, {}, {}, {}, {}
@@ -55,8 +55,10 @@ local function waypointFor(questID, mapID)
     return classicWaypoint(questID, mapID)
 end
 
+-- First caller pays the deferred parse. See Compat.ClassicSpawns.
 local function spawnPoints(questID, mapID)
-    local byMap = ns.CLASSIC_QUEST_SPAWNS and ns.CLASSIC_QUEST_SPAWNS[questID]
+    local spawns = ns.Compat and ns.Compat.ClassicSpawns and ns.Compat.ClassicSpawns()
+    local byMap = spawns and spawns[questID]
     return byMap and byMap[mapID]
 end
 
