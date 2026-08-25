@@ -798,7 +798,7 @@ if mode == "available" then
         local qlvl  = math.max(0, math.min(99, tonumber(q[Q_QUESTLEVEL]) or 0))
         local races = tonumber(q[Q_RACES]) or 0
         local class = tonumber(q[Q_CLASSES]) or 0
-        -- Only the low three: repeatable, needs a world event, monthly reset
+        -- Only the low three: repeatable, completed by exploring or by a script, monthly reset
         local flags = (tonumber(q[Q_SPECIALFLAGS]) or 0) % 8
         -- Loud rather than clamped. A truncated bitmask would offer a quest to the wrong race.
         assert(races >= 0 and races <= 9999, ("quest %d: race mask %s does not fit"):format(id, tostring(races)))
@@ -887,7 +887,9 @@ if mode == "available" then
         "--        Ordered densest first, so a reader's prefix keeps the best locations.\n",
         "-- gates  [questID] = requiredLevel*1e11 + questLevel*1e9 + specialFlags*1e8\n",
         "--                    + requiredRaces*1e4 + requiredClasses\n",
-        "--        specialFlags: 1 repeatable, 2 needs a world event, 4 monthly reset\n",
+        "--        specialFlags: 1 repeatable, 2 completed by exploring or by a script, 4\n",
+        "--        monthly reset. Bit 2 is NOT a holiday marker and must not be gated on as\n",
+        "--        one. See Modules/MapPOI/Holidays.lua for what actually decides a holiday.\n",
         "--        A bitmask of 0 means no restriction, not 'no races allowed'.\n",
         "-- names  [questID] = English title. The client is asked first and this is the fallback,\n",
         "--        so a non-English client shows English only for quests it does not know.\n",
@@ -1214,7 +1216,8 @@ if mode == "category" then
         "\n-- [questID] = category bitmask\n",
         "--   1 instance    the quest is sorted into a dungeon or raid area\n",
         "--   2 repeatable  specialFlags bit 0\n",
-        "--   4 event       specialFlags bit 1, a world event or holiday quest\n",
+        "--   4 event       specialFlags bit 1, which marks a quest completed by exploring\n",
+        "--                 or by a script. It is NOT a holiday marker.\n",
         "--   8 class       the quest carries a required class mask\n",
         "--  16 profession  the quest carries a required skill\n",
         "-- A quest with no category at all is left out, so absence means ordinary quest.\n",

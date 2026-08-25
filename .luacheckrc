@@ -41,6 +41,7 @@ read_globals = {
     "C_Scenario", "C_ScenarioInfo", "C_TradeSkillUI", "C_AddOns", "C_ChatInfo",
     "C_Container", "C_Item", "C_Spell", "C_PerksActivities", "C_CurrencyInfo",
     "C_Reputation", "C_QuestInfoSystem", "C_QuestLine", "C_PvP", "C_LFGList", "C_CreatureInfo",
+    "C_DateAndTime",
     "C_Garrison", "C_FactionInfo", "C_MajorFactions", "C_TaxiMap", "C_GossipInfo",
     "C_CampaignInfo", "C_AreaPoiInfo", "C_Minimap", "C_ChallengeMode",
     "C_VignetteInfo", "C_UnitAuras", "C_UIWidgetManager",

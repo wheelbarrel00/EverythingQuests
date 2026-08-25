@@ -87,7 +87,13 @@ end
 -- Race and class never change for a character, so a rejection for either is safe to remember.
 local _permaNo = {}
 
-local SF_REPEATABLE, SF_EVENT = 1, 2
+-- Declared here because isAvailable reads them and preparePass, further down, is what sets them.
+local _holidays, _hideSeason, _hideHigh, _redCeiling
+
+-- Bit 2 is the upstream QUEST_SPECIAL_FLAG_EXPLORATION_OR_EVENT: a quest COMPLETED by exploring
+-- or by a script, never one that needs a holiday. The source database names only bit 1 and gates
+-- nothing on bit 2.
+local SF_REPEATABLE, SF_EXPLORE = 1, 2
 
 -- Blizzard's own grey threshold, so "low level" here means exactly what the client means by it.
 -- Absent means the filter cannot judge and every quest is shown, which is the same fail-open rule
@@ -102,6 +108,22 @@ local function trivialFloor()
     end
     if type(range) ~= "number" then return nil end
     return _level - range
+end
+
+-- The level at which the game first colors a quest RED for this character, which is what it
+-- uses to say "out of reach". Derived rather than a fixed offset so it follows the client.
+-- Measured on 1.15.9 at level 22: yellow to 24, orange 25 and 26, red from 27, so +5 today.
+-- Nil means it could not be read, and an unreadable gate shows the quest.
+local function redCeiling()
+    if type(_G.GetQuestDifficultyColor) ~= "function" then return nil end
+    local impossible = _G.QuestDifficultyColors and _G.QuestDifficultyColors.impossible
+    if not impossible then return nil end
+    if not _level or _level <= 0 then return nil end
+    for offset = 1, 20 do
+        local ok, color = pcall(_G.GetQuestDifficultyColor, _level + offset)
+        if ok and color == impossible then return _level + offset end
+    end
+    return nil
 end
 
 local function anyCompleted(list)
@@ -159,14 +181,14 @@ local REASON_HOLIDAY     = "holiday quest"
 local REASON_RACE_CLASS  = "race or class"
 local REASON_REQ_LEVEL   = "too low level"
 local REASON_LOW_LEVEL   = "low level"
+local REASON_HIGH_LEVEL  = "high level"
 local REASON_PREREQ      = "prerequisite"
 local REASON_LATER_STEP  = "later step done"
 local REASON_BRANCH      = "took another branch"
 local REASON_REPUTATION  = "reputation"
 
 -- Category bits, matching Data/QuestCategory_Classic.lua. The event bit is deliberately not read
--- here: a holiday quest is already refused outright further down, because nothing in the data
--- says whether the holiday is running.
+-- here: it is derived from the same flag as SF_EXPLORE and so names ordinary quests, not holidays.
 local CAT_INSTANCE, CAT_REPEATABLE, CAT_PROFESSION = 1, 2, 16
 
 -- Each entry is a filter the user can switch on to REMOVE that category, so nil reads as "show
@@ -226,9 +248,6 @@ local function isAvailable(questID, D, hideLowLevel, floor)
     local inLog, failed = logState(questID)
     if inLog and not failed then return false, REASON_IN_LOG end
 
-    -- Nothing in the base data says whether a world event is running, and a holiday quest pinned
-    -- year round is a confident lie. Hidden outright, which costs the pin during the holiday.
-    if (flags % (SF_EVENT + SF_EVENT)) >= SF_EVENT then return false, REASON_HOLIDAY end
 
     local races = math.floor(gates % 1e8 / 1e4)
     if not hasBit(races, _raceBit) then
@@ -248,6 +267,24 @@ local function isAvailable(questID, D, hideLowLevel, floor)
     if hideLowLevel and floor then
         local questLevel = math.floor(gates % 1e11 / 1e9)
         if questLevel > 0 and questLevel < floor then return false, REASON_LOW_LEVEL end
+    end
+
+    -- The `> 0` half mirrors the low filter, where it IS load bearing because 0 is below any
+    -- trivial floor. Here the ceiling is always above the player level, so an unknown level could
+    -- never reach it anyway. Kept because it states the intent, not because it currently fires.
+    if _hideHigh and _redCeiling then
+        local questLevel = math.floor(gates % 1e11 / 1e9)
+        if questLevel > 0 and questLevel >= _redCeiling then return false, REASON_HIGH_LEVEL end
+    end
+
+    -- Below race, class and level so its count is not inflated by quests they would have taken
+    -- anyway. It is still NOT a count of pins saved: prerequisite and everything under it reject
+    -- some of these as well, and the high level filter above can take them first. Only the LAST
+    -- gate in the chain could claim that, and this file has already shipped one number that read
+    -- as 185 pins when it was worth 6. It does NOT read specialFlags bit 2, which marks
+    -- exploration quests. Holidays.lua owns the dates and fails open on anything it cannot read.
+    if _hideSeason and _holidays and _holidays:IsOutOfSeason(questID) then
+        return false, REASON_HOLIDAY
     end
 
     local pre = D.pre[questID]
@@ -308,6 +345,11 @@ local function preparePass()
     local Cache = ns:GetSubsystem("Cache")
     if Cache and Cache.All then Cache:All() end
 
+    -- Resolved and reset once per pass rather than per quest: the season answer is the same for
+    -- every quest in one rebuild, and asking per quest is a client time call per holiday quest.
+    _holidays = ns:GetSubsystem("QuestHolidays")
+    if _holidays then _holidays:BeginPass() end
+
     readPlayer()
     if not (_raceBit and _classBit) then return false end
     readCompleted()
@@ -320,6 +362,11 @@ local function preparePass()
     -- Compared against false, not tested for truthiness, so a profile written before this option
     -- existed reads as ON, which is what the checkbox shows for the same nil.
     _hideLowLevel = not (map and map.hideLowLevelQuests == false)
+    _hideSeason = not (map and map.hideOutOfSeasonQuests == false)
+    _hideHigh = (map and map.hideHighLevelQuests) == true
+    _redCeiling = _hideHigh and redCeiling() or nil
+    M._gatesRun.highLevel = (_redCeiling ~= nil)
+    M._gatesRun.season = (_hideSeason and _holidays ~= nil) or false
     _floor = _hideLowLevel and trivialFloor() or nil
     M._gatesRun.trivial = (_floor ~= nil)
     _prepared = true
@@ -410,12 +457,12 @@ function M:IsRepeatable(questID)
     return (flags % (SF_REPEATABLE + SF_REPEATABLE)) >= SF_REPEATABLE
 end
 
-function M:NeedsWorldEvent(questID)
+function M:IsExplorationOrScripted(questID)
     local D = data()
     local gates = D and D.gates[questID]
     if not gates then return false end
     local flags = math.floor(gates % 1e9 / 1e8)
-    return (flags % (SF_EVENT + SF_EVENT)) >= SF_EVENT
+    return (flags % (SF_EXPLORE + SF_EXPLORE)) >= SF_EXPLORE
 end
 
 -- The race and class masks, undecoded. Handing out the raw mask keeps the packing decoded in one

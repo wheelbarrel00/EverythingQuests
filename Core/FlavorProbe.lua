@@ -2433,15 +2433,24 @@ function Probe:Available()
     line("  A reputation gate that cannot be read shows the quest rather than hiding it.")
     line("  requiredSkill is SHIPPED but never enforced - no reliable skill id lookup here.")
 
+    -- Which events are running, and whether the moving one is covered for this year at all. A lunar
+    -- table that has run out SHOWS its quests, exactly as a running event does, so without this the
+    -- two are indistinguishable on screen.
+    local H = ns:GetSubsystem("QuestHolidays")
+    if H and H.ProbeLines then
+        for _, l in ipairs(H:ProbeLines()) do line("  %s", l) end
+    end
+
     line("4. the last pass:")
     -- The pass is lazy, so on a cold run these counters are still at zero and would read as
     -- "every quest was ruled out" rather than "nothing has been computed yet".
     A:All()
     line("  stage=%q  quests considered=%s  AVAILABLE=%s",
          tostring(A._stage), tostring(A._resolved), tostring(A._availableN))
-    line("  gates that actually ran: raceClass=%s trivial=%s reputation=%s",
+    line("  gates that actually ran: raceClass=%s trivial=%s reputation=%s highLevel=%s season=%s",
          tostring(A._gatesRun.raceClass), tostring(A._gatesRun.trivial),
-         tostring(A._gatesRun.reputation))
+         tostring(A._gatesRun.reputation), tostring(A._gatesRun.highLevel),
+         tostring(A._gatesRun.season))
     local reasons = {}
     for why, n in pairs(A._reason) do reasons[#reasons + 1] = ("%s=%d"):format(why, n) end
     table.sort(reasons)

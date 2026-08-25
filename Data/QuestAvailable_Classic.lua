@@ -12,7 +12,8 @@ local _, ns = ...
 --        Ordered densest first, so a reader's prefix keeps the best locations.
 -- gates  [questID] = requiredLevel*1e11 + questLevel*1e9 + specialFlags*1e8
 --                    + requiredRaces*1e4 + requiredClasses
---        specialFlags: 1 repeatable, 2 needs a world event, 4 monthly reset
+--        specialFlags: 1 repeatable, 2 completed by exploring or by a script, 4 monthly
+--        reset. Bit 2 is NOT a holiday marker and must not be gated on as one.
 --        A bitmask of 0 means no restriction, not 'no races allowed'.
 -- names  [questID] = English title. The client is asked first and this is the fallback,
 --        so a non-English client shows English only for quests it does not know.

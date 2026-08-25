@@ -130,7 +130,9 @@ local function factionName(factionID)
     return nil
 end
 
-local CAT_INSTANCE, CAT_REPEATABLE, CAT_EVENT, CAT_CLASS, CAT_PROFESSION = 1, 2, 4, 8, 16
+-- 4 is the event bit, deliberately not taken: it is built from the same flag as
+-- IsExplorationOrScripted and names escorts rather than holidays.
+local CAT_INSTANCE, CAT_REPEATABLE, CAT_CLASS, CAT_PROFESSION = 1, 2, 8, 16
 
 local function hasCat(mask, bit)
     if not mask then return false end
@@ -313,7 +315,10 @@ function QB:Record(questID)
     local cats = ns.CLASSIC_QUEST_CATEGORY and ns.CLASSIC_QUEST_CATEGORY[questID]
     r.isInstance   = hasCat(cats, CAT_INSTANCE)
     r.isRepeatable = hasCat(cats, CAT_REPEATABLE) or A:IsRepeatable(questID)
-    r.isEvent      = hasCat(cats, CAT_EVENT) or A:NeedsWorldEvent(questID)
+    -- NOT CAT_EVENT, which is built from the same flag as IsExplorationOrScripted and so
+    -- names escorts rather than holidays. The holiday table is what actually knows.
+    local hol = ns.CLASSIC_QUEST_HOLIDAY
+    r.isEvent      = (hol and hol.event and hol.event[questID]) ~= nil
     r.isClassQuest = hasCat(cats, CAT_CLASS)
     r.isProfession = hasCat(cats, CAT_PROFESSION)
 

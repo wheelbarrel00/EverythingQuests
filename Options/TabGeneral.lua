@@ -128,7 +128,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         local avail = Options:CreateCheckbox(content,
             L["Show quests you can pick up"],
             availGet, availSet,
-            L["Marks every quest giver who has something for you but is not in your quest log yet, with a gold ring around the exclamation mark so it reads apart from the quests you are already carrying. One marker covers a whole quest giver, and hovering it lists everything that giver offers. Quests are filtered by your level, race, class and the quests you have already finished. Holiday quests are left out, because nothing in the data says whether the holiday is running."])
+            L["Marks every quest giver who has something for you but is not in your quest log yet, with a gold ring around the exclamation mark so it reads apart from the quests you are already carrying. One marker covers a whole quest giver, and hovering it lists everything that giver offers. Quests are filtered by your level, race, class and the quests you have already finished, and holiday quests are shown only while their world event is running."])
         place(avail, 0, 16)
 
         local function lowGet()
@@ -149,6 +149,43 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             lowGet, lowSet,
             L["Leaves out quests the game has already grayed out for you, using the game's own threshold rather than a fixed number of levels. On by default. Turn it off to see everything a quest giver has, including the quests you have outleveled."])
         place(low, 16, 6)
+
+        local function seasonGet()
+            local DB = ns:GetSubsystem("DB")
+            return not DB or not DB.db.profile.map
+                   or DB.db.profile.map.hideOutOfSeasonQuests ~= false
+        end
+        local function seasonSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.hideOutOfSeasonQuests = v and true or false
+            end
+            rebuildAvailable()
+        end
+        local season = Options:CreateCheckbox(content,
+            L["Hide holiday quests out of season"],
+            seasonGet, seasonSet,
+            L["Leaves out quests belonging to a world event that is not running, such as the Lunar Festival in July. On by default. Turn it off to see every holiday quest all year, which is how the map behaved before."])
+        place(season, 16, 6)
+
+        local function highGet()
+            local DB = ns:GetSubsystem("DB")
+            return (DB and DB.db.profile.map and DB.db.profile.map.hideHighLevelQuests) == true
+        end
+        local function highSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.hideHighLevelQuests = v and true or false
+            end
+            rebuildAvailable()
+        end
+        local high = Options:CreateCheckbox(content,
+            L["Hide quests above your level"],
+            highGet, highSet,
+            L["Leaves out quests the game colors red for you, using its own threshold rather than a fixed number of levels. Off by default, because a red quest is still worth knowing about if you are coming back later."])
+        place(high, 16, 6)
     end
 
     local MinimapPins = ns:GetSubsystem("MinimapQuestPins")

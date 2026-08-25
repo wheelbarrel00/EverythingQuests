@@ -2,6 +2,18 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.44.0", date = "2026-08-24",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "About 190 quests on Classic Era and 310 on Burning Crusade Classic were hidden from the map by mistake, and they are back. A flag in the quest data was being read as \"this belongs to a world event\" when what it actually marks is \"this quest is finished by exploring somewhere, or by a scripted event\". That covers a great many ordinary quests, and none of them drew a marker: The Defias Brotherhood, The Missing Diplomat, The Fargodeep Mine and essentially every escort quest in the game. Nearly all of them draw one again, the exception being the few that really are holiday quests and now follow the season.",
+            } },
+            { head = "New Features", items = {
+                "Holiday quests are now only shown while their world event is actually running. The Lunar Festival, Winter Veil, Hallow's End, Midsummer, Brewfest, the Darkmoon Faire and the rest used to put markers on the map every day of the year, which is how you could find Brewfest quests sitting there in August. A new checkbox under the map options, Hide holiday quests out of season, is on by default. Turning it off puts every holiday quest back on the map all year, the way it behaved before. Thanks to JonnyN for reporting it.",
+                "A new option leaves out quests the game considers out of reach. Hide quests above your level removes anything the game colors red for you, which is roughly five levels above you and higher. It is off by default, because a red quest is still worth knowing about if you mean to come back for it later. It reads the game's own difficulty color rather than counting a fixed number of levels, the same way the existing low level filter works at the other end of the scale.",
+            } },
+        },
+    },
+    {
         version = "1.43.2", date = "2026-08-23",
         sections = {
             { head = "Bug Fixes", items = {

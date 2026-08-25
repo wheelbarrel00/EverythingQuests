@@ -42,6 +42,8 @@ DB.defaults = {
             -- listing one here would hide the nil that Modules/MapPOI/Pin.lua needs to tell
             -- "never chosen" apart from "switched off", and retail would lose its ring.
             showAvailableRing   = false,
+            hideOutOfSeasonQuests = true,
+            hideHighLevelQuests  = false,
             hideDungeonQuests    = false,
             hideRepeatableQuests = false,
             hideProfessionQuests = false,

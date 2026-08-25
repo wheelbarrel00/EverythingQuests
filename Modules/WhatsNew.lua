@@ -3,8 +3,8 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.43.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.43.0"
+local FEATURE_POPUP_VERSION = "1.44.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.44.0"
 
 local POPUP_BODY = [[
 |cffEBB706Quest information on the tooltips you already hover|r

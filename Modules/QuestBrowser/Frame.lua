@@ -38,6 +38,7 @@ local function reasonText(reason)
     if reason == "race or class"        then return L["Your race or class cannot take this quest."] end
     if reason == "too low level"        then return L["You do not meet the required level yet."] end
     if reason == "low level"            then return L["Too far below your level to be worth showing. Turn off the low level filter to see it."] end
+    if reason == "high level"           then return L["The game colors this quest red for you, so it is out of reach for now. Turn off the high level filter to see it."] end
     if reason == "prerequisite"         then return L["An earlier quest has to be finished first."] end
     if reason == "later step done"      then return L["A later step of this chain is already done or in your log."] end
     if reason == "took another branch"  then return L["You took a different branch of this quest line."] end
