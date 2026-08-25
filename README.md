@@ -45,12 +45,12 @@ Era and TBC were measured identical across every game API the addon reads, so on
 
 - **Objective markers** on the world map and the minimap, drawn from a generated coordinate database rather than from the client, which exposes no quest coordinates at all
 - **Objective kind icons** — kill, loot, or interact — and dungeon objectives marked at the dungeon entrance
-- **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites and completion
+- **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites, reputation, completion, and whether a holiday quest's world event is actually running
 - **Nameplate quest icons**, resolved from the creature ID in the unit GUID, since a Classic unit tooltip carries no quest data
 - **The Quest Browser** — look up almost any quest in the game, including ones never picked up, with its level, race and class requirements, start and turn-in locations, prerequisites, and the reason it is not available yet. `/eqs quests`, or right-click a gold marker
 - **Quest progress on tooltips** — a bag item names the quest that wants it and what is still missing, and on Classic an enemy names the quest it counts toward, which the client there never does
 - **Coordinates** on the world map and under the minimap, with a slider for how many decimals to show
-- **Two ways to quiet a busy map**, both off by default: leave out markers for quests you have untracked, and fade markers sitting on top of your own position
+- **Two more ways to quiet a busy map** on top of the filters above, both off by default: leave out markers for quests you have untracked, and fade markers sitting on top of your own position
 - **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, the **focus arrow**, and the **`/eqs`** options window (General and About tabs)
 - All bundled locales
 
@@ -148,7 +148,9 @@ Custom quest pins on zone maps. On retail the icon carries the Everything-suite 
 - **Fixed size at every zoom** — `SetScalingLimits(1, s, s)` collapses Blizzard's zoom lerp to a constant, with a per-map-type factor so continent and world maps draw smaller. A scale slider and a per-quest pin limit live under `/eqs` → General
 - **On Classic** — in-progress pins come from `Data/QuestSpawns_Classic.lua` and carry objective art rather than a `!`, marking every clustered location a quest can be advanced, with a per-quest minimum separation applied at read time so a low limit still spreads across the zone
 - **Turn-in pins on Classic** — a finished quest is placed from `Data/QuestTurnIn_Classic.lua`, at every map where it can be handed in. That table is authoritative once it knows a quest, because 475 quests hand in on a different map from their objective
-- **Available quest pins on Classic** — gold `!` markers for quests you can pick up but have not accepted, from `Data/QuestAvailable_Classic.lua`, gated on level, race, class, prerequisites and completion. Pins merge by location rather than by quest, and category filters under `/eqs` → General → Map leave dungeon, repeatable or profession quests off the map
+- **Available quest pins on Classic** — gold `!` markers for quests you can pick up but have not accepted, from `Data/QuestAvailable_Classic.lua`, gated on level, race, class, prerequisites, reputation and completion. Pins merge by location rather than by quest
+- **Holiday quests follow their season** — a Lunar Festival or Brewfest quest is pinned only while that world event is running, from `Data/QuestHolidays_Classic.lua`. On by default. The one date that moves each year fails open, so a year the table does not list shows those quests rather than hiding them
+- **Filters for a busy map**, all under `/eqs` → General → Map — leave out dungeon, repeatable or profession quests, hide quests below your level using the game's own gray threshold, or hide the ones it colors red for you. That last one is off by default, because a red quest is still worth knowing about if you mean to come back for it
 
 ### Minimap Objective Pins
 The same objective markers on the minimap, for the zone you are standing in, powered by HereBeDragons-Pins. Classic only, and keyed on `C_Map.GetBestMapForUnit` rather than the open world map. Pins are hover-only so clicks pass through to the minimap underneath.
@@ -239,7 +241,7 @@ Bindable from **Esc → Options → Key Bindings → AddOns → Everything Quest
 
 | Tab | Settings |
 |---|---|
-| **General** | Open Tracker Settings, Everything Quests and Chain Guide icons on the tracker, auto-accept / auto-turn-in quests, restore super-tracked quest on relog, **quest icons on nameplates**, world-map quest pins, pin scale, objective pins per quest, minimap objective pins, show / hide minimap button, update notice style, options window scale, profile management, reset to defaults |
+| **General** | Open Tracker Settings, Everything Quests and Chain Guide icons on the tracker, auto-accept / auto-turn-in quests, restore super-tracked quest on relog, **quest icons on nameplates**, world-map quest pins, pin scale, objective pins per quest, minimap objective pins, **map filters** (dungeon, repeatable, profession, below your level, above your level, holiday quests out of season), show / hide minimap button, update notice style, options window scale, profile management, reset to defaults |
 | **World Quests** | Show / hide pins, per-reward filters, per-faction filters, docked map panel |
 | **Chain Guide** | Map pins and waypoints, cross-character chain cache stats and reset, prune stale entries |
 | **History** | Backfill from past completions, re-scan missing names, restore from backup, wipe history, view stats |
@@ -298,6 +300,7 @@ HereBeDragons is listed by the Classic TOC only. HBD-Pins calls `WorldMapFrame:A
 EverythingQuests/
 ├── EverythingQuests.toc              # Retail manifest, module load order
 ├── EverythingQuests_Vanilla.toc      # Classic Era manifest, omissions declared inline
+├── EverythingQuests_TBC.toc          # Burning Crusade Classic manifest, same shape
 ├── Bindings.xml                      # Keybinding declarations
 ├── Core/                             # Init, Compat, DB, Events, Profiler, Cache, Util,
 │                                     #   Media, Dialog, QuestRewards, Changelog, FlavorProbe
@@ -308,18 +311,30 @@ EverythingQuests/
 │   ├── Nameplates/                   # Nameplate quest icons (QuestIcons.lua)
 │   ├── WorldQuests/                  # World/zone map pins, docked panel
 │   ├── ChainGuide/                   # Chain browser window + campaign source
-│   ├── MapPOI/                       # Quest POI overlays and Classic spawn markers
+│   ├── MapPOI/                       # Quest POI overlays, Classic spawn markers,
+│   │                                 #   available-quest pins, the holiday season gate
+│   ├── QuestBrowser/                 # Classic quest lookup window (Data + Frame)
+│   ├── Tooltips/                     # Quest progress on item and unit tooltips
 │   ├── History/                      # Quest History (Recorder + Frame + Session)
+│   ├── MapCoords.lua                 # Coordinates on the world map and minimap
+│   ├── QuestArrow.lua                # Shared TomTom waypoint slot
 │   ├── QuestAuto.lua                 # Auto-accept / auto-turn-in handlers
 │   ├── TrackerBridge.lua             # Puts EQ's icons and menu entry onto
 │   │                                 #   EQ Objective Tracker via its public API
 │   └── WhatsNew.lua                  # One-time popup for new releases
 ├── Data/
 │   ├── QuestChains/                  # Hand-authored Midnight chain data
-│   ├── QuestCoords_Classic.lua       # Generated: questID -> single waypoint
-│   ├── QuestSpawns_Classic.lua       # Generated: questID -> every objective location
-│   └── QuestNPCs_Classic.lua         # Generated: questID -> creatures that advance it
-├── tools/                            # check_toc.py TOC gate, build_questcoords.lua
+│   ├── QuestCoords_*.lua             # Generated: questID -> single waypoint
+│   ├── QuestSpawns_*.lua             # Generated: questID -> every objective location
+│   ├── QuestNPCs_*.lua               # Generated: questID -> creatures that advance it
+│   ├── QuestTurnIn_*.lua             # Generated: questID -> every hand-in location
+│   ├── QuestAvailable_*.lua          # Generated: where a quest starts, plus its gates
+│   ├── QuestCategory_*.lua           # Generated: dungeon / repeatable / class / profession
+│   └── QuestHolidays_*.lua           # Generated: questID -> its world event
+│                                     #   Each has a _Classic and a _TBC variant. A TOC
+│                                     #   lists exactly one; they define the same globals
+├── tools/                            # TOC and locale-format gates, plus their own
+│                                     #   self-tests, and build_questcoords.lua
 └── Options/                          # General, World Quests, Chain Guide,
                                       #   History, About tabs
 ```
