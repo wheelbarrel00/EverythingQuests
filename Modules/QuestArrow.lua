@@ -46,8 +46,9 @@ local function playerMap()
     return ok and id or nil
 end
 
--- kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4), with the map as the outer key. Deliberately NOT
--- the same packing as ns.CLASSIC_QUEST_COORDS below, which carries the MAP in the high slot,
+-- srcID*1e9 + kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4), with the map as the outer key. Only
+-- the coordinate half is wanted here, so v % 1e8 skips the rest. Deliberately NOT the same
+-- packing as ns.CLASSIC_QUEST_COORDS below, which carries the MAP where this carries a kind,
 -- so the two decoders cannot be shared.
 local function turnInPoint(questID)
     local byMap = ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID]

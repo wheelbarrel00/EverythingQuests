@@ -212,3 +212,21 @@ function Compat.ClassicSpawns()
     end
     return ns.CLASSIC_QUEST_SPAWNS
 end
+
+-- The name of the creature or object a start or turn-in point belongs to, or nil when the point
+-- carries no source. KIND decides which id space to read, and it has to: the two overlap. In the
+-- shipped tables object ids run 31 to 187975 against creature ids 196 to 28329, 62 Classic and 73
+-- TBC object ids sit inside the creature range, and 7 ids are in BOTH sub-tables on both flavors.
+-- So no magnitude test could ever stand in for the kind, and reading the wrong table answers a
+-- real name for the wrong thing rather than nil.
+-- The kind is normalized first because a dungeon entrance carries its real kind plus 4, so an
+-- object entrance arrives as 6. Entrances all store a source of 0 today and would be rejected
+-- below anyway, but that is a property of the data rather than of this function.
+function Compat.SourceName(kind, srcID)
+    if type(srcID) ~= "number" or srcID <= 0 then return nil end
+    local S = ns.CLASSIC_QUEST_SOURCES
+    if not S then return nil end
+    local real = (ns.QuestRealKind and ns.QuestRealKind(kind)) or kind
+    local t = (real == 2) and S.obj or S.npc
+    return t and t[srcID]
+end

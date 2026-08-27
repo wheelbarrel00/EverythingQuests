@@ -3,31 +3,20 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.44.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.44.0"
+local FEATURE_POPUP_VERSION = "1.45.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.45.0"
 
 local POPUP_BODY = [[
-|cffEBB706Quest information on the tooltips you already hover|r
-Hover an item in your bags and it now tells you |cffffffffwhich quest wants it|r and how many you still need. On Classic, hovering an enemy tells you which quest it counts toward and what is left, which the game there never says at all.
+|cffEBB706Quest markers now tell you who to talk to|r
+Hover a marker for a quest you can |cffffffffpick up|r and it names the person standing there. Hover one for a quest you have |cfffffffffinished|r and it names who to hand it in to. The same names show up in the |cffffffffQuest Browser|r under Starts and Turn in, so you can see where a quest begins without opening the map.
 
-Nothing is added to a tooltip that has nothing to say. On retail the enemy half is left alone, because the game already writes those lines itself.
+This covers about |cffffffff1,700|r quest givers and finishers on Classic Era and |cffffffff2,700|r on Burning Crusade Classic, and not only the people: a noticeboard, a sealed crate or a scrap of parchment gets named too. A quest that starts from an item you loot has nobody to name, and says so the way it always did.
 
-|cffaaaaaaThe bag item half has been tested on Classic but not on retail. If it looks wrong there, please let me know.|r
-
-|cffEBB706Coordinates, on the map and under the minimap|r
-The world map now shows the spot your |cffffffffmouse|r is pointing at, and |cffffffffyour own position|r when you are looking at the zone you are standing in. There is a matching readout under the minimap, off by default, and a slider for how many decimals to show.
-
-|cffEBB706Two ways to quiet a busy map|r
-|cffffffffOnly show markers for quests you are tracking|r leaves out the markers for anything in your log you have untracked, so a crowded zone shows only what you are working on. |cffffffffFade markers that cover your position|r makes any marker sitting on top of your own arrow see-through so you can still find yourself. Both are off by default and both live under |cffffffff/eqs|r > General.
-
-|cffEBB706Auto-accept picks the right quest|r
-At a quest giver offering several, auto-accept now takes the first quest it can |cffffffffactually accept|r rather than whatever sits at the top of the list, and passes over a trivial grey quest when a real one is on offer.
-
-|cffEBB706Traditional Chinese|r
-Everything Quests now ships |cffffffffzhTW|r translations alongside French, Russian, Korean and Simplified Chinese.
+|cffEBB706A fix to this window|r
+The What's New window for |cffffffff1.44.0|r was headed 1.44.0 but showed the notes from 1.43.0, so the holiday season gate and the level filter it was meant to announce were not in it. In case you missed them: holiday quests now only appear while their event is actually running, and a new option hides quests the game colors red for you. Both live under |cffffffff/eqs|r > General.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffAIR|r for reporting that |cffffffffGet Directions|r could set no waypoint and say nothing about it, which is fixed in this release. Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian) and |cfffffffflabrie75|r (Korean) for keeping Everything Quests translated, to |cffffffffBNS333|r (Traditional Chinese) and |cffffffffKeriaovo|r (Simplified Chinese), and to everyone who sends reports and suggestions.
+Thanks to |cffffffffJonnyN|r for reporting the Brewfest markers sitting on the map in August, which is what led to the holiday work. Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]

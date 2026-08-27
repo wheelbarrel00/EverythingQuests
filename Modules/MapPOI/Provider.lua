@@ -16,15 +16,19 @@ end
 -- enumerating the canvas - ExecuteOnAllPins and RegisterPin are both absent on Era.
 M._drawnN = 0
 M._drawnQ, M._drawnX, M._drawnY, M._drawnK, M._drawnM = {}, {}, {}, {}, {}
+M._drawnS = {}
 
 -- The quest list of an available-quest pin, which has no quest log entry for the tooltip to reach.
 -- Nil for every pin backed by the quest log, which is every pin on retail.
 M._drawnA = {}
 
-local function record(qid, x, y, kind, mask, avail)
+local function record(qid, x, y, kind, mask, avail, srcID)
     local n = M._drawnN + 1
     M._drawnN, M._drawnQ[n], M._drawnX[n], M._drawnY[n] = n, qid, x, y
     M._drawnK[n], M._drawnM[n], M._drawnA[n] = kind, mask, avail
+    -- Assigned unconditionally. This array is reused across refreshes, so skipping it for a
+    -- pin with no source would leave the previous refresh's finisher at that index.
+    M._drawnS[n] = srcID
 end
 
 function providerMixin:RemoveAllData()
@@ -107,7 +111,7 @@ end
 
 -- Shared scratch for PointsFor, which the world map and the minimap both call. Read the arrays
 -- before calling again.
-M._ptX, M._ptY, M._ptKind, M._ptMask = {}, {}, {}, {}
+M._ptX, M._ptY, M._ptKind, M._ptMask, M._ptSrc = {}, {}, {}, {}, {}
 
 -- The generator's kind values against the client's own objective `type` strings. Shared with
 -- Modules/Nameplates so one number never means two different objective types.
@@ -183,7 +187,7 @@ M._untrackedHidden = 0
 -- The third return is a string, not a boolean, because /eqsprobe has to tell the pin sources apart
 -- when they look identical on the map, and tell a refusal from an empty result.
 function M:PointsFor(questID, mapID, q)
-    local X, Y, K, MK = self._ptX, self._ptY, self._ptKind, self._ptMask
+    local X, Y, K, MK, S = self._ptX, self._ptY, self._ptKind, self._ptMask, self._ptSrc
     local isComplete = q and q.isComplete
 
     if not ns.QuestPinTracked(q) then
@@ -209,7 +213,10 @@ function M:PointsFor(questID, mapID, q)
                 X[i], Y[i] = math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4
                 -- The kind rides along only so an entrance pin can be tinted and named. The
                 -- icon is the turn-in mark either way, chosen from isComplete.
-                K[i], MK[i] = math.floor(v / 1e8), nil
+                -- % 10 because srcID sits above the kind at 1e9. Without it the kind reads as
+                -- the whole creature id and every turn-in pin looks like an entrance.
+                K[i], MK[i] = math.floor(v / 1e8) % 10, nil
+                S[i] = math.floor(v / 1e9)
             end
             return #turnIn, 0, "turnin"
         end
@@ -219,7 +226,7 @@ function M:PointsFor(questID, mapID, q)
     if not spawns then
         local x, y = waypointFor(questID, mapID)
         if not x then return 0, 0, "none" end
-        X[1], Y[1], K[1], MK[1] = x, y, nil, nil
+        X[1], Y[1], K[1], MK[1], S[1] = x, y, nil, nil, nil
         return 1, 0, "single"
     end
 
@@ -243,7 +250,7 @@ function M:PointsFor(questID, mapID, q)
             local y = (rest % 1e4) / 1e4
             if spreadAccepts(x, y) then
                 n = n + 1
-                X[n], Y[n], K[n], MK[n] = x, y, kind, mask
+                X[n], Y[n], K[n], MK[n], S[n] = x, y, kind, mask, nil
             else
                 thinned = thinned + 1
             end
@@ -330,8 +337,8 @@ function providerMixin:_DoRefresh()
                 for i = 1, n do
                     local x, y = M._ptX[i], M._ptY[i]
                     map:AcquirePin(PIN_TEMPLATE, qid, x, y, q.isComplete, mapID,
-                                   M._ptKind[i], M._ptMask[i])
-                    record(qid, x, y, M._ptKind[i], M._ptMask[i])
+                                   M._ptKind[i], M._ptMask[i], nil, M._ptSrc[i])
+                    record(qid, x, y, M._ptKind[i], M._ptMask[i], nil, M._ptSrc[i])
                     M._pins = M._pins + 1
                     if source == "spawn" then
                         M._spawnPins = M._spawnPins + 1

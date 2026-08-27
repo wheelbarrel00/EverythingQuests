@@ -2,6 +2,17 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.45.0", date = "2026-08-26",
+        sections = {
+            { head = "New Features", items = {
+                "Quest markers now name the person who gives the quest, and the one who takes it back. Hovering a marker for a quest you can pick up tells you who is standing there, and hovering a marker for a quest you have finished tells you who to hand it in to. The same names appear in the Quest Browser under Starts and Turn in. This covers about 1,700 quest givers and finishers on Classic Era and 2,700 on Burning Crusade Classic, including the ones that are not people: a noticeboard, a sealed crate or a scrap of parchment is named too. A quest that starts from an item you loot has nobody to name.",
+            } },
+            { head = "Bug Fixes", items = {
+                "The What's New window in 1.44.0 showed the previous release's notes. It was headed 1.44.0 but described the 1.43.0 features, so the holiday season gate and the level filter it was meant to announce were not mentioned anywhere in it. The window now matches the release again.",
+            } },
+        },
+    },
+    {
         version = "1.44.0", date = "2026-08-24",
         sections = {
             { head = "Bug Fixes", items = {

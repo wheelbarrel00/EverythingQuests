@@ -502,12 +502,13 @@ function M:Data()
     return data()
 end
 
--- kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4). The low eight digits are the coordinate pair, the
--- high slot is what the table stores above it, which differs per table. rest is returned because
--- it is what pins merge on - two givers at one spot are one pin.
+-- srcID*1e9 + kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4). The fourth return is the merge KEY and
+-- is deliberately the coordinate half alone: two quests offered by the same person share one pin,
+-- and folding the source into the key would split that into overlapping pins on one spot.
 local function decodeStart(v)
     local rest = v % 1e8
-    return math.floor(v / 1e8), math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4, rest
+    return math.floor(v / 1e8) % 10, math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4, rest,
+           math.floor(v / 1e9)
 end
 
 -- Every place this quest can be picked up, across all maps. PointsFor answers the different
@@ -519,9 +520,10 @@ function M:StartsFor(questID, out)
     local n = 0
     for mapID, list in pairs(byMap) do
         for i = 1, #list do
-            local kind, x, y = decodeStart(list[i])
+            local kind, x, y, _, src = decodeStart(list[i])
             n = n + 1
-            out[n] = { mapID = mapID, x = x, y = y, kind = kind }
+            out[n] = { mapID = mapID, x = x, y = y, kind = kind,
+                       name = ns.Compat.SourceName(kind, src) }
         end
     end
     return n
@@ -589,15 +591,21 @@ function M:PointsFor(mapID)
             -- locations rather than arbitrary ones. Never reorder here.
             for i = 1, #list do
                 if taken >= MAX_PER_QUEST then break end
-                local kind, x, y, key = decodeStart(list[i])
+                local kind, x, y, key, src = decodeStart(list[i])
                 local slot = _byCoord[key]
                 if not slot then
-                    slot = { x = x, y = y, kind = kind, quests = {} }
+                    slot = { x = x, y = y, kind = kind, src = src, quests = {} }
                     _byCoord[key] = slot
                     _order[#_order + 1] = key
-                elseif kind < slot.kind then
-                    -- An NPC who offers a quest outranks the same spot merely dropping a starter
-                    slot.kind = kind
+                elseif kind < slot.kind or (kind == slot.kind and src < slot.src) then
+                    -- An NPC who offers a quest outranks the same spot merely dropping a starter.
+                    -- Kind and source move TOGETHER and must never be taken from different
+                    -- points: the kind is what picks the id space the name is looked up in, so a
+                    -- mismatched pair reads the object table with a creature id.
+                    -- The lower source wins a tie because the outer walk is pairs() order, and
+                    -- one Dun Morogh spot really is two differently named barrels - without this
+                    -- its label flips between reloads.
+                    slot.kind, slot.src = kind, src
                 end
                 slot.quests[#slot.quests + 1] = questID
                 taken = taken + 1
@@ -614,6 +622,7 @@ function M:PointsFor(mapID)
         -- Rides on the quest list because that table is what travels to the pin and on to the
         -- tooltip. A named key leaves the array border alone, so #quests is still the count.
         slot.quests.startKind = slot.kind
+        slot.quests.startSrc  = slot.src
     end
     self._locN = n
     return n

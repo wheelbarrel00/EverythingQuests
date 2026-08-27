@@ -342,12 +342,15 @@ local function startFadeTicker()
     end)
 end
 
-function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask, avail)
+function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask, avail, srcID)
     self.questID    = questID
     self.isComplete = isComplete
     self.kind       = kind
     self.objMask    = objMask
     self.avail      = avail
+    -- Only a turn-in point carries one. Assigned unconditionally rather than behind a test, or a
+    -- POOLED pin reused for a spawn would keep the previous pin's finisher and name a stranger.
+    self.srcID      = srcID
     self.mapX, self.mapY, self.mapID = x, y, mapID
     self:SetPosition(x, y)
 
@@ -397,7 +400,7 @@ end
 
 function Pin:OnReleased()
     self.questID, self.isComplete, self.kind, self.objMask = nil, nil, nil, nil
-    self.avail = nil
+    self.avail, self.srcID = nil, nil
     self.mapX, self.mapY, self.mapID = nil, nil, nil
     _live[self] = nil
     unfade(self)
@@ -580,6 +583,23 @@ function ns.QuestPinAvailable(tip, quests, isFirstLine)
     if quests.startKind == START_ITEM then
         tip:AddLine(L["Starts from an item that drops here"], 0.7, 0.7, 0.7)
     end
+    -- Who is standing here. A bare name needs no manifest key and no translation - the pin has
+    -- already said what this place is, and a proper noun reads the same in every language.
+    -- startKind and startSrc are set together by the provider and must stay that way: the kind
+    -- is what picks the id space this name is looked up in.
+    local giver = ns.Compat.SourceName(quests.startKind, quests.startSrc)
+    if giver then tip:AddLine(giver, 0.85, 0.85, 0.85) end
+end
+
+-- The body of an owned pin's tooltip. Shared by the world map, the minimap and a neighbor line,
+-- because Provider:PointsFor is already shared so that those three cannot draw different pins -
+-- and until this existed they could still describe the same pin differently.
+-- The taker's name needs no manifest key: the pin is already the turn-in marker, and a bare
+-- proper noun reads the same in every language. Nil on any pin that is not a turn-in.
+function ns.QuestPinOwned(tip, q, kind, objMask, srcID)
+    local taker = ns.Compat.SourceName(kind, srcID)
+    if taker then tip:AddLine(taker, 0.85, 0.85, 0.85) end
+    ns.QuestPinObjectives(tip, q, kind, objMask)
 end
 
 -- Deliberately NOT part of the builder above. That one is shared with the minimap, whose pins
@@ -607,7 +627,7 @@ function Pin:OnMouseEnter()
     else
         tip:SetText(ns.QuestPinTitle(q, self.questID), 1.0, 0.82, 0.0, 1, true)
         if q.zone   then tip:AddLine(q.zone, 0.7, 0.7, 0.7) end
-        ns.QuestPinObjectives(tip, q, self.kind, self.objMask)
+        ns.QuestPinOwned(tip, q, self.kind, self.objMask, self.srcID)
     end
 
     local Provider = ns:GetSubsystem("MapPOIProvider")
@@ -637,7 +657,8 @@ function Pin:OnMouseEnter()
                 ns.QuestPinAvailable(tip, availList)
             else
                 tip:AddLine(ns.QuestPinTitle(other, _nearQ[i]), 1.0, 0.82, 0.0, true)
-                ns.QuestPinObjectives(tip, other, Provider._drawnK[at], Provider._drawnM[at])
+                ns.QuestPinOwned(tip, other, Provider._drawnK[at], Provider._drawnM[at],
+                                 Provider._drawnS[at])
             end
             shown = shown + 1
         end

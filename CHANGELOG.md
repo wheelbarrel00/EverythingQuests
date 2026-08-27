@@ -5,6 +5,18 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.0] - 2026-08-26
+
+Quest markers on Classic Era and Burning Crusade Classic now tell you who to talk to.
+
+### New Features
+
+- **Quest markers name the person who gives the quest, and the one who takes it back.** Hovering a marker for a quest you can pick up tells you who is standing there, and hovering a marker for a quest you have finished tells you who to hand it in to. The same names appear in the Quest Browser under Starts and Turn in, so you can see where a quest begins without opening the map. This covers about 1,700 quest givers and finishers on Classic Era and 2,700 on Burning Crusade Classic, including the ones that are not people: a noticeboard, a sealed crate or a scrap of parchment is named too. A quest that starts from an item you loot has nobody to name, and says so the way it always did.
+
+### Bug Fixes
+
+- **The What's New window in 1.44.0 showed the previous release's notes.** It was headed 1.44.0 but described the 1.43.0 features, so the holiday season gate and the level filter it was meant to announce were not mentioned anywhere in it. The window now matches the release again.
+
 ## [1.44.0] - 2026-08-24
 
 Quest markers are far more accurate on Classic Era and Burning Crusade Classic. Quests that were being hidden by mistake are back, holiday quests no longer sit on the map all year, and there is a new option to leave out quests that are still out of reach.

@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 _G.EverythingQuests = ns
 ns.NAME = addonName
-ns.VERSION = "1.44.0"
+ns.VERSION = "1.45.0"
 
 ns.DISCORD_URL = "https://discord.gg/vm8K2WfQUE"
 

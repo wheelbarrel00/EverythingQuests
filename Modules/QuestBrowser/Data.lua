@@ -262,11 +262,26 @@ function QB:Query(opts)
     return _rows, matched
 end
 
-local function pointList(byMap, out)
+-- withSource is passed explicitly and never inferred. This is shared by the TURN IN table, whose
+-- 1e9 slot holds the creature or object that takes the quest, and by the OBJECTIVE spawn table,
+-- whose 1e9 slot holds the objective BITMASK. Decoding the second as a source would hand a mask
+-- to the name lookup and answer with whatever creature happens to carry that id.
+local function pointList(byMap, out, withSource)
     if not byMap then return nil end
     for mapID, list in pairs(byMap) do
         local x, y = coords(list[1])
-        out[#out + 1] = { mapID = mapID, x = x, y = y, points = #list }
+        local name
+        if withSource then
+            -- Every distinct one, for the same reason the start rows list every giver
+            local names, seen = {}, {}
+            for i = 1, #list do
+                local v = list[i]
+                local nm = ns.Compat.SourceName(math.floor(v / 1e8) % 10, math.floor(v / 1e9))
+                if nm and not seen[nm] then seen[nm] = true; names[#names + 1] = nm end
+            end
+            name = (#names > 0) and table.concat(names, " / ") or nil
+        end
+        out[#out + 1] = { mapID = mapID, x = x, y = y, points = #list, name = name }
     end
     if #out == 0 then return nil end
     table.sort(out, function(a, b) return a.mapID < b.mapID end)
@@ -331,21 +346,36 @@ function QB:Record(questID)
             local s = starts[i]
             local slot = byMap[s.mapID]
             if not slot then
-                slot = { mapID = s.mapID, x = s.x, y = s.y, kind = s.kind, points = 0 }
+                slot = { mapID = s.mapID, x = s.x, y = s.y, kind = s.kind,
+                         names = {}, seen = {}, points = 0 }
                 byMap[s.mapID] = slot
                 order[#order + 1] = slot
             elseif s.kind < slot.kind then
                 slot.kind, slot.x, slot.y = s.kind, s.x, s.y
             end
+            -- EVERY distinct giver on this map, because a row is merged per MAP while a map pin
+            -- is merged per COORDINATE. 25 Classic and 36 TBC rows cover more than one person -
+            -- quest 109 in Elwynn is offered by three - and naming only the first states
+            -- something false about the other locations. Each name was resolved against its own
+            -- point's kind in StartsFor, so accumulating them here cannot cross the id spaces.
+            if s.name and not slot.seen[s.name] then
+                slot.seen[s.name] = true
+                slot.names[#slot.names + 1] = s.name
+            end
             slot.points = slot.points + 1
+        end
+        for i = 1, #order do
+            local slot = order[i]
+            slot.name = (#slot.names > 0) and table.concat(slot.names, " / ") or nil
+            slot.names, slot.seen = nil, nil
         end
         table.sort(order, function(a, b) return a.mapID < b.mapID end)
         r.starts = order
     end
 
     local spawns = ns.Compat and ns.Compat.ClassicSpawns and ns.Compat.ClassicSpawns()
-    r.objectives = pointList(spawns and spawns[questID], {})
-    r.turnIn     = pointList(ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID], {})
+    r.objectives = pointList(spawns and spawns[questID], {}, false)
+    r.turnIn     = pointList(ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID], {}, true)
 
     -- preQuestSingle is ANY of, and is consulted INSTEAD of preQuestGroup rather than alongside
     -- it, which is the semantic the availability gate already follows.

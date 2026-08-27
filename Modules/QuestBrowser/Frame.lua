@@ -386,12 +386,19 @@ local function places(parent, list, title, questTitle)
         local p = list[i]
         local zone = D:ZoneName(p.mapID) or ("map " .. tostring(p.mapID))
         local text = ("%s  (%.1f, %.1f)"):format(zone, p.x * 100, p.y * 100)
+        -- The giver's name leads, because it is what the reader is looking for once the section
+        -- header has already said Starts or Turn in. Joined with the separator this line already
+        -- uses rather than a new phrase, so naming a quest giver costs no manifest key and no
+        -- translation. A quest started by an item has no name and reads exactly as it did.
+        if p.name then text = p.name .. "  -  " .. text end
         -- Its own key rather than the pin tooltip's "and %d more", which counts QUESTS. One
         -- English phrase covering two meanings is one manifest key, and translators only see one.
         if p.points and p.points > 1 then
             text = text .. "  -  " .. (L["%d locations"]):format(p.points)
         end
-        local kindLine = p.kind and sourceText(p.kind)
+        -- Only when nobody is named. "Farmer Furlbrow" already says a character offers it, and
+        -- the sentence is what carries the meaning for an item start, which names nobody.
+        local kindLine = (not p.name) and p.kind and sourceText(p.kind)
         if kindLine then text = text .. "  -  " .. kindLine end
         line(parent, text, {
             indent = 10, color = MUTED,

@@ -44,7 +44,7 @@ local function acquire()
             if not q then return end
             tip:SetOwner(self, "ANCHOR_LEFT")
             tip:SetText(ns.QuestPinTitle(q, self.questID), 1.0, 0.82, 0.0, 1, true)
-            ns.QuestPinObjectives(tip, q, self.kind, self.objMask)
+            ns.QuestPinOwned(tip, q, self.kind, self.objMask, self.srcID)
             tip:Show()
         end)
         f:SetScript("OnLeave", function() ns.Util.PinTooltip():Hide() end)
@@ -62,7 +62,7 @@ local function releaseAll()
     if HBDP then HBDP:RemoveAllMinimapIcons(REF) end
     for i = #_active, 1, -1 do
         local f = _active[i]
-        f.questID, f.kind, f.objMask, f.avail = nil, nil, nil, nil
+        f.questID, f.kind, f.objMask, f.avail, f.srcID = nil, nil, nil, nil, nil
         f:Hide()
         _active[i] = nil
         _pool[#_pool + 1] = f
@@ -103,6 +103,9 @@ function M:Rebuild()
             local x, y = Provider._ptX[i], Provider._ptY[i]
             local f = acquire()
             f.questID, f.kind, f.objMask = qid, Provider._ptKind[i], Provider._ptMask[i]
+            -- Assigned every acquire, never conditionally. These frames are pooled and only
+            -- these fields are rewritten, so a skipped one keeps the last quest's finisher.
+            f.srcID = Provider._ptSrc[i]
             f.texture:SetTexture(ns.QuestPinTexture(q.isComplete, f.kind))
             f.texture:SetVertexColor(ns.QuestPinTint(f.kind))
             -- AddMinimapIconMap answers false rather than raising when HereBeDragons has no

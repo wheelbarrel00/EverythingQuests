@@ -1,7 +1,7 @@
 -- Derives quest location tables for the Classic flavors from an upstream dataset.
 --
 --   lua5.1 tools/build_questcoords.lua <dataDir> [mode] [encoding] [uiMapId]
---     mode      objective | turnin | both | spawns | npcs | available | category
+--     mode      objective | turnin | both | spawns | npcs | available | category | srcnames
 --                 (default both: one point per quest, objective with turn-in as fallback)
 --                 (spawns: EVERY objective location, clustered - a different table, see below)
 --                 (npcs: which creatures advance each quest - no coordinates, for nameplates)
@@ -10,6 +10,9 @@
 --                 (turnin: where each quest is HANDED IN, clustered per map. The both mode's
 --                  point is the OBJECTIVE for any quest that has one, so it answers a different
 --                  question and puts a finished quest's pin back on the field you farmed.)
+--                 (srcnames: names for the creatures and objects that start or finish a quest,
+--                  holding exactly the ids the available and turnin tables reference. Rerun it
+--                  whenever either of those is regenerated or a pin can ask for a missing name.)
 --     encoding  packed | table                (default packed - see the memory note below)
 --     uiMapId   optional, emit one zone only, for a pilot
 --
@@ -114,6 +117,13 @@ local KIND_SLAY, KIND_OBJECT, KIND_LOOT = 1, 2, 3
 -- subtracting and the objective index still means "the nth objective of that type".
 local KIND_ENTRANCE = 4
 
+-- Start and turn-in points carry the creature or object that produced them in a 1e9 slot.
+-- The bound guards the packing rather than recording a maximum: at 1e6 the worst packed value
+-- stays under 1e15 against the 9.007e15 exact integer ceiling. The largest id that actually
+-- reaches this slot is 187273 on Era and 187975 on TBC, for a worst packed value of 1.88e14.
+-- Loud rather than clamped, because a silently truncated id would name a different creature.
+local MAX_SRC_ID = 1000000
+
 -- areaId -> { {parentAreaId, x, y}, ... }. A dungeon has two area ids used interchangeably
 -- upstream, so the alternative id is registered too or the busiest dungeons answer nothing.
 local entranceFor = {}
@@ -157,7 +167,10 @@ local function factionOfRaces(mask)
     return nil
 end
 
-local function collect(out, rec, idx, kind, objIdx)
+-- srcID is the creature or object that produced the point, carried so a start or turn-in pin can
+-- name who is standing there. Only the coordinate modes that emit it pass one - the spawn walk
+-- leaves it nil, so QuestSpawns is byte identical.
+local function collect(out, rec, idx, kind, objIdx, srcID)
     local sp = rec and rec[idx]
     if type(sp) ~= "table" then return end
     local om = (kind == KIND_SLAY) and ambiguousMonster or nil
@@ -171,7 +184,8 @@ local function collect(out, rec, idx, kind, objIdx)
                 -- -1,-1 means "exists, location unknown". It is a sentinel, not a place, and
                 -- averaging it in drags the pin off the map. It was 470 of 4123 rows.
                 if px and py and px > 0 and py > 0 then
-                    out[#out + 1] = { a = areaId, x = px, y = py, k = kind, oi = objIdx, om = om }
+                    out[#out + 1] = { a = areaId, x = px, y = py, k = kind, oi = objIdx, om = om,
+                                      s = srcID }
                     -- Gated on area2ui because a real coordinate in an unmapped area still
                     -- produces no cell, and would otherwise suppress the entrance fallback
                     if key and realSeen and area2ui[areaId] then realSeen[key] = true end
@@ -380,14 +394,62 @@ local function turninPoints(q)
     if WANT_ENTRANCES then realSeen, sentinelSeen = {}, {} end
     if type(f) == "table" then
         if type(f[1]) == "table" then
-            for i = 1, #f[1] do collect(pts, npcs[f[1][i]], NPC_SPAWNS, KIND_SLAY, TURNIN_IDX) end
+            for i = 1, #f[1] do
+                collect(pts, npcs[f[1][i]], NPC_SPAWNS, KIND_SLAY, TURNIN_IDX, f[1][i])
+            end
         end
         if type(f[2]) == "table" then
-            for i = 1, #f[2] do collect(pts, objects[f[2][i]], OBJ_SPAWNS, KIND_OBJECT, TURNIN_IDX) end
+            for i = 1, #f[2] do
+                collect(pts, objects[f[2][i]], OBJ_SPAWNS, KIND_OBJECT, TURNIN_IDX, f[2][i])
+            end
         end
+        -- Entrance points carry no source: nobody stands at the way in, and the pin already says
+        -- it is a dungeon entrance.
         appendEntrances(pts)
     end
     realSeen, sentinelSeen = nil, nil
+    return pts
+end
+
+-- The same 1/2/3 the other tables use for creature, object and item, because the source of a
+-- start point is the same three things. Here it means who OFFERS the quest, not what the
+-- objective is, which is why the available table documents its own kinds rather than sharing.
+local START_NPC, START_OBJECT, START_ITEM = 1, 2, 3
+
+-- Module scope rather than inside the available mode, because the srcnames mode has to gather
+-- the very same points to know which names the shipped table will reference. Two copies of this
+-- walk could drift and leave a name missing for a pin that asks for one.
+local function startPoints(q)
+    local pts, sb = {}, q[Q_STARTEDBY]
+    if type(sb) ~= "table" then return pts end
+    if type(sb[1]) == "table" then
+        for i = 1, #sb[1] do
+            collect(pts, npcs[sb[1][i]], NPC_SPAWNS, START_NPC, nil, sb[1][i])
+        end
+    end
+    if type(sb[2]) == "table" then
+        for i = 1, #sb[2] do
+            collect(pts, objects[sb[2][i]], OBJ_SPAWNS, START_OBJECT, nil, sb[2][i])
+        end
+    end
+    -- A quest started by an ITEM is picked up wherever that item drops, so the pin marks
+    -- the source rather than a person standing somewhere. No source id is carried: the dropper
+    -- can be a creature or an object and the kind would not say which id space it came from.
+    if type(sb[3]) == "table" then
+        for i = 1, #sb[3] do
+            local it = items[sb[3][i]]
+            if it then
+                local d = it[I_NPCDROPS]
+                if type(d) == "table" then
+                    for k = 1, #d do collect(pts, npcs[d[k]], NPC_SPAWNS, START_ITEM) end
+                end
+                local od = it[I_OBJDROPS]
+                if type(od) == "table" then
+                    for k = 1, #od do collect(pts, objects[od[k]], OBJ_SPAWNS, START_ITEM) end
+                end
+            end
+        end
+    end
     return pts
 end
 
@@ -456,7 +518,11 @@ local function clusterSimple(points)
                         .. math.floor(y / SPAWN_GRID) .. ":" .. tostring(p.k)
             local c = cells[key]
             if not c then
-                c = { m = ui, x = x, y = y, k = p.k, n = 0, seq = #(byMap[ui] or {}) }
+                -- The cell takes the FIRST point's source. Measured against the real dump, a cell
+                -- holds more than one source in 4 of 4470 start cells and 1 of 4521 turn-in cells
+                -- on Era, 3 of 6371 and 0 of 6413 on TBC, so the representative is the answer
+                -- essentially always.
+                c = { m = ui, x = x, y = y, k = p.k, s = p.s, n = 0, seq = #(byMap[ui] or {}) }
                 cells[key] = c
                 byMap[ui] = byMap[ui] or {}
                 table.insert(byMap[ui], c)
@@ -756,40 +822,6 @@ if mode == "npcs" then
 end
 
 if mode == "available" then
-    -- The same 1/2/3 the other tables use for creature, object and item, because the source of
-    -- a start point is the same three things. Here it means who OFFERS the quest, not what the
-    -- objective is, which is why this table documents its own kinds rather than sharing theirs.
-    local START_NPC, START_OBJECT, START_ITEM = 1, 2, 3
-
-    local function startPoints(q)
-        local pts, sb = {}, q[Q_STARTEDBY]
-        if type(sb) ~= "table" then return pts end
-        if type(sb[1]) == "table" then
-            for i = 1, #sb[1] do collect(pts, npcs[sb[1][i]], NPC_SPAWNS, START_NPC) end
-        end
-        if type(sb[2]) == "table" then
-            for i = 1, #sb[2] do collect(pts, objects[sb[2][i]], OBJ_SPAWNS, START_OBJECT) end
-        end
-        -- A quest started by an ITEM is picked up wherever that item drops, so the pin marks
-        -- the source rather than a person standing somewhere.
-        if type(sb[3]) == "table" then
-            for i = 1, #sb[3] do
-                local it = items[sb[3][i]]
-                if it then
-                    local d = it[I_NPCDROPS]
-                    if type(d) == "table" then
-                        for k = 1, #d do collect(pts, npcs[d[k]], NPC_SPAWNS, START_ITEM) end
-                    end
-                    local od = it[I_OBJDROPS]
-                    if type(od) == "table" then
-                        for k = 1, #od do collect(pts, objects[od[k]], OBJ_SPAWNS, START_ITEM) end
-                    end
-                end
-            end
-        end
-        return pts
-    end
-
     -- Two digits of required level, two of quest level, one of flags, four of each bitmask.
     -- Thirteen digits sits well inside a double's exact integer range, and packing by decimal
     -- rather than by bits keeps this working on an interpreter with no bit library.
@@ -879,11 +911,15 @@ if mode == "available" then
         "-- The client answers none of this for a quest that is not in the log, so it ships.\n",
         "--\n",
         "-- start  [questID] = { [uiMapID] = { packed, ... } }\n",
-        "--        packed = kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4)\n",
+        "--        packed = srcID*1e9 + kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4)\n",
         "--        kind 1=an NPC offers it, 2=an object offers it, 3=an item that starts it\n",
         "--        drops here. These are SOURCES of the quest, not objective types.\n",
-        "--        decode: kind = floor(v/1e8), rest = v%1e8,\n",
+        "--        srcID is the creature id when kind is 1 and the object id when kind is 2, for\n",
+        "--        the name the tooltip shows. It is 0 when kind is 3, because the dropper of a\n",
+        "--        starting item can be either and kind would not say which id space it is.\n",
+        "--        decode: srcID = floor(v/1e9), kind = floor(v/1e8)%10, rest = v%1e8,\n",
         "--                x = floor(rest/1e4)/1e4, y = (rest%1e4)/1e4\n",
+        "--        A reader wanting only the coordinate can still take v%1e8 and ignore the rest.\n",
         "--        Ordered densest first, so a reader's prefix keeps the best locations.\n",
         "-- gates  [questID] = requiredLevel*1e11 + questLevel*1e9 + specialFlags*1e8\n",
         "--                    + requiredRaces*1e4 + requiredClasses\n",
@@ -921,9 +957,24 @@ if mode == "available" then
                 local kind = list[j].k or START_NPC
                 assert(kind >= START_NPC and kind <= START_ITEM,
                        ("quest %d: start kind %s out of range"):format(id, tostring(kind)))
+                -- Only the NPC and object kinds carry a source. A START_ITEM point is wherever
+                -- the starting item DROPS, and its dropper can be either a creature or an object,
+                -- so the id space would be ambiguous with nothing to disambiguate it - kind is
+                -- what tells the two apart everywhere else here.
+                local src = (kind == START_ITEM) and 0 or (list[j].s or 0)
+                assert(src >= 0 and src < MAX_SRC_ID,
+                       ("quest %d: start source id %s too large to pack"):format(id, tostring(src)))
+                -- Both directions, because the emitted header promises the names file holds
+                -- exactly the referenced ids. Without this, dropping the source anywhere in the
+                -- walk packs every point as 0 and every reload check still passes.
+                if kind == START_ITEM then
+                    assert(src == 0, ("quest %d: an item start must carry no source"):format(id))
+                else
+                    assert(src > 0, ("quest %d: kind %d start carries no source"):format(id, kind))
+                end
                 -- %.0f rather than %d: Lua 5.1's %d casts through a 32-bit int
-                nums[j] = ("%.0f"):format(kind * 100000000 + xi * 10000 + yi)
-                mine[j] = { x = xi / 10000, y = yi / 10000, k = kind }
+                nums[j] = ("%.0f"):format(src * 1000000000 + kind * 100000000 + xi * 10000 + yi)
+                mine[j] = { x = xi / 10000, y = yi / 10000, k = kind, s = src }
             end
             expect[id][m] = mine
             chunks[#chunks + 1] = ("[%d]={%s}"):format(m, table.concat(nums, ","))
@@ -991,13 +1042,19 @@ if mode == "available" then
                     local v = gl[j]
                     assert(type(v) == "number" and v > 0,
                            ("quest %d serialized as %s - 32-bit overflow?"):format(qid, tostring(v)))
-                    local kind = math.floor(v / 100000000)
+                    local src  = math.floor(v / 1000000000)
+                    local kind = math.floor(v / 100000000) % 10
                     local rest = v % 100000000
                     local x, y = math.floor(rest / 10000) / 10000, (rest % 10000) / 10000
                     assert(x >= 0 and x <= 1 and y >= 0 and y <= 1,
                            ("quest %d decoded out of range: %s,%s"):format(qid, x, y))
                     assert(kind == list[j].k,
                            ("quest %d start kind changed on reload"):format(qid))
+                    -- Checked exactly. The drift tolerance below is for coordinates only, and an
+                    -- id compared loosely would let a one-digit corruption name another NPC.
+                    assert(src == list[j].s,
+                           ("quest %d start source changed on reload: %s vs %s")
+                           :format(qid, tostring(src), tostring(list[j].s)))
                     local d = math.max(math.abs(x - list[j].x), math.abs(y - list[j].y))
                     if d > worst then worst = d end
                     seen = seen + 1
@@ -1083,12 +1140,16 @@ if mode == "turnin" then
     local parts = {
         "local _, ns = ...\n",
         "\n-- [questID] = { [uiMapID] = { packed, ... } }\n",
-        "-- packed = kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4)\n",
+        "-- packed = srcID*1e9 + kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4)\n",
         "-- kind 1=an NPC takes it, 2=an object does, and the same +4 (5,6) for a DUNGEON\n",
         "-- ENTRANCE - the turn-in is inside an instance whose interior coordinates nobody\n",
         "-- records, so the pin marks the way in. Recover the real kind by subtracting 4.\n",
-        "-- decode: kind = floor(v/1e8), rest = v%1e8,\n",
+        "-- srcID is the creature id when kind is 1 and the object id when kind is 2, for the\n",
+        "-- name the tooltip shows. It is 0 for an entrance, where nobody is standing.\n",
+        "-- KIND is what says which id space srcID belongs to. The two overlap numerically.\n",
+        "-- decode: srcID = floor(v/1e9), kind = floor(v/1e8)%10, rest = v%1e8,\n",
         "--         x = floor(rest/1e4)/1e4, y = (rest%1e4)/1e4\n",
+        "-- A reader that wants only the coordinate can still take v%1e8 and ignore the rest.\n",
         "-- Ordered densest first, so a reader's prefix keeps the best locations.\n",
         "--\n",
         "-- Deliberately NOT ns.CLASSIC_QUEST_COORDS. That table answers where a quest is\n",
@@ -1132,9 +1193,20 @@ if mode == "turnin" then
                            or kind == KIND_SLAY + KIND_ENTRANCE or kind == KIND_OBJECT + KIND_ENTRANCE,
                            ("quest %d: turn-in kind %s out of range"):format(id, tostring(kind)))
                     if kind > KIND_ENTRANCE then entrancePts = entrancePts + 1 end
+                    -- An entrance has no source, and neither does anything the walk could not
+                    -- attribute. 0 reads as "no name" rather than as creature 0.
+                    local src = list[j].s or 0
+                    assert(src >= 0 and src < MAX_SRC_ID,
+                           ("quest %d: turn-in source id %s too large to pack"):format(id, tostring(src)))
+                    -- Both directions, for the reason in the start emitter above
+                    if kind > KIND_ENTRANCE then
+                        assert(src == 0, ("quest %d: an entrance must carry no source"):format(id))
+                    else
+                        assert(src > 0, ("quest %d: kind %d turn-in carries no source"):format(id, kind))
+                    end
                     -- %.0f rather than %d: Lua 5.1's %d casts through a 32-bit int
-                    nums[j] = ("%.0f"):format(kind * 100000000 + xi * 10000 + yi)
-                    mine[j] = { x = xi / 10000, y = yi / 10000, k = kind }
+                    nums[j] = ("%.0f"):format(src * 1000000000 + kind * 100000000 + xi * 10000 + yi)
+                    mine[j] = { x = xi / 10000, y = yi / 10000, k = kind, s = src }
                     emitted = emitted + 1
                 end
                 expect[id][m] = mine
@@ -1160,13 +1232,19 @@ if mode == "turnin" then
                     local v = gl[j]
                     assert(type(v) == "number" and v > 0,
                            ("quest %d serialized as %s - 32-bit overflow?"):format(qid, tostring(v)))
-                    local kind = math.floor(v / 100000000)
+                    local src  = math.floor(v / 1000000000)
+                    local kind = math.floor(v / 100000000) % 10
                     local rest = v % 100000000
                     local x, y = math.floor(rest / 10000) / 10000, (rest % 10000) / 10000
                     assert(x >= 0 and x <= 1 and y >= 0 and y <= 1,
                            ("quest %d decoded out of range: %s,%s"):format(qid, x, y))
                     assert(kind == list[j].k,
                            ("quest %d turn-in kind changed on reload"):format(qid))
+                    -- Checked exactly. The drift tolerance below is for coordinates only, and an
+                    -- id compared loosely would let a one-digit corruption name another NPC.
+                    assert(src == list[j].s,
+                           ("quest %d turn-in source changed on reload: %s vs %s")
+                           :format(qid, tostring(src), tostring(list[j].s)))
                     local d = math.max(math.abs(x - list[j].x), math.abs(y - list[j].y))
                     if d > worst then worst = d end
                     seen = seen + 1
@@ -1191,6 +1269,124 @@ if mode == "turnin" then
         :format(pctl(.5), pctl(.75), pctl(.90), pctl(.99), widest))
     io.stderr:write(("-- %d quest(s) hand in on MORE THAN ONE map, %d point(s) are dungeon entrances\n")
         :format(multiMap, entrancePts))
+    return
+end
+
+if mode == "srcnames" then
+    local NAME = 1
+
+    -- Exactly the ids the shipped tables reference, gathered by running the SAME walk the two
+    -- emitters run rather than by taking every quest giver in the dump. A giver with no spawn
+    -- record produces no point, so listing it here would be a name nothing can ask for.
+    local wantNpc, wantObj = {}, {}
+
+    local function want(set, id)
+        if type(id) == "number" and id > 0 then set[id] = true end
+    end
+
+    local function harvest(byMap)
+        for m, list in pairs(byMap) do
+            if (not zoneFilter) or m == zoneFilter then
+                for j = 1, #list do
+                    local kind, src = list[j].k, list[j].s
+                    -- Only the two kinds that carry one. An item start and an entrance reach
+                    -- here with src nil, and the emitters assert that they stay 0.
+                    if kind == START_NPC then want(wantNpc, src)
+                    elseif kind == START_OBJECT then want(wantObj, src) end
+                end
+            end
+        end
+    end
+
+    for i = 1, #ids do
+        local q = quests[ids[i]]
+        harvest(clusterSimple(startPoints(q)))
+        harvest(clusterSimple(turninPoints(q)))
+    end
+
+    local parts = {
+        "local _, ns = ...\n",
+        "\n-- Names for the creatures and objects that START or FINISH a quest, so a start or\n",
+        "-- turn-in pin can say WHO is standing there and not only where.\n",
+        "--\n",
+        "-- npc  [creatureID] = name\n",
+        "-- obj  [objectID]   = name\n",
+        "--\n",
+        "-- TWO sub-tables under one global, because creature and object ids OVERLAP. Object ids\n",
+        "-- here run 31 to 187975 against creature ids 196 to 28329, dozens of object ids sit\n",
+        "-- inside the creature range, and 7 ids are in BOTH sub-tables on both flavors - 261 is\n",
+        "-- Guard Thomas and also Damaged Crate. So no test on the id itself can tell them apart.\n",
+        "-- The point's KIND is what says which of the two to read, and reading the wrong one\n",
+        "-- returns a real name for the wrong thing rather than nil.\n",
+        "--\n",
+        "-- Holds exactly the ids the srcID slot of Data/QuestAvailable_*.lua's start table and\n",
+        "-- Data/QuestTurnIn_*.lua actually reference, so nothing is orphaned and nothing is\n",
+        "-- missing. A quest started by an ITEM stores no source and needs no name here.\n",
+        "--\n",
+        "-- English. The client cannot name a creature it has never seen and offers no way to\n",
+        "-- ask by id on this flavor, so unlike a quest title there is nothing to prefer over it.\n",
+        "ns.CLASSIC_QUEST_SOURCES = {\n",
+    }
+
+    local expect = { npc = {}, obj = {} }
+    local counts, missing = { npc = 0, obj = 0 }, { npc = 0, obj = 0 }
+
+    local function emit(label, set, db)
+        parts[#parts + 1] = ("%s = {\n"):format(label)
+        local sorted = {}
+        for id in pairs(set) do sorted[#sorted + 1] = id end
+        table.sort(sorted)
+        for i = 1, #sorted do
+            local id = sorted[i]
+            local row = db[id]
+            local nm = row and row[NAME]
+            if type(nm) == "string" and nm ~= "" then
+                parts[#parts + 1] = ("\t[%d]=%q,\n"):format(id, nm)
+                expect[label][id] = nm
+                counts[label] = counts[label] + 1
+            else
+                missing[label] = missing[label] + 1
+            end
+        end
+        parts[#parts + 1] = "},\n"
+    end
+
+    emit("npc", wantNpc, npcs)
+    emit("obj", wantObj, objects)
+    parts[#parts + 1] = "}\n"
+    local text = table.concat(parts)
+
+    do
+        local probe = {}
+        assert(loadstring(text))("EQ", probe)
+        local got = assert(probe.CLASSIC_QUEST_SOURCES, "emitted file did not define the table")
+        local seen = 0
+        for _, label in ipairs({ "npc", "obj" }) do
+            local dst = assert(got[label], "sub-table missing after reload: " .. label)
+            for id, nm in pairs(expect[label]) do
+                assert(dst[id] == nm,
+                       ("%s %d name changed on reload: %s vs %s")
+                       :format(label, id, tostring(dst[id]), nm))
+                seen = seen + 1
+            end
+            -- Both directions, or a reload that INVENTED a row would pass the loop above.
+            for id in pairs(dst) do
+                assert(expect[label][id] ~= nil,
+                       ("%s %d gained a row on reload"):format(label, id))
+            end
+        end
+        assert(seen == counts.npc + counts.obj, "name count changed on reload")
+        io.stderr:write(("-- verified %d source name(s) by reload\n"):format(seen))
+    end
+
+    -- The header promises nothing is missing, so a source with no name upstream is a hard stop
+    -- rather than a stderr line. A pin would otherwise ask for a name that is not there.
+    assert(missing.npc == 0 and missing.obj == 0,
+           ("%d creature and %d object source(s) have no name upstream")
+           :format(missing.npc, missing.obj))
+    io.write(text)
+    io.stderr:write(("-- mode=srcnames | npc names=%d (%d unnamed) obj names=%d (%d unnamed) bytes=%d\n")
+        :format(counts.npc, missing.npc, counts.obj, missing.obj, #text))
     return
 end
 

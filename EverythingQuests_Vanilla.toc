@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Classic Era support is limited and growing - see the What's New notice.
 ## Author: Wheelbarrel00
-## Version: 1.44.0
+## Version: 1.45.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -190,6 +190,12 @@ Data\QuestSpawns_Classic.lua
 # single point in QuestCoords is the OBJECTIVE for any quest that has one, so neither of them
 # can place a finished quest's pin. Defines ns.CLASSIC_QUEST_TURNIN.
 Data\QuestTurnIn_Classic.lua
+# Names for the creatures and objects that start or finish a quest, so a start or turn-in
+# pin can say WHO is standing there. Holds exactly the ids that the start table in
+# QuestAvailable and the QuestTurnIn table reference. Defines ns.CLASSIC_QUEST_SOURCES, with
+# npc and obj sub-tables kept apart because the two id spaces overlap. Position does not
+# matter - nothing reads it at file scope.
+Data\QuestSources_Classic.lua
 
 # questID -> the creatures that advance it. Nameplates inverts this to creature -> quest at
 # runtime over the quest log only, so nothing here is searched during play.

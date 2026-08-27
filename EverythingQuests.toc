@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Unified replacement for the Blizzard quest experience - world map overlays, nameplate quest icons, quest history, and a Midnight chain guide. The objective tracker installs alongside it as EQ Objective Tracker.
 ## Author: Wheelbarrel00
-## Version: 1.44.0
+## Version: 1.45.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -117,6 +117,7 @@ Modules\History\Session.lua
 # point IS the objective for any quest that has one, so a finished quest was being pinned at the
 # field it was farmed in. Retail gets the turn-in from Blizzard's own waypoint.
 # check-toc: flavor-only Data/QuestTurnIn_Classic.lua
+# check-toc: flavor-only Data/QuestSources_Classic.lua
 
 # Modules\Minimap\QuestPins.lua draws the objective pins on the minimap and needs
 # HereBeDragons-Pins to do it. That library calls WorldMapFrame:AddDataProvider at FILE SCOPE, on
@@ -159,6 +160,7 @@ Modules\History\Session.lua
 # check-toc: flavor-only Data/QuestCoords_TBC.lua
 # check-toc: flavor-only Data/QuestSpawns_TBC.lua
 # check-toc: flavor-only Data/QuestTurnIn_TBC.lua
+# check-toc: flavor-only Data/QuestSources_TBC.lua
 # check-toc: flavor-only Data/QuestNPCs_TBC.lua
 # check-toc: flavor-only Data/QuestAvailable_TBC.lua
 # check-toc: flavor-only Data/QuestCategory_TBC.lua
