@@ -46,6 +46,7 @@ Era and TBC were measured identical across every game API the addon reads, so on
 - **Objective markers** on the world map and the minimap, drawn from a generated coordinate database rather than from the client, which exposes no quest coordinates at all
 - **Objective kind icons** — kill, loot, or interact — and dungeon objectives marked at the dungeon entrance
 - **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites, reputation, completion, and whether a holiday quest's world event is actually running
+- **Named quest givers and finishers** — a marker for a quest you can pick up names who is standing there, and a marker for one you have finished names who takes it back, on the world map, the minimap and in the Quest Browser
 - **Nameplate quest icons**, resolved from the creature ID in the unit GUID, since a Classic unit tooltip carries no quest data
 - **The Quest Browser** — look up almost any quest in the game, including ones never picked up, with its level, race and class requirements, start and turn-in locations, prerequisites, and the reason it is not available yet. `/eqs quests`, or right-click a gold marker
 - **Quest progress on tooltips** — a bag item names the quest that wants it and what is still missing, and on Classic an enemy names the quest it counts toward, which the client there never does
@@ -149,6 +150,7 @@ Custom quest pins on zone maps. On retail the icon carries the Everything-suite 
 - **On Classic** — in-progress pins come from `Data/QuestSpawns_Classic.lua` and carry objective art rather than a `!`, marking every clustered location a quest can be advanced, with a per-quest minimum separation applied at read time so a low limit still spreads across the zone
 - **Turn-in pins on Classic** — a finished quest is placed from `Data/QuestTurnIn_Classic.lua`, at every map where it can be handed in. That table is authoritative once it knows a quest, because 475 quests hand in on a different map from their objective
 - **Available quest pins on Classic** — gold `!` markers for quests you can pick up but have not accepted, from `Data/QuestAvailable_Classic.lua`, gated on level, race, class, prerequisites, reputation and completion. Pins merge by location rather than by quest
+- **Source names on start and turn-in pins** — the creature or object each of those points belongs to is packed alongside its coordinate, and named from `Data/QuestSources_Classic.lua`. Creature and object IDs overlap numerically, so the point's *kind* decides which of the two name tables to read; nothing infers it from the ID. A quest that starts from a looted item stores no source, because its dropper could be either
 - **Holiday quests follow their season** — a Lunar Festival or Brewfest quest is pinned only while that world event is running, from `Data/QuestHolidays_Classic.lua`. On by default. The one date that moves each year fails open, so a year the table does not list shows those quests rather than hiding them
 - **Filters for a busy map**, all under `/eqs` → General → Map — leave out dungeon, repeatable or profession quests, hide quests below your level using the game's own gray threshold, or hide the ones it colors red for you. That last one is off by default, because a red quest is still worth knowing about if you mean to come back for it
 
@@ -162,6 +164,7 @@ Classic Era and Burning Crusade Classic only. A search-and-details window over E
 - **Details** — quest level, required level, race and class gates, category, every map it starts / has objectives / turns in on, prerequisites (any-of vs all-of), follow-ups, exclusions, and skill and reputation gates
 - **The reason it is unavailable** comes from `AvailableQuests:Explain`, the *same* gate that decides which gold markers are drawn. There is deliberately one implementation — a second copy would let the window and the map disagree while both looked right
 - **Clickable throughout** — a location opens the world map there and sets a TomTom waypoint; a prerequisite or follow-up navigates to that quest. References the data cannot describe render as plain text rather than a dead link
+- **Who to talk to** — the Starts and Turn in rows name the giver and the finisher. A row is merged per map while a map pin is merged per coordinate, so a row covering several different people names all of them rather than picking one
 - **Entry points** — `/eqs quests [text]`, the button under `/eqs` > General, or right-clicking a gold available-quest marker, which previously did nothing
 - **Coverage is not total.** It reads the `names`/`gates` tables (3,794 Era / 5,652 TBC) while the coordinate tables cover more, so 357 Era and 508 TBC quests EQ pins on the map are not in the browser
 - `/eqsprobe questbrowser` reports the data, a live query, the player's zone, one full decoded record, and whether the browser and the map pins agree
@@ -330,7 +333,9 @@ EverythingQuests/
 │   ├── QuestTurnIn_*.lua             # Generated: questID -> every hand-in location
 │   ├── QuestAvailable_*.lua          # Generated: where a quest starts, plus its gates
 │   ├── QuestCategory_*.lua           # Generated: dungeon / repeatable / class / profession
-│   └── QuestHolidays_*.lua           # Generated: questID -> its world event
+│   ├── QuestHolidays_*.lua           # Generated: questID -> its world event
+│   └── QuestSources_*.lua            # Generated: creature and object names for the
+│                                     #   points that start and finish a quest
 │                                     #   Each has a _Classic and a _TBC variant. A TOC
 │                                     #   lists exactly one; they define the same globals
 ├── tools/                            # TOC and locale-format gates, plus their own
