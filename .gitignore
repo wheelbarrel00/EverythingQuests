@@ -32,3 +32,6 @@ __pycache__/
 # omission rather than claiming coverage. Nothing here is ignored any more - the packager
 # derives a CurseForge game version from every TOC it packages, and both claims are ones we
 # can stand behind.
+
+# Built by the release workflow from CHANGELOG.md, and by the pre-flight awk locally.
+.release_changelog.md

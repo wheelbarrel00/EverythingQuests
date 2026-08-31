@@ -62,6 +62,9 @@ QB._rowPool,  QB._rowActive  = {}, {}
 QB._linePool, QB._lineActive = {}, {}
 
 local function listRowClick(self)
+    if not self._questID then return end
+    local QLink = ns:GetSubsystem("QuestLink")
+    if QLink and QLink:WantsShare() and QLink:Share(self._questID) then return end
     QB:Select(self._questID)
 end
 
@@ -94,6 +97,8 @@ end
 
 local function detailLineClick(self)
     if self._questID then
+        local QLink = ns:GetSubsystem("QuestLink")
+        if QLink and QLink:WantsShare() and QLink:Share(self._questID) then return end
         QB:Select(self._questID)
     elseif self._mapID then
         QB:GoTo(self._mapID, self._px, self._py, self._title)

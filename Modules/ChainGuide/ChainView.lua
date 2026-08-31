@@ -324,13 +324,9 @@ local function buildChainNavTooltip(item)
 end
 
 local function onNodeClickQuest(item, chain)
-    if IsShiftKeyDown and IsShiftKeyDown() and ChatEdit_InsertLink then
-        local title = ns.Util.QuestTitle(item.id)
-        if title then
-            ChatEdit_InsertLink(("[%s]"):format(title))
-            return
-        end
-    end
+    -- Through QuestLink like every other producer, so a rebound chat-link modifier works here too
+    local QLink = ns:GetSubsystem("QuestLink")
+    if QLink and QLink:WantsShare() and QLink:Share(item.id) then return end
     local WP = ns:GetSubsystem("ChainGuideWaypoint")
     if WP and WP.GoTo then WP:GoTo(item.id, chain) end
 end

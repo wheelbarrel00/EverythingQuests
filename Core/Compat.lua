@@ -230,3 +230,26 @@ function Compat.SourceName(kind, srcID)
     local t = (real == 2) and S.obj or S.npc
     return t and t[srcID]
 end
+
+-- Classic sends plain text, not a hyperlink: the client strips a link type it does not know,
+-- and GetQuestLink cannot name a quest that is not in your log.
+-- The level is baked in because the receiver's flavor may level the same quest differently.
+function Compat.QuestLinkText(questID, title, level)
+    if type(questID) ~= "number" or questID <= 0 then return nil end
+
+    if not ns.HAS_CLASSIC_SPAWNS then
+        local get = _G["GetQuestLink"]
+        if type(get) == "function" then
+            local ok, link = pcall(get, questID)
+            if ok and type(link) == "string" and link:find("|Hquest:", 1, true) then
+                return link
+            end
+        end
+    end
+
+    if type(title) ~= "string" or title == "" then return nil end
+    if type(level) == "number" and level > 0 then
+        return ("[[%d] %s (%d)]"):format(level, title, questID)
+    end
+    return ("[%s (%d)]"):format(title, questID)
+end
