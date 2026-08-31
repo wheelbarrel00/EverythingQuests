@@ -5,6 +5,18 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.1] - 2026-08-30
+
+A one-line fix for a problem that had nothing to do with quests, and all six languages are complete again.
+
+### Improvements
+
+- **German, French, Korean, Russian, Simplified Chinese and Traditional Chinese are back to 100%.** Version 1.44.0 added the two new map filters and reworded one of the map explanations, and those six phrases had been rendering in English ever since. They are translated now, so the Hide holiday quests out of season and Hide quests above your level checkboxes, both of their explanations, the explanation on Show quests you can pick up, and the Quest Browser's reason for hiding a quest that is above your level all read in your own language. Thanks as always to Stonetwist, Zox, labrie75, Malevi4, Keriaovo and BNS333, and corrections are always welcome.
+
+### Bug Fixes
+
+- **Everything Quests no longer resets Arcana's bar layout.** On retail, our TOC named ChocolateBar as an optional dependency, left over from when ChocolateBar was the data-broker display addon that showed our minimap launcher. Arcana, which replaced it, ships a load-on-demand stub folder still called ChocolateBar so it can import old ChocolateBar profiles, and naming a load-on-demand addon as an optional dependency force-loads it. So every login, Everything Quests was quietly triggering that import: Arcana re-ran its migration, replaced its own live settings with the result, and re-initialized, which moved bar tiles back and undid display settings. The entry is gone, along with the TitanClassic and ElvUI entries beside it. None of the three bought anything: our launcher is not registered until everything has finished loading at login, so load order could never have mattered, and everything Everything Quests reads from ElvUI it reads later still. Nothing else changes. The Classic Era and Burning Crusade Classic builds never carried the entry and were never affected. Thanks to RoadBlock for the report that turned this up.
+
 ## [1.45.0] - 2026-08-26
 
 Quest markers on Classic Era and Burning Crusade Classic now tell you who to talk to.

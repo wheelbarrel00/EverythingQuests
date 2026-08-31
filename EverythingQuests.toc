@@ -2,12 +2,11 @@
 ## Title: Everything Quests
 ## Notes: Unified replacement for the Blizzard quest experience - world map overlays, nameplate quest icons, quest history, and a Midnight chain guide. The objective tracker installs alongside it as EQ Objective Tracker.
 ## Author: Wheelbarrel00
-## Version: 1.45.0
+## Version: 1.45.1
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
 ## IconTexture: Interface\AddOns\EverythingQuests\Media\Textures\eq-logo-v3
-## OptionalDeps: TitanClassic, ChocolateBar, ElvUI
 ## X-Curse-Project-ID: 1544648
 ## X-Wago-ID:
 

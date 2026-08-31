@@ -178,7 +178,7 @@ Optional, opt-in handlers for quest gossip and detail screens. Both default OFF.
 - **Insecure-only APIs** — all touchpoints (`C_GossipInfo.*`, `AcceptQuest`, `CompleteQuest`, `GetQuestReward`) are non-protected, so no taint
 
 ### Minimap Launcher
-LibDataBroker-powered launcher compatible with Titan Panel, ChocolateBar, ElvUI's data-broker bar, and any other LibDataBroker display.
+LibDataBroker-powered launcher compatible with Titan Panel, Arcana (formerly ChocolateBar), ElvUI's data-broker bar, and any other LibDataBroker display.
 
 | Click | Action |
 |---|---|
@@ -279,7 +279,7 @@ Every section gates on the subsystem it drives rather than on a flavor check, so
 
 **Optional:**
 - **[TomTom](https://www.curseforge.com/wow/addons/tomtom)** — recommended on retail for the Chain Guide, and effectively required on Classic: clicking a quest or an objective marker uses TomTom's on-screen arrow, and Classic has no built-in waypoint system to fall back on
-- [TitanClassic](https://www.curseforge.com/wow/addons/titan-panel-classic), [ChocolateBar](https://www.curseforge.com/wow/addons/chocolatebar), or [ElvUI](https://www.tukui.org/) — display the minimap button on a data-broker bar instead of around the minimap
+- [TitanClassic](https://www.curseforge.com/wow/addons/titan-panel-classic), Arcana (formerly ChocolateBar), or [ElvUI](https://www.tukui.org/) — display the minimap button on a data-broker bar instead of around the minimap
 - **[ElvUI](https://www.tukui.org/)** — ElvUI ships its own nameplate quest icons. When detected, EQ's version defaults off and a one-time dialog asks which to use; choose either, and your pick is remembered. No conflict either way
 
 ### Bundled Libraries
