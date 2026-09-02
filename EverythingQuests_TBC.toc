@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Burning Crusade Classic support is limited and growing - see the What's New notice.
 ## Author: Wheelbarrel00
-## Version: 1.45.1
+## Version: 1.46.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -156,6 +156,11 @@ Modules\QuestBrowser\Frame.lua
 Modules\Minimap\Minimap.lua
 Modules\TrackerBridge.lua
 Modules\QuestAuto.lua
+
+# Shareable quest links. Reaches Compat, AvailableQuests and the Quest Browser at RUNTIME,
+# so its position does not matter. The incoming-chat half self-gates on the Classic data
+# table, so retail installs nothing and shares only the client's own quest link.
+Modules\QuestLink.lua
 
 # Reaches MapPOIProvider, ns.QuestPinTexture and ns.QuestPinObjectives at RUNTIME rather than
 # at file scope, so its position relative to Modules/MapPOI does not matter.

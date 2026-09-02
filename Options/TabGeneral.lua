@@ -210,19 +210,46 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         place(mmpins, 0, 16)
     end
 
-    if ns:GetSubsystem("QuestAuto") then
+    local QA = ns:GetSubsystem("QuestAuto")
+    if QA then
+        -- Above the two boxes it makes inert, so the explanation is read before they are ticked
+        local autoGap = 6
+        if QA:ImmersionLoaded() then
+            local immBox = Options:CreateCheckbox(content,
+                L["Let Immersion handle quest dialogs"],
+                function() return QA:DeferToImmersion() end,
+                function(v)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then DB.db.profile.general.deferToImmersion = v and true or false end
+                end,
+                L["Immersion replaces the quest and gossip windows so you can read them, so EQ leaves accepting and turning in to you while it is installed. Uncheck to accept and turn in automatically anyway."])
+            place(immBox, 0, 6)
+            autoGap = 2
+        end
+
+        -- The clause is appended rather than written into the two keys, which are already
+        -- translated in six languages and would be retired by a reword. It is also only true
+        -- while Immersion is actually handling the windows.
+        local altHint    = L["Hold Alt to pause."]
+        local rewardHint = L["Skips reward-choice screens."]
+        if QA:DeferToImmersion() then
+            local inert = L["Immersion is handling quest windows, so this does nothing right now."]
+            altHint    = altHint .. " " .. inert
+            rewardHint = rewardHint .. " " .. inert
+        end
+
         local autoAccGet, autoAccSet = generalSetting("autoAcceptQuests")
         local autoAcc = Options:CreateCheckbox(content,
             L["Auto-accept quests"],
             autoAccGet, autoAccSet,
-            L["Hold Alt to pause."])
-        place(autoAcc, 0, 6)
+            altHint)
+        place(autoAcc, 0, autoGap)
 
         local autoTIGet, autoTISet = generalSetting("autoTurnInQuests")
         local autoTI = Options:CreateCheckbox(content,
             L["Auto-turn-in quests"],
             autoTIGet, autoTISet,
-            L["Skips reward-choice screens."])
+            rewardHint)
         place(autoTI, 0, 2)
     end
 

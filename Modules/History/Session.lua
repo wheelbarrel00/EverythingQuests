@@ -56,13 +56,30 @@ function Session:Summary()
     local quests     = s.quests or 0
     local startLevel = s.startLevel or (UnitLevel and UnitLevel("player")) or 0
     local curLevel   = (UnitLevel and UnitLevel("player")) or startLevel
+
+    local abandoned, recording = 0, true
+    -- R.sv is assigned in OnInitialize, which Core/Init.lua xpcalls - a raise there leaves the
+    -- subsystem present with every method defined and no storage behind them
+    local R = ns:GetSubsystem("History")
+    if R and R.sv and R.AbandonedFor and R.CurrentCharacter then
+        local list = R:AbandonedFor(R:CurrentCharacter())
+        for i = 1, #list do
+            if (list[i].t or 0) >= startTime then abandoned = abandoned + 1 end
+        end
+        recording = R:IsRecording()
+    end
+
     return {
         played     = played,
         quests     = quests,
         xp         = s.xp or 0,
         gold       = s.gold or 0,
+        abandoned  = abandoned,
+        recording  = recording,
         startLevel = startLevel,
         curLevel   = curLevel,
+        -- A subtraction because this one must be right even for levels gained while History
+        -- was off. sv.levels feeds the journal, not this number.
         levelUps   = math.max(0, curLevel - startLevel),
         perHour    = (played >= 60) and (quests / (played / 3600)) or nil,
     }
@@ -87,6 +104,9 @@ function Session:Print()
     end
     if sm.gold > 0 then
         print("  Quest gold:  " .. money(sm.gold))
+    end
+    if sm.abandoned > 0 then
+        print(("  Abandoned:   " .. W .. "%d" .. R):format(sm.abandoned))
     end
     if sm.levelUps > 0 then
         print(("  Level-ups:   " .. W .. "%d" .. R .. "  (%d to %d)"):format(

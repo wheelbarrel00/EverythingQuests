@@ -328,7 +328,7 @@ local function startFadeTicker()
     if _fadeTicker then return end
     if not (C_Timer and C_Timer.NewTicker) then return end
     _fadeTicker = C_Timer.NewTicker(FADE_PERIOD, function()
-        -- Self-cancelling on an empty pool rather than hooked to the map's show and hide. Re-arming
+        -- Self-canceling on an empty pool rather than hooked to the map's show and hide. Re-arming
         -- costs one acquire, and this cannot outlive the pins the way a hook can outlive a frame.
         if not next(_live) then
             if _fadeTicker then _fadeTicker:Cancel() end
@@ -676,6 +676,10 @@ end
 
 function Pin:OnClick(button)
     if not self.questID then return end
+    if button ~= "RightButton" then
+        local QLink = ns:GetSubsystem("QuestLink")
+        if QLink and QLink:WantsShare() and QLink:Share(self.questID) then return end
+    end
     if button == "RightButton" then
         -- The quest log has no entry to open for a quest you have not accepted, so the browser
         -- takes that click instead - it is the only thing that can describe an unaccepted quest.
