@@ -70,6 +70,11 @@ local function rowOnEnter(self)
     if kind == "history" then
         GameTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT")
         GameTooltip:SetText(self._fullName or ("Quest #" .. tostring(self._questID)), 1, 1, 1, 1, true)
+        if self._held and self._held > 0 and self._accepted then
+            GameTooltip:AddLine((L["Accepted %1$s, held %2$s"]):format(
+                fmtTime(self._accepted),
+                ns.Util.FmtDurationLong(self._held)), YELLOW[1], YELLOW[2], YELLOW[3])
+        end
         GameTooltip:AddLine(L["Right-click to open in the Chain Guide"], 0.7, 0.7, 0.7)
         GameTooltip:Show()
     elseif kind == "timeline" then
@@ -133,6 +138,7 @@ local function releaseAllRows()
         r:EnableMouse(false)
         r._kind = nil
         r._questID, r._fullName = nil, nil
+        r._held, r._accepted = nil, nil
         r._chainID, r._chainName = nil, nil
         HF._rowPool[#HF._rowPool + 1] = r
         HF._rowActive[i] = nil
@@ -566,6 +572,9 @@ function HF:_renderQuests()
 
         local meta = e.c or ""
         if e.z and e.z ~= "" then meta = meta .. "  •  " .. e.z end
+        if e.d and e.d > 0 then
+            meta = meta .. "  •  " .. (L["held for %s"]):format(ns.Util.FmtDurationLong(e.d))
+        end
         row.meta:SetText(meta)
         row.right:SetText(fmtTime(e.t))
 
@@ -573,6 +582,8 @@ function HF:_renderQuests()
         row._kind     = "history"
         row._questID  = e.q
         row._fullName = e.n
+        row._held     = e.d
+        row._accepted = (e.t and e.t > 0 and e.d) and (e.t - e.d) or nil
     end
 
     if n > MAX then
@@ -1020,9 +1031,9 @@ function HF:_buildTotalsPane(parent)
     pane._intro:SetText(L["Account-wide quest rewards. Totals count only quests turned in while reward tracking was on; older entries didn't capture XP or gold."])
     thin(pane._intro)
 
-    local function pairBlock(yOffset, labelText, big)
+    local function pairBlock(yOffset, labelText, big, xOffset)
         local label = tvw:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        label:SetPoint("TOPLEFT", 30, yOffset)
+        label:SetPoint("TOPLEFT", xOffset or 30, yOffset)
         label:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
         label:SetText(labelText)
         thin(label)
@@ -1032,12 +1043,26 @@ function HF:_buildTotalsPane(parent)
         value:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
         value:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
         thin(value)
+
+        -- A second column has a hard right edge. Truncating beats wrapping, which would drop a
+        -- long translated label onto the block below it.
+        if xOffset then
+            label:SetPoint("TOPRIGHT", -30, yOffset)
+            label:SetJustifyH("LEFT")
+            label:SetWordWrap(false)
+            value:SetPoint("TOPRIGHT", label, "BOTTOMRIGHT", 0, -2)
+            value:SetJustifyH("LEFT")
+            value:SetWordWrap(false)
+        end
         return value
     end
 
     pane._totalQuests = pairBlock(-30,  L["Total quests with reward data"], true)
     pane._totalGold   = pairBlock(-78,  L["Total gold earned"],             true)
     pane._totalXP     = pairBlock(-126, L["Total XP earned"],               true)
+
+    pane._abandoned = pairBlock(-30, L["Total quests abandoned"], true, 380)
+    pane._avgHeld   = pairBlock(-78, L["Average time"],           true, 380)
 
     local h2 = tvw:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     h2:SetPoint("TOPLEFT", 30, -180)
@@ -1104,6 +1129,22 @@ function HF:_renderTotals()
     pane._totalQuests:SetText(fmtBigNumber(t.totalCount))
     pane._totalGold:SetText(fmtMoney(t.totalMoney))
     pane._totalXP:SetText(fmtBigNumber(t.totalXP) .. " XP")
+
+    -- A zero here would read as "you abandoned none" when recording was simply switched off
+    if t.recording == false then
+        pane._abandoned:SetText("\226\128\148")
+        pane._avgHeld:SetText("\226\128\148")
+    else
+        pane._abandoned:SetText(fmtBigNumber(t.abandoned or 0))
+        if t.avgHeld and (t.heldCount or 0) > 0 then
+            -- The count is shown because the average covers only quests accepted since this
+            -- shipped, which is a far smaller set than the totals beside it
+            pane._avgHeld:SetText((L["%1$s   |cffaaaaaa(%2$d quests)|r"]):format(
+                ns.Util.FmtDurationLong(t.avgHeld), t.heldCount))
+        else
+            pane._avgHeld:SetText("\226\128\148")
+        end
+    end
 
     local chars = {}
     for k, v in pairs(t.byChar) do
@@ -1378,6 +1419,7 @@ function HF:_buildSessionPane(parent)
     pane._xp     = pairBlock(-154, L["Quest XP earned"])
     pane._gold   = pairBlock(-208, L["Quest gold earned"])
     pane._levels = pairBlock(-262, L["Level-ups"])
+    pane._abandoned = pairBlock(-316, L["Quests abandoned"])
 
     return pane
 end
@@ -1402,6 +1444,9 @@ function HF:_renderSession()
     else
         pane._levels:SetText("0")
     end
+
+    pane._abandoned:SetText(sm.recording == false and "\226\128\148"
+                            or fmtBigNumber(sm.abandoned or 0))
 end
 
 function HF:Render()
@@ -1454,12 +1499,13 @@ function HF:_exportQuests()
         sortDir        = HF._sortDir or "desc",
     })
     local lines = { ("# Quest History — %d entries"):format(#entries) }
-    lines[#lines + 1] = "# date | character | quest | type | zone"
+    lines[#lines + 1] = "# date | character | quest | type | zone | held"
     for i = 1, #entries do
         local e = entries[i]
         local d = (e.t and e.t > 0) and date("%Y-%m-%d %H:%M", e.t) or L["(before tracking)"]
-        lines[#lines + 1] = ("%s | %s | %s | %s | %s"):format(
-            d, e.c or "?", e.n or ("Quest #" .. tostring(e.q)), e.k or "?", e.z or "")
+        lines[#lines + 1] = ("%s | %s | %s | %s | %s | %s"):format(
+            d, e.c or "?", e.n or ("Quest #" .. tostring(e.q)), e.k or "?", e.z or "",
+            (e.d and e.d > 0) and ns.Util.FmtDurationLong(e.d) or "")
     end
     return table.concat(lines, "\n")
 end
@@ -1537,6 +1583,9 @@ function HF:_exportTotals()
         ("Total quests with reward data: %d"):format(t.totalCount),
         ("Total gold earned: %s"):format(fmtMoneyText(t.totalMoney)),
         ("Total XP earned: %d"):format(t.totalXP),
+        ("Total quests abandoned: %d"):format(t.abandoned or 0),
+        ("Average time: %s (over %d quests)"):format(
+            t.avgHeld and ns.Util.FmtDurationLong(t.avgHeld) or "n/a", t.heldCount or 0),
         "",
         "By character:",
     }
@@ -1594,6 +1643,7 @@ function HF:_exportSession()
             sm.perHour and ((" (%.1f/hour)"):format(sm.perHour)) or ""),
         ("Quest XP earned: %d"):format(sm.xp),
         ("Quest gold earned: %s"):format(fmtMoneyText(sm.gold)),
+        ("Quests abandoned: %d"):format(sm.abandoned or 0),
     }
     if sm.levelUps > 0 then
         lines[#lines + 1] = ("Level-ups: %d (%d to %d)"):format(

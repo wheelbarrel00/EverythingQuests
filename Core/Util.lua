@@ -62,6 +62,16 @@ function Util.FmtDuration(secs)
     return timeAbbrTight("SECOND_ONELETTER_ABBR", "%ds", secs)
 end
 
+-- Days, because a quest held across sessions reads as "72h 15m" through FmtDuration
+function Util.FmtDurationLong(secs)
+    secs = math.max(0, math.floor(secs or 0))
+    if secs < 86400 then return Util.FmtDuration(secs) end
+    local d = math.floor(secs / 86400)
+    local h = math.floor((secs % 86400) / 3600)
+    return timeAbbrTight("DAY_ONELETTER_ABBR", "%dd", d) .. " "
+           .. timeAbbrTight("HOUR_ONELETTER_ABBR", "%dh", h)
+end
+
 function Util.WQTimeColor(mins)
     if not mins or mins <= 0 then return 1.00, 0.10, 0.10 end
     if mins < 30  then return 1.00, 0.25, 0.25 end

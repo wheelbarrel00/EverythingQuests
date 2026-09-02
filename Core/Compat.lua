@@ -233,7 +233,7 @@ end
 
 -- Classic sends plain text, not a hyperlink: the client strips a link type it does not know,
 -- and GetQuestLink cannot name a quest that is not in your log.
--- The level is baked in because the receiver's flavor may level the same quest differently.
+-- The level is baked in so the receiver renders the sender's, not its own flavor's.
 function Compat.QuestLinkText(questID, title, level)
     if type(questID) ~= "number" or questID <= 0 then return nil end
 

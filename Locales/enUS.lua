@@ -44,10 +44,13 @@ L["Hide quests above your level"] = true
 L["Leaves out quests the game colors red for you, using its own threshold rather than a fixed number of levels. Off by default, because a red quest is still worth knowing about if you are coming back later."] = true
 L["Show objective pins on the minimap"] = true
 L["Puts the same objective markers on the minimap as on the world map, for the zone you are standing in. They use the per-quest limit above. Hover one for the quest name and what it still needs."] = true
-L["Auto-accept quests"] = true
+L["Let Immersion handle quest dialogs"] = true
+L["Immersion replaces the quest and gossip windows so you can read them, so EQ leaves accepting and turning in to you while it is installed. Uncheck to accept and turn in automatically anyway."] = true
 L["Hold Alt to pause."] = true
-L["Auto-turn-in quests"] = true
 L["Skips reward-choice screens."] = true
+L["Immersion is handling quest windows, so this does nothing right now."] = true
+L["Auto-accept quests"] = true
+L["Auto-turn-in quests"] = true
 L["Map"] = true
 L["Show a ring around quest pins"] = true
 L["Draws the red circle behind every world map marker for a quest in your log, both the ones you are still working on and the ones that are ready to turn in. Turn it off for plain icons and a much quieter map when a zone is busy."] = true
@@ -310,6 +313,7 @@ L["Falls back to a Wowhead link in chat if EQ doesn't have a chain for this ques
 -- ─── Modules/History/Frame.lua ───
 L["(before tracking)"] = true
 L["|cffEBB706EQ History|r: |cffffffff%s|r isn't part of any chain in the Chain Guide."] = true
+L["Accepted %1$s, held %2$s"] = true
 L["Right-click to open in the Chain Guide"] = true
 L["Click to expand"] = true
 L["Export"] = true
@@ -344,6 +348,7 @@ L["Click to flip ascending / descending."] = true
 L["Hide undated  |cffaaaaaa(backfilled)|r"] = true
 L["(no matching quests)"] = true
 L["%d entries"] = true
+L["held for %s"] = true
 L["first"] = true
 L["oldest"] = true
 L["newest"] = true
@@ -369,8 +374,11 @@ L["Account-wide quest rewards. Totals count only quests turned in while reward t
 L["Total quests with reward data"] = true
 L["Total gold earned"] = true
 L["Total XP earned"] = true
+L["Total quests abandoned"] = true
+L["Average time"] = true
 L["By character"] = true
 L["Top single-quest rewards"] = true
+L["%1$s   |cffaaaaaa(%2$d quests)|r"] = true
 L["%s  \194\183  %s quests  \194\183  %s  \194\183  %s XP"] = true
 L["Biggest gold:  |cffffffff%s|r  \194\183  %s"] = true
 L["Biggest gold:  (none yet)"] = true
@@ -392,6 +400,7 @@ L["Quests completed"] = true
 L["Quest XP earned"] = true
 L["Quest gold earned"] = true
 L["Level-ups"] = true
+L["Quests abandoned"] = true
 L["   |cffaaaaaa(%.1f / hour)|r"] = true
 L["%d   |cffaaaaaa(%d to %d)|r"] = true
 L["Press Ctrl+A to select all, then Ctrl+C to copy."] = true
@@ -413,6 +422,11 @@ L["Repeatable quest"] = true
 L["and %d more"] = true
 L["Starts from an item that drops here"] = true
 L["Right-click for quest details"] = true
+
+-- ─── Modules/QuestAuto.lua ───
+L["Immersion is installed. It replaces the quest and gossip windows so you can read them, and EQ's auto-accept and auto-turn-in would click straight past it. Which would you like?"] = true
+L["Keep auto-questing"] = true
+L["Let Immersion handle it"] = true
 
 -- ─── Modules/QuestBrowser/Frame.lua ───
 L["You have already completed this quest."] = true

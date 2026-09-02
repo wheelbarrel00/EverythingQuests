@@ -5,6 +5,20 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.46.0] - 2026-09-01
+
+Quests you can paste into chat, a history that knows how long you took, and a truce with Immersion.
+
+### New Features
+
+- **Shareable quest links on Classic Era and Burning Crusade Classic.** Shift-click a quest marker on the map, or a row in the Quest Browser, with a chat box open, and the quest drops into chat as text anyone can read. Someone else running Everything Quests sees a colored, clickable link that opens their Quest Browser on that quest. It is plain text on purpose: the game refuses to send a link type it does not recognize, so a custom link would arrive empty for everyone, and the game cannot name a quest that is not already in your log. The wording matches the format the established Classic quest addon already sends, so links pass between the two without either addon knowing about the other. Shift-clicking with no chat box open still sets a waypoint exactly as before.
+
+- **Quest History records how long you held each quest, and what you abandoned.** On retail, a quest you accept and later turn in now shows the time you held it on its row, and hovering that row tells you when you accepted it. The Stats tab gains a total of quests abandoned and the average time a quest spends in your log. Quests you were already carrying have no accept time to measure from, so they show nothing rather than a guess, and the average prints the number of quests behind it so it cannot be mistaken for a lifetime figure.
+
+### Improvements
+
+- **Immersion is left to handle the quest windows.** Immersion replaces the quest and gossip windows so you can read them, and Everything Quests' auto-accept and auto-turn-in would click straight past it. With both installed, Everything Quests now stands aside. If you had auto-questing switched on it asks once which you would rather have, and a checkbox under /eqs > General changes your mind later. With Immersion not installed, nothing changes at all.
+
 ## [1.45.1] - 2026-08-30
 
 A one-line fix for a problem that had nothing to do with quests, and all six languages are complete again.

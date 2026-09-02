@@ -3,20 +3,21 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.45.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.45.0"
+local FEATURE_POPUP_VERSION = "1.46.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.46.0"
 
 local POPUP_BODY = [[
-|cffEBB706Quest markers now tell you who to talk to|r
-Hover a marker for a quest you can |cffffffffpick up|r and it names the person standing there. Hover one for a quest you have |cfffffffffinished|r and it names who to hand it in to. The same names show up in the |cffffffffQuest Browser|r under Starts and Turn in, so you can see where a quest begins without opening the map.
+|cffEBB706Share a quest in chat|r  |cffaaaaaa(Classic Era and Burning Crusade Classic)|r
+Shift-click a quest marker on the map, or a row in the |cffffffffQuest Browser|r, with a chat box open, and the quest goes into chat as text anyone can read. Anyone else running Everything Quests sees a clickable link that opens their Quest Browser on that quest. Shift-clicking with chat closed still sets a waypoint, the way it always did.
 
-This covers about |cffffffff1,700|r quest givers and finishers on Classic Era and |cffffffff2,700|r on Burning Crusade Classic, and not only the people: a noticeboard, a sealed crate or a scrap of parchment gets named too. A quest that starts from an item you loot has nobody to name, and says so the way it always did.
+|cffEBB706Quest History now knows how long you took|r  |cffaaaaaa(retail)|r
+A quest you accept and later turn in shows how long you |cffffffffheld|r it, and hovering the row tells you when you accepted it. The |cffffffffStats|r tab adds a total of quests abandoned and an average time. Quests you were already carrying have no accept time to measure from, so they show nothing rather than a guess.
 
-|cffEBB706A fix to this window|r
-The What's New window for |cffffffff1.44.0|r was headed 1.44.0 but showed the notes from 1.43.0, so the holiday season gate and the level filter it was meant to announce were not in it. In case you missed them: holiday quests now only appear while their event is actually running, and a new option hides quests the game colors red for you. Both live under |cffffffff/eqs|r > General.
+|cffEBB706Immersion gets the quest windows to itself|r
+If you run |cffffffffImmersion|r, Everything Quests no longer clicks past it with auto-accept or auto-turn-in. If you had auto-questing switched on it asks once which you would rather have, and there is a checkbox under |cffffffff/eqs|r > General to change your mind later. Without Immersion nothing changes at all.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffJonnyN|r for reporting the Brewfest markers sitting on the map in August, which is what led to the holiday work. Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
+Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]

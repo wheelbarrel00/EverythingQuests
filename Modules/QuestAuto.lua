@@ -1,4 +1,5 @@
 local _, ns = ...
+local L = ns.L
 
 local QA = ns:RegisterSubsystem("QuestAuto", {})
 
@@ -13,8 +14,32 @@ local function autoTurnInOn()
     local DB = ns:GetSubsystem("DB")
     return DB and DB.db.profile.general.autoTurnInQuests == true
 end
+local function immersionLoaded()
+    local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G["IsAddOnLoaded"]
+    return (f and f("Immersion")) and true or false
+end
+
+function QA:ImmersionLoaded()
+    return immersionLoaded()
+end
+
+-- The one implementation of the rule, so the checkbox and the handlers cannot disagree about an
+-- unset value. The key is deliberately absent from DB.defaults, because AceDB answers the default
+-- for an unset key and that would hide the nil this needs.
+function QA:DeferToImmersion()
+    if not immersionLoaded() then return false end
+    local DB = ns:GetSubsystem("DB")
+    local v = DB and DB.db.profile.general.deferToImmersion
+    if v == nil then return true end
+    return v and true or false
+end
+
 local function paused()
     if IsAltKeyDown and IsAltKeyDown() then return true end
+    -- Gate on the addon being LOADED, not on its frame being shown: handler order between addons
+    -- is undefined, and Immersion leaves its frame hidden for some events it handles anyway, so a
+    -- visibility test could accept the quest before Immersion has drawn.
+    if QA:DeferToImmersion() then return true end
     return GetTime() < _declineLockUntil
 end
 
@@ -127,4 +152,30 @@ function QA:OnEnable()
             _declineLockUntil = GetTime() + DECLINE_LOCKOUT_S
         end)
     end
+
+    self:_askAboutImmersion()
+end
+
+-- Only the players this silently changes are asked: Immersion present, no answer stored, and
+-- auto-questing actually switched on. Everyone else sees nothing.
+function QA:_askAboutImmersion()
+    local DB = ns:GetSubsystem("DB")
+    local g = DB and DB.db.profile.general
+    if not g or g.deferToImmersion ~= nil or g.immConflictAsked then return end
+    if not immersionLoaded() then return end
+    if g.autoAcceptQuests ~= true and g.autoTurnInQuests ~= true then return end
+
+    g.immConflictAsked = true
+    C_Timer.After(4, function()
+        local Dialog = ns:GetSubsystem("Dialog")
+        if not Dialog then return end
+        Dialog:Show({
+            title   = "Everything Quests",
+            text    = L["Immersion is installed. It replaces the quest and gossip windows so you can read them, and EQ's auto-accept and auto-turn-in would click straight past it. Which would you like?"],
+            button1 = L["Keep auto-questing"],
+            button2 = L["Let Immersion handle it"],
+            onAccept = function() g.deferToImmersion = false end,
+            onCancel = function() g.deferToImmersion = true end,
+        })
+    end)
 end

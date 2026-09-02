@@ -18,6 +18,10 @@ local function ensureSV()
     sv.entries        = sv.entries        or {}
     sv.charBackfilled = sv.charBackfilled or {}
     sv.goldDaily      = sv.goldDaily      or {}
+    sv.accepted       = sv.accepted       or {}
+    sv.abandoned      = sv.abandoned      or {}
+    sv.abandonCount   = sv.abandonCount   or {}
+    sv.levels         = sv.levels         or {}
     return sv
 end
 
@@ -43,11 +47,33 @@ local function ensureBackupSV()
     return b
 end
 
+-- Every stored field must be listed here. This copy is what a backup restore writes back over
+-- sv.entries, so an omitted field survives normal play and is erased by the restore.
 local function copyEntries(src)
     local out = {}
     for i = 1, #src do
         local e = src[i]
-        out[i] = { q = e.q, t = e.t, n = e.n, c = e.c, z = e.z, k = e.k, xp = e.xp, m = e.m }
+        out[i] = { q = e.q, t = e.t, n = e.n, c = e.c, z = e.z, k = e.k,
+                   xp = e.xp, m = e.m, d = e.d }
+    end
+    return out
+end
+
+local function copyCharLedger(src)
+    local out = {}
+    if not src then return out end
+    for key, inner in pairs(src) do
+        local t = {}
+        for k, v in pairs(inner) do
+            if type(v) == "table" then
+                local row = {}
+                for rk, rv in pairs(v) do row[rk] = rv end
+                t[k] = row
+            else
+                t[k] = v
+            end
+        end
+        out[key] = t
     end
     return out
 end
@@ -56,6 +82,12 @@ local function copySet(src)
     local out = {}
     if src then for k, v in pairs(src) do out[k] = v end end
     return out
+end
+
+local function charTable(parent, key)
+    local t = parent[key]
+    if not t then t = {}; parent[key] = t end
+    return t
 end
 
 local function countForChar(entries, key)
@@ -80,6 +112,10 @@ end
 function R:OnInitialize()
     self.sv = ensureSV()
     self.backups = ensureBackupSV()
+    -- Core/Init.lua xpcalls this and enables the subsystem regardless, so anything the event
+    -- handlers touch has to exist before the first line that can raise
+    self._giveUp = {}
+    self._turnedIn = {}
 
     self._loadNotice = self:_guardOnLoad()
 
@@ -88,7 +124,6 @@ function R:OnInitialize()
     for i = 1, #entries do
         self:_updateCompletion(entries[i].q, entries[i].t or 0)
     end
-    self._giveUp = {}
 end
 
 local function resolveTitle(qid)
@@ -112,8 +147,20 @@ function R:OnEnable()
     local Events = ns:GetSubsystem("Events")
     if not Events then return end
     Events:On("QUEST_TURNED_IN", function(_, questID, xpReward, moneyReward)
+        self:MarkTurnedIn(questID)
         if not enabled() then return end
         self:Record(questID, xpReward, moneyReward)
+    end)
+
+    -- Classic passes questLogIndex first and retail passes the id alone, so the id is last on both
+    Events:On("QUEST_ACCEPTED", function(_, a, b)
+        self:RecordAccept(b or a)
+    end)
+    Events:On("QUEST_REMOVED", function(_, questID)
+        self:RecordAbandon(questID)
+    end)
+    Events:On("PLAYER_LEVEL_UP", function(_, level)
+        self:RecordLevel(level)
     end)
 
     self._moneyBaseline = (GetMoney and GetMoney()) or 0
@@ -142,6 +189,7 @@ function R:OnEnable()
 
     C_Timer.After(8, function()
         if not enabled() then return end
+        self:PruneAccepts()
         local key = charKey()
         if self.sv.charBackfilled[key] then return end
         if countForChar(self.sv.entries, key) > 0 then
@@ -174,6 +222,10 @@ end
 local function applySnapshot(self, snap)
     self.sv.entries        = copyEntries(snap.entries)
     self.sv.charBackfilled = copySet(snap.charBackfilled)
+    self.sv.accepted       = copyCharLedger(snap.accepted)
+    self.sv.abandoned      = copyCharLedger(snap.abandoned)
+    self.sv.levels         = copyCharLedger(snap.levels)
+    self.sv.abandonCount   = copySet(snap.abandonCount)
     self._completion = {}
     self._pendingTitles = nil
     local entries = self.sv.entries
@@ -229,6 +281,10 @@ function R:_snapshotToBackup()
         count          = n,
         entries        = copyEntries(entries),
         charBackfilled = copySet(self.sv.charBackfilled),
+        accepted       = copyCharLedger(self.sv.accepted),
+        abandoned      = copyCharLedger(self.sv.abandoned),
+        levels         = copyCharLedger(self.sv.levels),
+        abandonCount   = copySet(self.sv.abandonCount),
     })
     for i = #b.snapshots, MAX_SNAPSHOTS + 1, -1 do
         b.snapshots[i] = nil
@@ -357,11 +413,179 @@ function R:_pumpTitles()
     end
 end
 
+function R:_takeAccept(questID)
+    local mine = self.sv.accepted[charKey()]
+    if not mine then return nil end
+    local at = mine[questID]
+    mine[questID] = nil
+    return at
+end
+
+function R:AcceptedAt(questID)
+    local mine = self.sv.accepted[charKey()]
+    return mine and mine[questID]
+end
+
+-- A task, bonus objective or world quest enters and leaves the quest log on its own with no
+-- turn-in, so an accept recorded for one would later be read as an abandon nobody made.
+local function transientQuest(questID)
+    local ql = _G["C_QuestLog"]
+    if ql and ql.IsQuestTask then
+        local ok, isTask = pcall(ql.IsQuestTask, questID)
+        if ok and isTask then return true end
+    end
+    local isWQ = _G["QuestUtils_IsQuestWorldQuest"]
+    if isWQ then
+        local ok, yes = pcall(isWQ, questID)
+        if ok and yes then return true end
+    end
+    return false
+end
+
+-- The record is cleared even when recording is off. Leaving an older one in place is worse than
+-- having none, because the next hand-in then measures a duration from the wrong day.
+function R:RecordAccept(questID)
+    if not questID then return end
+    self._turnedIn[questID] = nil
+    local mine = charTable(self.sv.accepted, charKey())
+    if not enabled() or transientQuest(questID) then
+        mine[questID] = nil
+        return
+    end
+    mine[questID] = (GetServerTime and GetServerTime()) or time()
+end
+
+-- QUEST_TURNED_IN always precedes QUEST_REMOVED for a hand-in, so the marker is the only thing
+-- separating the two. It is set even when recording is off, or toggling History mid-quest would
+-- log a completed quest as abandoned.
+function R:MarkTurnedIn(questID)
+    if questID then self._turnedIn[questID] = true end
+end
+
+local MAX_ABANDONED = 250
+
+function R:RecordAbandon(questID)
+    if not questID then return end
+    local at = self:_takeAccept(questID)
+    if self._turnedIn[questID] then
+        self._turnedIn[questID] = nil
+        return
+    end
+    -- Only a quest this addon watched being accepted can be one the player abandoned. Anything
+    -- else arriving here is a task, a bonus objective, or a quest that predates recording.
+    if not at or not enabled() then return end
+
+    local now = (GetServerTime and GetServerTime()) or time()
+    local key = charKey()
+    local list = charTable(self.sv.abandoned, key)
+    list[#list + 1] = {
+        q = questID,
+        t = now,
+        n = resolveTitle(questID),
+        h = math.max(0, now - at),
+    }
+    while #list > MAX_ABANDONED do table.remove(list, 1) end
+    -- The list above is a capped detail buffer, so the total is counted separately or the figure
+    -- on the Totals pane silently stops growing at the cap and still reads as a lifetime number.
+    self.sv.abandonCount[key] = (self.sv.abandonCount[key] or 0) + 1
+end
+
+-- Recorded for the quest journal, which has no surface yet. Nothing reads it back, so it can
+-- only ever be missing data rather than a wrong number on a pane.
+function R:RecordLevel(level)
+    level = tonumber(level)
+    if not level or level <= 0 or not enabled() then return end
+    local list = charTable(self.sv.levels, charKey())
+    local last = list[#list]
+    -- A reconnect can replay PLAYER_LEVEL_UP for a level already recorded
+    if last and last.l == level then return end
+    list[#list + 1] = { l = level, t = (GetServerTime and GetServerTime()) or time() }
+end
+
+-- Pruning against an EMPTY log would discard every pending duration, so a log that reports
+-- nothing is left alone.
+function R:PruneAccepts()
+    local mine = self.sv.accepted[charKey()]
+    if not mine or not next(mine) then return 0 end
+
+    local rows = {}
+    -- CollectQuestLog returns the table FIRST and the highest index filled second
+    local _, last = ns.Compat.CollectQuestLog(rows)
+    local live, seen = {}, 0
+    for i = 1, (last or 0) do
+        local info = rows[i]
+        if info and info.questID and not info.isHeader then
+            live[info.questID] = true
+            seen = seen + 1
+        end
+    end
+    if seen == 0 then return 0 end
+
+    local dropped = 0
+    for questID in pairs(mine) do
+        if not live[questID] then
+            mine[questID] = nil
+            dropped = dropped + 1
+        end
+    end
+    return dropped
+end
+
+function R:IsRecording()
+    return enabled()
+end
+
+function R:AbandonedCount(charFilter)
+    local ledger = self.sv.abandonCount
+    if not ledger then return 0 end
+    if charFilter and charFilter ~= "all" and charFilter ~= "" then
+        return ledger[charFilter] or 0
+    end
+    local n = 0
+    for _, v in pairs(ledger) do n = n + (v or 0) end
+    return n
+end
+
+function R:AbandonedFor(charFilter)
+    local out = {}
+    local ledger = self.sv.abandoned
+    if not ledger then return out end
+    if charFilter and charFilter ~= "all" and charFilter ~= "" then
+        local list = ledger[charFilter]
+        if list then for i = 1, #list do out[#out + 1] = list[i] end end
+        return out
+    end
+    for _, list in pairs(ledger) do
+        for i = 1, #list do out[#out + 1] = list[i] end
+    end
+    return out
+end
+
+function R:LevelUpsSince(since, charFilter)
+    local ledger = self.sv.levels
+    if not ledger then return 0, nil, nil end
+    local n, lo, hi = 0, nil, nil
+    for ckey, list in pairs(ledger) do
+        if not charFilter or charFilter == "all" or charFilter == "" or ckey == charFilter then
+            for i = 1, #list do
+                local e = list[i]
+                if e.l and (not since or (e.t or 0) >= since) then
+                    n = n + 1
+                    if not lo or e.l < lo then lo = e.l end
+                    if not hi or e.l > hi then hi = e.l end
+                end
+            end
+        end
+    end
+    return n, lo, hi
+end
+
 function R:Record(questID, xpReward, moneyReward)
     if not questID then return end
+    local now = (GetServerTime and GetServerTime()) or time()
     local entry = {
         q = questID,
-        t = (GetServerTime and GetServerTime()) or time(),
+        t = now,
         n = resolveTitle(questID),
         c = charKey(),
         z = (GetZoneText and GetZoneText()) or nil,
@@ -372,6 +596,9 @@ function R:Record(questID, xpReward, moneyReward)
     }
     if xpReward    and xpReward    > 0 then entry.xp = xpReward    end
     if moneyReward and moneyReward > 0 then entry.m  = moneyReward end
+
+    local acceptedAt = self:_takeAccept(questID)
+    if acceptedAt then entry.d = math.max(0, now - acceptedAt) end
 
     local entries = self.sv.entries
     entries[#entries + 1] = entry
@@ -497,7 +724,12 @@ function R:Wipe()
     self._completion       = {}
     self._pendingTitles    = nil
     self.sv.goldDaily      = {}
+    self.sv.accepted       = {}
+    self.sv.abandoned      = {}
+    self.sv.abandonCount   = {}
+    self.sv.levels         = {}
     self._giveUp           = {}
+    self._turnedIn         = {}
     if self.backups then
         self.backups.snapshots      = {}
         self.backups.lastKnownCount = 0
@@ -678,12 +910,18 @@ end
 function R:Totals()
     local entries = self.sv.entries
     local totalCount, totalXP, totalMoney = 0, 0, 0
+    local totalHeld, heldCount = 0, 0
     local byChar = {}
     local topGold, topXP
 
     for i = 1, #entries do
         local e = entries[i]
         totalCount = totalCount + 1
+
+        if e.d and e.d > 0 then
+            totalHeld = totalHeld + e.d
+            heldCount = heldCount + 1
+        end
 
         local c = e.c or "?"
         local rec = byChar[c]
@@ -714,6 +952,10 @@ function R:Totals()
         byChar     = byChar,
         topGold    = topGold,
         topXP      = topXP,
+        abandoned  = self:AbandonedCount(nil),
+        heldCount  = heldCount,
+        avgHeld    = (heldCount > 0) and (totalHeld / heldCount) or nil,
+        recording  = enabled(),
     }
 end
 
