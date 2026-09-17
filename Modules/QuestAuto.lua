@@ -14,6 +14,10 @@ local function autoTurnInOn()
     local DB = ns:GetSubsystem("DB")
     return DB and DB.db.profile.general.autoTurnInQuests == true
 end
+local function autoConfirmOn()
+    local DB = ns:GetSubsystem("DB")
+    return DB and DB.db.profile.general.autoConfirmGroupQuests == true
+end
 local function immersionLoaded()
     local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G["IsAddOnLoaded"]
     return (f and f("Immersion")) and true or false
@@ -34,13 +38,19 @@ function QA:DeferToImmersion()
     return v and true or false
 end
 
-local function paused()
+-- The two pauses the player asked for, with no bearing on which window is being replaced.
+local function heldBack()
     if IsAltKeyDown and IsAltKeyDown() then return true end
+    return GetTime() < _declineLockUntil
+end
+
+local function paused()
+    if heldBack() then return true end
     -- Gate on the addon being LOADED, not on its frame being shown: handler order between addons
     -- is undefined, and Immersion leaves its frame hidden for some events it handles anyway, so a
     -- visibility test could accept the quest before Immersion has drawn.
     if QA:DeferToImmersion() then return true end
-    return GetTime() < _declineLockUntil
+    return false
 end
 
 -- Reading avail[1] ALONE meant one unusable first row blocked auto-accept entirely while good rows
@@ -139,6 +149,28 @@ local function onQuestComplete()
     end
 end
 
+-- Immersion is deliberately not consulted. It replaces the quest and gossip windows, and this popup is neither.
+local function fromGroupMember(who)
+    -- A payload naming nobody falls through to the switch, so a differently shaped payload cannot kill this.
+    if type(who) ~= "string" or who == "" then return true end
+    return (UnitInParty(who) or UnitInRaid(who)) and true or false
+end
+
+-- ConfirmAcceptQuest leaves the popup up, and a full quest log raises the LOG_FULL variant instead.
+local ACCEPT_POPUPS = { "QUEST_ACCEPT", "QUEST_ACCEPT_LOG_FULL" }
+
+local function onQuestAcceptConfirm(_, who)
+    if heldBack() then return end
+    if not autoConfirmOn() then return end
+    if not fromGroupMember(who) then return end
+    local confirm = _G["ConfirmAcceptQuest"]
+    if type(confirm) ~= "function" then return end
+    confirm()
+    local hide = _G["StaticPopup_Hide"]
+    if type(hide) ~= "function" then return end
+    for _, name in ipairs(ACCEPT_POPUPS) do pcall(hide, name) end
+end
+
 function QA:OnEnable()
     local Events = ns:GetSubsystem("Events")
     Events:On("GOSSIP_SHOW",    onGossipShow)
@@ -146,6 +178,7 @@ function QA:OnEnable()
     Events:On("QUEST_DETAIL",   onQuestDetail)
     Events:On("QUEST_PROGRESS", onQuestProgress)
     Events:On("QUEST_COMPLETE", onQuestComplete)
+    Events:On("QUEST_ACCEPT_CONFIRM", onQuestAcceptConfirm)
 
     if hooksecurefunc and _G.DeclineQuest then
         hooksecurefunc("DeclineQuest", function()

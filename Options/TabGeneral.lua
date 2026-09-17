@@ -251,6 +251,134 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             autoTIGet, autoTISet,
             rewardHint)
         place(autoTI, 0, 2)
+
+        -- No Immersion clause, because this popup is not a window Immersion replaces.
+        local confirmGet, confirmSet = generalSetting("autoConfirmGroupQuests")
+        local confirmBox = Options:CreateCheckbox(content,
+            L["Join group quests automatically"],
+            confirmGet, confirmSet,
+            L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."]
+                .. " " .. L["Hold Alt to pause."])
+        place(confirmBox, 0, 2)
+    end
+
+    if ns:GetSubsystem("Announce") then
+        local function announceSetting(key)
+            return
+                function()
+                    local DB = ns:GetSubsystem("DB")
+                    return DB and DB.db.profile.announce and DB.db.profile.announce[key]
+                end,
+                function(value)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then
+                        DB.db.profile.announce = DB.db.profile.announce or {}
+                        DB.db.profile.announce[key] = value
+                    end
+                end
+        end
+
+        local annHeader = Options:CreateSectionHeader(content, L["Quest announcements"])
+        place(annHeader, 0, 16)
+
+        -- Client globals, so channel names read correctly in every client language.
+        local PARTY_NAME = _G["PARTY"] or "Party"
+        local RAID_NAME  = _G["RAID"] or "Raid"
+        local CHANNELS = {
+            { value = "off",   label = _G["NONE"] or L["Nobody"] },
+            { value = "party", label = PARTY_NAME },
+            { value = "raid",  label = RAID_NAME },
+            { value = "both",  label = PARTY_NAME .. " / " .. RAID_NAME },
+        }
+
+        local chanGet, chanSet = announceSetting("channel")
+        local chanDD = Options:CreateDropdown(content, L["Announce to"], CHANNELS,
+            function() return chanGet() or "off" end, chanSet)
+        place(chanDD, 4, 8)
+        chanDD:SetWidth(280)
+        Options:AttachTooltip(chanDD.button, L["Announce to"],
+            L["Which chat channel your quest updates are posted to. None sends nothing at all - the switches below then only decide what is printed to your own chat."])
+
+        local selfGet, selfSet = announceSetting("toSelf")
+        local selfBox = Options:CreateCheckbox(content,
+            L["Also print to your own chat"],
+            selfGet, selfSet,
+            L["Prints each update to your own chat window as well. Nobody else sees these, so it is also how to watch what the switches below do before letting anything reach a group."])
+        place(selfBox, 4, 8)
+
+        local accGet, accSet = announceSetting("accepted")
+        local accBox = Options:CreateCheckbox(content,
+            L["Announce quests you accept"],
+            accGet, accSet,
+            L["Posts a line as you pick each quest up, so the group can see what you are on."])
+        place(accBox, 4, 6)
+
+        local objGet, objSet = announceSetting("objective")
+        local objBox = Options:CreateCheckbox(content,
+            L["Announce objectives you finish"],
+            objGet, objSet,
+            L["Posts a line the moment an objective fills, so the group knows you are done with that part and can stop helping."])
+        place(objBox, 4, 2)
+
+        local compGet, compSet = announceSetting("completed")
+        local compBox = Options:CreateCheckbox(content,
+            L["Announce quests you hand in"],
+            compGet, compSet,
+            L["Posts a line as you turn each quest in."])
+        place(compBox, 4, 2)
+
+        local abanGet, abanSet = announceSetting("abandoned")
+        local abanBox = Options:CreateCheckbox(content,
+            L["Announce quests you abandon"],
+            abanGet, abanSet,
+            L["Posts a line when you drop a quest. Off to begin with, because it is the one people rarely want broadcast."])
+        place(abanBox, 4, 2)
+
+        local hideGet, hideSet = announceSetting("hideIncoming")
+        local hideBox = Options:CreateCheckbox(content,
+            L["Hide announcements from other players"],
+            hideGet, hideSet,
+            L["Hides quest announcements other people in your group send, including the ones other quest addons post. Your own are always shown, so this does not silence anything you switched on above."])
+        place(hideBox, 4, 8)
+    end
+
+    if ns:GetSubsystem("GroupComms") then
+        local function groupSetting(key)
+            return
+                function()
+                    local DB = ns:GetSubsystem("DB")
+                    return DB and DB.db.profile.group and DB.db.profile.group[key]
+                end,
+                function(value)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then
+                        DB.db.profile.group = DB.db.profile.group or {}
+                        DB.db.profile.group[key] = value
+                    end
+                    local Comms = ns:GetSubsystem("GroupComms")
+                    if Comms and Comms.OnSettingChanged then Comms:OnSettingChanged(key) end
+                end
+        end
+
+        local groupHeader = Options:CreateSectionHeader(content, L["Party quest progress"])
+        place(groupHeader, 0, 16)
+
+        local shareGet, shareSet = groupSetting("partyProgress")
+        local shareBox = Options:CreateCheckbox(content,
+            L["Share quest progress with your group"],
+            shareGet, shareSet,
+            L["Your group sees how far along you are on each quest, and you see the same for them. This travels as hidden addon messages, so nothing is ever posted to anyone's chat. Switching it off stops both halves."])
+        place(shareBox, 4, 8)
+
+        -- Classic only, because no retail addon speaks that protocol and the request is never sent there.
+        if ns.HAS_CLASSIC_SPAWNS then
+            local peerGet, peerSet = groupSetting("readPeerAddons")
+            local peerBox = Options:CreateCheckbox(content,
+                L["Read other quest addons as well"],
+                peerGet, peerSet,
+                L["Also reads the progress other quest addons share, so you see group members running them as well as the people running EQ. EQ asks their users for their quest logs when either of you joins the group. Your own progress is never sent on their channel."])
+            place(peerBox, 4, 8)
+        end
     end
 
     if ns:GetSubsystem("MapPOIProvider") then

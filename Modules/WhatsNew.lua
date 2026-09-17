@@ -3,18 +3,18 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.46.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.46.0"
+local FEATURE_POPUP_VERSION = "1.47.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.47.0"
 
 local POPUP_BODY = [[
-|cffEBB706Share a quest in chat|r  |cffaaaaaa(Classic Era and Burning Crusade Classic)|r
-Shift-click a quest marker on the map, or a row in the |cffffffffQuest Browser|r, with a chat box open, and the quest goes into chat as text anyone can read. Anyone else running Everything Quests sees a clickable link that opens their Quest Browser on that quest. Shift-clicking with chat closed still sets a waypoint, the way it always did.
+|cffEBB706Quest updates in party chat|r
+Everything Quests can tell your group when you accept a quest, finish an objective, hand a quest in or abandon one. Pick a channel under |cffffffff/eqs|r > General > |cffffffffQuest announcements|r. Nothing is sent until you do, and |cffffffffAlso print to your own chat|r lets you see the lines first. You can also hide the quest announcements other people post.
 
-|cffEBB706Quest History now knows how long you took|r  |cffaaaaaa(retail)|r
-A quest you accept and later turn in shows how long you |cffffffffheld|r it, and hovering the row tells you when you accepted it. The |cffffffffStats|r tab adds a total of quests abandoned and an average time. Quests you were already carrying have no accept time to measure from, so they show nothing rather than a guess.
+|cffEBB706Escorts joined for you|r
+When someone in your group starts an escort or another quest the game asks you to join, |cffffffffJoin group quests automatically|r answers yes for you. It is off by default, only answers for people in your group, and holding Alt pauses it.
 
-|cffEBB706Immersion gets the quest windows to itself|r
-If you run |cffffffffImmersion|r, Everything Quests no longer clicks past it with auto-accept or auto-turn-in. If you had auto-questing switched on it asks once which you would rather have, and there is a checkbox under |cffffffff/eqs|r > General to change your mind later. Without Immersion nothing changes at all.
+|cffEBB706Groundwork for your group's quest progress|r
+Everything Quests now shares your quest progress with group members running it, as hidden addon messages that never reach anyone's chat. On Classic Era and Burning Crusade Classic it also reads the progress other quest addons share. Nothing shows it yet: this release lays the groundwork for a display that comes later. You can switch it off under |cffffffff/eqs|r > General > |cffffffffParty quest progress|r.
 
 |cffEBB706Thank you|r
 Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.

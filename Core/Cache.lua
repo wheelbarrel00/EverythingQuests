@@ -161,10 +161,11 @@ local function refreshDynamicFields()
         local watched = ns.Compat.IsQuestWatched(id)
         q.isWatched = watched
         q.isCampaign = deriveIsCampaign(id)
+        -- Every quest, not only tracked ones, because announcements and the party broadcast read the whole log.
+        if C_QuestLog.GetQuestObjectives then
+            q.objectives = C_QuestLog.GetQuestObjectives(id) or q.objectives
+        end
         if watched or not onlyWatched or (pinnedSet and pinnedSet[id]) then
-            if C_QuestLog.GetQuestObjectives then
-                q.objectives = C_QuestLog.GetQuestObjectives(id) or q.objectives
-            end
             if C_QuestLog.IsComplete then
                 q.isComplete = C_QuestLog.IsComplete(id) or false
             end

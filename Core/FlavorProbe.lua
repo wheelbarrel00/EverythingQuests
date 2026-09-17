@@ -2097,6 +2097,8 @@ local EVENTS = {
     "QUEST_DATA_LOAD_RESULT", "QUESTLINE_UPDATE", "SUPER_TRACKING_CHANGED",
     "TASK_PROGRESS_UPDATE", "WORLD_QUEST_COMPLETED_BY_SPELL",
     "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED",
+    "PLAYER_LEVEL_UP", "SKILL_LINES_CHANGED", "UPDATE_FACTION", "ZONE_CHANGED_NEW_AREA",
+    "QUEST_ACCEPT_CONFIRM", "GROUP_JOINED", "GROUP_LEFT", "GROUP_ROSTER_UPDATE",
 }
 
 function Probe:Events()
@@ -2734,8 +2736,84 @@ function Probe:QuestBrowser()
     end
 end
 
+function Probe:Group()
+    out("party quest progress")
+
+    local Comms = ns:GetSubsystem("GroupComms")
+    local Data  = ns:GetSubsystem("GroupData")
+    if not (Comms and Data) then
+        line("GroupComms/GroupData: not loaded by this TOC - nothing else here means anything")
+        return
+    end
+
+    local DB  = ns:GetSubsystem("DB")
+    local cfg = DB and DB.db and DB.db.profile and DB.db.profile.group
+    line("1. settings")
+    line("  share progress   %s", tostring(cfg and cfg.partyProgress))
+    line("  read other addons %s", tostring(cfg and cfg.readPeerAddons))
+
+    line("2. the transport")
+    -- Asked of the shipped resolver, so the probe cannot resolve LibStub differently from the addon.
+    local lib = Comms.Transport and Comms:Transport()
+    line("  LibStub           %s", type(LibStub))
+    line("  AceComm-3.0       %s", lib and "resolved" or "ABSENT - nothing can be sent or read")
+    line("  ChatThrottleLib   %s  version %s",
+         type(_G["ChatThrottleLib"]),
+         tostring(_G["ChatThrottleLib"] and _G["ChatThrottleLib"].version))
+    local reg = _G["C_ChatInfo"] and _G["C_ChatInfo"].IsAddonMessagePrefixRegistered
+    if type(reg) == "function" then
+        for _, row in ipairs(Comms:Prefixes()) do
+            local ok, yes = pcall(reg, row.prefix)
+            line("  prefix %-10s registered=%s", row.label, ok and tostring(yes) or "RAISED")
+        end
+    else
+        line("  IsAddonMessagePrefixRegistered is ABSENT, so registration cannot be read back")
+    end
+    if Comms.PeerListenerPresent then
+        line("  another listener on the interop prefix: %s",
+             Comms:PeerListenerPresent() and "yes" or "no")
+    end
+
+    line("3. the group")
+    local bg = "unreadable"
+    if type(UnitInBattleground) == "function" then
+        -- Bound to locals, because tostring() with no argument raises when the call returns nothing.
+        local ok, yes = pcall(UnitInBattleground, "player")
+        bg = ok and tostring(yes) or "RAISED"
+    end
+    line("  IsInGroup=%s  IsInRaid=%s  GetNumGroupMembers=%s  battleground=%s",
+         tostring(IsInGroup()), tostring(IsInRaid()), tostring(GetNumGroupMembers()), bg)
+    if not IsInGroup() then
+        line("  NOT IN A GROUP. Everything below reads empty for that reason and not another.")
+    end
+
+    line("4. what has been received")
+    local names = Data:PlayerNames()
+    line("  players sharing   %d", #names)
+    for _, who in ipairs(names) do
+        line("    %-16s class=%s", who, tostring(Data:Class(who)))
+    end
+    local Cache = ns:GetSubsystem("Cache")
+    if not Cache then
+        line("  Cache is ABSENT, so your own quests could not be compared against the store")
+    else
+        local quests, rows, mine = 0, 0, 0
+        for questID in pairs(Cache:All()) do
+            mine = mine + 1
+            local n = Data:CountForQuest(questID)
+            if n > 0 then quests = quests + 1; rows = rows + n end
+        end
+        line("  of your %d quests, %d also held by someone else, %d party rows in total",
+             mine, quests, rows)
+    end
+    line("  store revision    %d", Data.revision)
+    line("  A player count above zero with zero rows on your own quests is NORMAL - it means")
+    line("  they are working quests you do not have, which nothing draws yet.")
+end
+
 local SECTIONS = {
     media   = Probe.Media,
+    group   = Probe.Group,
     xp      = Probe.XP,
     available = Probe.Available,
     questbrowser = Probe.QuestBrowser,
@@ -2777,12 +2855,12 @@ function Probe:Run(msg)
         return
     end
     if which ~= "" then
-        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, available, questbrowser, flare, quest, port, tooltip, xp, events, ui, misc, or none for all",
+        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, available, questbrowser, group, flare, quest, port, tooltip, xp, events, ui, misc, or none for all",
             which)
         return
     end
     out("EQ %s - full flavor probe", tostring(ns.VERSION))
-    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "available", "questbrowser", "quest", "events", "ui" }) do
+    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "available", "questbrowser", "group", "quest", "events", "ui" }) do
         runSection(self, name, SECTIONS[name])
     end
     -- tooltip, mappoi, flare and xp are left out on purpose. Each needs setup first, so a blind

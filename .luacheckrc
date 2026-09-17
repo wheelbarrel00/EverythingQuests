@@ -47,7 +47,10 @@ read_globals = {
     "C_VignetteInfo", "C_UnitAuras", "C_UIWidgetManager",
     -- functions
     "hooksecurefunc", "issecurevariable", "InCombatLockdown", "secureexecuterange",
-    "IsModifiedClick", "IsAltKeyDown", "IsInGroup", "IsQuestCompletable",
+    "IsModifiedClick", "IsAltKeyDown", "IsInGroup", "IsInRaid", "GetNumGroupMembers",
+    "StaticPopup_Hide",
+    "UnitInParty", "UnitInRaid", "UnitIsConnected", "UnitInBattleground", "UnitClassBase",
+    "SendChatMessage", "IsQuestCompletable",
     "QuestMapFrame_OpenToQuestDetails", "QuestUtil", "ProfessionsUtil", "QuestUtils_GetQuestName",
     "QuestUtils_IsQuestWorldQuest", "QuestMapQuestOptions_OpenQuestDetails",
     "QuestMapFrame_UpdateQuestDetailsButtons", "QuestMapFrame_GetDetailQuestID",

@@ -7,6 +7,7 @@ DB.defaults = {
         general = {
             autoAcceptQuests = false,
             autoTurnInQuests = false,
+            autoConfirmGroupQuests = false,
             -- EQ Objective Tracker draws these icons, but EQ owns whether they appear, so
             -- TrackerBridge adds and removes the registration from here.
             showChainGuideIcon = true,
@@ -17,6 +18,21 @@ DB.defaults = {
             npIconOffsetX   = 0,
             npIconOffsetY   = 0,
             questTooltips   = true,
+        },
+        announce = {
+            -- Off, because every other value posts in other people's chat.
+            channel      = "off",
+            toSelf       = false,
+            accepted     = true,
+            objective    = true,
+            completed    = true,
+            abandoned    = false,
+            hideIncoming = false,
+        },
+        group = {
+            -- On, because these never show in chat and a feature both sides must opt into never starts.
+            partyProgress  = true,
+            readPeerAddons = true,
         },
         worldQuests = {
             enabled = true,

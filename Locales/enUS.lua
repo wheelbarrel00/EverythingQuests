@@ -51,6 +51,29 @@ L["Skips reward-choice screens."] = true
 L["Immersion is handling quest windows, so this does nothing right now."] = true
 L["Auto-accept quests"] = true
 L["Auto-turn-in quests"] = true
+L["Join group quests automatically"] = true
+L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."] = true
+L["Quest announcements"] = true
+L["Nobody"] = true
+L["Announce to"] = true
+L["Which chat channel your quest updates are posted to. None sends nothing at all - the switches below then only decide what is printed to your own chat."] = true
+L["Also print to your own chat"] = true
+L["Prints each update to your own chat window as well. Nobody else sees these, so it is also how to watch what the switches below do before letting anything reach a group."] = true
+L["Announce quests you accept"] = true
+L["Posts a line as you pick each quest up, so the group can see what you are on."] = true
+L["Announce objectives you finish"] = true
+L["Posts a line the moment an objective fills, so the group knows you are done with that part and can stop helping."] = true
+L["Announce quests you hand in"] = true
+L["Posts a line as you turn each quest in."] = true
+L["Announce quests you abandon"] = true
+L["Posts a line when you drop a quest. Off to begin with, because it is the one people rarely want broadcast."] = true
+L["Hide announcements from other players"] = true
+L["Hides quest announcements other people in your group send, including the ones other quest addons post. Your own are always shown, so this does not silence anything you switched on above."] = true
+L["Party quest progress"] = true
+L["Share quest progress with your group"] = true
+L["Your group sees how far along you are on each quest, and you see the same for them. This travels as hidden addon messages, so nothing is ever posted to anyone's chat. Switching it off stops both halves."] = true
+L["Read other quest addons as well"] = true
+L["Also reads the progress other quest addons share, so you see group members running them as well as the people running EQ. EQ asks their users for their quest logs when either of you joins the group. Your own progress is never sent on their channel."] = true
 L["Map"] = true
 L["Show a ring around quest pins"] = true
 L["Draws the red circle behind every world map marker for a quest in your log, both the ones you are still working on and the ones that are ready to turn in. Turn it off for plain icons and a much quieter map when a zone is busy."] = true
@@ -247,6 +270,12 @@ L["Choose one:"] = true
 
 -- ─── Core/Util.lua ───
 L["Expired"] = true
+
+-- ─── Modules/Announce.lua ───
+L["Accepted %s"] = true
+L["Completed %s"] = true
+L["Abandoned %s"] = true
+L["%1$s for %2$s"] = true
 
 -- ─── Modules/ChainGuide/CampaignSource.lua ───
 L["Campaign Map"] = true

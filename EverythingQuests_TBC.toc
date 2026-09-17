@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Burning Crusade Classic support is limited and growing - see the What's New notice.
 ## Author: Wheelbarrel00
-## Version: 1.46.0
+## Version: 1.47.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -87,6 +87,9 @@ Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 Libs\AceDB-3.0\AceDB-3.0.xml
 
+# The XML loads ChatThrottleLib first, because AceComm asserts on it at file scope.
+Libs\AceComm-3.0\AceComm-3.0.xml
+
 # LibDBIcon errors at FILE SCOPE if LibDataBroker is not already loaded, so this pair's order
 # is load bearing. Both are for the minimap button.
 Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
@@ -161,6 +164,14 @@ Modules\QuestAuto.lua
 # so its position does not matter. The incoming-chat half self-gates on the Classic data
 # table, so retail installs nothing and shares only the client's own quest link.
 Modules\QuestLink.lua
+
+# Reads ns.L at FILE SCOPE, so the locales must precede it. DB, Cache and QuestLink are reached at RUNTIME.
+Modules\Announce.lua
+
+# Comms reaches DB, Cache, GroupData and PeerFormat at RUNTIME, so the order of these three does not matter.
+Modules\Group\PeerFormat.lua
+Modules\Group\Data.lua
+Modules\Group\Comms.lua
 
 # Reaches MapPOIProvider, ns.QuestPinTexture and ns.QuestPinObjectives at RUNTIME rather than
 # at file scope, so its position relative to Modules/MapPOI does not matter.

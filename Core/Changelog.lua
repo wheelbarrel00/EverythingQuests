@@ -2,6 +2,20 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.47.0", date = "2026-09-16",
+        sections = {
+            { head = "New Features", items = {
+                "Quest announcements in party and raid chat. Everything Quests can post a line to your group when you accept a quest, finish one of its objectives, hand it in or abandon it. Choose where the lines go under /eqs > General > Quest announcements: nobody, your party, your raid, or both. Each kind of line has its own switch, and abandoned quests stay quiet unless you turn them on. Nothing is sent until you pick a channel, and Also print to your own chat lets you see what would go out before anyone else does. Each line carries the quest the same way a shared quest link does, and anyone else running Everything Quests sees it marked with the Everything Quests logo. On retail, world quests and bonus objectives are not announced as accepted or abandoned just because you passed through their area.",
+                "Hide quest announcements from other players. A new checkbox, Hide announcements from other players, hides the quest updates other people in your group post, including the ones other quest addons send. Your own lines are always shown. It is off by default.",
+                "Join group quests automatically. When someone in your group starts an escort or another quest the game asks you to join, Everything Quests can answer yes for you and close the question. It only answers for people actually in your group, holding Alt pauses it, and it keeps working with Immersion installed. The checkbox sits with the other auto-quest options under /eqs > General and is off by default.",
+                "The groundwork for seeing your group's quest progress. Everything Quests now shares how far along you are on each quest with group members running it, and keeps what they share with you. It travels as hidden addon messages, so nothing is ever posted to anyone's chat, and it pauses in battlegrounds and in groups larger than 15. On Classic Era and Burning Crusade Classic it also reads the progress shared by the established Classic quest addon, and asks group members running it for their quest log when you join. Nothing in the interface shows this yet: this release puts the sharing in place so a display can build on it later. Both switches are under /eqs > General > Party quest progress and are on by default, and switching sharing off takes back what your group was holding for you.",
+            } },
+            { head = "Improvements", items = {
+                "Every new option reads in German, French, Korean, Russian, Simplified Chinese and Traditional Chinese. Thanks as always to Stonetwist, Zox, labrie75, Malevi4, Keriaovo and BNS333, and corrections are always welcome.",
+            } },
+        },
+    },
+    {
         version = "1.46.0", date = "2026-09-01",
         sections = {
             { head = "New Features", items = {
