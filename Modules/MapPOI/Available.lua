@@ -31,8 +31,12 @@ local CLASS_BIT = {
 
 local _level, _raceBit, _classBit
 
-local function readPlayer()
+local function readLevel()
     _level = UnitLevel and UnitLevel("player") or 0
+end
+
+local function readPlayer()
+    readLevel()
 
     local _, raceToken, raceID = UnitRace("player")
     if type(raceID) == "number" and raceID > 0 and raceID < 32 then
@@ -99,12 +103,20 @@ local SF_REPEATABLE, SF_EXPLORE = 1, 2
 -- Absent means the filter cannot judge and every quest is shown, which is the same fail-open rule
 -- the objective mask uses - hiding on missing data empties the map and reads as a broken feature.
 local function trivialFloor()
-    if type(_G.GetQuestGreenRange) ~= "function" then return nil end
-    local ok, range = pcall(_G.GetQuestGreenRange, "player")
-    if not (ok and type(range) == "number") then
-        -- Older builds take no unit argument
-        ok, range = pcall(_G.GetQuestGreenRange)
+    local ok, range
+    if type(_G.GetQuestGreenRange) == "function" then
+        ok, range = pcall(_G.GetQuestGreenRange, "player")
+        if not (ok and type(range) == "number") then
+            -- Older builds take no unit argument
+            ok, range = pcall(_G.GetQuestGreenRange)
+            if not ok then return nil end
+        end
+    elseif type(_G.UnitQuestTrivialLevelRange) == "function" then
+        -- The retail client's name for the same range, and WoW Forever runs the retail client
+        ok, range = pcall(_G.UnitQuestTrivialLevelRange, "player")
         if not ok then return nil end
+        -- Blizzard's DifficultyUtil keeps a quest yellow down to 4 levels below you, whatever the range
+        if type(range) == "number" then range = math.max(range, 4) end
     end
     if type(range) ~= "number" then return nil end
     return _level - range
@@ -500,6 +512,11 @@ end
 
 function M:Data()
     return data()
+end
+
+function M:TrivialFloor()
+    readLevel()
+    return trivialFloor()
 end
 
 -- srcID*1e9 + kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4). The fourth return is the merge KEY and

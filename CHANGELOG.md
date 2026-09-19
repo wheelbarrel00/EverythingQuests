@@ -5,6 +5,14 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.48.0] - 2026-09-18
+
+Everything Quests arrives on WoW Forever, as a work in progress.
+
+### New Features
+
+- **WoW Forever support, as a work in progress.** Everything Quests now loads on WoW Forever with its Classic Era set of features, without the retail-only Chain Guide, World Quests and Quest History. So far the world map markers have been checked there, both for the quests in your log and for quests you can pick up. For a quest Forever shares with Classic Era, the world map shows the kill, loot and hand-in spots from the Classic Era data. The other features, including the minimap markers, the Quest Browser, nameplate icons, auto-accept and auto-turn-in, quest links and the group features, are included but not yet tested on Forever. Quests that are new to Forever are not in the Classic Era data yet. While one of those is in your quest log, the world map still marks it using the game's own quest data, but it has no marker before you pick it up and no Quest Browser entry. A Forever quest database is planned. Right now the Forever beta forgets every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard, and until it is fixed Everything Quests starts from its default settings on each launch. Forever is still in beta, so reports are very welcome.
+
 ## [1.47.0] - 2026-09-16
 
 Everything Quests learns to play in a group: quest updates in party chat, escorts joined for you, and the groundwork for seeing your group's quest progress.

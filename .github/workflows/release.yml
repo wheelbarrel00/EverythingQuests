@@ -48,7 +48,7 @@ jobs:
           fi
 
       - name: Check TOC file lists
-        # All three TOCs are tracked now, so this sees the full picture. It is worth having
+        # Every TOC is tracked now, so this sees the full picture. It is worth having
         # here because a TOC that lists a file the tag does not carry packages a zip that
         # errors on load.
         run: |

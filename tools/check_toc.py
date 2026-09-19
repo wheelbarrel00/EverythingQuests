@@ -33,21 +33,21 @@ Three directives, written as comments in a TOC:
                                It satisfies check 2 without a retail listing.
 
 Flavor TOCs may list files no retail TOC has - a Classic-only quest database is the obvious
-case. Locally check 2 covers those, because the flavor TOC listing them is on disk. In CI it
-does NOT: .gitignore hides the flavor TOCs, actions/checkout never materializes them, and
-the file reads as listed by nothing. That is what flavor-only declares, and it therefore has
-to live in a TRACKED TOC - declaring it in a gitignored one is an error, because CI would
-never read the directive either.
+case. Check 2 covers those through the flavor TOC that lists them, but only where that TOC is
+on disk. A flavor TOC that .gitignore hides never reaches CI, because actions/checkout never
+materializes it, so there the file would read as listed by nothing. That is what flavor-only
+declares, and it therefore has to live in a TRACKED TOC - declaring it in a gitignored one is
+an error, because CI would never read the directive either.
 
 Its own coverage is not waived, only moved: on a tree that has a flavor TOC, at least one
 must actually list the file. Where no flavor TOC is on disk it is reported as NOT CHECKED by
-name, alongside the TOCs themselves.
+name.
 
 The packager copies the whole checkout, so a flavor-only file ships inside the retail zip
 too. It costs disk there and nothing else - no retail TOC loads it.
 
-TOCs that .gitignore hides are reported as NOT CHECKED when they are absent from disk, so
-a green run in CI or on a fresh clone can never read as "the flavor TOCs were verified".
+A TOC that .gitignore hides is reported as NOT CHECKED when it is absent from disk, so a
+green run in CI or on a fresh clone can never read as "that TOC was verified".
 
 Run locally or in CI. Exits non-zero on any problem. tools/test_check_toc.py proves it
 fires on each of these shapes and stays quiet on a good tree.
@@ -62,10 +62,10 @@ SOURCE_SUFFIXES = (".lua", ".xml")
 ADDON = "EverythingQuests"
 SHARED_HEADERS = ("Version", "X-Curse-Project-ID")
 
-# The packager derives a game version from the suffix. One it does not recognize is not an
-# error there, it is silently treated as another retail TOC, so it has to be an error here.
+# The packager only reads TOCs whose suffix it knows. One it does not recognize is not an
+# error there, it is silently skipped, so it has to be an error here.
 RETAIL_SUFFIXES = ("", "Mainline")
-FLAVOR_SUFFIXES = ("Classic", "Vanilla", "TBC", "Wrath", "Cata", "Mists")
+FLAVOR_SUFFIXES = ("Classic", "Vanilla", "TBC", "Wrath", "Cata", "Mists", "Camelot")
 
 _HEADER = re.compile(r"^##\s*([^:]+):\s*(.*?)\s*$")
 _DIRECTIVE = re.compile(r"^#\s*check-toc:\s*(\S+)\s*(.*?)\s*$")

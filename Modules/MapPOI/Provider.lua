@@ -259,6 +259,13 @@ function M:PointsFor(questID, mapID, q)
     return n, thinned, "spawn"
 end
 
+-- The single point never counts, because for most quests it is the turn-in fallback, not the objective.
+local function classicDraws(questID, mapID, q)
+    if not q or not (turnInMaps(questID) or spawnPoints(questID, mapID)) then return false end
+    local n, _, source = M:PointsFor(questID, mapID, q)
+    return n > 0 and (source == "spawn" or source == "turnin")
+end
+
 -- Read by /eqsprobe mappoi. Three failures look identical from outside - never called, called
 -- and found nothing, called and drew pins that are not visible - and they share no fix.
 M._refreshes, M._pins, M._stage, M._mapID = 0, 0, "never ran", nil
@@ -301,7 +308,8 @@ function providerMixin:_DoRefresh()
         for i = 1, #primary do
             local info = primary[i]
             local qid  = info and info.questID
-            if qid then
+            -- WoW Forever answers here too, and the Classic tables win only where they draw a spawn or turn-in spot
+            if qid and not classicDraws(qid, mapID, Cache:Get(qid)) then
                 local x, y = info.x, info.y
                 if not x or not y then
                     x, y = waypointFor(qid, mapID)

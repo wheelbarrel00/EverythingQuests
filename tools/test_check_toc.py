@@ -34,6 +34,7 @@ RETAIL = "EverythingQuests.toc"
 MAINLINE = "EverythingQuests_Mainline.toc"
 VANILLA = "EverythingQuests_Vanilla.toc"
 TBC = "EverythingQuests_TBC.toc"
+CAMELOT = "EverythingQuests_Camelot.toc"
 
 HEADER = (
     "## Interface: {interface}\n"
@@ -136,6 +137,14 @@ case(
     "a full flavor TOC listing everything the retail TOC lists passes",
     0,
     _with(**{VANILLA: _full()}),
+    BASE_LUAS,
+)
+
+# WoW Forever's client reads the suffix of its internal game type, camelot.
+case(
+    "a complete WoW Forever TOC passes the gate",
+    0,
+    dict(copy.deepcopy(GOOD), **{CAMELOT: _full(interface="16001")}),
     BASE_LUAS,
 )
 
@@ -265,6 +274,17 @@ case(
     _with(**{VANILLA: _full(files=[f for f in RETAIL_FILES if f != "Modules/QuestAuto.lua"])}),
     BASE_LUAS,
     expect_out=["does not list Modules/QuestAuto.lua"],
+)
+
+# The coverage message is what proves the WoW Forever TOC is held to the flavor rule, rather
+# than filed as a retail TOC or waved through.
+case(
+    "a WoW Forever TOC missing a shared file fails like any flavor TOC",
+    1,
+    dict(copy.deepcopy(GOOD), **{CAMELOT: _full(
+        interface="16001", files=[f for f in RETAIL_FILES if f != "Modules/QuestAuto.lua"])}),
+    BASE_LUAS,
+    expect_out=[f"{CAMELOT}: does not list Modules/QuestAuto.lua"],
 )
 
 case(

@@ -3,18 +3,17 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.47.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.47.0"
+local FEATURE_POPUP_VERSION = "1.48.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.48.0"
 
 local POPUP_BODY = [[
-|cffEBB706Quest updates in party chat|r
-Everything Quests can tell your group when you accept a quest, finish an objective, hand a quest in or abandon one. Pick a channel under |cffffffff/eqs|r > General > |cffffffffQuest announcements|r. Nothing is sent until you do, and |cffffffffAlso print to your own chat|r lets you see the lines first. You can also hide the quest announcements other people post.
+|cffEBB706WoW Forever, a work in progress|r
+Everything Quests now runs on WoW Forever with its Classic Era set of features. The retail-only Chain Guide, World Quests and Quest History are left out on Forever. So far the world map markers have been checked there, for the quests in your log and the ones you can pick up. Everything else is included but not yet tested on Forever.
 
-|cffEBB706Escorts joined for you|r
-When someone in your group starts an escort or another quest the game asks you to join, |cffffffffJoin group quests automatically|r answers yes for you. It is off by default, only answers for people in your group, and holding Alt pauses it.
+|cffEBB706Known gaps on Forever|r
+Forever uses the Classic Era quest data for now. A quest that is new to Forever gets a world map marker once it is in your quest log, but none before you pick it up and no Quest Browser entry. A Forever quest database is planned, and since Forever is still in beta, reports are very welcome.
 
-|cffEBB706Groundwork for your group's quest progress|r
-Everything Quests now shares your quest progress with group members running it, as hidden addon messages that never reach anyone's chat. On Classic Era and Burning Crusade Classic it also reads the progress other quest addons share. Nothing shows it yet: this release lays the groundwork for a display that comes later. You can switch it off under |cffffffff/eqs|r > General > |cffffffffParty quest progress|r.
+Right now the Forever beta also forgets every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard. Until it is fixed, Everything Quests starts from its default settings on Forever whenever the game starts. This window comes back each time, other questions Everything Quests asked you may come back too, and the choices you made in them are not remembered.
 
 |cffEBB706Thank you|r
 Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.

@@ -2420,13 +2420,19 @@ function Probe:Available()
     else
         line("  GetQuestsCompleted: ABSENT - falls back to IsQuestFlaggedCompleted per quest")
     end
-    local green = resolve("GetQuestGreenRange")
+    local rangeName = "GetQuestGreenRange"
+    local green = resolve(rangeName)
+    if not green then
+        rangeName = "UnitQuestTrivialLevelRange"
+        green = resolve(rangeName)
+    end
     if green then
         local ok, r = pcall(green, "player")
-        line("  GetQuestGreenRange: present, returns %s -> quests below level %s are hidden",
-             tostring(ok and r), tostring(ok and type(r) == "number" and (UnitLevel("player") - r)))
+        line("  %s: present, returns %s -> quests below level %s are hidden%s", rangeName,
+             tostring(ok and r), tostring(A:TrivialFloor()),
+             rangeName == "UnitQuestTrivialLevelRange" and " (a range under 4 counts as 4, as in Blizzard's own colors)" or "")
     else
-        line("  GetQuestGreenRange: ABSENT - the low level filter cannot judge, so it hides NOTHING")
+        line("  GetQuestGreenRange and UnitQuestTrivialLevelRange: both ABSENT - the low level filter cannot judge, so it hides NOTHING")
     end
     local repByID = resolve("GetFactionInfoByID")
     line("  reputation: C_Reputation.GetFactionDataByID=%s  GetFactionInfoByID=%s",

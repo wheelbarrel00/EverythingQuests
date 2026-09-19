@@ -1,0 +1,137 @@
+## Interface: 16001
+## Title: Everything Quests
+## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. WoW Forever support is a work in progress.
+## Author: Wheelbarrel00
+## Version: 1.48.0
+## Dependencies: EQObjectiveTracker
+## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
+## SavedVariablesPerCharacter: EverythingQuestsCharDB
+## IconTexture: Interface\AddOns\EverythingQuests\Media\Textures\eq-logo-v3
+## X-Curse-Project-ID: 1544648
+
+# WoW Forever runs 1.x content, so this lists the Classic Era file set.
+
+# check-toc: omit Modules/ChainGuide/Frame.lua
+# check-toc: omit Modules/ChainGuide/Database.lua
+# check-toc: omit Modules/ChainGuide/QuestLineSource.lua
+# check-toc: omit Modules/ChainGuide/CampaignSource.lua
+# check-toc: omit Modules/ChainGuide/Waypoint.lua
+# check-toc: omit Modules/ChainGuide/ChainView.lua
+# check-toc: omit Modules/ChainGuide/Characters.lua
+# check-toc: omit Modules/ChainGuide/History.lua
+# check-toc: omit Modules/ChainGuide/QuestMapButton.lua
+# check-toc: omit Modules/ChainGuide/MapPin.lua
+# check-toc: omit Modules/ChainGuide/MapPin.xml
+# check-toc: omit Modules/ChainGuide/MapPinProvider.lua
+# check-toc: omit Options/TabChainGuide.lua
+# check-toc: omit Data/QuestChains/_Index.lua
+# check-toc: omit Data/QuestChains/_QuestLineRouting.lua
+# check-toc: omit Data/QuestChains/_QuestCoords.lua
+# check-toc: omit Data/QuestChains/_Overlays.lua
+# check-toc: omit Data/QuestChains/_Overlays_Campaign.lua
+# check-toc: omit Data/QuestChains/_Overlays_Eversong.lua
+# check-toc: omit Data/QuestChains/_Overlays_Zulaman.lua
+# check-toc: omit Data/QuestChains/_Overlays_Harandar.lua
+# check-toc: omit Data/QuestChains/_Overlays_Voidstorm.lua
+# check-toc: omit Data/QuestChains/_Overlays_Revelations.lua
+# check-toc: omit Data/QuestChains/_Overlays_Val.lua
+# check-toc: omit Modules/WorldQuests/Rewards.lua
+# check-toc: omit Modules/WorldQuests/Tooltip.lua
+# check-toc: omit Modules/WorldQuests/Pin.lua
+# check-toc: omit Modules/WorldQuests/Pin.xml
+# check-toc: omit Modules/WorldQuests/WatchPersist.lua
+# check-toc: omit Modules/WorldQuests/WorldMap.lua
+# check-toc: omit Modules/WorldQuests/ZoneMap.lua
+# check-toc: omit Modules/WorldQuests/Summary.lua
+# check-toc: omit Modules/WorldQuests/Panel.lua
+# check-toc: omit Modules/WorldQuests/Tab.lua
+# check-toc: omit Options/TabWorldQuests.lua
+# check-toc: omit Modules/History/Recorder.lua
+# check-toc: omit Modules/History/Frame.lua
+# check-toc: omit Modules/History/Session.lua
+# check-toc: omit Options/TabHistory.lua
+# check-toc: omit Core/Media.lua
+# check-toc: omit Core/Profiler.lua
+# check-toc: omit Libs/LibSharedMedia-3.0/lib.xml
+# check-toc: omit Core/QuestRewards.lua
+# check-toc: omit Libs/AceEvent-3.0/AceEvent-3.0.xml
+# check-toc: omit Libs/AceTimer-3.0/AceTimer-3.0.xml
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\AceDB-3.0\AceDB-3.0.xml
+Libs\AceComm-3.0\AceComm-3.0.xml
+
+# LibDBIcon errors at file scope unless LibDataBroker loaded first.
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+Libs\LibMapPinHandler\LibMapPinHandler.lua
+
+# HereBeDragons-Pins needs HereBeDragons-2.0 loaded first.
+Libs\HereBeDragons\HereBeDragons-2.0.lua
+Libs\HereBeDragons\HereBeDragons-Pins-2.0.lua
+
+Core\Init.lua
+Core\Compat.lua
+
+# Every locale must load before the first file that reads ns.L at file scope.
+Locales\enUS.lua
+Locales\frFR.lua
+Locales\ruRU.lua
+Locales\koKR.lua
+Locales\zhCN.lua
+Locales\zhTW.lua
+Locales\deDE.lua
+
+Core\DB.lua
+Core\Events.lua
+Core\Cache.lua
+Core\Util.lua
+Core\Dialog.lua
+Core\Changelog.lua
+Core\FlavorProbe.lua
+
+Modules\QuestArrow.lua
+
+# Pin.xml names the mixin Pin.lua defines.
+Modules\MapPOI\Pin.lua
+Modules\MapPOI\Pin.xml
+Modules\MapPOI\Provider.lua
+Modules\MapPOI\Available.lua
+Modules\MapPOI\Holidays.lua
+
+Modules\QuestBrowser\Data.lua
+Modules\QuestBrowser\Frame.lua
+
+Modules\Minimap\Minimap.lua
+Modules\TrackerBridge.lua
+Modules\QuestAuto.lua
+Modules\QuestLink.lua
+Modules\Announce.lua
+
+Modules\Group\PeerFormat.lua
+Modules\Group\Data.lua
+Modules\Group\Comms.lua
+
+Modules\Minimap\QuestPins.lua
+Modules\Nameplates\QuestIcons.lua
+Modules\Tooltips\QuestTooltips.lua
+Modules\MapCoords.lua
+
+# The tabs call AddTab at file scope.
+Options\Frame.lua
+Options\TabGeneral.lua
+Options\TabAbout.lua
+
+# The Classic Era data set. Each file defines its own global.
+Data\QuestCoords_Classic.lua
+Data\QuestSpawns_Classic.lua
+Data\QuestTurnIn_Classic.lua
+Data\QuestSources_Classic.lua
+Data\QuestNPCs_Classic.lua
+Data\QuestAvailable_Classic.lua
+Data\QuestCategory_Classic.lua
+Data\QuestHolidays_Classic.lua
+
+Modules\WhatsNew.lua
