@@ -2402,13 +2402,14 @@ function Probe:Available()
     -- same wrong reading the pins get.
     local raceName, raceToken, raceID = UnitRace("player")
     local className, classToken, classID = UnitClass("player")
-    line("  level=%s  race=%s/%s/%s  class=%s/%s/%s",
+    line("  level=%s  race=%s/%s/%s  class=%s/%s/%s  faction=%s",
          tostring(UnitLevel("player")),
          tostring(raceName), tostring(raceToken), tostring(raceID),
-         tostring(className), tostring(classToken), tostring(classID))
-    if type(raceID) ~= "number" or type(classID) ~= "number" then
-        line("  one of the numeric ids is missing, so the module falls back to the token table.")
-        line("  If BOTH routes miss, it draws nothing rather than offering the other faction's quests.")
+         tostring(className), tostring(classToken), tostring(classID),
+         tostring(UnitFactionGroup and UnitFactionGroup("player")))
+    if type(raceID) ~= "number" or raceID < 1 or raceID > 31 or type(classID) ~= "number" then
+        line("  a numeric id is missing or the race id is above 31, so the module tries the token table.")
+        line("  A race with no bit there is gated by faction, and with no faction it draws nothing.")
     end
 
     line("3. the gates that need a live client call:")
@@ -2453,8 +2454,8 @@ function Probe:Available()
     -- The pass is lazy, so on a cold run these counters are still at zero and would read as
     -- "every quest was ruled out" rather than "nothing has been computed yet".
     A:All()
-    line("  stage=%q  quests considered=%s  AVAILABLE=%s",
-         tostring(A._stage), tostring(A._resolved), tostring(A._availableN))
+    line("  stage=%q  quests considered=%s  AVAILABLE=%s  race route=%s",
+         tostring(A._stage), tostring(A._resolved), tostring(A._availableN), tostring(A._raceRoute))
     line("  gates that actually ran: raceClass=%s trivial=%s reputation=%s highLevel=%s season=%s",
          tostring(A._gatesRun.raceClass), tostring(A._gatesRun.trivial),
          tostring(A._gatesRun.reputation), tostring(A._gatesRun.highLevel),

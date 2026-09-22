@@ -2,14 +2,14 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. WoW Forever support is a work in progress.
 ## Author: Wheelbarrel00
-## Version: 1.48.0
+## Version: 1.49.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
 ## IconTexture: Interface\AddOns\EverythingQuests\Media\Textures\eq-logo-v3
 ## X-Curse-Project-ID: 1544648
 
-# WoW Forever runs 1.x content, so this lists the Classic Era file set.
+# WoW Forever runs 1.x content, so this lists the Classic Era file set with Forever's own data files.
 
 # check-toc: omit Modules/ChainGuide/Frame.lua
 # check-toc: omit Modules/ChainGuide/Database.lua
@@ -124,14 +124,15 @@ Options\Frame.lua
 Options\TabGeneral.lua
 Options\TabAbout.lua
 
-# The Classic Era data set. Each file defines its own global.
-Data\QuestCoords_Classic.lua
-Data\QuestSpawns_Classic.lua
-Data\QuestTurnIn_Classic.lua
-Data\QuestSources_Classic.lua
-Data\QuestNPCs_Classic.lua
-Data\QuestAvailable_Classic.lua
-Data\QuestCategory_Classic.lua
+# The Forever data set. Each file defines the same global as its _Classic twin.
+# QuestHolidays holds no coordinates, so Forever shares the Era file.
+Data\QuestCoords_Forever.lua
+Data\QuestSpawns_Forever.lua
+Data\QuestTurnIn_Forever.lua
+Data\QuestSources_Forever.lua
+Data\QuestNPCs_Forever.lua
+Data\QuestAvailable_Forever.lua
+Data\QuestCategory_Forever.lua
 Data\QuestHolidays_Classic.lua
 
 Modules\WhatsNew.lua

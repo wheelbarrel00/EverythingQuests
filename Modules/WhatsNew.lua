@@ -3,17 +3,23 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.48.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.48.0"
+local FEATURE_POPUP_VERSION = "1.49.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.49.0"
 
 local POPUP_BODY = [[
-|cffEBB706WoW Forever, a work in progress|r
-Everything Quests now runs on WoW Forever with its Classic Era set of features. The retail-only Chain Guide, World Quests and Quest History are left out on Forever. So far the world map markers have been checked there, for the quests in your log and the ones you can pick up. Everything else is included but not yet tested on Forever.
+|cffEBB706A quest database for WoW Forever|r
+Forever now has quest data of its own: the Classic Era data adjusted to Forever's maps, plus quests gathered by playing Forever itself. That adds 25 Forever quests so far, most of them on Zephras Isle and in Elwynn Forest, and most of those now get markers where you pick them up and hand them in, and entries in the Quest Browser. More will follow as they are gathered. Quests gathered on Forever do not carry a level requirement yet, so a few may be marked before you can take them.
 
-|cffEBB706Known gaps on Forever|r
-Forever uses the Classic Era quest data for now. A quest that is new to Forever gets a world map marker once it is in your quest log, but none before you pick it up and no Quest Browser entry. A Forever quest database is planned, and since Forever is still in beta, reports are very welcome.
+|cffEBB706Markers in the right place|r
+Forever draws Stormwind City, Redridge Mountains, Mulgore and Eastern Plaguelands over different ground than Classic Era, so markers there landed off target. They are now converted to Forever's maps. Stormwind and Redridge have been checked in game, and Mulgore and Eastern Plaguelands not yet.
 
-Right now the Forever beta also forgets every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard. Until it is fixed, Everything Quests starts from its default settings on Forever whenever the game starts. This window comes back each time, other questions Everything Quests asked you may come back too, and the choices you made in them are not remembered.
+|cffEBB706Skyborne characters|r
+Skyborne characters now get markers for the quests they can pick up, and answers in the Quest Browser. A quest open to every race of your faction is marked for you. A few quests limited to particular races, such as some Stormwind mage quests, stay hidden until we can confirm Forever offers them to Skyborne.
+
+|cffEBB706Still known on Forever|r
+A quest in your quest log can show the game's own marker beside the Everything Quests one. A fix is planned.
+
+The Forever beta also still forgets every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard. Until it is fixed, Everything Quests starts from its default settings on Forever whenever the game starts. This window comes back each time, other questions Everything Quests asked you may come back too, and the choices you made in them are not remembered. Since Forever is still in beta, reports are very welcome.
 
 |cffEBB706Thank you|r
 Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.

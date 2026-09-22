@@ -29,21 +29,44 @@ local CLASS_BIT = {
     SHAMAN = 64, MAGE = 128, WARLOCK = 256, MONK = 512, DRUID = 1024,
 }
 
-local _level, _raceBit, _classBit
+-- Forever's Skyborne races (ids 95 and 96) have no bit the four-digit race mask can hold, so a race
+-- with no bit takes a quest whose mask holds every Era race of its faction.
+local ALLIANCE_ERA_RACES = { 1, 4, 8, 64 }
+local HORDE_ERA_RACES    = { 2, 16, 32, 128 }
+
+local _level, _raceBit, _classBit, _raceEveryOf
 
 local function readLevel()
     _level = UnitLevel and UnitLevel("player") or 0
+end
+
+local function raceAllows(races)
+    if _raceEveryOf then
+        for i = 1, #_raceEveryOf do
+            if not hasBit(races, _raceEveryOf[i]) then return false end
+        end
+        return true
+    end
+    return hasBit(races, _raceBit)
 end
 
 local function readPlayer()
     readLevel()
 
     local _, raceToken, raceID = UnitRace("player")
+    _raceEveryOf = nil
     if type(raceID) == "number" and raceID > 0 and raceID < 32 then
         _raceBit = 2 ^ (raceID - 1)
     else
         _raceBit = RACE_BIT[raceToken or ""]
     end
+    if not _raceBit then
+        local faction = UnitFactionGroup and UnitFactionGroup("player")
+        _raceEveryOf = (faction == "Alliance" and ALLIANCE_ERA_RACES)
+                    or (faction == "Horde" and HORDE_ERA_RACES)
+                    or nil
+    end
+    M._raceRoute = (_raceBit and "race bit") or (_raceEveryOf and "faction") or nil
 
     local _, classToken, classID = UnitClass("player")
     if type(classID) == "number" and classID > 0 and classID < 32 then
@@ -88,7 +111,7 @@ local function logState(questID)
     return true, q.isFailed and true or false
 end
 
--- Race and class never change for a character, so a rejection for either is safe to remember.
+-- Only bit rejections are remembered. The faction route can stand in for a race that failed to read.
 local _permaNo = {}
 
 -- Declared here because isAvailable reads them and preparePass, further down, is what sets them.
@@ -211,7 +234,7 @@ local CATEGORY_FILTERS = {
     { bit = CAT_PROFESSION, key = "hideProfessionQuests", reason = "profession quest" },
 }
 
--- Rebuilt per pass rather than read per quest, so a settings lookup does not happen 3,794 times.
+-- Rebuilt per pass, so the settings are read once rather than once per quest.
 local _catMask = 0
 
 local function refreshCategoryMask()
@@ -254,7 +277,6 @@ local function isAvailable(questID, D, hideLowLevel, floor)
     local flags = math.floor(gates % 1e9 / 1e8)
     local repeatable = (flags % (SF_REPEATABLE + SF_REPEATABLE)) >= SF_REPEATABLE
 
-    -- A repeatable quest comes back after it is completed, so completion only rules out the rest
     if isCompleted(questID) and not repeatable then return false, REASON_COMPLETED end
 
     local inLog, failed = logState(questID)
@@ -262,8 +284,8 @@ local function isAvailable(questID, D, hideLowLevel, floor)
 
 
     local races = math.floor(gates % 1e8 / 1e4)
-    if not hasBit(races, _raceBit) then
-        _permaNo[questID] = true
+    if not raceAllows(races) then
+        if not _raceEveryOf then _permaNo[questID] = true end
         return false, REASON_RACE_CLASS
     end
     local classes = gates % 1e4
@@ -281,20 +303,14 @@ local function isAvailable(questID, D, hideLowLevel, floor)
         if questLevel > 0 and questLevel < floor then return false, REASON_LOW_LEVEL end
     end
 
-    -- The `> 0` half mirrors the low filter, where it IS load bearing because 0 is below any
-    -- trivial floor. Here the ceiling is always above the player level, so an unknown level could
-    -- never reach it anyway. Kept because it states the intent, not because it currently fires.
+    -- The `> 0` test mirrors the low filter and cannot fire here, as the ceiling is above the player.
     if _hideHigh and _redCeiling then
         local questLevel = math.floor(gates % 1e11 / 1e9)
         if questLevel > 0 and questLevel >= _redCeiling then return false, REASON_HIGH_LEVEL end
     end
 
-    -- Below race, class and level so its count is not inflated by quests they would have taken
-    -- anyway. It is still NOT a count of pins saved: prerequisite and everything under it reject
-    -- some of these as well, and the high level filter above can take them first. Only the LAST
-    -- gate in the chain could claim that, and this file has already shipped one number that read
-    -- as 185 pins when it was worth 6. It does NOT read specialFlags bit 2, which marks
-    -- exploration quests. Holidays.lua owns the dates and fails open on anything it cannot read.
+    -- Below race, class and level so its count excludes quests they reject anyway. It never reads
+    -- specialFlags bit 2, which marks exploration quests. Holidays.lua owns the dates and fails open.
     if _hideSeason and _holidays and _holidays:IsOutOfSeason(questID) then
         return false, REASON_HOLIDAY
     end
@@ -363,10 +379,9 @@ local function preparePass()
     if _holidays then _holidays:BeginPass() end
 
     readPlayer()
-    if not (_raceBit and _classBit) then return false end
+    if not ((_raceBit or _raceEveryOf) and _classBit) then return false end
     readCompleted()
-    -- Set here rather than inside the loop, so it means "the masks were readable" rather than
-    -- "at least one quest survived them" - the second says nothing on a pass that rejected all.
+    -- Set once the masks are readable, so it holds even on a pass that rejects every quest.
     M._gatesRun.raceClass = true
 
     local DB = ns:GetSubsystem("DB")
@@ -391,7 +406,7 @@ function M:Rebuild()
     -- Wiped with the rest, or a pass that returned early keeps reporting the gates an EARLIER
     -- pass ran, which is the one thing this counter exists to tell apart.
     wipe(M._gatesRun)
-    M._resolved, M._availableN = 0, 0
+    M._resolved, M._availableN, M._raceRoute = 0, 0, nil
     _built = true
 
     local D = data()
@@ -555,10 +570,8 @@ function M:SkillGate(questID)
     return math.floor(v / 1e4), v % 1e4
 end
 
--- factionID*1e6 + standing, for the minimum and maximum reputation gates alike.
--- Written as a branch rather than an and/or chain: 221 quests carry a minimum and no maximum,
--- and `(which == "max") and D.maxRep[id] or D.minRep[id]` answers the MINIMUM for every one of
--- them, because a nil on the left of the `or` falls through.
+-- factionID*1e6 + standing, for both reputation gates. A branch, because the and/or form
+-- `(which == "max") and D.maxRep[id] or D.minRep[id]` answers the minimum when no maximum exists.
 function M:RepGate(questID, which)
     local D = data()
     if not D then return nil end
@@ -582,8 +595,8 @@ function M:Explain(questID)
     return isAvailable(questID, D, _hideLowLevel, _floor)
 end
 
--- The cap bounds points per quest, where the worst item started quest offers 1,161 on one map.
--- Locations merge below because one giver can offer 27 quests and a pin each would stack them.
+-- The worst item-started quest offers over a thousand points on one map. Locations merge below,
+-- because one giver can offer dozens of quests.
 local MAX_PER_QUEST = 4
 
 M._locX, M._locY, M._locKind, M._locQuests, M._locN = {}, {}, {}, {}, 0
@@ -615,13 +628,8 @@ function M:PointsFor(mapID)
                     _byCoord[key] = slot
                     _order[#_order + 1] = key
                 elseif kind < slot.kind or (kind == slot.kind and src < slot.src) then
-                    -- An NPC who offers a quest outranks the same spot merely dropping a starter.
-                    -- Kind and source move TOGETHER and must never be taken from different
-                    -- points: the kind is what picks the id space the name is looked up in, so a
-                    -- mismatched pair reads the object table with a creature id.
-                    -- The lower source wins a tie because the outer walk is pairs() order, and
-                    -- one Dun Morogh spot really is two differently named barrels - without this
-                    -- its label flips between reloads.
+                    -- An NPC outranks a dropped starter and a tie goes to the lower source, so the label
+                    -- is stable. Kind and source move TOGETHER, because the kind picks the id space.
                     slot.kind, slot.src = kind, src
                 end
                 slot.quests[#slot.quests + 1] = questID

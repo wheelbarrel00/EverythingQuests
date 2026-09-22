@@ -20,8 +20,8 @@
 -- listed in SOURCES below. Their rows are Lua literals inside a [[return {...}]] long string,
 -- so they are loadstring'd rather than parsed.
 --
--- objective/turnin/both emit one waypoint per quest, spawns emits every objective location.
--- They define different global names, so both can ship at once.
+-- objective and both emit one waypoint per quest as ns.CLASSIC_QUEST_COORDS. Every other mode
+-- emits a table under its own global name, so those can ship beside it.
 --
 -- Packed is the default because a per-row {m=,x=,y=} table measured 1063 KB resident against
 -- 192 KB packed, and it round-trips exactly. Do not tidy it back to a table.
@@ -84,7 +84,7 @@ local Q_PREGROUP, Q_PRESINGLE, Q_EXCLUSIVE = 12, 13, 16
 local Q_REQSKILL, Q_MINREP, Q_MAXREP = 18, 19, 20
 -- Read by the category mode. Positive is an area id, negative is a class or profession sort.
 -- Only the positive half is used - the sort enum is not in the dump and guessing it would
--- mislabel 983 quests.
+-- mislabel 983 quests on Era.
 local Q_ZONEORSORT = 17
 local Q_NEXTINCHAIN, Q_SPECIALFLAGS, Q_PARENT = 22, 24, 25
 
@@ -109,6 +109,106 @@ local items   = loadBlock(SOURCES.items)
 local area2ui  = loadBlock(SOURCES.areaMap)
 local entrances = loadBlock(SOURCES.dungeons)
 
+-- foreverMaps.lua holds { [uiMapID] = { ax, bx, ay, by } } from both clients' map rectangles, b as a
+-- map fraction. The conversion runs BEFORE the overlay, whose rows were read on Forever already.
+local mapFix
+do
+    local path = dir .. "/foreverMaps.lua"
+    local f = io.open(path, "rb")
+    if f then
+        f:close()
+        assert(PREFIX == "classic", "a Forever map conversion cannot be applied to " .. PREFIX .. " data")
+        mapFix = assert(loadfile(path))()
+    end
+end
+local function applyMapConversion()
+    local byArea, areas = {}, 0
+    for areaId, ui in pairs(area2ui) do
+        if mapFix[ui] then byArea[areaId] = mapFix[ui]; areas = areas + 1 end
+    end
+    local moved, offMap = 0, 0
+    -- A point converted past the edge is not on this map, so it becomes the -1,-1 sentinel instead of
+    -- being clamped to the edge. A sentinel is never converted, or it would become a real place.
+    local function convert(byAreaList)
+        for areaId, pts in pairs(byAreaList) do
+            local t = byArea[areaId]
+            if t and type(pts) == "table" then
+                for i = 1, #pts do
+                    local p = pts[i]
+                    local x = type(p) == "table" and tonumber(p[1])
+                    local y = type(p) == "table" and tonumber(p[2])
+                    if x and y and x > 0 and y > 0 then
+                        local nx, ny = t[1] * x + t[2] * 100, t[3] * y + t[4] * 100
+                        if nx > 0 and ny > 0 and nx < 100 and ny < 100 then
+                            p[1], p[2] = nx, ny
+                            moved = moved + 1
+                        else
+                            p[1], p[2] = -1, -1
+                            offMap = offMap + 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    for _, rec in pairs(npcs) do
+        if type(rec[NPC_SPAWNS]) == "table" then convert(rec[NPC_SPAWNS]) end
+    end
+    for _, rec in pairs(objects) do
+        if type(rec[OBJ_SPAWNS]) == "table" then convert(rec[OBJ_SPAWNS]) end
+    end
+    if entrances then
+        for _, row in pairs(entrances) do
+            local coords = type(row) == "table" and row[2]
+            for i = 1, type(coords) == "table" and #coords or 0 do
+                local c = coords[i]
+                local t = type(c) == "table" and byArea[c[1]]
+                local x, y = t and tonumber(c[2]), t and tonumber(c[3])
+                if x and y and x > 0 and y > 0 then
+                    local nx, ny = t[1] * x + t[2] * 100, t[3] * y + t[4] * 100
+                    if nx > 0 and ny > 0 and nx < 100 and ny < 100 then
+                        c[2], c[3] = nx, ny
+                        moved = moved + 1
+                    else
+                        c[2], c[3] = -1, -1
+                        offMap = offMap + 1
+                    end
+                end
+            end
+        end
+    end
+    local maps = 0
+    for _ in pairs(mapFix) do maps = maps + 1 end
+    io.stderr:write(("-- map conversion: %d map(s) over %d area(s), %d point(s) moved, %d left the map\n")
+        :format(maps, areas, moved, offMap))
+end
+if mapFix then applyMapConversion() end
+
+-- A supplement in the same directory as its base flavor, written by build_forever_supplement.lua.
+-- Its rows replace or add whole rows, so WoW Forever runs the Era data plus what its client added.
+local OVERLAYS = { forever = "classic" }
+for name, baseFlavor in pairs(OVERLAYS) do
+    local f = io.open(dir .. "/" .. name .. "QuestDB.lua", "rb")
+    if f then
+        f:close()
+        assert(PREFIX == baseFlavor, ("%s rows sit on %s data, not %s"):format(name, baseFlavor, PREFIX))
+        local report = {}
+        for _, t in ipairs({ { quests, "QuestDB.lua", SOURCES.quests.marker },
+                             { npcs, "NpcDB.lua", SOURCES.npcs.marker },
+                             { objects, "ObjectDB.lua", SOURCES.objects.marker },
+                             { items, "ItemDB.lua", SOURCES.items.marker } }) do
+            local rows = loadBlock({ file = name .. t[2], marker = t[3] })
+            local added, replaced = 0, 0
+            for id, row in pairs(rows) do
+                if t[1][id] then replaced = replaced + 1 else added = added + 1 end
+                t[1][id] = row
+            end
+            report[#report + 1] = ("%s +%d ~%d"):format(t[2], added, replaced)
+        end
+        io.stderr:write(("-- overlay %s: %s\n"):format(name, table.concat(report, ", ")))
+    end
+end
+
 -- An item objective keeps KIND_LOOT even though it resolves through the NPC that drops it,
 -- because "loot it here" is the player-facing fact.
 local KIND_SLAY, KIND_OBJECT, KIND_LOOT = 1, 2, 3
@@ -119,8 +219,7 @@ local KIND_ENTRANCE = 4
 
 -- Start and turn-in points carry the creature or object that produced them in a 1e9 slot.
 -- The bound guards the packing rather than recording a maximum: at 1e6 the worst packed value
--- stays under 1e15 against the 9.007e15 exact integer ceiling. The largest id that actually
--- reaches this slot is 187273 on Era and 187975 on TBC, for a worst packed value of 1.88e14.
+-- stays under 1e15 against the 9.007e15 exact integer ceiling.
 -- Loud rather than clamped, because a silently truncated id would name a different creature.
 local MAX_SRC_ID = 1000000
 
@@ -182,7 +281,7 @@ local function collect(out, rec, idx, kind, objIdx, srcID)
                 local px = type(p) == "table" and tonumber(p[1])
                 local py = type(p) == "table" and tonumber(p[2])
                 -- -1,-1 means "exists, location unknown". It is a sentinel, not a place, and
-                -- averaging it in drags the pin off the map. It was 470 of 4123 rows.
+                -- averaging it in drags the pin off the map.
                 if px and py and px > 0 and py > 0 then
                     out[#out + 1] = { a = areaId, x = px, y = py, k = kind, oi = objIdx, om = om,
                                       s = srcID }
@@ -217,8 +316,11 @@ local function appendEntrances(out)
             local coords = entranceFor[areas[j]]
             if coords then
                 for c = 1, #coords do
-                    out[#out + 1] = { a = coords[c][1], x = coords[c][2], y = coords[c][3],
-                                      k = kind + KIND_ENTRANCE, oi = objIdx }
+                    -- A map conversion can turn an entrance into the -1,-1 sentinel.
+                    if coords[c][2] > 0 and coords[c][3] > 0 then
+                        out[#out + 1] = { a = coords[c][1], x = coords[c][2], y = coords[c][3],
+                                          k = kind + KIND_ENTRANCE, oi = objIdx }
+                    end
                 end
             end
         end
@@ -277,7 +379,7 @@ local function collectItem(out, id, objIdx)
     -- because kinds 1-3 are the only values the entrance offset of 4 leaves room for.
     local vendors = it[I_VENDORS]
     if type(vendors) == "table" then
-        -- Vendors reach 184 for one item, so the same cutoff gates the mob list here too.
+        -- Vendors reach 184 for one item on Era, so the same cutoff gates the mob list here too.
         local saved = npcSink
         if #vendors > MAX_ITEM_SOURCES then npcSink = nil end
         for i = 1, #vendors do
@@ -324,7 +426,7 @@ end
 
 -- Entrance points belong to the per-map tables only. The single point modes emit
 -- ns.CLASSIC_QUEST_COORDS, which carries no kind field, so an entrance there is indistinguishable
--- from a real location. Measured: without this gate the both mode grows 3985 rows to 4062.
+-- from a real location.
 local WANT_ENTRANCES = (mode == "spawns" or mode == "turnin")
 
 local function objectivePoints(q)
@@ -352,7 +454,7 @@ local function objectivePoints(q)
     -- quest carrying both cannot be numbered reliably. Those points take every monster bit and
     -- stay until all of the quest's monster objectives are done, because a surplus pin is
     -- visible and a missing one is silent. Era has 0 such quests, TBC has 6, and 11885 is the only
--- one where the bucket is wider than two.
+    -- one where the bucket is wider than two.
     local n1 = type(o[1]) == "table" and #o[1] or 0
     local n5 = type(o[5]) == "table" and #o[5] or 0
     if n1 > 0 and n5 > 0 then
@@ -518,10 +620,8 @@ local function clusterSimple(points)
                         .. math.floor(y / SPAWN_GRID) .. ":" .. tostring(p.k)
             local c = cells[key]
             if not c then
-                -- The cell takes the FIRST point's source. Measured against the real dump, a cell
-                -- holds more than one source in 4 of 4470 start cells and 1 of 4521 turn-in cells
-                -- on Era, 3 of 6371 and 0 of 6413 on TBC, so the representative is the answer
-                -- essentially always.
+                -- The cell takes the FIRST point's source. A cell holding two sources is rare, a handful in
+                -- thousands on each flavor, so the representative is the answer essentially always.
                 c = { m = ui, x = x, y = y, k = p.k, s = p.s, n = 0, seq = #(byMap[ui] or {}) }
                 cells[key] = c
                 byMap[ui] = byMap[ui] or {}
@@ -655,12 +755,8 @@ if mode == "spawns" then
         io.stderr:write(("-- verified %d point(s) by reload, max drift %.6f\n"):format(seen, worst))
     end
 
-    -- Measured on real Lua 5.1.5 (docs/classic-pilot/measure_datastring.lua): the client scans
-    -- one string token at file load instead of the table constructor, 119 ms -> 16 ms on Era
-    -- (556,774 entries) and 158 ms -> 17 ms on TBC (724,037). The constructor still has to be
-    -- parsed, so this is a DEFERRAL and not a saving - total CPU rises 16 to 22 ms across runs.
-    -- It moves off login to the first caller, which on Classic is the minimap pin pass a moment
-    -- after PLAYER_ENTERING_WORLD, not the first world map open.
+    -- Shipped as one long string, so login scans a single token and the constructor is parsed by
+    -- the first caller, the minimap pin pass just after PLAYER_ENTERING_WORLD. A deferral, not a saving.
     local assignAt = assert(text:find(SPAWNS_ASSIGN, 1, true), "could not find the assignment")
     assert(not text:find(SPAWNS_ASSIGN, assignAt + #SPAWNS_ASSIGN, true),
            "the assignment appears more than once, so the slice is ambiguous")
@@ -1312,10 +1408,8 @@ if mode == "srcnames" then
         "-- npc  [creatureID] = name\n",
         "-- obj  [objectID]   = name\n",
         "--\n",
-        "-- TWO sub-tables under one global, because creature and object ids OVERLAP. Object ids\n",
-        "-- here run 31 to 187975 against creature ids 196 to 28329, dozens of object ids sit\n",
-        "-- inside the creature range, and 7 ids are in BOTH sub-tables on both flavors - 261 is\n",
-        "-- Guard Thomas and also Damaged Crate. So no test on the id itself can tell them apart.\n",
+        "-- TWO sub-tables under one global, because creature and object ids OVERLAP. 261 is both\n",
+        "-- Guard Thomas and Damaged Crate, so no test on the id itself can tell them apart.\n",
         "-- The point's KIND is what says which of the two to read, and reading the wrong one\n",
         "-- returns a real name for the wrong thing rather than nil.\n",
         "--\n",
@@ -1490,7 +1584,7 @@ if mode == "category" then
     end
 
     io.write(text)
-    io.stderr:write(("-- mode=category | quests=%d categorised=%d bytes=%d\n")
+    io.stderr:write(("-- mode=category | quests=%d categorized=%d bytes=%d\n")
         :format(#ids, emitted, #text))
     io.stderr:write(("-- instance=%d repeatable=%d event=%d class=%d profession=%d\n")
         :format(counts.instance, counts.repeatable, counts.event, counts.class, counts.profession))
@@ -1504,18 +1598,12 @@ for i = 1, #ids do
     local q = quests[id]
     stats.total = stats.total + 1
 
-    local pts
-    if mode == "turnin" then
+    local pts = objectivePoints(q)
+    if #pts > 0 then
+        stats.objective = stats.objective + 1
+    elseif mode == "both" then
         pts = turninPoints(q)
         if #pts > 0 then stats.turnin = stats.turnin + 1 end
-    else
-        pts = objectivePoints(q)
-        if #pts > 0 then
-            stats.objective = stats.objective + 1
-        elseif mode == "both" then
-            pts = turninPoints(q)
-            if #pts > 0 then stats.turnin = stats.turnin + 1 end
-        end
     end
 
     if #pts == 0 then
@@ -1539,8 +1627,7 @@ local function packOf(r)
     return r.m * 100000000 + xi * 10000 + yi
 end
 
--- Every run emits this same global name, so the objective and turn-in tables are alternatives.
--- Listing both in one TOC silently keeps whichever loads second. Rename here and in MapPOI first.
+-- objective and both emit this same global, so their tables are alternatives and a TOC lists one.
 local out = { "local _, ns = ...\n", "\nns.CLASSIC_QUEST_COORDS = {\n" }
 for i = 1, #rows do
     local r = rows[i]

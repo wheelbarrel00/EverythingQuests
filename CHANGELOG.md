@@ -5,6 +5,26 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.49.0] - 2026-09-21
+
+WoW Forever gets a quest database of its own, markers land in the right place in Stormwind and Redridge, and Skyborne characters get their quest markers.
+
+### New Features
+
+- **A quest database for WoW Forever.** Until now Everything Quests used the Classic Era quest data on Forever, which knows none of the quests new to Forever. Forever now has data of its own: the Classic Era data adjusted to Forever's maps, plus quests gathered by playing Forever itself. That adds 25 Forever quests so far, most of them on Zephras Isle and in Elwynn Forest. Most of them now have a marker where you pick them up, a marker where you hand them in and a Quest Browser entry, and more will follow as they are gathered. Quests gathered on Forever do not carry a level requirement yet, so a few may be marked before you are high enough to take them.
+
+### Bug Fixes
+
+- **Quest markers in Stormwind City and Redridge Mountains were in the wrong place on Forever.** Forever draws four maps over different ground than Classic Era does: Stormwind City, Redridge Mountains, Mulgore and Eastern Plaguelands. Markers from the Classic Era data landed off target on all four, far off in Stormwind and about 110 yards east of the right spot in Redridge. The markers on those maps are now converted to Forever's own. Stormwind and Redridge have been checked in game, and Mulgore and Eastern Plaguelands are converted the same way but not yet checked. Classic Era and Burning Crusade Classic are unaffected.
+
+- **Skyborne characters got no markers for quests they could pick up.** The Skyborne races are new to Forever and have no place in the quest data's race lists, so Everything Quests could not tell which quests a Skyborne character can take. It showed none, and the Quest Browser could not answer either. A Skyborne character is now treated as their faction: a quest open to every race of the Alliance, or of the Horde, is marked for them. A few quests limited to particular races, such as some Stormwind mage quests, stay hidden for Skyborne characters until we can confirm that Forever offers them.
+
+### Known Issues
+
+- **Two markers for one quest on Forever.** A quest in your quest log can show the game's own marker beside the Everything Quests one, on the world map and the minimap. A fix is planned.
+
+- **The Forever beta still forgets every addon's settings when the game restarts.** That is a bug in the beta client itself, reported to Blizzard, and until it is fixed Everything Quests starts from its default settings on each launch.
+
 ## [1.48.0] - 2026-09-18
 
 Everything Quests arrives on WoW Forever, as a work in progress.

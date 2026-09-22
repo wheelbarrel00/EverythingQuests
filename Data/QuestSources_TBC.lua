@@ -6,10 +6,8 @@ local _, ns = ...
 -- npc  [creatureID] = name
 -- obj  [objectID]   = name
 --
--- TWO sub-tables under one global, because creature and object ids OVERLAP. Object ids
--- here run 31 to 187975 against creature ids 196 to 28329, dozens of object ids sit
--- inside the creature range, and 7 ids are in BOTH sub-tables on both flavors - 261 is
--- Guard Thomas and also Damaged Crate. So no test on the id itself can tell them apart.
+-- TWO sub-tables under one global, because creature and object ids OVERLAP. 261 is both
+-- Guard Thomas and Damaged Crate, so no test on the id itself can tell them apart.
 -- The point's KIND is what says which of the two to read, and reading the wrong one
 -- returns a real name for the wrong thing rather than nil.
 --
