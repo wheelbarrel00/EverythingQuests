@@ -27,7 +27,7 @@ Everything Quests replaces Blizzard's quest tracking and builds on the rest of i
 4. A standalone **Chain Guide** window for browsing Midnight quest chains (retail)
 5. An account-wide **Quest History** log with six views and a backfill of past completions (retail)
 6. Branded **Quest POI** overlays on zone maps, and on Classic, objective spawn markers on both the world map and the minimap
-7. A **Quest Browser** on Classic, for looking up almost any quest in the game before you accept it, and **shareable quest links** in chat
+7. A **Quest Browser** on Classic, for looking up almost any quest in the game before you accept it, plus **shareable quest links** in chat on every flavor
 8. **Quest progress on game tooltips** — a bag item names the quest that wants it and how many are still missing
 9. **Coordinate readouts** on the world map and under the minimap, for the cursor and for your own position
 10. Optional **auto-accept / auto-turn-in** for quest dialogs (Alt to pause)
