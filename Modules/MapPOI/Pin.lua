@@ -12,12 +12,14 @@ ns.QUEST_PIN_AVAILABLE_ICON = ICON_QUEST_AVAILABLE
 
 -- SetTexture fails silently on a missing path, so EQ ships its own art rather than depending on
 -- a client texture per flavor. Keys are the generator's kind values, 1=slay 2=object 3=loot.
+-- skull.tga is deliberately absent: it is the nameplate kill marker and keeps its own art.
 local MEDIA = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\"
 local KIND_ICON = {
-    [1] = MEDIA .. "skull.tga",
+    [1] = MEDIA .. "slay.tga",
     [2] = MEDIA .. "object.tga",
     [3] = MEDIA .. "loot.tga",
 }
+local ICON_ENTRANCE = MEDIA .. "entrance.tga"
 
 -- SetAtlas raises on a name the client does not know, which would cost the whole pin, so this
 -- world quest atlas is resolved through GetAtlasInfo once.
@@ -25,8 +27,9 @@ local RING_ATLAS = "worldquest-emissary-ring"
 local _ringAtlas
 
 function ns.QuestPinTexture(isComplete, kind)
-    return (isComplete and ICON_QUEST_TURNIN)
-           or (kind and KIND_ICON[ns.QuestRealKind and ns.QuestRealKind(kind) or kind])
+    if isComplete then return ICON_QUEST_TURNIN end
+    if kind and ns.QuestIsEntrance and ns.QuestIsEntrance(kind) then return ICON_ENTRANCE end
+    return (kind and KIND_ICON[ns.QuestRealKind and ns.QuestRealKind(kind) or kind])
            or ICON_QUEST_AVAILABLE
 end
 
@@ -39,11 +42,12 @@ function ns.QuestPinAvailableTint()
     return AVAILABLE_RING[1], AVAILABLE_RING[2], AVAILABLE_RING[3], 1
 end
 
--- An entrance pin keeps the objective's own icon but is tinted, so it cannot be read as "the
--- mob is right here".
+-- An entrance has its own icon, so the only pin still needing blue is a FINISHED quest handed in
+-- inside an instance, which draws the turn-in mark and has no entrance form. The white return is
+-- load bearing on the minimap, where one pooled texture serves this and the gold available pin.
 local ENTRANCE_TINT = { 0.45, 0.7, 1.0 }
-function ns.QuestPinTint(kind)
-    if ns.QuestIsEntrance and ns.QuestIsEntrance(kind) then
+function ns.QuestPinTint(kind, isComplete)
+    if isComplete and ns.QuestIsEntrance and ns.QuestIsEntrance(kind) then
         return ENTRANCE_TINT[1], ENTRANCE_TINT[2], ENTRANCE_TINT[3], 1
     end
     return 1, 1, 1, 1
@@ -383,7 +387,7 @@ function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask, avail, 
         self.icon:SetVertexColor(1, 1, 1, 1)
     else
         self.icon:SetTexture(ns.QuestPinTexture(isComplete, kind))
-        self.icon:SetVertexColor(ns.QuestPinTint(kind))
+        self.icon:SetVertexColor(ns.QuestPinTint(kind, isComplete))
     end
     self.numberText:SetText("")
 

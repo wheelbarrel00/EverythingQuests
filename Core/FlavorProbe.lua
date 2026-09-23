@@ -2328,7 +2328,7 @@ function Probe:Media()
     out("EQ's own texture files - do they resolve")
     local BASE = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\"
     local FILES = {
-        "skull.tga", "loot.tga", "object.tga",
+        "skull.tga", "slay.tga", "loot.tga", "object.tga", "entrance.tga",
         "eq-logo-v3.tga", "discord.tga", "headerbar-softmask.tga",
     }
 

@@ -107,7 +107,7 @@ function M:Rebuild()
             -- these fields are rewritten, so a skipped one keeps the last quest's finisher.
             f.srcID = Provider._ptSrc[i]
             f.texture:SetTexture(ns.QuestPinTexture(q.isComplete, f.kind))
-            f.texture:SetVertexColor(ns.QuestPinTint(f.kind))
+            f.texture:SetVertexColor(ns.QuestPinTint(f.kind, q.isComplete))
             -- AddMinimapIconMap answers false rather than raising when HereBeDragons has no
             -- world size for the map.
             if HBDP:AddMinimapIconMap(REF, f, mapID, x, y, false, false) then

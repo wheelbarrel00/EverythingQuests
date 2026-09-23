@@ -3,23 +3,20 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.49.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.49.0"
+local FEATURE_POPUP_VERSION = "1.50.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.50.0"
 
 local POPUP_BODY = [[
-|cffEBB706A quest database for WoW Forever|r
-Forever now has quest data of its own: the Classic Era data adjusted to Forever's maps, plus quests gathered by playing Forever itself. That adds 25 Forever quests so far, most of them on Zephras Isle and in Elwynn Forest, and most of those now get markers where you pick them up and hand them in, and entries in the Quest Browser. More will follow as they are gathered. Quests gathered on Forever do not carry a level requirement yet, so a few may be marked before you can take them.
+|cffEBB706New markers for quest objectives|r
+On Classic Era, Burning Crusade Classic and WoW Forever, the markers Everything Quests draws on the world map and the minimap have been redrawn. The old ones were pale grey on a parchment map, so a zone with a lot of quests in it turned into a field of identical shapes. Each kind of objective now has its own color: red for something to kill, amber for something to loot, and green for something to use or pick up. Every marker carries a dark outline so it reads against the map, and the symbol inside is simpler. They are the same size as before, and the skull over a quest enemy's nameplate has not changed.
 
-|cffEBB706Markers in the right place|r
-Forever draws Stormwind City, Redridge Mountains, Mulgore and Eastern Plaguelands over different ground than Classic Era, so markers there landed off target. They are now converted to Forever's maps. Stormwind and Redridge have been checked in game, and Mulgore and Eastern Plaguelands not yet.
-
-|cffEBB706Skyborne characters|r
-Skyborne characters now get markers for the quests they can pick up, and answers in the Quest Browser. A quest open to every race of your faction is marked for you. A few quests limited to particular races, such as some Stormwind mage quests, stay hidden until we can confirm Forever offers them to Skyborne.
+|cffEBB706Dungeon entrances have a marker of their own|r
+When a quest objective sits inside a dungeon, Everything Quests marks the way in rather than a spot you cannot reach. That marker used to be the objective's own symbol tinted blue, which was easy to read as "the thing is right here". It is now a blue archway, so an entrance looks like an entrance. A quest you have already finished that hands in inside a dungeon still shows the hand-in mark tinted blue.
 
 |cffEBB706Still known on Forever|r
 A quest in your quest log can show the game's own marker beside the Everything Quests one. A fix is planned.
 
-The Forever beta also still forgets every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard. Until it is fixed, Everything Quests starts from its default settings on Forever whenever the game starts. This window comes back each time, other questions Everything Quests asked you may come back too, and the choices you made in them are not remembered. Since Forever is still in beta, reports are very welcome.
+The Forever beta may also still forget every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard. While it lasts, Everything Quests starts from its default settings on Forever, this window comes back, and other questions Everything Quests asked you may come back too. Since Forever is still in beta, reports are very welcome.
 
 |cffEBB706Thank you|r
 Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.

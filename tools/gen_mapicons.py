@@ -1,18 +1,20 @@
-"""Generates the map objective icons EQ ships for the Classic quest pins.
+"""Generates the map objective pins EQ ships for the Classic quest map.
 
     python tools/gen_mapicons.py
 
-Writes Media/Textures/loot.tga and object.tga. The kill icon is NOT generated - map pins
-reuse the existing skull.tga, so a kill objective shows the same symbol on a nameplate and
-on the map.
+Writes Media/Textures/slay.tga, loot.tga, object.tga and entrance.tga. Media/Textures/skull.tga
+is NOT touched: it is the nameplate kill marker and keeps its own art.
 
-Output format is matched to skull.tga exactly, byte layout included: uncompressed true
-color TGA (type 2), 128x128, 32bpp BGRA, descriptor 0x08 meaning origin at top-left with
-8 alpha bits. WoW rejects a bottom-up origin here, which is what descriptor 0x08 pins down.
+The art is drawn at 18 units on the world map (Modules/MapPOI/Pin.xml) and 12 on the minimap
+(Modules/Minimap/QuestPins.lua), so any detail added here has to survive that.
+
+Output format is matched to skull.tga exactly, byte layout included: uncompressed true color TGA
+(type 2), 128x128, 32bpp BGRA, descriptor 0x08.
 
 No third-party imaging library on purpose, so this runs anywhere Python does.
 """
 
+import math
 import os
 import struct
 
@@ -21,9 +23,28 @@ SS = 4                      # supersample factor, so edges get real coverage-bas
 OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        "Media", "Textures")
 
-FILL_TOP = (238, 240, 242)
-FILL_BOTTOM = (165, 174, 182)
-OUTLINE = (24, 24, 28)
+INK = (26, 22, 20)
+GLYPH = (250, 246, 238)
+
+R_OUTER = 0.478
+R_INNER = 0.426
+
+# Blue is the entrance because Modules/MapPOI/Pin.lua still tints the turn-in mark blue for a
+# quest handed in inside an instance.
+KINDS = {
+    "slay":     {"top": (222, 86, 72),  "bottom": (186, 46, 38),  "deep": (112, 22, 18)},
+    "loot":     {"top": (240, 160, 48), "bottom": (200, 116, 18), "deep": (128, 66, 8)},
+    "object":   {"top": (64, 190, 150), "bottom": (30, 150, 116), "deep": (14, 88, 68)},
+    "entrance": {"top": (92, 148, 232), "bottom": (48, 106, 202), "deep": (20, 54, 120)},
+}
+
+
+def _ellipse(x, y, cx, cy, rx, ry):
+    return ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1.0
+
+
+def _rect(x, y, x0, y0, x1, y1):
+    return x0 <= x <= x1 and y0 <= y <= y1
 
 
 def _rounded_rect(x, y, x0, y0, x1, y1, r):
@@ -34,105 +55,120 @@ def _rounded_rect(x, y, x0, y0, x1, y1, r):
     return (x - cx) ** 2 + (y - cy) ** 2 <= r * r
 
 
-def _ellipse(x, y, cx, cy, rx, ry):
-    return ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1.0
+def disc(x, y, r):
+    return (x - 0.5) ** 2 + (y - 0.5) ** 2 <= r * r
+
+
+def slay(x, y):
+    if _ellipse(x, y, 0.500, 0.452, 0.207, 0.196):
+        return True
+    return _rounded_rect(x, y, 0.386, 0.575, 0.614, 0.722, 0.036)
+
+
+def slay_holes(x, y):
+    if _ellipse(x, y, 0.434, 0.443, 0.056, 0.064):                 # eye sockets
+        return True
+    if _ellipse(x, y, 0.566, 0.443, 0.056, 0.064):
+        return True
+    if 0.505 <= y <= 0.566 and abs(x - 0.5) <= (y - 0.505) * 0.52:  # nose
+        return True
+    if 0.588 <= y <= 0.706 and abs(abs(x - 0.5) - 0.052) <= 0.017:  # teeth
+        return True
+    return False
 
 
 def loot(x, y):
-    """A cinched coin bag. Chosen over a coin stack because the silhouette stays readable
-    at the ~16 pixels a map pin actually occupies."""
-    if _ellipse(x, y, 0.50, 0.660, 0.340, 0.310):                  # body
+    if _ellipse(x, y, 0.500, 0.620, 0.246, 0.202):                 # body
         return True
-    if 0.150 <= y <= 0.345:                                        # gathered neck
-        if abs(x - 0.5) <= 0.110 + (y - 0.150) * 0.52:
-            return True
+    if 0.326 <= y <= 0.456:
+        return abs(x - 0.5) <= 0.052 + (y - 0.326) * 0.46
     return False
 
 
-def loot_detail(x, y):
-    """Grooves. Without these the bag renders as one blank blob and reads as a flask."""
-    if 0.306 <= y <= 0.340 and abs(x - 0.5) <= 0.235:              # tie band
-        return True
-    if 0.165 <= y <= 0.306 and abs(abs(x - 0.5) - 0.050) <= 0.011:  # cloth folds
-        return True
-    return False
+def loot_holes(x, y):
+    return 0.424 <= y <= 0.462 and abs(x - 0.5) <= 0.196           # cinch
 
 
 def obj(x, y):
-    """A chest. Reads as 'go click this' and is distinct from the bag at small sizes."""
-    if _rounded_rect(x, y, 0.120, 0.455, 0.880, 0.865, 0.050):     # body
+    cx, cy = 0.5, 0.5
+    dx, dy = x - cx, y - cy
+    d = math.hypot(dx, dy)
+    if d <= 0.152:
         return True
-    if y <= 0.465 and _ellipse(x, y, 0.50, 0.465, 0.380, 0.235):   # domed lid
-        return True
-    return False
+    if d > 0.218:
+        return False
+    a = math.atan2(dy, dx)
+    return math.cos(a * 8.0) >= -0.10                              # eight teeth
 
 
-def obj_detail(x, y):
-    if 0.448 <= y <= 0.492:                                        # lid seam
-        return True
-    if abs(abs(x - 0.5) - 0.105) <= 0.022 and y >= 0.245:          # strap edges
-        return True
-    if _rounded_rect(x, y, 0.432, 0.505, 0.568, 0.625, 0.028):     # latch
-        return True
-    return False
+def obj_holes(x, y):
+    return _ellipse(x, y, 0.500, 0.500, 0.068, 0.068)              # hub
 
 
-def render(shape, detail=None):
-    # coverage-based alpha at SS x SS per output pixel
-    alpha = [0] * (SIZE * SIZE)
+def entrance(x, y):
+    if _ellipse(x, y, 0.500, 0.474, 0.198, 0.198) and y <= 0.474:  # arch crown
+        return True
+    if _rect(x, y, 0.302, 0.474, 0.698, 0.760):                    # jambs
+        return True
+    return _rounded_rect(x, y, 0.262, 0.744, 0.738, 0.800, 0.022)  # threshold
+
+
+def entrance_holes(x, y):
+    if _ellipse(x, y, 0.500, 0.512, 0.116, 0.116) and y <= 0.512:  # doorway
+        return True
+    return _rect(x, y, 0.384, 0.512, 0.616, 0.744)
+
+
+SHAPES = {
+    "slay": (slay, slay_holes),
+    "loot": (loot, loot_holes),
+    "object": (obj, obj_holes),
+    "entrance": (entrance, entrance_holes),
+}
+
+
+def render(kind):
+    shape, holes = SHAPES[kind]
+    c = KINDS[kind]
     step = 1.0 / (SIZE * SS)
+    rows = []
     for py in range(SIZE):
+        row = bytearray()
+        t = py / float(SIZE - 1)
+        fill = [c["top"][i] + (c["bottom"][i] - c["top"][i]) * t for i in range(3)]
         for px in range(SIZE):
-            hits = 0
+            # Each sub-sample picks ONE color and the pixel is their mean. Compositing the layers
+            # as successive blends instead over-weights the glyph wherever a hole reaches its
+            # antialiased edge, which is what lightened the pouch cinch.
+            ar = ag = ab = 0.0
+            covered = 0
             for sy in range(SS):
                 y = (py * SS + sy + 0.5) * step
                 for sx in range(SS):
                     x = (px * SS + sx + 0.5) * step
-                    if shape(x, y):
-                        hits += 1
-            alpha[py * SIZE + px] = hits * 255 // (SS * SS)
-
-    # A cheap dark rim: a pixel whose 5x5 neighborhood contains transparency is near the
-    # boundary, so it blends toward the outline color. Doing it here rather than in the
-    # shape functions keeps the shapes readable as plain geometry.
-    rows = []
-    for py in range(SIZE):
-        row = bytearray()
-        for px in range(SIZE):
-            a = alpha[py * SIZE + px]
-            if a == 0:
+                    if not disc(x, y, R_OUTER):
+                        continue
+                    covered += 1
+                    if not disc(x, y, R_INNER):
+                        src = INK
+                    elif shape(x, y):
+                        src = c["deep"] if holes(x, y) else GLYPH
+                    else:
+                        src = fill
+                    ar, ag, ab = ar + src[0], ag + src[1], ab + src[2]
+            if covered == 0:
                 row += b"\x00\x00\x00\x00"
                 continue
-            lowest = 255
-            for ny in range(max(0, py - 2), min(SIZE, py + 3)):
-                for nx in range(max(0, px - 2), min(SIZE, px + 3)):
-                    v = alpha[ny * SIZE + nx]
-                    if v < lowest:
-                        lowest = v
-            edge = 1.0 - (lowest / 255.0)
-
-            if detail is not None:
-                hits = 0
-                for sy in range(SS):
-                    yy = (py * SS + sy + 0.5) * step
-                    for sx in range(SS):
-                        xx = (px * SS + sx + 0.5) * step
-                        if detail(xx, yy) and shape(xx, yy):
-                            hits += 1
-                if hits:
-                    edge = max(edge, 0.88 * hits / float(SS * SS))
-
-            t = py / float(SIZE - 1)
-            base = [FILL_TOP[i] + (FILL_BOTTOM[i] - FILL_TOP[i]) * t for i in range(3)]
-            rgb = [int(round(base[i] + (OUTLINE[i] - base[i]) * edge)) for i in range(3)]
-            row += bytes((rgb[2], rgb[1], rgb[0], a))              # BGRA
+            a = int(round(covered * 255.0 / (SS * SS)))
+            row += bytes((int(round(ab / covered)), int(round(ag / covered)),
+                          int(round(ar / covered)), a))
         rows.append(bytes(row))
 
-    # BOTTOM-UP. Descriptor 0x08 leaves bit 5 clear, which declares a BOTTOM-LEFT origin, so
-    # the first row in the file is the BOTTOM of the image. Writing rows top-down under that
-    # header renders the icon vertically mirrored - the coin bag came out as a hot air balloon,
-    # and a PNG preview that assumed top-down agreed with the mistake instead of catching it.
-    # skull.tga uses 0x08 and is authored this way, so this matches the art already shipping.
+    # BOTTOM-UP. Descriptor 0x08 leaves bit 5 clear, which declares a BOTTOM-LEFT origin, so the
+    # first row in the file is the BOTTOM of the image. Writing rows top-down under that header
+    # renders the icon vertically mirrored - the coin bag came out as a hot air balloon, and a PNG
+    # preview that assumed top-down agreed with the mistake instead of catching it. skull.tga uses
+    # 0x08 and is authored this way, so this matches the art already shipping.
     rows.reverse()
     return b"".join(rows)
 
@@ -147,7 +183,7 @@ def write_tga(path, pixels):
         0, 0,   # origin
         SIZE, SIZE,
         32,     # bits per pixel
-        0x08,   # top-left origin, 8 alpha bits
+        0x08,
     )
     with open(path, "wb") as fh:
         fh.write(header + pixels)
@@ -155,9 +191,9 @@ def write_tga(path, pixels):
 
 
 def main():
-    for name, shape, detail in (("loot", loot, loot_detail), ("object", obj, obj_detail)):
+    for name in ("slay", "loot", "object", "entrance"):
         path = os.path.join(OUT_DIR, name + ".tga")
-        size = write_tga(path, render(shape, detail))
+        size = write_tga(path, render(name))
         print("wrote %-38s %d bytes" % (path, size))
 
 

@@ -5,6 +5,22 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.0] - 2026-09-22
+
+New markers for quest objectives on the Classic map and minimap, and dungeon entrances get a symbol of their own.
+
+### Improvements
+
+- **New markers for quest objectives.** On Classic Era, Burning Crusade Classic and WoW Forever, the markers Everything Quests draws on the world map and the minimap have been redrawn. The old ones were pale grey on a parchment map, so a zone with a lot of quests in it turned into a field of identical shapes. Each kind of objective now has its own color: red for something to kill, amber for something to loot, and green for something to use or pick up. Every marker carries a dark outline so it reads against the map, and the symbol inside is simpler. The markers are the same size as before, and the skull over a quest enemy's nameplate has not changed.
+
+- **Dungeon entrance markers have a symbol of their own.** When a quest objective sits inside a dungeon, Everything Quests marks the way in rather than a spot you cannot reach. That marker used to be the objective's own symbol tinted blue, which was easy to read as "the thing is right here". It is now a blue archway, so an entrance looks like an entrance. A quest you have already finished that hands in inside a dungeon still shows the hand-in mark tinted blue.
+
+### Known Issues
+
+- **Two markers for one quest on Forever.** A quest in your quest log can show the game's own marker beside the Everything Quests one, on the world map and the minimap. A fix is planned.
+
+- **The Forever beta may still forget every addon's settings when the game restarts.** That is a bug in the beta client itself, reported to Blizzard. While it lasts, Everything Quests starts from its default settings on each launch.
+
 ## [1.49.0] - 2026-09-21
 
 WoW Forever gets a quest database of its own, markers land in the right place in Stormwind and Redridge, and Skyborne characters get their quest markers.
