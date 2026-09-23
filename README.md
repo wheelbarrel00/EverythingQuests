@@ -46,7 +46,7 @@ Era and TBC were measured identical across every game API the addon reads, so on
 **Working on Classic Era and TBC**
 
 - **Objective markers** on the world map and the minimap, drawn from a generated coordinate database rather than from the client, which exposes no quest coordinates at all
-- **Objective kind icons** — kill, loot, or interact — and dungeon objectives marked at the dungeon entrance
+- **Objective kind icons** — a colored badge per kind, red for something to kill, amber for something to loot and green for something to use, each with a dark outline so a busy zone stays readable. An objective inside a dungeon is marked at the dungeon entrance, with an archway of its own
 - **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites, reputation, completion, and whether a holiday quest's world event is actually running
 - **Named quest givers and finishers** — a marker for a quest you can pick up names who is standing there, and a marker for one you have finished names who takes it back, on the world map, the minimap and in the Quest Browser
 - **Nameplate quest icons**, resolved from the creature ID in the unit GUID, since a Classic Era or TBC unit tooltip carries no quest data
@@ -72,7 +72,7 @@ Forever runs 1.x content on the modern game client. Everything Quests loads its 
 **Known issues on WoW Forever**
 
 - A quest in your quest log can show the game's own marker beside the Everything Quests one, on the world map and the minimap. A fix is planned
-- The Forever beta forgets every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard, and until it is fixed Everything Quests starts from its default settings on each launch
+- The Forever beta may still forget every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard. While it lasts, Everything Quests starts from its default settings on each launch
 
 **Retail-only**
 
