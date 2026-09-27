@@ -45,6 +45,7 @@ local function acquire()
             tip:SetOwner(self, "ANCHOR_LEFT")
             tip:SetText(ns.QuestPinTitle(q, self.questID), 1.0, 0.82, 0.0, 1, true)
             ns.QuestPinOwned(tip, q, self.kind, self.objMask, self.srcID)
+            ns.QuestPinParty(tip, self.questID, self.kind, self.objMask)
             tip:Show()
         end)
         f:SetScript("OnLeave", function() ns.Util.PinTooltip():Hide() end)
@@ -56,13 +57,100 @@ end
 -- Read by /eqsprobe minimap. "Registered 0" and "registered 200 that HBD refused" look identical
 -- from the minimap itself, and they have completely different causes.
 M._registered, M._rejected, M._mapID, M._stage = 0, 0, nil, "never ran"
+M._yielded = 0
+M._blizzardMarks = {}
+
+-- No Lua call lists the engine's own markers, so yield only for the narrowest set seen in game
+local function readBlizzardMarks(mapID)
+    local marks = M._blizzardMarks
+    local filters = Enum and Enum.MinimapTrackingFilter
+    local filteredOut = C_Minimap and C_Minimap.IsFilteredOut
+    if not (filters and filters.QuestPOIs and filteredOut) or filteredOut(filters.QuestPOIs) then
+        return marks
+    end
+    if not (GetCVarBool and GetCVarBool("questPOI")) then return marks end
+    local rows = C_QuestLog.GetQuestsOnMap and C_QuestLog.GetQuestsOnMap(mapID)
+    if type(rows) ~= "table" then return marks end
+    for i = 1, #rows do
+        local qid = rows[i] and rows[i].questID
+        if qid and ns.Compat and ns.Compat.IsQuestWatched(qid) == true then marks[qid] = true end
+    end
+    return marks
+end
+
+-- Yards within which the engine marks a giver or finisher. A guess until /eqsprobe minimap measures it
+local GIVER_RANGE = 100
+M._giverRange = GIVER_RANGE
+M._givers, M._giversHeld = {}, 0
+
+local function engineDrawsGivers()
+    return C_Minimap and C_Minimap.IsFilteredOut and C_Minimap.IsTrackingHiddenQuests and true or false
+end
+
+-- Blizzard's ShouldAddQuestOffer trivial and account gates, with EQ's own trivial floor beside IsQuestTrivial
+local function engineMarks(questID, Avail, floor)
+    local tracksHidden = C_Minimap.IsTrackingHiddenQuests
+    if not (tracksHidden and tracksHidden()) then
+        local level = Avail.QuestLevel and Avail:QuestLevel(questID)
+        if level and floor and level < floor then return false end
+        local ok, trivial = pcall(C_QuestLog.IsQuestTrivial, questID)
+        if ok and trivial then return false end
+    end
+    local tracking = C_Minimap.IsTrackingAccountCompletedQuests
+    if C_QuestLog.IsQuestFlaggedCompletedOnAccount and not (tracking and tracking()) then
+        local ok, done = pcall(C_QuestLog.IsQuestFlaggedCompletedOnAccount, questID)
+        if ok and done then
+            local okKept, kept = pcall(C_QuestLog.QuestIgnoresAccountCompletedFiltering, questID)
+            if not (okKept and kept) then return false end
+        end
+    end
+    return true
+end
+
+-- HereBeDragons shows and hides the frame itself, so a held pin hides only its texture and mouse
+local function setHeld(f, held)
+    f.held = held
+    f.texture:SetShown(not held)
+    local tip = held and ns.Util.PinTooltip()
+    if tip and tip:GetOwner() == f then tip:Hide() end
+    if f.SetMouseClickEnabled then
+        f:EnableMouse(not held)
+        if not held then f:SetMouseClickEnabled(false) end
+    end
+end
+
+local function giverDistance(HBDP, f)
+    local ok, _, dist = pcall(HBDP.GetVectorToIcon, HBDP, f)
+    if not (ok and type(dist) == "number") then return nil end
+    if _G.issecretvalue and _G.issecretvalue(dist) then return nil end
+    return dist
+end
+
+local function holdGivers()
+    local HBDP = lib()
+    local held = 0
+    for i = 1, #M._givers do
+        local f = M._givers[i]
+        local dist = HBDP and giverDistance(HBDP, f)
+        local hold = dist ~= nil and dist <= GIVER_RANGE
+        if hold ~= f.held then setHeld(f, hold) end
+        if hold then held = held + 1 end
+    end
+    M._giversHeld = held
+end
 
 local function releaseAll()
     local HBDP = lib()
     if HBDP then HBDP:RemoveAllMinimapIcons(REF) end
+    if M._giverTicker then M._giverTicker:Cancel() end
+    M._giverTicker = nil
+    wipe(M._givers)
+    M._giversHeld = 0
     for i = #_active, 1, -1 do
         local f = _active[i]
         f.questID, f.kind, f.objMask, f.avail, f.srcID = nil, nil, nil, nil, nil
+        if f.held then setHeld(f, false) end
+        f.held = nil
         f:Hide()
         _active[i] = nil
         _pool[#_pool + 1] = f
@@ -72,6 +160,8 @@ end
 
 function M:Rebuild()
     releaseAll()
+    M._yielded = 0
+    wipe(M._blizzardMarks)
 
     local HBDP = lib()
     if not HBDP then M._stage = "HereBeDragons not loaded on this flavor" return end
@@ -97,8 +187,15 @@ function M:Rebuild()
         return
     end
 
+    local marked = readBlizzardMarks(mapID)
+    local engine = engineDrawsGivers()
     for qid, q in pairs(Cache:All()) do
-        local n = Provider:PointsFor(qid, mapID, q)
+        local n, _, source = Provider:PointsFor(qid, mapID, q)
+        -- Blizzard's marker is its turn-in or its one point, so the objective clusters stay
+        if n > 0 and marked[qid] and (source == "turnin" or source == "single") then
+            M._yielded = M._yielded + 1
+            n = 0
+        end
         for i = 1, n do
             local x, y = Provider._ptX[i], Provider._ptY[i]
             local f = acquire()
@@ -112,6 +209,10 @@ function M:Rebuild()
             -- world size for the map.
             if HBDP:AddMinimapIconMap(REF, f, mapID, x, y, false, false) then
                 M._registered = M._registered + 1
+                -- The engine puts its own "?" over a creature finisher it has loaded, tracked or not
+                if engine and source == "turnin" and f.kind == 1 then
+                    M._givers[#M._givers + 1] = f
+                end
             else
                 M._rejected = M._rejected + 1
                 f:Hide()
@@ -123,6 +224,7 @@ function M:Rebuild()
     local Avail = ns:GetSubsystem("AvailableQuests")
     if Avail and Avail.PointsFor then
         local n = Avail:PointsFor(mapID)
+        local floor = engine and Avail.TrivialFloor and Avail:TrivialFloor()
         for i = 1, n do
             local quests = Avail._locQuests[i]
             local f = acquire()
@@ -131,11 +233,26 @@ function M:Rebuild()
             f.texture:SetVertexColor(ns.QuestPinAvailableTint())
             if HBDP:AddMinimapIconMap(REF, f, mapID, Avail._locX[i], Avail._locY[i], false, false) then
                 M._registered = M._registered + 1
+                -- Kind 1 is a creature. Objects and dropped items are assumed to carry no engine mark
+                if engine and Avail._locKind[i] == 1 then
+                    for k = 1, #quests do
+                        if engineMarks(quests[k], Avail, floor) then
+                            M._givers[#M._givers + 1] = f
+                            break
+                        end
+                    end
+                end
             else
                 M._rejected = M._rejected + 1
                 f:Hide()
             end
         end
+    end
+
+    -- The player walks into and out of the engine's sight, so the hold is judged again on a timer
+    if #M._givers > 0 then
+        holdGivers()
+        M._giverTicker = C_Timer.NewTicker(0.5, holdGivers)
     end
 end
 
@@ -158,4 +275,13 @@ function M:OnEnable()
     Events:On("QUEST_ACCEPTED",        refresh)
     Events:On("QUEST_REMOVED",         refresh)
     Events:On("QUEST_TURNED_IN",       refresh)
+    -- Which markers yield to Blizzard's depends on its watch list and both quest marker settings
+    if not (C_Minimap and C_Minimap.IsFilteredOut) then return end
+    Events:On("QUEST_WATCH_LIST_CHANGED", refresh)
+    Events:On("MINIMAP_UPDATE_TRACKING",  refresh)
+    -- Blizzard's own quest map provider refreshes on this event, and the marks read the same rows
+    Events:On("QUEST_POI_UPDATE",         refresh)
+    Events:On("CVAR_UPDATE", function(_, cvar)
+        if cvar == "questPOI" then refresh() end
+    end)
 end

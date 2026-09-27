@@ -126,6 +126,67 @@ function Data:KnowsQuest(questID)
     return byQuest[questID] ~= nil
 end
 
+-- A REUSED array, like ForQuest's.
+local _questIDs = {}
+
+function Data:Quests()
+    wipe(_questIDs)
+    local n = 0
+    for questID in pairs(byQuest) do n = n + 1; _questIDs[n] = questID end
+    table.sort(_questIDs)
+    return _questIDs, n
+end
+
+local _progress, _rows, _indices = {}, {}, {}
+
+-- Another quest addon omits objectives its database lacks, and a gap in the indices shifts every later slot
+local function pickObjectives(objectives, typeChar, slots, into)
+    wipe(_indices)
+    for index in pairs(objectives) do _indices[#_indices + 1] = index end
+    table.sort(_indices)
+    if typeChar and slots and _indices[#_indices] == #_indices then
+        local seen = 0
+        for k = 1, #_indices do
+            local o = objectives[_indices[k]]
+            if o.typeChar == typeChar then
+                if slots[seen] then into[#into + 1] = o end
+                seen = seen + 1
+            end
+        end
+        if #into > 0 then return end
+    end
+    for k = 1, #_indices do into[#into + 1] = objectives[_indices[k]] end
+end
+
+local function byName(a, b) return a.name < b.name end
+
+-- A REUSED array of reused rows, rewritten by the next call. Picked objectives are the store's own
+function Data:Progress(questID, typeChar, slots)
+    local n = 0
+    local holders = byQuest[questID]
+    if holders then
+        for name, objectives in pairs(holders) do
+            n = n + 1
+            local row = _rows[n]
+            if not row then row = { picked = {} }; _rows[n] = row end
+            wipe(row.picked)
+            row.name, row.class = name, self:Class(name)
+            pickObjectives(objectives, typeChar, slots, row.picked)
+            local all, done = 0, true
+            for _, o in pairs(objectives) do
+                all = all + 1
+                if not o.finished then done = false end
+            end
+            -- Nothing to judge by for a quest with no objectives, such as a delivery
+            row.allDone = all > 0 and done
+            _progress[n] = row
+        end
+    end
+    for i = #_progress, n + 1, -1 do _progress[i] = nil end
+    table.sort(_progress, byName)
+    return _progress, n
+end
+
 function Data:PlayerNames()
     local names = {}
     local n = 0

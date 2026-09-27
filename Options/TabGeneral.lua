@@ -19,15 +19,22 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
     local h = Options:CreateSectionHeader(content, L["General"])
     h:SetPoint("TOPLEFT", 8, -8)
 
-    -- Sections are skipped per flavor, which would break a chain of SetPoint(prev), so the
-    -- column walks a cursor carrying an absolute indent instead.
-    local prev, prevIndent = h, 0
-    local function place(widget, indent, gap)
-        indent = indent or 0
-        widget:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", indent - prevIndent, -gap)
-        prev, prevIndent = widget, indent
-        return widget
+    -- The same offset as EQOT's Appearance tab, so the two option windows line up
+    local COLUMN_X = 460
+    local mapTop = Options:CreateSectionHeader(content, L["Map"])
+    mapTop:SetPoint("TOPLEFT", h, "TOPLEFT", COLUMN_X, 0)
+
+    -- Sections are skipped per flavor, so each column anchors to the last widget placed, with an absolute indent
+    local function column(anchor)
+        local prev, prevIndent = anchor, 0
+        return function(widget, indent, gap)
+            indent = indent or 0
+            widget:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", indent - prevIndent, -gap)
+            prev, prevIndent = widget, indent
+            return widget
+        end
     end
+    local placeL, placeR = column(h), column(mapTop)
 
     local function refreshPins()
         local P = ns:GetSubsystem("MapPOIProvider")
@@ -54,7 +61,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["Show quest pins on the world map"],
             questPinsGet, questPinsSet,
             L["These are the round red markers Everything Quests puts on the big world map for quests you've already picked up (the ones in your quest log). A red \"!\" means \"go here for this quest's next step.\" A red \"?\" means \"this quest is done \226\128\148 go here to turn it in.\" Uncheck this box and all of EQ's red markers go away. Quests you have not accepted yet are controlled separately."])
-        place(qpins, 0, 16)
+        placeR(qpins, 0, 16)
 
         local function pinScaleGet()
             local DB = ns:GetSubsystem("DB")
@@ -71,7 +78,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         end
         local pinScale = Options:CreateSlider(content, L["World map pin scale"],
             0.5, 2.0, 0.05, pinScaleGet, pinScaleSet)
-        place(pinScale, 4, 6)
+        placeR(pinScale, 4, 6)
         pinScale:SetWidth(280)
         Options:AttachTooltip(pinScale, L["World map pin scale"],
             L["Quest pins are drawn at a fixed size no matter how far the map is zoomed, and this sets that size. Raise it if the pins are hard to pick out on a large or high-resolution display."])
@@ -89,18 +96,120 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
                 DB.db.profile.map.pinCap = value
             end
             refreshPins()
-            -- The minimap reads the same pinCap, so without this it keeps the old set until an
-            -- unrelated quest event fires
+            -- The minimap reads the same pinCap, and nothing else rebuilds it when the cap changes
             local MM = ns:GetSubsystem("MinimapQuestPins")
             if MM then MM:Rebuild() end
         end
         local pinCap = Options:CreateSlider(content, L["Objective pins per quest"],
             25, MAX_PINS, 25, pinCapGet, pinCapSet,
             function(v) return v >= MAX_PINS and L["No limit"] or ("%d"):format(v) end)
-        place(pinCap, 4, 6)
+        placeR(pinCap, 4, 6)
         pinCap:SetWidth(280)
         Options:AttachTooltip(pinCap, L["Objective pins per quest"],
             L["How many places to mark for a single quest on one map. The busiest locations are kept first, so a lower number still points you somewhere useful. Slide all the way right for no limit at all - a few gathering quests can then put hundreds of markers on one map."])
+    end
+
+    if ns:GetSubsystem("MapPOIProvider") then
+        -- Asks the pin's own resolver, because unset means ON on retail and OFF on Classic
+        local function pinRingGet()
+            return ns.QuestPinRingWanted and ns.QuestPinRingWanted(false) or false
+        end
+        local function pinRingSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.showPinRing = v and true or false
+            end
+            refreshPins()
+        end
+        local pinRing = Options:CreateCheckbox(content,
+            L["Show a ring around quest pins"],
+            pinRingGet, pinRingSet,
+            L["Draws the red circle behind every world map marker for a quest in your log, both the ones you are still working on and the ones that are ready to turn in. Turn it off for plain icons and a much quieter map when a zone is busy."])
+        placeR(pinRing, 0, 10)
+
+        if ns:GetSubsystem("AvailableQuests") then
+            local function availRingGet()
+                local DB = ns:GetSubsystem("DB")
+                return (DB and DB.db.profile.map and DB.db.profile.map.showAvailableRing) == true
+            end
+            local function availRingSet(v)
+                local DB = ns:GetSubsystem("DB")
+                if DB then
+                    DB.db.profile.map = DB.db.profile.map or {}
+                    DB.db.profile.map.showAvailableRing = v and true or false
+                end
+                refreshPins()
+                local MM = ns:GetSubsystem("MinimapQuestPins")
+                if MM then MM:Rebuild() end
+            end
+            local availRing = Options:CreateCheckbox(content,
+                L["Show a ring around quests you can pick up"],
+                availRingGet, availRingSet,
+                L["Draws the gold circle behind the exclamation mark of every quest giver who has something for you. Off by default. The mark itself still tells these apart from the quests you are already carrying, because those use their own objective art or the turn-in mark instead."])
+            placeR(availRing, 0, 6)
+        end
+
+        local function trackedGet()
+            local DB = ns:GetSubsystem("DB")
+            return (DB and DB.db.profile.map and DB.db.profile.map.onlyTrackedPins) == true
+        end
+        local function trackedSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.onlyTrackedPins = v and true or false
+            end
+            refreshPins()
+            local MM = ns:GetSubsystem("MinimapQuestPins")
+            if MM then MM:Rebuild() end
+        end
+        local tracked = Options:CreateCheckbox(content,
+            L["Only show markers for quests you are tracking"],
+            trackedGet, trackedSet,
+            L["Leaves out the markers for any quest in your log that you have untracked, so a busy zone shows only what you are actually working on. Off by default. Quests you have not picked up yet are not affected, because there is nothing to have tracked."])
+        placeR(tracked, 0, 6)
+
+        local function fadeGet()
+            local DB = ns:GetSubsystem("DB")
+            return (DB and DB.db.profile.map and DB.db.profile.map.fadePinsOverPlayer) == true
+        end
+        local function fadeSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.fadePinsOverPlayer = v and true or false
+            end
+            -- Applied at once rather than on the next fade tick, so the box and the map agree
+            if ns.QuestPinApplyFade then ns.QuestPinApplyFade() end
+        end
+        local fade = Options:CreateCheckbox(content,
+            L["Fade markers that cover your position"],
+            fadeGet, fadeSet,
+            L["Makes any marker sitting on top of your own arrow see-through, so you can still find yourself on a zone that is drawing hundreds of them. Off by default. The markers are still there and still answer the mouse, they are only dimmed while you are standing under them."])
+        placeR(fade, 0, 6)
+    end
+
+    local MinimapPins = ns:GetSubsystem("MinimapQuestPins")
+    if MinimapPins then
+        local function minimapPinsGet()
+            local DB = ns:GetSubsystem("DB")
+            return not DB or not DB.db.profile.map
+                   or DB.db.profile.map.showMinimapPins ~= false
+        end
+        local function minimapPinsSet(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then
+                DB.db.profile.map = DB.db.profile.map or {}
+                DB.db.profile.map.showMinimapPins = v and true or false
+            end
+            MinimapPins:Rebuild()
+        end
+        local mmpins = Options:CreateCheckbox(content,
+            L["Show objective pins on the minimap"],
+            minimapPinsGet, minimapPinsSet,
+            L["Puts the same objective markers on the minimap as on the world map, for the zone you are standing in. They use the per-quest limit above. Hover one for the quest name and what it still needs."])
+        placeR(mmpins, 0, 12)
     end
 
     local Avail = ns:GetSubsystem("AvailableQuests")
@@ -129,7 +238,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["Show quests you can pick up"],
             availGet, availSet,
             L["Marks every quest giver who has something for you but is not in your quest log yet, with a gold ring around the exclamation mark so it reads apart from the quests you are already carrying. One marker covers a whole quest giver, and hovering it lists everything that giver offers. Quests are filtered by your level, race, class and the quests you have already finished, and holiday quests are shown only while their world event is running."])
-        place(avail, 0, 16)
+        placeR(avail, 0, 12)
 
         local function lowGet()
             local DB = ns:GetSubsystem("DB")
@@ -148,7 +257,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["Hide quests below your level"],
             lowGet, lowSet,
             L["Leaves out quests the game has already grayed out for you, using the game's own threshold rather than a fixed number of levels. On by default. Turn it off to see everything a quest giver has, including the quests you have outleveled."])
-        place(low, 16, 6)
+        placeR(low, 16, 6)
 
         local function seasonGet()
             local DB = ns:GetSubsystem("DB")
@@ -167,7 +276,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["Hide holiday quests out of season"],
             seasonGet, seasonSet,
             L["Leaves out quests belonging to a world event that is not running, such as the Lunar Festival in July. On by default. Turn it off to see every holiday quest all year, which is how the map behaved before."])
-        place(season, 16, 6)
+        placeR(season, 16, 6)
 
         local function highGet()
             local DB = ns:GetSubsystem("DB")
@@ -185,292 +294,52 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["Hide quests above your level"],
             highGet, highSet,
             L["Leaves out quests the game colors red for you, using its own threshold rather than a fixed number of levels. Off by default, because a red quest is still worth knowing about if you are coming back later."])
-        place(high, 16, 6)
+        placeR(high, 16, 6)
     end
 
-    local MinimapPins = ns:GetSubsystem("MinimapQuestPins")
-    if MinimapPins then
-        local function minimapPinsGet()
-            local DB = ns:GetSubsystem("DB")
-            return not DB or not DB.db.profile.map
-                   or DB.db.profile.map.showMinimapPins ~= false
-        end
-        local function minimapPinsSet(v)
-            local DB = ns:GetSubsystem("DB")
-            if DB then
-                DB.db.profile.map = DB.db.profile.map or {}
-                DB.db.profile.map.showMinimapPins = v and true or false
-            end
-            MinimapPins:Rebuild()
-        end
-        local mmpins = Options:CreateCheckbox(content,
-            L["Show objective pins on the minimap"],
-            minimapPinsGet, minimapPinsSet,
-            L["Puts the same objective markers on the minimap as on the world map, for the zone you are standing in. They use the per-quest limit above. Hover one for the quest name and what it still needs."])
-        place(mmpins, 0, 16)
-    end
-
-    local QA = ns:GetSubsystem("QuestAuto")
-    if QA then
-        -- Above the two boxes it makes inert, so the explanation is read before they are ticked
-        local autoGap = 6
-        if QA:ImmersionLoaded() then
-            local immBox = Options:CreateCheckbox(content,
-                L["Let Immersion handle quest dialogs"],
-                function() return QA:DeferToImmersion() end,
-                function(v)
-                    local DB = ns:GetSubsystem("DB")
-                    if DB then DB.db.profile.general.deferToImmersion = v and true or false end
-                end,
-                L["Immersion replaces the quest and gossip windows so you can read them, so EQ leaves accepting and turning in to you while it is installed. Uncheck to accept and turn in automatically anyway."])
-            place(immBox, 0, 6)
-            autoGap = 2
-        end
-
-        -- The clause is appended rather than written into the two keys, which are already
-        -- translated in six languages and would be retired by a reword. It is also only true
-        -- while Immersion is actually handling the windows.
-        local altHint    = L["Hold Alt to pause."]
-        local rewardHint = L["Skips reward-choice screens."]
-        if QA:DeferToImmersion() then
-            local inert = L["Immersion is handling quest windows, so this does nothing right now."]
-            altHint    = altHint .. " " .. inert
-            rewardHint = rewardHint .. " " .. inert
-        end
-
-        local autoAccGet, autoAccSet = generalSetting("autoAcceptQuests")
-        local autoAcc = Options:CreateCheckbox(content,
-            L["Auto-accept quests"],
-            autoAccGet, autoAccSet,
-            altHint)
-        place(autoAcc, 0, autoGap)
-
-        local autoTIGet, autoTISet = generalSetting("autoTurnInQuests")
-        local autoTI = Options:CreateCheckbox(content,
-            L["Auto-turn-in quests"],
-            autoTIGet, autoTISet,
-            rewardHint)
-        place(autoTI, 0, 2)
-
-        -- No Immersion clause, because this popup is not a window Immersion replaces.
-        local confirmGet, confirmSet = generalSetting("autoConfirmGroupQuests")
-        local confirmBox = Options:CreateCheckbox(content,
-            L["Join group quests automatically"],
-            confirmGet, confirmSet,
-            L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."]
-                .. " " .. L["Hold Alt to pause."])
-        place(confirmBox, 0, 2)
-    end
-
-    if ns:GetSubsystem("Announce") then
-        local function announceSetting(key)
-            return
-                function()
-                    local DB = ns:GetSubsystem("DB")
-                    return DB and DB.db.profile.announce and DB.db.profile.announce[key]
-                end,
-                function(value)
-                    local DB = ns:GetSubsystem("DB")
-                    if DB then
-                        DB.db.profile.announce = DB.db.profile.announce or {}
-                        DB.db.profile.announce[key] = value
-                    end
-                end
-        end
-
-        local annHeader = Options:CreateSectionHeader(content, L["Quest announcements"])
-        place(annHeader, 0, 16)
-
-        -- Client globals, so channel names read correctly in every client language.
-        local PARTY_NAME = _G["PARTY"] or "Party"
-        local RAID_NAME  = _G["RAID"] or "Raid"
-        local CHANNELS = {
-            { value = "off",   label = _G["NONE"] or L["Nobody"] },
-            { value = "party", label = PARTY_NAME },
-            { value = "raid",  label = RAID_NAME },
-            { value = "both",  label = PARTY_NAME .. " / " .. RAID_NAME },
-        }
-
-        local chanGet, chanSet = announceSetting("channel")
-        local chanDD = Options:CreateDropdown(content, L["Announce to"], CHANNELS,
-            function() return chanGet() or "off" end, chanSet)
-        place(chanDD, 4, 8)
-        chanDD:SetWidth(280)
-        Options:AttachTooltip(chanDD.button, L["Announce to"],
-            L["Which chat channel your quest updates are posted to. None sends nothing at all - the switches below then only decide what is printed to your own chat."])
-
-        local selfGet, selfSet = announceSetting("toSelf")
-        local selfBox = Options:CreateCheckbox(content,
-            L["Also print to your own chat"],
-            selfGet, selfSet,
-            L["Prints each update to your own chat window as well. Nobody else sees these, so it is also how to watch what the switches below do before letting anything reach a group."])
-        place(selfBox, 4, 8)
-
-        local accGet, accSet = announceSetting("accepted")
-        local accBox = Options:CreateCheckbox(content,
-            L["Announce quests you accept"],
-            accGet, accSet,
-            L["Posts a line as you pick each quest up, so the group can see what you are on."])
-        place(accBox, 4, 6)
-
-        local objGet, objSet = announceSetting("objective")
-        local objBox = Options:CreateCheckbox(content,
-            L["Announce objectives you finish"],
-            objGet, objSet,
-            L["Posts a line the moment an objective fills, so the group knows you are done with that part and can stop helping."])
-        place(objBox, 4, 2)
-
-        local compGet, compSet = announceSetting("completed")
-        local compBox = Options:CreateCheckbox(content,
-            L["Announce quests you hand in"],
-            compGet, compSet,
-            L["Posts a line as you turn each quest in."])
-        place(compBox, 4, 2)
-
-        local abanGet, abanSet = announceSetting("abandoned")
-        local abanBox = Options:CreateCheckbox(content,
-            L["Announce quests you abandon"],
-            abanGet, abanSet,
-            L["Posts a line when you drop a quest. Off to begin with, because it is the one people rarely want broadcast."])
-        place(abanBox, 4, 2)
-
-        local hideGet, hideSet = announceSetting("hideIncoming")
-        local hideBox = Options:CreateCheckbox(content,
-            L["Hide announcements from other players"],
-            hideGet, hideSet,
-            L["Hides quest announcements other people in your group send, including the ones other quest addons post. Your own are always shown, so this does not silence anything you switched on above."])
-        place(hideBox, 4, 8)
-    end
-
-    if ns:GetSubsystem("GroupComms") then
-        local function groupSetting(key)
-            return
-                function()
-                    local DB = ns:GetSubsystem("DB")
-                    return DB and DB.db.profile.group and DB.db.profile.group[key]
-                end,
-                function(value)
-                    local DB = ns:GetSubsystem("DB")
-                    if DB then
-                        DB.db.profile.group = DB.db.profile.group or {}
-                        DB.db.profile.group[key] = value
-                    end
-                    local Comms = ns:GetSubsystem("GroupComms")
-                    if Comms and Comms.OnSettingChanged then Comms:OnSettingChanged(key) end
-                end
-        end
-
-        local groupHeader = Options:CreateSectionHeader(content, L["Party quest progress"])
-        place(groupHeader, 0, 16)
-
-        local shareGet, shareSet = groupSetting("partyProgress")
-        local shareBox = Options:CreateCheckbox(content,
-            L["Share quest progress with your group"],
-            shareGet, shareSet,
-            L["Your group sees how far along you are on each quest, and you see the same for them. This travels as hidden addon messages, so nothing is ever posted to anyone's chat. Switching it off stops both halves."])
-        place(shareBox, 4, 8)
-
-        -- Classic only, because no retail addon speaks that protocol and the request is never sent there.
-        if ns.HAS_CLASSIC_SPAWNS then
-            local peerGet, peerSet = groupSetting("readPeerAddons")
-            local peerBox = Options:CreateCheckbox(content,
-                L["Read other quest addons as well"],
-                peerGet, peerSet,
-                L["Also reads the progress other quest addons share, so you see group members running them as well as the people running EQ. EQ asks their users for their quest logs when either of you joins the group. Your own progress is never sent on their channel."])
-            place(peerBox, 4, 8)
-        end
-    end
-
-    if ns:GetSubsystem("MapPOIProvider") then
-        local mapHeader = Options:CreateSectionHeader(content, L["Map"])
-        place(mapHeader, 0, 16)
-
-        -- Asked of the pin's own resolver rather than read here, because an unset value means ON
-        -- on retail and OFF on Classic. A second copy of that rule would leave the box and the map
-        -- disagreeing, and only one of the two is on screen at a time.
-        local function pinRingGet()
-            return ns.QuestPinRingWanted and ns.QuestPinRingWanted(false) or false
-        end
-        local function pinRingSet(v)
-            local DB = ns:GetSubsystem("DB")
-            if DB then
-                DB.db.profile.map = DB.db.profile.map or {}
-                DB.db.profile.map.showPinRing = v and true or false
-            end
-            refreshPins()
-        end
-        local pinRing = Options:CreateCheckbox(content,
-            L["Show a ring around quest pins"],
-            pinRingGet, pinRingSet,
-            L["Draws the red circle behind every world map marker for a quest in your log, both the ones you are still working on and the ones that are ready to turn in. Turn it off for plain icons and a much quieter map when a zone is busy."])
-        place(pinRing, 0, 10)
-
-        if ns:GetSubsystem("AvailableQuests") then
-            local function availRingGet()
-                local DB = ns:GetSubsystem("DB")
-                return (DB and DB.db.profile.map and DB.db.profile.map.showAvailableRing) == true
-            end
-            local function availRingSet(v)
-                local DB = ns:GetSubsystem("DB")
-                if DB then
-                    DB.db.profile.map = DB.db.profile.map or {}
-                    DB.db.profile.map.showAvailableRing = v and true or false
-                end
-                refreshPins()
-                local MM = ns:GetSubsystem("MinimapQuestPins")
-                if MM then MM:Rebuild() end
-            end
-            local availRing = Options:CreateCheckbox(content,
-                L["Show a ring around quests you can pick up"],
-                availRingGet, availRingSet,
-                L["Draws the gold circle behind the exclamation mark of every quest giver who has something for you. Off by default. The mark itself still tells these apart from the quests you are already carrying, because those use their own objective art or the turn-in mark instead."])
-            place(availRing, 0, 6)
-        end
-
-        local function trackedGet()
-            local DB = ns:GetSubsystem("DB")
-            return (DB and DB.db.profile.map and DB.db.profile.map.onlyTrackedPins) == true
-        end
-        local function trackedSet(v)
-            local DB = ns:GetSubsystem("DB")
-            if DB then
-                DB.db.profile.map = DB.db.profile.map or {}
-                DB.db.profile.map.onlyTrackedPins = v and true or false
-            end
+    if Avail and ns.CLASSIC_QUEST_CATEGORY then
+        local function rebuildAvailable()
+            Avail:Invalidate()
             refreshPins()
             local MM = ns:GetSubsystem("MinimapQuestPins")
             if MM then MM:Rebuild() end
         end
-        local tracked = Options:CreateCheckbox(content,
-            L["Only show markers for quests you are tracking"],
-            trackedGet, trackedSet,
-            L["Leaves out the markers for any quest in your log that you have untracked, so a busy zone shows only what you are actually working on. Off by default. Quests you have not picked up yet are not affected, because there is nothing to have tracked."])
-        place(tracked, 0, 6)
 
-        local function fadeGet()
-            local DB = ns:GetSubsystem("DB")
-            return (DB and DB.db.profile.map and DB.db.profile.map.fadePinsOverPlayer) == true
+        -- Each box HIDES its category, so nil reads as show it and older profiles are unchanged
+        local function categoryOption(key, label, tooltip)
+            local box = Options:CreateCheckbox(content, label,
+                function()
+                    local DB = ns:GetSubsystem("DB")
+                    return (DB and DB.db.profile.map and DB.db.profile.map[key]) == true
+                end,
+                function(v)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then
+                        DB.db.profile.map = DB.db.profile.map or {}
+                        DB.db.profile.map[key] = v and true or false
+                    end
+                    rebuildAvailable()
+                end,
+                tooltip)
+            placeR(box, 16, 6)
         end
-        local function fadeSet(v)
-            local DB = ns:GetSubsystem("DB")
-            if DB then
-                DB.db.profile.map = DB.db.profile.map or {}
-                DB.db.profile.map.fadePinsOverPlayer = v and true or false
-            end
-            -- Applied at once rather than waiting up to a tick, so the box and the map agree
-            -- while the player is looking at both.
-            if ns.QuestPinApplyFade then ns.QuestPinApplyFade() end
-        end
-        local fade = Options:CreateCheckbox(content,
-            L["Fade markers that cover your position"],
-            fadeGet, fadeSet,
-            L["Makes any marker sitting on top of your own arrow see-through, so you can still find yourself on a zone that is drawing hundreds of them. Off by default. The markers are still there and still answer the mouse, they are only dimmed while you are standing under them."])
-        place(fade, 0, 6)
+
+        local filterHeader = Options:CreateSectionHeader(content, L["Hide these quests on the map"])
+        placeR(filterHeader, 0, 16)
+        Options:AttachTooltip(filterHeader, L["Hide these quests on the map"],
+            L["These only affect the markers for quests you have NOT picked up yet. A quest already in your log always keeps its markers, because hiding something you are carrying would make the map lie about what you still have to do."])
+
+        categoryOption("hideDungeonQuests", L["Dungeon and raid quests"],
+            L["Leaves out quests that are sorted into a dungeon or a raid. Most are picked up inside the instance or from a quest giver at its door, so they clutter the outdoor map without helping you while you are questing in the world."])
+        categoryOption("hideRepeatableQuests", L["Repeatable quests"],
+            L["Leaves out the quests you can hand in over and over, usually a turn-in for reputation or a common trade good. They never stop being offered, so they stay on the map forever once you can see them."])
+        categoryOption("hideProfessionQuests", L["Profession quests"],
+            L["Leaves out quests that require a trade skill, such as a Blacksmithing or Alchemy specialization. Everything Quests cannot read your skill levels on this version of the game, so these are offered even when you have not trained the profession they need."])
     end
 
     if ns:GetSubsystem("MapCoords") then
         local coordsHeader = Options:CreateSectionHeader(content, L["Coordinates"])
-        place(coordsHeader, 0, 16)
+        placeR(coordsHeader, 0, 16)
 
         local function coordSetting(key, default)
             return
@@ -496,14 +365,14 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["Show coordinates on the world map"],
             mapCoordGet, mapCoordSet,
             L["Puts a small readout in the bottom left of the world map with the position your mouse is pointing at, and your own position when you are looking at the zone you are standing in. Turn it off if another addon already shows coordinates there."])
-        place(mapCoord, 0, 12)
+        placeR(mapCoord, 0, 12)
 
         local mmCoordGet, mmCoordSet = coordSetting("showMinimapCoords", false)
         local mmCoord = Options:CreateCheckbox(content,
             L["Show coordinates under the minimap"],
             mmCoordGet, mmCoordSet,
             L["Puts your own position just below the minimap so it is readable without opening the map. Off by default, because many interface addons already put something there."])
-        place(mmCoord, 0, 6)
+        placeR(mmCoord, 0, 6)
 
         local function precGet()
             local DB = ns:GetSubsystem("DB")
@@ -522,56 +391,15 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         local prec = Options:CreateSlider(content, L["Coordinate decimals"],
             0, 2, 1, precGet, precSet,
             function(v) return ("%d"):format(v) end)
-        place(prec, 4, 10)
+        placeR(prec, 4, 10)
         prec:SetWidth(280)
         Options:AttachTooltip(prec, L["Coordinate decimals"],
             L["How precise the numbers are. Zero is whole numbers, which is enough to find a spot on the map. Two is what most quest guides quote."])
     end
 
-    if Avail and ns.CLASSIC_QUEST_CATEGORY then
-        local function rebuildAvailable()
-            Avail:Invalidate()
-            refreshPins()
-            local MM = ns:GetSubsystem("MinimapQuestPins")
-            if MM then MM:Rebuild() end
-        end
-
-        -- Each box HIDES its category, so the stored value is the filter rather than the content.
-        -- nil therefore reads as "show it" and an existing profile is unchanged.
-        local function categoryOption(key, label, tooltip)
-            local box = Options:CreateCheckbox(content, label,
-                function()
-                    local DB = ns:GetSubsystem("DB")
-                    return (DB and DB.db.profile.map and DB.db.profile.map[key]) == true
-                end,
-                function(v)
-                    local DB = ns:GetSubsystem("DB")
-                    if DB then
-                        DB.db.profile.map = DB.db.profile.map or {}
-                        DB.db.profile.map[key] = v and true or false
-                    end
-                    rebuildAvailable()
-                end,
-                tooltip)
-            place(box, 16, 6)
-        end
-
-        local filterHeader = Options:CreateSectionHeader(content, L["Hide these quests on the map"])
-        place(filterHeader, 0, 14)
-        Options:AttachTooltip(filterHeader, L["Hide these quests on the map"],
-            L["These only affect the markers for quests you have NOT picked up yet. A quest already in your log always keeps its markers, because hiding something you are carrying would make the map lie about what you still have to do."])
-
-        categoryOption("hideDungeonQuests", L["Dungeon and raid quests"],
-            L["Leaves out quests that are sorted into a dungeon or a raid. Most are picked up inside the instance or from a quest giver at its door, so they clutter the outdoor map without helping you while you are questing in the world."])
-        categoryOption("hideRepeatableQuests", L["Repeatable quests"],
-            L["Leaves out the quests you can hand in over and over, usually a turn-in for reputation or a common trade good. They never stop being offered, so they stay on the map forever once you can see them."])
-        categoryOption("hideProfessionQuests", L["Profession quests"],
-            L["Leaves out quests that require a trade skill, such as a Blacksmithing or Alchemy specialization. Everything Quests cannot read your skill levels on this version of the game, so these are offered even when you have not trained the profession they need."])
-    end
-
     if ns:GetSubsystem("QuestTooltips") then
         local tipHeader = Options:CreateSectionHeader(content, L["Tooltips"])
-        place(tipHeader, 0, 16)
+        placeR(tipHeader, 0, 16)
 
         local tipBox = Options:CreateCheckbox(content,
             L["Show quest progress on tooltips"],
@@ -586,62 +414,146 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
                 if QT then QT:ApplyEnabled() end
             end,
             L["Adds the quest name and what it still needs to the tooltips you already see in the game. Hovering an item in your bags tells you which quest wants it and how many are still missing. On Classic, hovering an enemy also tells you which quest it counts toward, which the game itself never says there. Only quests already in your log are listed, and nothing is added to a tooltip that has nothing to say."])
-        place(tipBox, 0, 12)
+        placeR(tipBox, 0, 12)
     end
 
-    do
-        local QB = ns:GetSubsystem("QuestBrowser")
-        if QB and QB.Available and QB:Available() then
-            local browserHeader = Options:CreateSectionHeader(content, L["Quest Browser"])
-            place(browserHeader, 0, 16)
-
-            local browserBtn = Options:CreateYellowButton(content, L["Open Quest Browser"], function()
-                local B = ns:GetSubsystem("QuestBrowser")
-                if B then B:Open() end
-            end)
-            place(browserBtn, 0, 12)
-            Options:AttachTooltip(browserBtn, L["Quest Browser"],
-                L["Look up almost any quest in the game, including ones you have never picked up. Shows the level and race and class requirements, where it starts and turns in, what has to be finished first, and why you cannot take it yet. Also on /eqs quests, or right-click a gold quest marker on the map."])
-        end
-    end
-
-    if ns:GetSubsystem("TrackerBridge") then
-        local trackerHeader = Options:CreateSectionHeader(content, L["Tracker"])
-        place(trackerHeader, 0, 16)
-
-        local trackerBtn = Options:CreateYellowButton(content, L["Open Tracker Settings"], function()
-            local Bridge = ns:GetSubsystem("TrackerBridge")
-            if Bridge then Bridge:OpenTrackerOptions() end
-        end)
-        place(trackerBtn, 0, 10)
-        Options:AttachTooltip(trackerBtn, L["Open Tracker Settings"],
-            L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."])
-
-        local eqIconGet, eqIconSet = generalSetting("showEQIcon")
-        local eqIcon = Options:CreateCheckbox(content,
-            L["Show Everything Quests icon on the tracker"],
-            eqIconGet,
-            function(value)
-                eqIconSet(value)
-                local Bridge = ns:GetSubsystem("TrackerBridge")
-                if Bridge then Bridge:ApplyEQIcon() end
-            end,
-            L["Adds the Everything Quests logo at the top right of the tracker, which opens this options window. The tracker's own cogwheel opens the tracker's settings instead. You can also reach this window from the minimap button or by typing /eqs."])
-        place(eqIcon, 0, 8)
-
-        if ns:GetSubsystem("ChainGuide") then
-            local chainIconGet, chainIconSet = generalSetting("showChainGuideIcon")
-            local chainIcon = Options:CreateCheckbox(content,
-                L["Show Chain Guide icon on the tracker"],
-                chainIconGet,
-                function(value)
-                    chainIconSet(value)
-                    local Bridge = ns:GetSubsystem("TrackerBridge")
-                    if Bridge then Bridge:ApplyChainIcon() end
+    if ns:GetSubsystem("NameplateQuestIcons") then
+        local function npLayoutSetting(key)
+            return
+                function()
+                    local DB = ns:GetSubsystem("DB")
+                    return DB and DB.db.profile.general[key]
                 end,
-                L["Adds a small chain icon beside the cogwheel at the top right of the tracker, which opens the Chain Guide."])
-            place(chainIcon, 0, 2)
+                function(value)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then DB.db.profile.general[key] = value end
+                    local QI = ns:GetSubsystem("NameplateQuestIcons")
+                    if QI and QI.ApplyLayout then QI:ApplyLayout() end
+                end
         end
+
+        local npHeader = Options:CreateSectionHeader(content, L["Nameplate Quest Icons"])
+        placeR(npHeader, 0, 16)
+
+        local function npGet()
+            local QI = ns:GetSubsystem("NameplateQuestIcons")
+            return QI and QI.IsEnabled and QI:IsEnabled()
+        end
+        local function npSet(value)
+            local DB = ns:GetSubsystem("DB")
+            if DB then DB.db.profile.general.questNameplateIcons = value and true or false end
+            local QI = ns:GetSubsystem("NameplateQuestIcons")
+            if QI and QI.ApplyEnabled then QI:ApplyEnabled() end
+        end
+        local nameplates = Options:CreateCheckbox(content,
+            L["Quest icons on nameplates"],
+            npGet, npSet,
+            L["Shows the \"!\" + count on objective mobs."])
+        placeR(nameplates, 0, 10)
+
+        local NP_PLACEMENT = {
+            { value = "LEFT",   label = L["Left"] },
+            { value = "RIGHT",  label = L["Right"] },
+            { value = "TOP",    label = L["Above"] },
+            { value = "BOTTOM", label = L["Below"] },
+        }
+        local placeGet, placeSet = npLayoutSetting("npIconPlacement")
+        local npPlace = Options:CreateRadioGroup(content, L["Position"], NP_PLACEMENT, placeGet, placeSet, 260, nil,
+            L["Position"],
+            L["Where the quest icon + count sits relative to the enemy nameplate. Move it closer to the health bar to taste."])
+        placeR(npPlace, 0, 8)
+
+        local szGet, szSet = npLayoutSetting("npIconSize")
+        local npSize = Options:CreateSlider(content, L["Icon size"], 12, 48, 0.5, szGet, szSet)
+        placeR(npSize, 0, 12)
+        npSize:SetWidth(280)
+
+        local txtGet, txtSet = npLayoutSetting("npIconTextSize")
+        local npText = Options:CreateSlider(content, L["Count text size"], 8, 24, 0.5, txtGet, txtSet)
+        placeR(npText, 0, 16)
+        npText:SetWidth(280)
+
+        local offXGet, offXSet = npLayoutSetting("npIconOffsetX")
+        local npOffX = Options:CreateSlider(content, L["X offset"], -50, 50, 1, offXGet, offXSet)
+        placeR(npOffX, 0, 16)
+        npOffX:SetWidth(280)
+        Options:AttachTooltip(npOffX, L["X offset"],
+            L["Nudges the icon and count together left or right from the Position above, so you can slide them right up against the health bar."])
+
+        local offYGet, offYSet = npLayoutSetting("npIconOffsetY")
+        local npOffY = Options:CreateSlider(content, L["Y offset"], -50, 50, 1, offYGet, offYSet)
+        placeR(npOffY, 0, 16)
+        npOffY:SetWidth(280)
+        Options:AttachTooltip(npOffY, L["Y offset"],
+            L["Nudges the icon and count together up or down from the Position above (positive moves them up)."])
+    end
+
+    local QA = ns:GetSubsystem("QuestAuto")
+    if QA then
+        -- Above the two boxes it makes inert, so the explanation is read before they are ticked
+        local autoGap = 12
+        if QA:ImmersionLoaded() then
+            local immBox = Options:CreateCheckbox(content,
+                L["Let Immersion handle quest dialogs"],
+                function() return QA:DeferToImmersion() end,
+                function(v)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then DB.db.profile.general.deferToImmersion = v and true or false end
+                end,
+                L["Immersion replaces the quest and gossip windows so you can read them, so EQ leaves accepting and turning in to you while it is installed. Uncheck to accept and turn in automatically anyway."])
+            placeL(immBox, 0, 12)
+            autoGap = 2
+        end
+
+        -- Appended, since a reword would retire six translations, and only while Immersion handles the windows
+        local altHint    = L["Hold Alt to pause."]
+        local rewardHint = L["Skips reward-choice screens."]
+        if QA:DeferToImmersion() then
+            local inert = L["Immersion is handling quest windows, so this does nothing right now."]
+            altHint    = altHint .. " " .. inert
+            rewardHint = rewardHint .. " " .. inert
+        end
+
+        local autoAccGet, autoAccSet = generalSetting("autoAcceptQuests")
+        local autoAcc = Options:CreateCheckbox(content,
+            L["Auto-accept quests"],
+            autoAccGet, autoAccSet,
+            altHint)
+        placeL(autoAcc, 0, autoGap)
+
+        local autoTIGet, autoTISet = generalSetting("autoTurnInQuests")
+        local autoTI = Options:CreateCheckbox(content,
+            L["Auto-turn-in quests"],
+            autoTIGet, autoTISet,
+            rewardHint)
+        placeL(autoTI, 0, 2)
+
+        -- No Immersion clause, because this popup is not a window Immersion replaces.
+        local confirmGet, confirmSet = generalSetting("autoConfirmGroupQuests")
+        local confirmBox = Options:CreateCheckbox(content,
+            L["Join group quests automatically"],
+            confirmGet, confirmSet,
+            L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."]
+                .. " " .. L["Hold Alt to pause."])
+        placeL(confirmBox, 0, 2)
+    end
+
+    if ns:GetSubsystem("Minimap") then
+        local function mmGet()
+            local DB = ns:GetSubsystem("DB")
+            return DB and not DB.char.minimap.hide
+        end
+        local function mmSet(value)
+            local DB = ns:GetSubsystem("DB")
+            if not DB then return end
+            DB.char.minimap.hide = not value
+            local LDBI = LibStub and LibStub("LibDBIcon-1.0", true)
+            if LDBI then
+                if value then LDBI:Show("EverythingQuests") else LDBI:Hide("EverythingQuests") end
+            end
+        end
+        local mm = Options:CreateCheckbox(content, L["Show minimap button"], mmGet, mmSet)
+        placeL(mm, 0, 6)
     end
 
     local function owScaleGet()
@@ -655,7 +567,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         end
     end
     local owScale = Options:CreateSlider(content, L["Options Window Scale"], 0.7, 1.4, 0.05, owScaleGet, owScaleSet)
-    place(owScale, 0, 18)
+    placeL(owScale, 4, 14)
     owScale:SetWidth(280)
     Options:AttachTooltip(owScale, L["Options Window Scale"],
         L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."])
@@ -682,118 +594,191 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             WHATSNEW_MODES, wnModeGet, wnModeSet, 320, 14,
             L["After an update"],
             L["How Everything Quests tells you about new features: a Popup window, a quiet clickable Chat link in your chat frame, or None. New features always ship off until you turn them on."])
-        place(wnMode, 0, 12)
+        placeL(wnMode, 0, 12)
     end
 
-    if ns:GetSubsystem("NameplateQuestIcons") then
-        local function npLayoutSetting(key)
+    if ns:GetSubsystem("Announce") then
+        local function announceSetting(key)
             return
                 function()
                     local DB = ns:GetSubsystem("DB")
-                    return DB and DB.db.profile.general[key]
+                    return DB and DB.db.profile.announce and DB.db.profile.announce[key]
                 end,
                 function(value)
                     local DB = ns:GetSubsystem("DB")
-                    if DB then DB.db.profile.general[key] = value end
-                    local QI = ns:GetSubsystem("NameplateQuestIcons")
-                    if QI and QI.ApplyLayout then QI:ApplyLayout() end
+                    if DB then
+                        DB.db.profile.announce = DB.db.profile.announce or {}
+                        DB.db.profile.announce[key] = value
+                    end
                 end
         end
 
-        local npHeader = Options:CreateSectionHeader(content, L["Nameplate Quest Icons"])
-        place(npHeader, 0, 16)
+        local annHeader = Options:CreateSectionHeader(content, L["Quest announcements"])
+        placeL(annHeader, 0, 16)
 
-        local function npGet()
-            local QI = ns:GetSubsystem("NameplateQuestIcons")
-            return QI and QI.IsEnabled and QI:IsEnabled()
-        end
-        local function npSet(value)
-            local DB = ns:GetSubsystem("DB")
-            if DB then DB.db.profile.general.questNameplateIcons = value and true or false end
-            local QI = ns:GetSubsystem("NameplateQuestIcons")
-            if QI and QI.ApplyEnabled then QI:ApplyEnabled() end
-        end
-        local nameplates = Options:CreateCheckbox(content,
-            L["Quest icons on nameplates"],
-            npGet, npSet,
-            L["Shows the \"!\" + count on objective mobs."])
-        place(nameplates, 0, 10)
-
-        local NP_PLACEMENT = {
-            { value = "LEFT",   label = L["Left"] },
-            { value = "RIGHT",  label = L["Right"] },
-            { value = "TOP",    label = L["Above"] },
-            { value = "BOTTOM", label = L["Below"] },
+        -- Client globals, so channel names read correctly in every client language.
+        local PARTY_NAME = _G["PARTY"] or "Party"
+        local RAID_NAME  = _G["RAID"] or "Raid"
+        local CHANNELS = {
+            { value = "off",   label = _G["NONE"] or L["Nobody"] },
+            { value = "party", label = PARTY_NAME },
+            { value = "raid",  label = RAID_NAME },
+            { value = "both",  label = PARTY_NAME .. " / " .. RAID_NAME },
         }
-        local placeGet, placeSet = npLayoutSetting("npIconPlacement")
-        local npPlace = Options:CreateRadioGroup(content, L["Position"], NP_PLACEMENT, placeGet, placeSet, 260, nil,
-            L["Position"],
-            L["Where the quest icon + count sits relative to the enemy nameplate. Move it closer to the health bar to taste."])
-        place(npPlace, 0, 8)
 
-        local szGet, szSet = npLayoutSetting("npIconSize")
-        local npSize = Options:CreateSlider(content, L["Icon size"], 12, 48, 0.5, szGet, szSet)
-        place(npSize, 0, 12)
-        npSize:SetWidth(280)
+        local chanGet, chanSet = announceSetting("channel")
+        local chanDD = Options:CreateDropdown(content, L["Announce to"], CHANNELS,
+            function() return chanGet() or "off" end, chanSet)
+        placeL(chanDD, 4, 8)
+        chanDD:SetWidth(280)
+        Options:AttachTooltip(chanDD.button, L["Announce to"],
+            L["Which chat channel your quest updates are posted to. None sends nothing at all - the switches below then only decide what is printed to your own chat."])
 
-        local txtGet, txtSet = npLayoutSetting("npIconTextSize")
-        local npText = Options:CreateSlider(content, L["Count text size"], 8, 24, 0.5, txtGet, txtSet)
-        place(npText, 0, 16)
-        npText:SetWidth(280)
+        local selfGet, selfSet = announceSetting("toSelf")
+        local selfBox = Options:CreateCheckbox(content,
+            L["Also print to your own chat"],
+            selfGet, selfSet,
+            L["Prints each update to your own chat window as well. Nobody else sees these, so it is also how to watch what the switches below do before letting anything reach a group."])
+        placeL(selfBox, 4, 8)
 
-        local offXGet, offXSet = npLayoutSetting("npIconOffsetX")
-        local npOffX = Options:CreateSlider(content, L["X offset"], -50, 50, 1, offXGet, offXSet)
-        place(npOffX, 0, 16)
-        npOffX:SetWidth(280)
-        Options:AttachTooltip(npOffX, L["X offset"],
-            L["Nudges the icon and count together left or right from the Position above, so you can slide them right up against the health bar."])
+        local accGet, accSet = announceSetting("accepted")
+        local accBox = Options:CreateCheckbox(content,
+            L["Announce quests you accept"],
+            accGet, accSet,
+            L["Posts a line as you pick each quest up, so the group can see what you are on."])
+        placeL(accBox, 4, 6)
 
-        local offYGet, offYSet = npLayoutSetting("npIconOffsetY")
-        local npOffY = Options:CreateSlider(content, L["Y offset"], -50, 50, 1, offYGet, offYSet)
-        place(npOffY, 0, 16)
-        npOffY:SetWidth(280)
-        Options:AttachTooltip(npOffY, L["Y offset"],
-            L["Nudges the icon and count together up or down from the Position above (positive moves them up)."])
+        local objGet, objSet = announceSetting("objective")
+        local objBox = Options:CreateCheckbox(content,
+            L["Announce objectives you finish"],
+            objGet, objSet,
+            L["Posts a line the moment an objective fills, so the group knows you are done with that part and can stop helping."])
+        placeL(objBox, 4, 2)
+
+        local compGet, compSet = announceSetting("completed")
+        local compBox = Options:CreateCheckbox(content,
+            L["Announce quests you hand in"],
+            compGet, compSet,
+            L["Posts a line as you turn each quest in."])
+        placeL(compBox, 4, 2)
+
+        local abanGet, abanSet = announceSetting("abandoned")
+        local abanBox = Options:CreateCheckbox(content,
+            L["Announce quests you abandon"],
+            abanGet, abanSet,
+            L["Posts a line when you drop a quest. Off to begin with, because it is the one people rarely want broadcast."])
+        placeL(abanBox, 4, 2)
+
+        local hideGet, hideSet = announceSetting("hideIncoming")
+        local hideBox = Options:CreateCheckbox(content,
+            L["Hide announcements from other players"],
+            hideGet, hideSet,
+            L["Hides quest announcements other people in your group send, including the ones other quest addons post. Your own are always shown, so this does not silence anything you switched on above."])
+        placeL(hideBox, 4, 8)
     end
 
-    local reset = Options:CreateYellowButton(content, L["Reset all settings"], function()
-        local Dialog = ns:GetSubsystem("Dialog")
-        if not Dialog then return end
-        Dialog:Show({
-            title   = "Everything Quests",
-            text    = L["Reset every Everything Quests setting to defaults?"],
-            button1 = L["Reset"],
-            button2 = L["Cancel"],
-            onAccept = function()
-                local DB = ns:GetSubsystem("DB")
-                if DB and DB.db then
-                    if DB.db.ResetProfile then DB.db:ResetProfile() end
-                    -- ResetProfile clears only the profile scope, so restore the global and per-character settings too
-                    local g = DB.db.global
-                    if g then
-                        g.optionsWindowScale = DB.defaults.global.optionsWindowScale
-                        g.whatsNewMode       = DB.defaults.global.whatsNewMode
+    if ns:GetSubsystem("GroupComms") then
+        local function groupSetting(key)
+            return
+                function()
+                    local DB = ns:GetSubsystem("DB")
+                    return DB and DB.db.profile.group and DB.db.profile.group[key]
+                end,
+                function(value)
+                    local DB = ns:GetSubsystem("DB")
+                    if DB then
+                        DB.db.profile.group = DB.db.profile.group or {}
+                        DB.db.profile.group[key] = value
                     end
-                    if DB.char and DB.char.minimap then
-                        DB.char.minimap.hide = DB.defaults.char.minimap.hide
-                    end
+                    local Comms = ns:GetSubsystem("GroupComms")
+                    if Comms and Comms.OnSettingChanged then Comms:OnSettingChanged(key) end
                 end
-                ReloadUI()
+        end
+
+        local groupHeader = Options:CreateSectionHeader(content, L["Party quest progress"])
+        placeL(groupHeader, 0, 16)
+
+        local shareGet, shareSet = groupSetting("partyProgress")
+        local shareBox = Options:CreateCheckbox(content,
+            L["Share quest progress with your group"],
+            shareGet, shareSet,
+            L["Your group sees how far along you are on each quest, and you see the same for them. This travels as hidden addon messages, so nothing is ever posted to anyone's chat. Switching it off stops both halves."])
+        placeL(shareBox, 4, 8)
+
+        -- Not built on retail, where no addon speaks that protocol and SendPeerRequest never asks
+        if ns.HAS_CLASSIC_SPAWNS then
+            local peerGet, peerSet = groupSetting("readPeerAddons")
+            local peerBox = Options:CreateCheckbox(content,
+                L["Read other quest addons as well"],
+                peerGet, peerSet,
+                L["Also reads the progress other quest addons share, so you see group members running them as well as the people running EQ. EQ asks their users for their quest logs when either of you joins the group. Your own progress is never sent on their channel."])
+            placeL(peerBox, 4, 8)
+        end
+    end
+
+    do
+        local QB = ns:GetSubsystem("QuestBrowser")
+        if QB and QB.Available and QB:Available() then
+            local browserHeader = Options:CreateSectionHeader(content, L["Quest Browser"])
+            placeL(browserHeader, 0, 16)
+
+            local browserBtn = Options:CreateYellowButton(content, L["Open Quest Browser"], function()
+                local B = ns:GetSubsystem("QuestBrowser")
+                if B then B:Open() end
+            end)
+            placeL(browserBtn, 0, 12)
+            Options:AttachTooltip(browserBtn, L["Quest Browser"],
+                L["Look up almost any quest in the game, including ones you have never picked up. Shows the level and race and class requirements, where it starts and turns in, what has to be finished first, and why you cannot take it yet. Also on /eqs quests, or right-click a gold quest marker on the map."])
+        end
+    end
+
+    if ns:GetSubsystem("TrackerBridge") then
+        local trackerHeader = Options:CreateSectionHeader(content, L["Tracker"])
+        placeL(trackerHeader, 0, 16)
+
+        local trackerBtn = Options:CreateYellowButton(content, L["Open Tracker Settings"], function()
+            local Bridge = ns:GetSubsystem("TrackerBridge")
+            if Bridge then Bridge:OpenTrackerOptions() end
+        end)
+        placeL(trackerBtn, 0, 10)
+        Options:AttachTooltip(trackerBtn, L["Open Tracker Settings"],
+            L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."])
+
+        local eqIconGet, eqIconSet = generalSetting("showEQIcon")
+        local eqIcon = Options:CreateCheckbox(content,
+            L["Show Everything Quests icon on the tracker"],
+            eqIconGet,
+            function(value)
+                eqIconSet(value)
+                local Bridge = ns:GetSubsystem("TrackerBridge")
+                if Bridge then Bridge:ApplyEQIcon() end
             end,
-        })
-    end)
-    reset:SetSize(160, 24)
-    place(reset, 0, 16)
+            L["Adds the Everything Quests logo at the top right of the tracker, which opens this options window. The tracker's own cogwheel opens the tracker's settings instead. You can also reach this window from the minimap button or by typing /eqs."])
+        placeL(eqIcon, 0, 8)
+
+        if ns:GetSubsystem("ChainGuide") then
+            local chainIconGet, chainIconSet = generalSetting("showChainGuideIcon")
+            local chainIcon = Options:CreateCheckbox(content,
+                L["Show Chain Guide icon on the tracker"],
+                chainIconGet,
+                function(value)
+                    chainIconSet(value)
+                    local Bridge = ns:GetSubsystem("TrackerBridge")
+                    if Bridge then Bridge:ApplyChainIcon() end
+                end,
+                L["Adds a small chain icon beside the cogwheel at the top right of the tracker, which opens the Chain Guide."])
+            placeL(chainIcon, 0, 2)
+        end
+    end
 
     local profilesHeader = Options:CreateSectionHeader(content, L["Profiles"])
-    profilesHeader:SetPoint("TOPLEFT", h, "TOPLEFT", 460, 0)
+    placeL(profilesHeader, 0, 16)
 
     local function profileList()
         local DB = ns:GetSubsystem("DB")
         local out = {}
         if not (DB and DB.db and DB.db.GetProfiles) then return out end
-        -- AceDB builds this list with pairs(), so the order is arbitrary and reshuffles
-        -- between sessions unless we sort it. The table is freshly built per call
+        -- AceDB builds this list with pairs(), so it is sorted here or it reshuffles between sessions
         local names = DB.db:GetProfiles()
         table.sort(names)
         for _, name in ipairs(names) do
@@ -834,7 +819,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
     end
     local profDD = Options:CreateDropdown(content, L["Active profile"],
         profileList, currentProfile, setProfile)
-    profDD:SetPoint("TOPLEFT", profilesHeader, "BOTTOMLEFT", 0, -16)
+    placeL(profDD, 0, 16)
     profDD:SetWidth(280)
 
     local function promptNewProfile()
@@ -872,29 +857,40 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         L["Switching profiles reloads the UI. Profiles are shared across characters; use them to keep different setups (e.g. raid vs solo). |cffEBB706New Profile|r prompts for a name and creates it on the spot."])
 
     local slashHeader = Options:CreateSectionHeader(content, L["Slash commands"])
-    slashHeader:SetPoint("TOPLEFT", profDD, "BOTTOMLEFT", 0, -20)
+    placeL(slashHeader, 0, 20)
 
     local slashText = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    slashText:SetPoint("TOPLEFT", slashHeader, "BOTTOMLEFT", 0, -8)
+    placeL(slashText, 0, 8)
     slashText:SetJustifyH("LEFT")
     slashText:SetTextColor(0.92, 0.72, 0.02)
     slashText:SetText(L["/eqs\n/everythingquests\n\n|cff999999Both open this options window.|r\n\n/eqs whatsnew\n\n|cff999999Show what's new in the latest update.|r\n\n/eqs session\n\n|cff999999Show a recap of your current play session.|r"])
 
-    if ns:GetSubsystem("Minimap") then
-        local function mmGet()
-            local DB = ns:GetSubsystem("DB")
-            return DB and not DB.char.minimap.hide
-        end
-        local function mmSet(value)
-            local DB = ns:GetSubsystem("DB")
-            if not DB then return end
-            DB.char.minimap.hide = not value
-            local LDBI = LibStub and LibStub("LibDBIcon-1.0", true)
-            if LDBI then
-                if value then LDBI:Show("EverythingQuests") else LDBI:Hide("EverythingQuests") end
-            end
-        end
-        local mm = Options:CreateCheckbox(content, L["Show minimap button"], mmGet, mmSet)
-        mm:SetPoint("TOPLEFT", slashText, "BOTTOMLEFT", 0, -30)
-    end
+    local reset = Options:CreateYellowButton(content, L["Reset all settings"], function()
+        local Dialog = ns:GetSubsystem("Dialog")
+        if not Dialog then return end
+        Dialog:Show({
+            title   = "Everything Quests",
+            text    = L["Reset every Everything Quests setting to defaults?"],
+            button1 = L["Reset"],
+            button2 = L["Cancel"],
+            onAccept = function()
+                local DB = ns:GetSubsystem("DB")
+                if DB and DB.db then
+                    if DB.db.ResetProfile then DB.db:ResetProfile() end
+                    -- ResetProfile clears only the profile scope, so this tab's global and character settings are reset by hand
+                    local g = DB.db.global
+                    if g then
+                        g.optionsWindowScale = DB.defaults.global.optionsWindowScale
+                        g.whatsNewMode       = DB.defaults.global.whatsNewMode
+                    end
+                    if DB.char and DB.char.minimap then
+                        DB.char.minimap.hide = DB.defaults.char.minimap.hide
+                    end
+                end
+                ReloadUI()
+            end,
+        })
+    end)
+    reset:SetSize(160, 24)
+    placeL(reset, 0, 20)
 end)

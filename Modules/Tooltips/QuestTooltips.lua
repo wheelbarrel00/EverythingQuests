@@ -2,8 +2,7 @@ local _, ns = ...
 
 local QT = ns:RegisterSubsystem("QuestTooltips", {})
 
--- The same ceiling the nameplate icons use, so a mob never lists more on its tooltip than it
--- shows on its plate.
+-- The nameplates' MAX_ICON_SLOTS, so a mob never lists more of your objectives than its plate shows
 local MAX_QUESTS = 4
 
 local TITLE_R, TITLE_G, TITLE_B = 1.00, 0.82, 0.00
@@ -17,6 +16,7 @@ local _seenTitles = {}
 QT.route     = "none"
 QT.unitCalls, QT.unitLines = 0, 0
 QT.itemCalls, QT.itemLines = 0, 0
+QT.partyLines = 0
 
 local function wanted()
     local DB = ns:GetSubsystem("DB")
@@ -29,12 +29,31 @@ local function objectiveCache()
     return ns:GetSubsystem("NameplateQuestIcons")
 end
 
--- The tooltip is not touched until a line is certain, so a quest with nothing outstanding
--- cannot leave a stray blank separator behind.
-local function addLines(tooltip, n)
-    if n <= 0 then return 0 end
+local function groupData()
+    local D = ns:GetSubsystem("GroupData")
+    return D and D.Progress and D or nil
+end
+
+local _slot, _shown = {}, {}
+
+local function objectiveKey(questID, otype, slot)
+    return ("%s:%s:%s"):format(tostring(questID), tostring(otype), tostring(slot))
+end
+
+-- A mob or an item answers "who still needs this", so a member who has finished it is left out.
+local function partyLines(tooltip, D, questID, otype, slot, onFirst)
+    if not (D and questID and otype and slot) then return 0 end
+    wipe(_slot)
+    _slot[slot] = true
+    local rows, n = D:Progress(questID, otype:sub(1, 1), _slot)
+    return ns.Util.AddPartyLines(tooltip, rows, n, false, onFirst)
+end
+
+-- Nothing is written until a line is certain, so a quest with nothing outstanding leaves no stray spacer
+local function addLines(tooltip, n, D)
     wipe(_seenTitles)
-    local added = 0
+    wipe(_shown)
+    local added, party = 0, 0
     for i = 1, n do
         local e = _entries[i]
         if e and e.title and e.text then
@@ -45,10 +64,87 @@ local function addLines(tooltip, n)
             end
             tooltip:AddLine("- " .. e.text, OBJ_R, OBJ_G, OBJ_B)
             added = added + 1
+            _shown[objectiveKey(e.questID, e.otype, e.slot)] = true
+            party = party + partyLines(tooltip, D, e.questID, e.otype, e.slot)
             if added >= MAX_QUESTS then break end
         end
     end
-    return added
+    return added, party
+end
+
+-- [creatureID] = { questID, packed, ... } over group members' quests. The plates' copy covers only your log
+local _partyMobs, _partyRevision = {}, nil
+
+local function partyMobs(D)
+    if _partyRevision == D.revision then return _partyMobs end
+    -- Emptied rather than dropped, because the store moves on every update a group member sends
+    for _, rows in pairs(_partyMobs) do wipe(rows) end
+    local mobsByQuest = ns.CLASSIC_QUEST_NPCS
+    local ids, n = D:Quests()
+    for i = 1, n do
+        local list = mobsByQuest and mobsByQuest[ids[i]]
+        if list then
+            for k = 1, #list do
+                local creatureID = list[k] % 10000000
+                local rows = _partyMobs[creatureID]
+                if not rows then rows = {}; _partyMobs[creatureID] = rows end
+                rows[#rows + 1] = ids[i]
+                rows[#rows + 1] = list[k]
+            end
+        end
+    end
+    _partyRevision = D.revision
+    return _partyMobs
+end
+
+-- Read off your own quest log in client order, the numbering the mob table's slots use
+local function youFinished(q, otype, slot)
+    local objs = q and q.objectives
+    if not objs then return false end
+    local seen = 0
+    for i = 1, #objs do
+        if objs[i].type == otype then
+            if seen == slot then return objs[i].finished == true end
+            seen = seen + 1
+        end
+    end
+    return false
+end
+
+-- Objectives you finished that members still need, which have no line of yours to sit under
+local function addPartyOnly(tooltip, unit, D, blocks, anyLine)
+    local QI = objectiveCache()
+    local Cache = ns:GetSubsystem("Cache")
+    local creatureID = D and Cache and QI and QI.CreatureID and QI:CreatureID(unit)
+    local rows = creatureID and partyMobs(D)[creatureID]
+    if not rows then return 0 end
+    local lines = 0
+    for k = 1, #rows, 2 do
+        if blocks >= MAX_QUESTS then break end
+        local questID, v = rows[k], rows[k + 1]
+        local slot = math.floor(v / 100000000)
+        local otype = ns.QUEST_KIND_TYPE and ns.QUEST_KIND_TYPE[math.floor((v % 100000000) / 10000000)]
+        local key = objectiveKey(questID, otype, slot)
+        local q = Cache:Get(questID)
+        if otype and not _shown[key] and youFinished(q, otype, slot) then
+            _shown[key] = true
+            local header = 0
+            local added = partyLines(tooltip, D, questID, otype, slot, function()
+                if not anyLine then tooltip:AddLine(" "); anyLine = true; header = header + 1 end
+                local title = (q and q.title) or ns.Util.QuestTitle(questID, true)
+                if not _seenTitles[title] then
+                    _seenTitles[title] = true
+                    tooltip:AddLine(title, TITLE_R, TITLE_G, TITLE_B)
+                    header = header + 1
+                end
+            end)
+            if added > 0 then
+                lines = lines + header + added
+                blocks = blocks + 1
+            end
+        end
+    end
+    return lines
 end
 
 -- OnTooltipSetItem can fire twice for one render, which would print the same lines twice. The
@@ -88,14 +184,14 @@ local function onUnit(tooltip)
     if not guid then return end
     if alreadyAdded(tooltip, guid) then return end
 
+    local D = groupData()
     local n = QI:UnitObjectives(unit, _entries)
-    local added = addLines(tooltip, n)
+    local added, party = addLines(tooltip, n, D)
+    party = party + addPartyOnly(tooltip, unit, D, added, added > 0)
     QT.unitLines = QT.unitLines + added
-    -- Only a pass that ADDED something may stamp. Stamping a zero-add records the tooltip's own
-    -- base count, and the next render of the same unit produces that identical count, so
-    -- alreadyAdded reads base >= base and refuses to look again. The quest would then never
-    -- appear on a mob whose tooltip was seen before the quest was accepted.
-    if added > 0 then stamp(tooltip, guid) end
+    QT.partyLines = QT.partyLines + party
+    -- Never stamp a zero-add pass. It records the base count, and every later render of this unit is refused
+    if added + party > 0 then stamp(tooltip, guid) end
 end
 
 local function onItem(tooltip)
@@ -111,9 +207,10 @@ local function onItem(tooltip)
     if alreadyAdded(tooltip, name) then return end
 
     local n = QI:ItemObjectives(name, _entries)
-    local added = addLines(tooltip, n)
+    local added, party = addLines(tooltip, n, groupData())
     QT.itemLines = QT.itemLines + added
-    if added > 0 then stamp(tooltip, name) end
+    QT.partyLines = QT.partyLines + party
+    if added + party > 0 then stamp(tooltip, name) end
 end
 
 -- Blizzard removed the OnTooltipSetUnit and OnTooltipSetItem scripts in the 10.0.2 tooltip

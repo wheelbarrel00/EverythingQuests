@@ -114,6 +114,53 @@ function Util.ColorizeProgress(text)
     return (text:gsub("(%d+)%s*/%s*(%d+)", progressRepl))
 end
 
+-- Every other member of a party. A raid past that is summarized, or one tooltip outgrows the screen.
+local PARTY_LINES = 4
+
+local function memberName(name, class)
+    local short = (type(Ambiguate) == "function" and Ambiguate(name, "none")) or name
+    local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+    if not (c and c.r) then return short end
+    return ("|cff%02x%02x%02x%s|r"):format(math.floor(c.r * 255), math.floor(c.g * 255),
+                                           math.floor(c.b * 255), short)
+end
+
+-- onFirst fires once, just before the first member line, so a caller's heading never sits over nothing
+function Util.AddPartyLines(tip, rows, n, wholeQuest, onFirst)
+    local shown, over = 0, 0
+    for i = 1, n or 0 do
+        local row = rows[i]
+        local needs, text = false, ""
+        for k = 1, #row.picked do
+            local o = row.picked[k]
+            if not o.finished then
+                needs = true
+                if o.required > 0 then
+                    text = text .. (text == "" and "" or "  ") .. progressRepl(o.fulfilled, o.required)
+                end
+            end
+        end
+        if wholeQuest and row.allDone then
+            needs, text = true, "|cff66d966" .. ns.L["Ready to turn in"] .. "|r"
+        end
+        if needs or wholeQuest then
+            if shown == 0 and onFirst then onFirst() end
+            if shown < PARTY_LINES then
+                tip:AddDoubleLine("  " .. memberName(row.name, row.class), text, 1, 1, 1, 1, 1, 1)
+                shown = shown + 1
+            else
+                over = over + 1
+            end
+        end
+    end
+    -- A bare count, since the koKR, zhCN and zhTW "and %d more" count with a word for things, not people
+    if over > 0 then
+        tip:AddLine("  +" .. over, 0.6, 0.6, 0.6)
+        return shown + 1
+    end
+    return shown
+end
+
 function Util.StripLeadingCount(text)
     return (text:gsub("^%s*%d+%s*/%s*%d+%s*", ""))
 end

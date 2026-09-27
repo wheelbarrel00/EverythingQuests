@@ -266,16 +266,63 @@ local function classicDraws(questID, mapID, q)
     return n > 0 and (source == "spawn" or source == "turnin")
 end
 
+M._blizzardMarks = {}
+M._blizzardStage = "never ran"
+
+-- Mirrors QuestDataProvider:RefreshAllData around Blizzard's own gate by hand. Recheck when it changes
+local function readBlizzardMarks(mapID, rows)
+    local marks = wipe(M._blizzardMarks)
+    if not ns.HAS_CLASSIC_SPAWNS then M._blizzardStage = "not this flavor" return marks end
+    local dp = _G["QuestDataProviderMixin"]
+    local gate = type(dp) == "table" and dp.ShouldShowQuest
+    if type(gate) ~= "function" then M._blizzardStage = "no Blizzard quest provider" return marks end
+    if not (GetCVarBool and GetCVarBool("questPOI")) then M._blizzardStage = "questPOI off" return marks end
+    local info = C_Map.GetMapInfo and C_Map.GetMapInfo(mapID)
+    local mapType = type(info) == "table" and info.mapType or nil
+    if mapType == nil then M._blizzardStage = "no map type" return marks end
+    local showsTask = C_TaskQuest and C_TaskQuest.DoesMapShowTaskQuestObjectives
+                      and C_TaskQuest.DoesMapShowTaskQuestObjectives(mapID)
+
+    local function ask(questID, isIndicator)
+        local ok, shown = pcall(gate, dp, questID, mapType, showsTask, isIndicator)
+        if ok and shown then marks[questID] = true end
+    end
+    if rows then
+        for i = 1, #rows do
+            local row = rows[i]
+            if row and row.questID then ask(row.questID, row.isMapIndicatorQuest) end
+        end
+    end
+    -- The routing pin Blizzard adds on top of the rows, for one quest only
+    local focused = QuestMapFrame_GetFocusedQuestID and QuestMapFrame_GetFocusedQuestID()
+    local routed = focused or (C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID
+                               and C_SuperTrack.GetSuperTrackedQuestID())
+    if type(routed) == "number" and routed > 0 and C_QuestLog.GetNextWaypointForMap then
+        local x, y = C_QuestLog.GetNextWaypointForMap(routed, mapID)
+        if x and y then ask(routed, false) end
+    end
+    M._blizzardStage = "asked"
+    return marks
+end
+
+-- On retail EQ's pin at a Blizzard marker is there to ring it, so with the owned ring on that pin stays
+local function ownedRingOn()
+    return ns.QuestPinRingWanted ~= nil and ns.QuestPinRingWanted(false) == true
+end
+
 -- Read by /eqsprobe mappoi. Three failures look identical from outside - never called, called
 -- and found nothing, called and drew pins that are not visible - and they share no fix.
 M._refreshes, M._pins, M._stage, M._mapID = 0, 0, "never ran", nil
 M._spawnPins, M._spawnThinned, M._availPins, M._turnInPins = 0, 0, 0, 0
+M._yielded = 0
 
 function providerMixin:_DoRefresh()
     self:RemoveAllData()
     M._refreshes = M._refreshes + 1
     M._pins, M._mapID, M._spawnPins, M._spawnThinned = 0, nil, 0, 0
-    M._availPins, M._turnInPins, M._untrackedHidden = 0, 0, 0
+    M._availPins, M._turnInPins, M._untrackedHidden, M._yielded = 0, 0, 0, 0
+    wipe(M._blizzardMarks)
+    M._blizzardStage = "not reached"
 
     -- Owned pins only. Available quests have their own checkbox, which is what the option's
     -- own tooltip promises, so this must not return early past the available block below.
@@ -304,22 +351,28 @@ function providerMixin:_DoRefresh()
     wipe(_seenQids)
 
     local primary = ownedWanted and C_QuestLog.GetQuestsOnMap and C_QuestLog.GetQuestsOnMap(mapID)
+    local marked = readBlizzardMarks(mapID, primary)
+    local yields = not ownedRingOn()
     if primary then
         for i = 1, #primary do
             local info = primary[i]
             local qid  = info and info.questID
-            -- WoW Forever answers here too, and the Classic tables win only where they draw a spawn or turn-in spot
-            if qid and not classicDraws(qid, mapID, Cache:Get(qid)) then
+            local q    = qid and Cache:Get(qid)
+            -- On Forever the Classic tables win where they draw, unless Blizzard's "?" marks this finished quest
+            if qid and (not classicDraws(qid, mapID, q) or (marked[qid] and q and q.isComplete)) then
                 local x, y = info.x, info.y
                 if not x or not y then
                     x, y = waypointFor(qid, mapID)
                 end
                 if type(x) == "number" and type(y) == "number" then
                     _seenQids[qid] = true
-                    local q = Cache:Get(qid)
                     -- This loop does not go through PointsFor, so the same gate is asked here
                     if q and not ns.QuestPinTracked(q) then
                         M._untrackedHidden = M._untrackedHidden + 1
+                        q = nil
+                    end
+                    if q and marked[qid] and yields then
+                        M._yielded = M._yielded + 1
                         q = nil
                     end
                     if q then
@@ -340,6 +393,10 @@ function providerMixin:_DoRefresh()
                 local n, thinned, source = M:PointsFor(qid, mapID, q)
                 if source == "untracked" then
                     M._untrackedHidden = M._untrackedHidden + 1
+                elseif source == "single" and n > 0 and marked[qid] and yields then
+                    -- Only Blizzard's routing pin reaches here, and waypointFor asked the same call
+                    M._yielded = M._yielded + 1
+                    n = 0
                 end
                 M._spawnThinned = M._spawnThinned + thinned
                 for i = 1, n do
@@ -399,6 +456,16 @@ local function attach(self)
     shadow:AddDataProvider(self.provider)
     self.shadow   = shadow
     self.attached = true
+
+    -- A yield follows the focused quest, and focusing on the open map fires no game event to redraw on
+    if not ns.HAS_CLASSIC_SPAWNS then return end
+    for _, method in ipairs({ "SetFocusedQuestID", "ClearFocusedQuestID" }) do
+        if type(WorldMapFrame[method]) == "function" then
+            hooksecurefunc(WorldMapFrame, method, function()
+                if self.provider and WorldMapFrame:IsShown() then self.provider:RefreshAllData() end
+            end)
+        end
+    end
 end
 
 function M:OnEnable()
@@ -420,4 +487,10 @@ function M:OnEnable()
     -- C_QuestLog.GetQuestWatchType. Classic has its answer from TrackerBridge instead, because
     -- EQOT owns the tracked set there and this event never fires for it.
     Events:On("QUEST_WATCH_LIST_CHANGED", refresh)
+    -- Blizzard's own markers come and go with these, and every yield depends on them
+    if not ns.HAS_CLASSIC_SPAWNS then return end
+    Events:On("QUEST_POI_UPDATE", refresh)
+    Events:On("CVAR_UPDATE", function(_, cvar)
+        if cvar == "questPOI" then refresh() end
+    end)
 end

@@ -153,9 +153,12 @@ local function rebuildCache()
                         if entry then
                             entry.type        = objType(text, itemTexture)
                             entry.itemTexture = itemTexture
-                            -- Carried for the tooltip, which names the objective off this entry
+                            -- Carried for the tooltip, which names the objective and looks up the group's progress on it
                             entry.text        = text
                             entry.title       = info.title
+                            entry.questID     = info.questID
+                            entry.otype       = otype
+                            entry.slot        = slot
                             objMap = objMap or {}
                             objMap[text] = entry
                             objList = objList or {}
@@ -494,6 +497,10 @@ end
 function QI:UnitObjectives(unit, out)
     if not unit then wipe(out); return 0 end
     return scanInto(unit, out)
+end
+
+function QI:CreatureID(unit)
+    return unit and creatureIDFromUnit(unit) or nil
 end
 
 -- Every quest waiting on this item, matched on the client's own objective text so it is right

@@ -959,6 +959,10 @@ function Probe:MapPOI()
     -- Thinned counts points the minimum separation rejected. Zero here with a high spawn count
     -- means the spread filter is not running, which reads identically to "nothing to thin".
     line("  spawn points thinned by minimum separation=%s", tostring(MP._spawnThinned))
+    -- A pin held back for Blizzard's own marker and a quest with no point here leave the same gap
+    line("  Blizzard's own markers: stage %q, quests it marks here=%s, EQ pins yielded to them=%s, owned ring=%s",
+         tostring(MP._blizzardStage), tostring(countKeys(MP._blizzardMarks)), tostring(MP._yielded),
+         tostring(ns.QuestPinRingWanted and ns.QuestPinRingWanted(false)))
     -- Switched off and hiding nothing draw the identical map, and so does a client where no source
     -- could answer, which leaves isWatched nil and keeps every pin. The rows below separate them.
     local DB = ns:GetSubsystem("DB")
@@ -1637,6 +1641,8 @@ local function tooltipWriteRoute()
     -- instruction that asked the reader to TARGET a mob, which never renders a tooltip.
     line("unit tooltips rendered so far=%d, EQ added %d line(s)", QT.unitCalls or 0, QT.unitLines or 0)
     line("item tooltips rendered so far=%d, EQ added %d line(s)", QT.itemCalls or 0, QT.itemLines or 0)
+    line("lines added for group members to unit and item tooltips so far=%d  (member lines, and the spacer, title and +N lines around them)",
+         QT.partyLines or 0)
 
     -- The unit half is gated on the Classic mob table because retail's own tooltip already
     -- carries these lines. Say so, or a retail run reads as the feature being broken.
@@ -2247,6 +2253,8 @@ function Probe:Misc()
     end
 end
 
+local minimapLogAgainstRows, minimapGivers
+
 -- HereBeDragons converts coords from its own map table and AddMinimapIconMap answers false
 -- rather than raising, so the conversion is called across the whole dataset block here.
 function Probe:Minimap()
@@ -2279,6 +2287,8 @@ function Probe:Minimap()
     -- silent, and it is the one failure that looks exactly like having nothing to draw.
     line("  icons registered=%s  REJECTED by HereBeDragons=%s",
          tostring(MM._registered), tostring(MM._rejected))
+    line("  quests yielded to Blizzard's own minimap marker=%s  (tracked, on Blizzard's rows: %s)",
+         tostring(MM._yielded), tostring(countKeys(MM._blizzardMarks)))
 
     line("3. can HereBeDragons place the player at all:")
     if HBD then
@@ -2319,6 +2329,91 @@ function Probe:Minimap()
             line("  NOT convertible - every quest whose spawns land here gets no minimap pin:")
             emit(badIDs, 8)
         end
+    end
+
+    minimapLogAgainstRows(MM, here)
+    minimapGivers(MM, HBDP)
+end
+
+-- No Lua call lists the engine's minimap markers, so this prints each quest's state to compare by eye
+function minimapLogAgainstRows(MM, here)
+    line("6. the quest log on the player's map, against Blizzard's own rows:")
+    local Cache = ns:GetSubsystem("Cache")
+    local Provider = ns:GetSubsystem("MapPOIProvider")
+    if not (here and Cache and Cache.All and Provider and Provider.PointsFor) then
+        line("  no player map, Cache or provider - nothing to list")
+        return
+    end
+    local rowOf = {}
+    local rowsFn = resolve("C_QuestLog.GetQuestsOnMap")
+    local rows = type(rowsFn) == "function" and rowsFn(here)
+    if type(rows) == "table" then
+        for i = 1, #rows do
+            if rows[i] and rows[i].questID then rowOf[rows[i].questID] = rows[i] end
+        end
+    end
+    local watchFn = resolve("C_QuestLog.GetQuestWatchType")
+    local superFn = resolve("C_SuperTrack.GetSuperTrackedQuestID")
+    -- Nil is the call's own answer for nothing super-tracked, so only an absent call reads n/a
+    line("  Blizzard rows on map %s: %s   super-tracked quest=%s   questPOI=%s",
+         tostring(here), tostring(countKeys(rowOf)),
+         tostring(type(superFn) == "function" and (superFn() or "none") or "n/a"),
+         tostring(GetCVar and GetCVar("questPOI")))
+    local filteredOut = resolve("C_Minimap.IsFilteredOut")
+    local poiFilter = Enum and Enum.MinimapTrackingFilter and Enum.MinimapTrackingFilter.QuestPOIs
+    line("  minimap tracking menu, quest markers: %s",
+         (type(filteredOut) == "function" and poiFilter)
+             and (filteredOut(poiFilter) and "OFF (filtered out)" or "on") or "n/a")
+    if MM._mapID ~= here then
+        line("  the held-back marks below come from the last minimap rebuild, on map %s, not this one",
+             tostring(MM._mapID))
+    end
+    line("  quest    done   watch        Blizzard row   EQ minimap pins")
+    local ids = {}
+    for qid in pairs(Cache:All()) do ids[#ids + 1] = qid end
+    table.sort(ids)
+    for _, qid in ipairs(ids) do
+        local q = Cache:All()[qid]
+        local row = rowOf[qid]
+        local n, _, source = Provider:PointsFor(qid, here, q)
+        local watch = "n/a"
+        if type(watchFn) == "function" then
+            local w = watchFn(qid)
+            watch = w == nil and "not watched" or tostring(w)
+        end
+        -- PointsFor answers before the minimap's own yield, which drops these two sources
+        local held = n and n > 0 and (source == "turnin" or source == "single")
+                     and MM._blizzardMarks and MM._blizzardMarks[qid]
+        line("  %-8s %-6s %-12s %-14s %s (%s)", tostring(qid), tostring(q and q.isComplete), watch,
+             row and type(row.x) == "number" and ("%.2f, %.2f"):format(row.x * 100, row.y * 100) or "none",
+             held and "0" or tostring(n),
+             held and (tostring(source) .. ", held back for Blizzard's marker") or tostring(source))
+    end
+end
+
+-- Measures GIVER_RANGE: walk toward a giver and note the distance printed when the game's mark appears
+function minimapGivers(MM, HBDP)
+    line("7. EQ's quest giver and hand-in pins the game also marks (held back within %s yards, a guess):",
+         tostring(MM._giverRange))
+    local hidden = resolve("C_Minimap.IsTrackingHiddenQuests")
+    if type(hidden) ~= "function" then
+        line("  this client has no minimap quest giver tracking call, so nothing is held back")
+        return
+    end
+    local account = resolve("C_Minimap.IsTrackingAccountCompletedQuests")
+    line("  minimap tracking menu, low-level quests: %s   account-completed quests: %s",
+         hidden() and "on" or "off",
+         type(account) == "function" and (account() and "on" or "off") or "n/a")
+    local givers = MM._givers or {}
+    line("  giver pins=%d   held back right now=%s", #givers, tostring(MM._giversHeld))
+    for i = 1, math.min(#givers, 12) do
+        local f = givers[i]
+        local ok, _, dist = pcall(HBDP.GetVectorToIcon, HBDP, f)
+        if not ok or (_G.issecretvalue and _G.issecretvalue(dist)) then dist = nil end
+        line("  %-29s %s yards   %s",
+             f.avail and ("quests " .. table.concat(f.avail, ",")) or ("hand-in " .. tostring(f.questID)),
+             type(dist) == "number" and ("%.0f"):format(dist) or "unknown",
+             f.held and "held back" or "shown")
     end
 end
 

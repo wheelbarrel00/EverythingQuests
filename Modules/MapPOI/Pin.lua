@@ -606,6 +606,28 @@ function ns.QuestPinOwned(tip, q, kind, objMask, srcID)
     ns.QuestPinObjectives(tip, q, kind, objMask)
 end
 
+local _partySlots = {}
+-- Called for the hovered quest only, since neighbors' lines would outgrow the screen in a full group
+function ns.QuestPinParty(tip, questID, kind, objMask)
+    local D = ns:GetSubsystem("GroupData")
+    if not (D and D.Progress and questID) then return 0 end
+    local typeChar, slots
+    local t = kind and objMask and objMask > 0 and ns.QUEST_KIND_TYPE
+              and ns.QUEST_KIND_TYPE[ns.QuestRealKind(kind)]
+    if t then
+        typeChar = t:sub(1, 1)
+        wipe(_partySlots)
+        local rest, i = objMask, 0
+        while rest > 0 do
+            if rest % 2 == 1 then _partySlots[i] = true end
+            rest, i = math.floor(rest / 2), i + 1
+        end
+        slots = _partySlots
+    end
+    local rows, n = D:Progress(questID, typeChar, slots)
+    return ns.Util.AddPartyLines(tip, rows, n, typeChar == nil)
+end
+
 -- Deliberately NOT part of the builder above. That one is shared with the minimap, whose pins
 -- are created click-through on purpose, and with an owned pin merely listing an available
 -- neighbor - neither can honor a right-click, so only the caller that can may promise it.
@@ -632,6 +654,7 @@ function Pin:OnMouseEnter()
         tip:SetText(ns.QuestPinTitle(q, self.questID), 1.0, 0.82, 0.0, 1, true)
         if q.zone   then tip:AddLine(q.zone, 0.7, 0.7, 0.7) end
         ns.QuestPinOwned(tip, q, self.kind, self.objMask, self.srcID)
+        ns.QuestPinParty(tip, self.questID, self.kind, self.objMask)
     end
 
     local Provider = ns:GetSubsystem("MapPOIProvider")
