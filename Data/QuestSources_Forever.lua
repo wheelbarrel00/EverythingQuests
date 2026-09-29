@@ -19,6 +19,7 @@ local _, ns = ...
 -- ask by id on this flavor, so unlike a quest title there is nothing to prefer over it.
 ns.CLASSIC_QUEST_SOURCES = {
 npc = {
+	[167]="Morhan Coppertongue",
 	[196]="Eagan Peltskinner",
 	[197]="Marshal McBride",
 	[198]="Khelden Bremen",

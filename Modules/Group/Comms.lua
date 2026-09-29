@@ -284,6 +284,7 @@ end
 
 -- That addon never volunteers its log, so a newcomer is asked back. Parties only, it answers one by one.
 function Comms:AskNewcomer(sender)
+    if not ns.HAS_CLASSIC_SPAWNS then return false end
     if not canSend() or IsInRaid() then return false end
     local now = GetTime()
     local last = _newcomerAskedAt[sender]

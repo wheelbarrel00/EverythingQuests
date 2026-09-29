@@ -43,8 +43,9 @@ end
 
 local KILL_WORDS = { "slain", "slay", "kill", "defeat", "destroy", "eliminat", "wound" }
 local CHAT_WORDS = { "speak", "talk" }
-local function objType(text, hasItem)
+local function objType(text, hasItem, otype)
     if hasItem then return "ITEM" end
+    if otype == "item" then return "LOOT" end
     if not text then return "DEFAULT" end
     local l = text:lower()
     for i = 1, #KILL_WORDS do if l:find(KILL_WORDS[i], 1, true) then return "KILL" end end
@@ -69,14 +70,14 @@ local _logRows = {}
 -- character in any language that uses one.
 local NAME_SEPARATORS = { ":", "\239\188\154" }
 
--- An item objective's text is the item's own name followed by its count, in the client's own
--- language, so the name is taken from the text rather than from a shipped table. The count is
--- stripped first and the separator second, because the separator is the part that varies by
--- language while "n/n" does not. The whole name has to match and not a substring, or "Okra"
--- would claim every tooltip whose item merely contains it.
+-- The item's name is the objective text less its count, last on Era and TBC ("Okra: 0/14") and first on Forever
 local function objectiveItemName(text)
     local name, found = text:gsub("%s*%d+%s*/%s*%d+%s*$", "")
-    if found == 0 then return text end
+    if found == 0 then
+        local lead, n = text:gsub("^%s*%d+%s*/%s*%d+%s+", "")
+        if n == 0 then return text end
+        return lead
+    end
     name = name:gsub("%s+$", "")
     for i = 1, #NAME_SEPARATORS do
         local sep = NAME_SEPARATORS[i]
@@ -151,7 +152,7 @@ local function rebuildCache()
                             end
                         end
                         if entry then
-                            entry.type        = objType(text, itemTexture)
+                            entry.type        = objType(text, itemTexture, otype)
                             entry.itemTexture = itemTexture
                             -- Carried for the tooltip, which names the objective and looks up the group's progress on it
                             entry.text        = text
@@ -299,6 +300,7 @@ local EQ_LOGO = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\eq-logo-v
 local TEX = {
     DEFAULT = { tex  = EQ_LOGO },
     KILL    = { tex  = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\skull.tga" },
+    LOOT    = { tex  = EQ_LOGO },
     CHAT    = { tex  = "Interface\\WorldMap\\ChatBubble_64.PNG", coord = { 0, 0.5, 0.5, 1 } },
     ITEM    = { item = true },
 }

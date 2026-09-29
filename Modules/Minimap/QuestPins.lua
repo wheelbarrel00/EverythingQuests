@@ -200,8 +200,6 @@ function M:Rebuild()
             local x, y = Provider._ptX[i], Provider._ptY[i]
             local f = acquire()
             f.questID, f.kind, f.objMask = qid, Provider._ptKind[i], Provider._ptMask[i]
-            -- Assigned every acquire, never conditionally. These frames are pooled and only
-            -- these fields are rewritten, so a skipped one keeps the last quest's finisher.
             f.srcID = Provider._ptSrc[i]
             f.texture:SetTexture(ns.QuestPinTexture(q.isComplete, f.kind))
             f.texture:SetVertexColor(ns.QuestPinTint(f.kind, q.isComplete))
@@ -233,10 +231,11 @@ function M:Rebuild()
             f.texture:SetVertexColor(ns.QuestPinAvailableTint())
             if HBDP:AddMinimapIconMap(REF, f, mapID, Avail._locX[i], Avail._locY[i], false, false) then
                 M._registered = M._registered + 1
-                -- Kind 1 is a creature. Objects and dropped items are assumed to carry no engine mark
-                if engine and Avail._locKind[i] == 1 then
+                -- Per quest, since a creature's spot can hold an item start too. Objects and items are assumed unmarked
+                if engine then
+                    local kinds = quests.startKinds
                     for k = 1, #quests do
-                        if engineMarks(quests[k], Avail, floor) then
+                        if kinds[k] == 1 and engineMarks(quests[k], Avail, floor) then
                             M._givers[#M._givers + 1] = f
                             break
                         end

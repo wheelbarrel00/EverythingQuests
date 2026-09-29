@@ -5,6 +5,26 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.52.0] - 2026-09-28
+
+Quest tooltips fixed on WoW Forever and Burning Crusade Classic, a loot icon on nameplates, whole factions named in the Quest Browser, and three more Forever quests.
+
+### Improvements
+
+- **A loot icon on nameplates.** An enemy that drops an item one of your quests needs now shows the Everything Quests logo over its nameplate. It used to show the skull, the same as an enemy you need to kill, so the two looked alike. Enemies you need to kill keep the skull, and a quest with an item of its own to use still shows that item.
+
+- **Whole factions in the Quest Browser.** A quest open to every race of a faction now reads "Races: Alliance" or "Races: Horde" instead of listing each race. On WoW Forever the old list left out the Skyborne, who can take those quests too. A quest open to only some races of a faction still names them, so on Burning Crusade Classic a quest for the four original Alliance races still lists those four.
+
+- **Three more WoW Forever quests.** Ingredients for the Forge in Loch Modan and Expanding Horizons in Darkshore now show where they start, and WANTED: Jai'vhanel in Darkshore shows where it starts and where to hand it in.
+
+### Bug Fixes
+
+- **Your quest listed twice on WoW Forever mob tooltips.** Forever lists your quest and its objectives on a mob's tooltip itself, and Everything Quests added a second copy under it. Everything Quests now leaves mob tooltips on Forever to the game, as it always has on retail. The game also lists your group's progress there, including for objectives you have already finished, so the group lines Everything Quests added to Forever mob tooltips in 1.51.0 are gone as well.
+
+- **No Everything Quests lines on WoW Forever item tooltips.** Forever writes an objective with its count first, as in "3/6 Fine Crab Chunks", where Classic Era writes it last, as in "Okra: 0/14". Everything Quests only understood the second form, so it never recognized a Forever quest item. Hover a quest item you still need on Forever and your objective now appears under the game's own "Quest Item" line, with the group members who still need it.
+
+- **No Everything Quests lines on any Burning Crusade Classic tooltip.** The quest lines Everything Quests adds to mob and item tooltips have never appeared on Burning Crusade Classic since they arrived in 1.43.0, and neither have the group lines 1.51.0 added to those tooltips. That client carries part of the newer tooltip system but never runs it on its tooltips, and Everything Quests was waiting on it. It now uses the same tooltip hooks as Classic Era.
+
 ## [1.51.0] - 2026-09-27
 
 Your group's quest progress now shows on quest markers and tooltips, and on WoW Forever, Everything Quests no longer draws a second marker beside the game's own on the world map, or on the minimap for the quests you track and the quest NPCs near you.

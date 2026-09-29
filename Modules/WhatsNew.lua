@@ -3,15 +3,18 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.51.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.51.0"
+local FEATURE_POPUP_VERSION = "1.52.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.52.0"
 
 local POPUP_BODY = [[
-|cffEBB706See how far along your group is|r
-Everything Quests has shared quest progress with your group since 1.47.0, and now you can see it, for the quests in your own quest log. Hover an item and the group members who still need it appear under your own objective. Hover one of the Everything Quests markers on the world map, or on the minimap on Classic Era, Burning Crusade Classic and WoW Forever, and the group members on that quest are listed in their class color with their progress. A kill, loot or object marker lists only those who still need that objective. On Classic Era and Burning Crusade Classic, a mob lists them under your own objective. There and on Forever, a mob also lists those who still need an objective you have already finished. On retail, mob tooltips are left to the game. It works with group members running Everything Quests and, where "Read other quest addons as well" is on, members running other quest addons.
+|cffEBB706Quest tooltips, fixed on two flavors|r
+On WoW Forever, a mob's tooltip no longer shows your quest twice. The game lists it there, along with your group's progress, so Everything Quests leaves it alone. Forever quest items now show your objective and the group members who still need it. On Burning Crusade Classic, the quest lines on mob and item tooltips never appeared at all, and now they do.
 
-|cffEBB706One marker per quest on Forever|r
-Forever draws its own marker for every quest in your log, and Everything Quests drew a second one beside it. Now the game's marker stands alone on the world map, and on the minimap for the quests you track. The kill, loot and object markers stay, because the game draws nothing like them. On the minimap, a quest NPC near you now carries only the game's own "!" or "?" too, tracked or not. Farther out, Everything Quests still marks quest givers, and the hand-ins of quests you are not tracking.
+|cffEBB706A loot icon on nameplates|r
+An enemy that drops an item your quest needs now shows the Everything Quests logo instead of the skull, so you can tell it apart from an enemy you need to kill.
+
+|cffEBB706Also new|r
+The Quest Browser now says "Races: Alliance" or "Races: Horde" for a quest open to a whole faction, and three more WoW Forever quests have markers, in Loch Modan and Darkshore.
 
 |cffEBB706Thank you|r
 Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.

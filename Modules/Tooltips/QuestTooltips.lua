@@ -36,6 +36,22 @@ end
 
 local _slot, _shown = {}, {}
 
+local LT = Enum and Enum.TooltipDataLineType
+local QUEST_OBJECTIVE = (LT and LT.QuestObjective) or 8
+local QUEST_TITLE     = (LT and LT.QuestTitle)     or 17
+local QUEST_PLAYER    = (LT and LT.QuestPlayer)    or 18
+
+-- Blizzard's UI hides no quest line of its tooltip data, so data naming a quest is already on screen
+local function drawsQuestLines(data)
+    local lines = type(data) == "table" and data.lines
+    if type(lines) ~= "table" then return false end
+    for i = 1, #lines do
+        local t = lines[i] and lines[i].type
+        if t == QUEST_OBJECTIVE or t == QUEST_TITLE or t == QUEST_PLAYER then return true end
+    end
+    return false
+end
+
 local function objectiveKey(questID, otype, slot)
     return ("%s:%s:%s"):format(tostring(questID), tostring(otype), tostring(slot))
 end
@@ -77,7 +93,7 @@ local _partyMobs, _partyRevision = {}, nil
 
 local function partyMobs(D)
     if _partyRevision == D.revision then return _partyMobs end
-    -- Emptied rather than dropped, because the store moves on every update a group member sends
+    -- Row tables are reused, because the store moves on every update a group member sends
     for _, rows in pairs(_partyMobs) do wipe(rows) end
     local mobsByQuest = ns.CLASSIC_QUEST_NPCS
     local ids, n = D:Quests()
@@ -92,6 +108,9 @@ local function partyMobs(D)
                 rows[#rows + 1] = list[k]
             end
         end
+    end
+    for creatureID, rows in pairs(_partyMobs) do
+        if #rows == 0 then _partyMobs[creatureID] = nil end
     end
     _partyRevision = D.revision
     return _partyMobs
@@ -165,10 +184,8 @@ local function onUnit(tooltip)
     QT.unitCalls = QT.unitCalls + 1
     if not (tooltip and wanted()) then return end
     if tooltip.IsForbidden and tooltip:IsForbidden() then return end
-    -- Retail's own unit tooltip already carries these lines, so EQ would print a second copy of
-    -- every one. The gate is the Classic mob table's presence, never a build number - only the
-    -- flavor TOCs list that file.
-    if not ns.CLASSIC_QUEST_NPCS then return end
+    -- Retail and Forever build this tooltip from data that carries the quest lines, so EQ adds nothing
+    if ns.Has.TooltipDataUnit then return end
     local QI = objectiveCache()
     if not (QI and QI.UnitObjectives) then return end
     if type(tooltip.GetUnit) ~= "function" then return end
@@ -194,10 +211,11 @@ local function onUnit(tooltip)
     if added + party > 0 then stamp(tooltip, guid) end
 end
 
-local function onItem(tooltip)
+local function onItem(tooltip, data)
     QT.itemCalls = QT.itemCalls + 1
     if not (tooltip and wanted()) then return end
     if tooltip.IsForbidden and tooltip:IsForbidden() then return end
+    if drawsQuestLines(data) then return end
     local QI = objectiveCache()
     if not (QI and QI.ItemObjectives) then return end
     if type(tooltip.GetItem) ~= "function" then return end
@@ -213,15 +231,14 @@ local function onItem(tooltip)
     if added + party > 0 then stamp(tooltip, name) end
 end
 
--- Blizzard removed the OnTooltipSetUnit and OnTooltipSetItem scripts in the 10.0.2 tooltip
--- rewrite and replaced them with TooltipDataProcessor. Classic kept the scripts and has neither
--- TooltipDataProcessor nor C_TooltipInfo, which is why Core/Compat.lua feature-detects
--- there, so presence decides the route rather than a build number.
+-- TBC defines TooltipDataProcessor too, but only a tooltip with ProcessInfo ever runs its post-calls
 local function installModern()
     local P = _G["TooltipDataProcessor"]
     local T = _G["Enum"] and _G["Enum"].TooltipDataType
+    local GT = _G["GameTooltip"]
     if type(P) ~= "table" or type(P.AddTooltipPostCall) ~= "function" then return false end
     if not (T and T.Unit and T.Item) then return false end
+    if not (GT and type(GT.ProcessInfo) == "function") then return false end
     -- Committed once the surface exists. Installing one half and then falling back would hook
     -- the other surface twice and double its lines.
     QT.route = "TooltipDataProcessor"

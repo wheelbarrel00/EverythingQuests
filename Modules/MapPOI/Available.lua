@@ -2,24 +2,19 @@ local _, ns = ...
 
 local M = ns:RegisterSubsystem("AvailableQuests", {})
 
--- Everything here is gated on the generated table's own presence, never a build number. Only the
--- flavor TOCs list it, so on retail this answers nothing and Blizzard's own available markers are
--- left to do the job they already do there.
+-- Gated on the generated table's presence, never a build number. Only the flavor TOCs list it
 local function data()
     return ns.CLASSIC_QUEST_AVAILABLE
 end
 
--- Bit index i, zero based, is race id i+1 and class id i+1. Tested by modulo rather than by the
--- bit library, which the offline harness's interpreter does not have.
+-- Bit i (zero based) is race or class id i+1, tested by modulo as the offline interpreter has no bit library
 local function hasBit(mask, flag)
     if not mask or mask == 0 then return true end
     if not flag then return false end
     return (mask % (flag + flag)) >= flag
 end
 
--- The third return of UnitRace and UnitClass is the numeric id, but a token fallback is kept
--- because the feature is meaningless without one - a wrong race bit offers the other faction's
--- quests, which is worse than showing nothing.
+-- For a client that gives no numeric id, since the gate cannot run without a bit
 local RACE_BIT = {
     Human = 1, Orc = 2, Dwarf = 4, NightElf = 8, Scourge = 16,
     Tauren = 32, Gnome = 64, Troll = 128, Goblin = 256, BloodElf = 512, Draenei = 1024,
@@ -29,8 +24,7 @@ local CLASS_BIT = {
     SHAMAN = 64, MAGE = 128, WARLOCK = 256, MONK = 512, DRUID = 1024,
 }
 
--- Forever's Skyborne races (ids 95 and 96) have no bit the four-digit race mask can hold, so a race
--- with no bit takes a quest whose mask holds every Era race of its faction.
+-- Forever's Skyborne races (ids 95 and 96) have no mask bit, so they need every Era race of their faction
 local ALLIANCE_ERA_RACES = { 1, 4, 8, 64 }
 local HORDE_ERA_RACES    = { 2, 16, 32, 128 }
 
@@ -76,8 +70,7 @@ local function readPlayer()
     end
 end
 
--- Read by /eqsprobe. Which gates ran and which could not is the difference between "this quest is
--- filtered out" and "this gate never fired", and the two look identical on the map.
+-- For /eqsprobe, since a gate that never ran and one that filtered look identical on the map
 M._gatesRun = {}
 M._resolved, M._availableN, M._reason = 0, 0, {}
 
@@ -102,8 +95,7 @@ local function isCompleted(questID)
     return false
 end
 
--- A quest in the log is not on offer, with one exception that is easy to miss: a FAILED quest can
--- be taken again, so its giver should still be marked.
+-- A quest in the log is not on offer unless it FAILED, as a failed quest can be taken again
 local function logState(questID)
     local Cache = ns:GetSubsystem("Cache")
     local q = Cache and Cache.quests and Cache.quests[questID]
@@ -117,14 +109,10 @@ local _permaNo = {}
 -- Declared here because isAvailable reads them and preparePass, further down, is what sets them.
 local _holidays, _hideSeason, _hideHigh, _redCeiling
 
--- Bit 2 is the upstream QUEST_SPECIAL_FLAG_EXPLORATION_OR_EVENT: a quest COMPLETED by exploring
--- or by a script, never one that needs a holiday. The source database names only bit 1 and gates
--- nothing on bit 2.
+-- Bit 2 marks a quest completed by exploring or a script, never a holiday. The source gates nothing on it
 local SF_REPEATABLE, SF_EXPLORE = 1, 2
 
--- Blizzard's own grey threshold, so "low level" here means exactly what the client means by it.
--- Absent means the filter cannot judge and every quest is shown, which is the same fail-open rule
--- the objective mask uses - hiding on missing data empties the map and reads as a broken feature.
+-- The client's own grey threshold. Unreadable shows every quest, as hiding on missing data empties the map
 local function trivialFloor()
     local ok, range
     if type(_G.GetQuestGreenRange) == "function" then
@@ -145,10 +133,7 @@ local function trivialFloor()
     return _level - range
 end
 
--- The level at which the game first colors a quest RED for this character, which is what it
--- uses to say "out of reach". Derived rather than a fixed offset so it follows the client.
--- Measured on 1.15.9 at level 22: yellow to 24, orange 25 and 26, red from 27, so +5 today.
--- Nil means it could not be read, and an unreadable gate shows the quest.
+-- The first level the client colors red, derived rather than fixed (+5 at level 22 on 1.15.9). Nil shows the quest
 local function redCeiling()
     if type(_G.GetQuestDifficultyColor) ~= "function" then return nil end
     local impossible = _G.QuestDifficultyColors and _G.QuestDifficultyColors.impossible
@@ -175,8 +160,7 @@ local function allCompleted(list)
     return true
 end
 
--- A gate that cannot be evaluated shows the quest - a missing pin is a silent failure, a surplus
--- one is visible.
+-- An unreadable standing shows the quest, since a missing pin fails silently and a surplus one is seen
 local function repStanding(factionID)
     if C_Reputation and C_Reputation.GetFactionDataByID then
         local ok, info = pcall(C_Reputation.GetFactionDataByID, factionID)
@@ -206,10 +190,7 @@ local function countReason(key)
     M._reason[key] = (M._reason[key] or 0) + 1
 end
 
--- The refusal reasons double as the Quest Browser's explanation for a single quest, so they are
--- returned rather than counted at the point of refusal. Counting them here keeps /eqsprobe
--- available's sum-to-total invariant, which is what proves each quest is refused by exactly one
--- gate, while one quest can be asked the same question without touching the counters.
+-- Returned rather than counted, so the Quest Browser can ask about one quest without touching the counters
 local REASON_COMPLETED   = "completed"
 local REASON_IN_LOG      = "in your quest log"
 local REASON_HOLIDAY     = "holiday quest"
@@ -222,12 +203,10 @@ local REASON_LATER_STEP  = "later step done"
 local REASON_BRANCH      = "took another branch"
 local REASON_REPUTATION  = "reputation"
 
--- Category bits, matching Data/QuestCategory_Classic.lua. The event bit is deliberately not read
--- here: it is derived from the same flag as SF_EXPLORE and so names ordinary quests, not holidays.
+-- The Data/QuestCategory bits. The event bit (4) stays unread, as it comes from SF_EXPLORE, not holidays
 local CAT_INSTANCE, CAT_REPEATABLE, CAT_PROFESSION = 1, 2, 16
 
--- Each entry is a filter the user can switch on to REMOVE that category, so nil reads as "show
--- it" and a profile that predates these options is unchanged.
+-- Each key HIDES its category, so nil shows it and older profiles are unchanged
 local CATEGORY_FILTERS = {
     { bit = CAT_INSTANCE,   key = "hideDungeonQuests",    reason = "dungeon or raid quest" },
     { bit = CAT_REPEATABLE, key = "hideRepeatableQuests", reason = "repeatable quest" },
@@ -248,8 +227,7 @@ local function refreshCategoryMask()
     end
 end
 
--- Answers the REASON so the caller can count it, because /eqsprobe available proves itself by
--- every rejection summing to the number considered. A gate that returns a bare false leaks.
+-- Answers the reason, so every refusal counts toward /eqsprobe available's sum to the total
 local function categoryHidden(questID)
     if _catMask == 0 then return nil end
     local cats = ns.CLASSIC_QUEST_CATEGORY
@@ -282,7 +260,6 @@ local function isAvailable(questID, D, hideLowLevel, floor)
     local inLog, failed = logState(questID)
     if inLog and not failed then return false, REASON_IN_LOG end
 
-
     local races = math.floor(gates % 1e8 / 1e4)
     if not raceAllows(races) then
         if not _raceEveryOf then _permaNo[questID] = true end
@@ -309,8 +286,7 @@ local function isAvailable(questID, D, hideLowLevel, floor)
         if questLevel > 0 and questLevel >= _redCeiling then return false, REASON_HIGH_LEVEL end
     end
 
-    -- Below race, class and level so its count excludes quests they reject anyway. It never reads
-    -- specialFlags bit 2, which marks exploration quests. Holidays.lua owns the dates and fails open.
+    -- Below race, class and level so it counts only what the season costs. Holidays.lua owns the dates
     if _hideSeason and _holidays and _holidays:IsOutOfSeason(questID) then
         return false, REASON_HOLIDAY
     end
@@ -323,8 +299,7 @@ local function isAvailable(questID, D, hideLowLevel, floor)
         if preAll and not allCompleted(preAll) then return false, REASON_PREREQ end
     end
 
-    -- The parent has to be ACTIVE, not merely done - these are the steps of an escort or a
-    -- multi-part quest that only exist while you are on it.
+    -- The parent must be in the log, not merely done, as these steps exist only while you are on it
     local parent = D.parent[questID]
     if parent then
         local parentInLog = logState(parent)
@@ -360,21 +335,15 @@ function M:Invalidate()
     _built, _prepared = false, false
 end
 
--- Everything the gate reads about the PLAYER rather than about a quest. Shared with Explain so
--- that asking about one quest and asking about all of them cannot diverge on the player state.
--- _prepared is what keeps a caller asking about one quest at a time from re-reading the whole
--- quest log per question, which a details panel does once per prerequisite.
+-- The player side of the gate, shared with Explain. _prepared saves a log refresh per question asked
 local function preparePass()
     refreshCategoryMask()
 
-    -- Forces the cache's own refresh once, up front. logState reads Cache.quests directly, which
-    -- skips that refresh, so without this a cold login reads an empty log and every quest already
-    -- in it is offered again.
+    -- Forces the cache's refresh once, as logState reads Cache.quests directly and a cold login reads it empty
     local Cache = ns:GetSubsystem("Cache")
     if Cache and Cache.All then Cache:All() end
 
-    -- Resolved and reset once per pass rather than per quest: the season answer is the same for
-    -- every quest in one rebuild, and asking per quest is a client time call per holiday quest.
+    -- Once per pass, as the season answer is the same for every quest in a rebuild
     _holidays = ns:GetSubsystem("QuestHolidays")
     if _holidays then _holidays:BeginPass() end
 
@@ -386,8 +355,7 @@ local function preparePass()
 
     local DB = ns:GetSubsystem("DB")
     local map = DB and DB.db.profile.map
-    -- Compared against false, not tested for truthiness, so a profile written before this option
-    -- existed reads as ON, which is what the checkbox shows for the same nil.
+    -- Compared against false, so a profile older than the option reads ON, as its checkbox shows
     _hideLowLevel = not (map and map.hideLowLevelQuests == false)
     _hideSeason = not (map and map.hideOutOfSeasonQuests == false)
     _hideHigh = (map and map.hideHighLevelQuests) == true
@@ -403,8 +371,7 @@ end
 function M:Rebuild()
     wipe(_available)
     wipe(M._reason)
-    -- Wiped with the rest, or a pass that returned early keeps reporting the gates an EARLIER
-    -- pass ran, which is the one thing this counter exists to tell apart.
+    -- Wiped too, or a pass that returns early reports the gates an earlier pass ran
     wipe(M._gatesRun)
     M._resolved, M._availableN, M._raceRoute = 0, 0, nil
     _built = true
@@ -492,8 +459,7 @@ function M:IsExplorationOrScripted(questID)
     return (flags % (SF_EXPLORE + SF_EXPLORE)) >= SF_EXPLORE
 end
 
--- The race and class masks, undecoded. Handing out the raw mask keeps the packing decoded in one
--- place while leaving the bit-to-name mapping to whoever wants to render it. Zero means no gate.
+-- The raw masks, leaving the bit names to the caller. Zero means no gate
 function M:RaceMask(questID)
     local D = data()
     local gates = D and D.gates[questID]
@@ -508,8 +474,7 @@ function M:ClassMask(questID)
     return gates % 1e4
 end
 
--- The two state reads the gate itself performs, so a caller asking about one quest cannot
--- disagree with the map about whether it is done or already taken.
+-- The gate's own two state reads, so one question cannot disagree with the map
 function M:IsCompleted(questID)
     ensure()
     if not _prepared then preparePass() end
@@ -518,9 +483,7 @@ end
 
 function M:InLog(questID)
     ensure()
-    -- Same guard IsCompleted needs, and for the same reason: logState reads Cache.quests
-    -- directly, and only preparePass forces the refresh that fills it. Without this a caller
-    -- asking before any pass has run reads an empty log and reports you are carrying nothing.
+    -- As in IsCompleted, since only preparePass forces the refresh that fills Cache.quests
     if not _prepared then preparePass() end
     return logState(questID)
 end
@@ -534,17 +497,14 @@ function M:TrivialFloor()
     return trivialFloor()
 end
 
--- srcID*1e9 + kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4). The fourth return is the merge KEY and
--- is deliberately the coordinate half alone: two quests offered by the same person share one pin,
--- and folding the source into the key would split that into overlapping pins on one spot.
+-- srcID*1e9 + kind*1e8 + coordinates. The merge key is the coordinates alone, so one giver is one pin
 local function decodeStart(v)
     local rest = v % 1e8
     return math.floor(v / 1e8) % 10, math.floor(rest / 1e4) / 1e4, (rest % 1e4) / 1e4, rest,
            math.floor(v / 1e9)
 end
 
--- Every place this quest can be picked up, across all maps. PointsFor answers the different
--- question of what to draw on one open map.
+-- Every start of one quest on every map, where PointsFor answers what to draw on one map
 function M:StartsFor(questID, out)
     local D = data()
     local byMap = D and D.start[questID]
@@ -561,8 +521,7 @@ function M:StartsFor(questID, out)
     return n
 end
 
--- skillLineID*1e4 + requiredValue. The id has no name lookup on this client, so only the fact
--- that a profession is required can be rendered - see the note in the generator.
+-- skillLineID*1e4 + requiredValue. The id has no name lookup here, so only the need can be shown
 function M:SkillGate(questID)
     local D = data()
     local v = D and D.skill[questID]
@@ -570,8 +529,7 @@ function M:SkillGate(questID)
     return math.floor(v / 1e4), v % 1e4
 end
 
--- factionID*1e6 + standing, for both reputation gates. A branch, because the and/or form
--- `(which == "max") and D.maxRep[id] or D.minRep[id]` answers the minimum when no maximum exists.
+-- factionID*1e6 + standing. An if, as the and/or form answers the minimum when no maximum exists
 function M:RepGate(questID, which)
     local D = data()
     if not D then return nil end
@@ -581,22 +539,18 @@ function M:RepGate(questID, which)
     return math.floor(v / 1e6), v % 1e6
 end
 
--- Asks the SAME gate the map pass asks, for one quest. Returns true, or false plus the reason it
--- was refused. A second implementation would let the browser and the map disagree about a quest
--- while both looked right on their own, which is the failure this shape exists to prevent.
+-- The SAME gate the map pass asks, for one quest, so the browser and the map cannot disagree
 function M:Explain(questID)
     local D = data()
     if not (D and questID and D.gates[questID]) then return nil end
     ensure()
     if _available[questID] then return true end
-    -- The pass can return before reading the player at all - the option being off is the common
-    -- case - and the browser still owes an answer, so the player state is read on demand.
+    -- A pass can stop before reading the player (the option off), and the browser still owes an answer
     if not _prepared and not preparePass() then return nil end
     return isAvailable(questID, D, _hideLowLevel, _floor)
 end
 
--- The worst item-started quest offers over a thousand points on one map. Locations merge below,
--- because one giver can offer dozens of quests.
+-- An item-started quest reaches over a thousand points on one map. One spot can hold over two dozen quests
 local MAX_PER_QUEST = 4
 
 M._locX, M._locY, M._locKind, M._locQuests, M._locN = {}, {}, {}, {}, 0
@@ -617,22 +571,21 @@ function M:PointsFor(mapID)
         local list = byMap and byMap[mapID]
         if list then
             local taken = 0
-            -- Stored densest first, so walking in order is what makes a low cap keep the best
-            -- locations rather than arbitrary ones. Never reorder here.
+            -- Stored densest first, so the cap keeps the best locations. Never reorder here
             for i = 1, #list do
                 if taken >= MAX_PER_QUEST then break end
                 local kind, x, y, key, src = decodeStart(list[i])
                 local slot = _byCoord[key]
                 if not slot then
-                    slot = { x = x, y = y, kind = kind, src = src, quests = {} }
+                    slot = { x = x, y = y, kind = kind, src = src, quests = {}, kinds = {} }
                     _byCoord[key] = slot
                     _order[#_order + 1] = key
                 elseif kind < slot.kind or (kind == slot.kind and src < slot.src) then
-                    -- An NPC outranks a dropped starter and a tie goes to the lower source, so the label
-                    -- is stable. Kind and source move TOGETHER, because the kind picks the id space.
+                    -- The lower kind wins, then the lower source. They move together, as the kind picks the id space
                     slot.kind, slot.src = kind, src
                 end
-                slot.quests[#slot.quests + 1] = questID
+                local q = #slot.quests + 1
+                slot.quests[q], slot.kinds[q] = questID, kind
                 taken = taken + 1
             end
         end
@@ -644,10 +597,10 @@ function M:PointsFor(mapID)
         n = n + 1
         self._locX[n], self._locY[n] = slot.x, slot.y
         self._locKind[n], self._locQuests[n] = slot.kind, slot.quests
-        -- Rides on the quest list because that table is what travels to the pin and on to the
-        -- tooltip. A named key leaves the array border alone, so #quests is still the count.
+        -- On the quest list, which travels to the pin. Named keys leave #quests as the count
         slot.quests.startKind = slot.kind
         slot.quests.startSrc  = slot.src
+        slot.quests.startKinds = slot.kinds
     end
     self._locN = n
     return n
@@ -658,10 +611,7 @@ function M:OnEnable()
     local Events = ns:GetSubsystem("Events")
 
     local function invalidate() M:Invalidate() end
-    -- QUEST_LOG_UPDATE is the ONLY event that fires when a quest fails in place, and it is also
-    -- what arrives when a cold login's quest log finally streams in. Without it a pass computed
-    -- against an empty log latched for the session and drew every quest you were carrying as one
-    -- you could pick up. Invalidate is a single flag write, and the sweep it schedules is lazy.
+    -- QUEST_LOG_UPDATE is the only event for a quest failing in place, and it brings a cold login's log
     Events:On("QUEST_LOG_UPDATE",     invalidate)
     Events:On("QUEST_ACCEPTED",       invalidate)
     Events:On("QUEST_REMOVED",        invalidate)

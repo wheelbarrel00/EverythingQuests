@@ -68,14 +68,16 @@ local function className(index)
     return token
 end
 
--- A mask of zero is no gate at all rather than "no races allowed", which is why it returns nil
--- and the caller renders nothing instead of an empty list.
-local function maskNames(mask, namer, count)
-    if not mask or mask == 0 then return nil end
-    local out
+local function hasBit(mask, i)
+    local bit = 2 ^ (i - 1)
+    return (mask % (bit + bit)) >= bit
+end
+
+-- A zero mask is no gate rather than "no races allowed", so it adds no names
+local function maskNames(mask, namer, count, out)
+    if not mask or mask == 0 then return out end
     for i = 1, count do
-        local bit = 2 ^ (i - 1)
-        if (mask % (bit + bit)) >= bit then
+        if hasBit(mask, i) then
             local name = namer(i)
             if name then
                 out = out or {}
@@ -84,6 +86,61 @@ local function maskNames(mask, namer, count)
         end
     end
     return out
+end
+
+local FACTION_RACES = {
+    { label = "FACTION_ALLIANCE", races = { 1, 3, 4, 7, 11 } },
+    { label = "FACTION_HORDE",    races = { 2, 5, 6, 8, 9, 10 } },
+}
+
+local _factionData, _factionMasks
+
+-- Only races the loaded data names somewhere count, so 77 is the whole Alliance on Era and not on TBC
+local function factionMasks(A, D)
+    if _factionData == D then return _factionMasks end
+    local present = {}
+    for questID in pairs(D.gates) do
+        local mask = A:RaceMask(questID)
+        if mask and mask > 0 then
+            for i = 1, #RACE_TOKEN do
+                if hasBit(mask, i) then present[i] = true end
+            end
+        end
+    end
+    local masks = {}
+    for f = 1, #FACTION_RACES do
+        local races, sum = FACTION_RACES[f].races, 0
+        for k = 1, #races do
+            local i = races[k]
+            if present[i] then sum = sum + 2 ^ (i - 1) end
+        end
+        masks[f] = sum
+    end
+    _factionData, _factionMasks = D, masks
+    return masks
+end
+
+local function containsMask(mask, part)
+    for i = 1, #RACE_TOKEN do
+        if hasBit(part, i) and not hasBit(mask, i) then return false end
+    end
+    return true
+end
+
+local function raceNames(A, D, mask)
+    if not mask or mask == 0 then return nil end
+    local masks = factionMasks(A, D)
+    local out
+    for f = 1, #FACTION_RACES do
+        local label = _G[FACTION_RACES[f].label]
+        local whole = masks[f]
+        if whole > 0 and type(label) == "string" and label ~= "" and containsMask(mask, whole) then
+            out = out or {}
+            out[#out + 1] = label
+            mask = mask - whole
+        end
+    end
+    return maskNames(mask, raceName, #RACE_TOKEN, out)
 end
 
 -- Blizzard's own reputation bar boundaries. The generator clamps a negative requirement to zero,
@@ -324,7 +381,7 @@ function QB:Record(questID)
     r.completed = A:IsCompleted(questID)
     r.inLog, r.failed = A:InLog(questID)
 
-    r.races   = maskNames(A:RaceMask(questID),  raceName,  #RACE_TOKEN)
+    r.races   = raceNames(A, D, A:RaceMask(questID))
     r.classes = maskNames(A:ClassMask(questID), className, #CLASS_TOKEN)
 
     local cats = ns.CLASSIC_QUEST_CATEGORY and ns.CLASSIC_QUEST_CATEGORY[questID]

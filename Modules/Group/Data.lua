@@ -139,12 +139,19 @@ end
 
 local _progress, _rows, _indices = {}, {}, {}
 
+local function numberedFromOne()
+    for k = 1, #_indices do
+        if _indices[k] ~= k then return false end
+    end
+    return true
+end
+
 -- Another quest addon omits objectives its database lacks, and a gap in the indices shifts every later slot
 local function pickObjectives(objectives, typeChar, slots, into)
     wipe(_indices)
     for index in pairs(objectives) do _indices[#_indices + 1] = index end
     table.sort(_indices)
-    if typeChar and slots and _indices[#_indices] == #_indices then
+    if typeChar and slots and numberedFromOne() then
         local seen = 0
         for k = 1, #_indices do
             local o = objectives[_indices[k]]

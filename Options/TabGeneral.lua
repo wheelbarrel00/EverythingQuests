@@ -21,20 +21,28 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
 
     -- The same offset as EQOT's Appearance tab, so the two option windows line up
     local COLUMN_X = 460
-    local mapTop = Options:CreateSectionHeader(content, L["Map"])
-    mapTop:SetPoint("TOPLEFT", h, "TOPLEFT", COLUMN_X, 0)
 
     -- Sections are skipped per flavor, so each column anchors to the last widget placed, with an absolute indent
-    local function column(anchor)
+    local function column(anchor, topX)
         local prev, prevIndent = anchor, 0
         return function(widget, indent, gap)
             indent = indent or 0
-            widget:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", indent - prevIndent, -gap)
+            if topX then
+                widget:SetPoint("TOPLEFT", prev, "TOPLEFT", topX + indent, 0)
+                topX = nil
+            else
+                widget:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", indent - prevIndent, -gap)
+            end
             prev, prevIndent = widget, indent
             return widget
         end
     end
-    local placeL, placeR = column(h), column(mapTop)
+    local placeL, placeR = column(h), column(h, COLUMN_X)
+
+    if ns:GetSubsystem("MapPOIProvider") or ns:GetSubsystem("MinimapQuestPins")
+        or ns:GetSubsystem("AvailableQuests") then
+        placeR(Options:CreateSectionHeader(content, L["Map"]), 0, 0)
+    end
 
     local function refreshPins()
         local P = ns:GetSubsystem("MapPOIProvider")
@@ -705,7 +713,7 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
             L["Your group sees how far along you are on each quest, and you see the same for them. This travels as hidden addon messages, so nothing is ever posted to anyone's chat. Switching it off stops both halves."])
         placeL(shareBox, 4, 8)
 
-        -- Not built on retail, where no addon speaks that protocol and SendPeerRequest never asks
+        -- Not built on retail, where no addon speaks that protocol and EQ never asks on it
         if ns.HAS_CLASSIC_SPAWNS then
             local peerGet, peerSet = groupSetting("readPeerAddons")
             local peerBox = Options:CreateCheckbox(content,
