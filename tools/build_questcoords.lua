@@ -11,8 +11,8 @@
 --                  point is the OBJECTIVE for any quest that has one, so it answers a different
 --                  question and puts a finished quest's pin back on the field you farmed.)
 --                 (srcnames: names for the creatures and objects that start or finish a quest,
---                  holding exactly the ids the available and turnin tables reference. Rerun it
---                  whenever either of those is regenerated or a pin can ask for a missing name.)
+--                  one for every id the available and turnin tables reference, bar an unnamed
+--                  supplement source. Rerun it whenever either of those is regenerated.)
 --     encoding  packed | table                (default packed - see the memory note below)
 --     uiMapId   optional, emit one zone only, for a pilot
 --
@@ -187,6 +187,7 @@ if mapFix then applyMapConversion() end
 -- A supplement in the same directory as its base flavor, written by build_forever_supplement.lua.
 -- Its rows replace or add whole rows, so WoW Forever runs the Era data plus what its client added.
 local OVERLAYS = { forever = "classic" }
+local overlaid = {}
 for name, baseFlavor in pairs(OVERLAYS) do
     local f = io.open(dir .. "/" .. name .. "QuestDB.lua", "rb")
     if f then
@@ -199,8 +200,9 @@ for name, baseFlavor in pairs(OVERLAYS) do
                              { items, "ItemDB.lua", SOURCES.items.marker } }) do
             local rows = loadBlock({ file = name .. t[2], marker = t[3] })
             local added, replaced = 0, 0
+            overlaid[t[1]] = overlaid[t[1]] or {}
             for id, row in pairs(rows) do
-                if t[1][id] then replaced = replaced + 1 else added = added + 1 end
+                if t[1][id] then replaced = replaced + 1 else added = added + 1; overlaid[t[1]][id] = true end
                 t[1][id] = row
             end
             report[#report + 1] = ("%s +%d ~%d"):format(t[2], added, replaced)
@@ -1423,7 +1425,7 @@ if mode == "srcnames" then
     }
 
     local expect = { npc = {}, obj = {} }
-    local counts, missing = { npc = 0, obj = 0 }, { npc = 0, obj = 0 }
+    local counts, missing, unnamedOverlay = { npc = 0, obj = 0 }, { npc = 0, obj = 0 }, { npc = 0, obj = 0 }
 
     local function emit(label, set, db)
         parts[#parts + 1] = ("%s = {\n"):format(label)
@@ -1438,6 +1440,8 @@ if mode == "srcnames" then
                 parts[#parts + 1] = ("\t[%d]=%q,\n"):format(id, nm)
                 expect[label][id] = nm
                 counts[label] = counts[label] + 1
+            elseif overlaid[db] and overlaid[db][id] then
+                unnamedOverlay[label] = unnamedOverlay[label] + 1
             else
                 missing[label] = missing[label] + 1
             end
@@ -1445,9 +1449,14 @@ if mode == "srcnames" then
         parts[#parts + 1] = "},\n"
     end
 
+    local tableAt = #parts
     emit("npc", wantNpc, npcs)
     emit("obj", wantObj, objects)
     parts[#parts + 1] = "}\n"
+    if unnamedOverlay.npc + unnamedOverlay.obj > 0 then
+        table.insert(parts, tableAt, ("-- %d creature(s) and %d object(s) from the Forever supplement have no name yet, so their pins and Quest Browser lines show none.\n")
+            :format(unnamedOverlay.npc, unnamedOverlay.obj))
+    end
     local text = table.concat(parts)
 
     do
@@ -1473,14 +1482,13 @@ if mode == "srcnames" then
         io.stderr:write(("-- verified %d source name(s) by reload\n"):format(seen))
     end
 
-    -- The header promises nothing is missing, so a source with no name upstream is a hard stop
-    -- rather than a stderr line. A pin would otherwise ask for a name that is not there.
+    -- A dump source with no name stops the build, while an unnamed supplement source is counted in the header instead.
     assert(missing.npc == 0 and missing.obj == 0,
            ("%d creature and %d object source(s) have no name upstream")
            :format(missing.npc, missing.obj))
     io.write(text)
     io.stderr:write(("-- mode=srcnames | npc names=%d (%d unnamed) obj names=%d (%d unnamed) bytes=%d\n")
-        :format(counts.npc, missing.npc, counts.obj, missing.obj, #text))
+        :format(counts.npc, unnamedOverlay.npc, counts.obj, unnamedOverlay.obj, #text))
     return
 end
 

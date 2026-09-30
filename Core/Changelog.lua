@@ -2,6 +2,22 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.53.0", date = "2026-09-29",
+        sections = {
+            { head = "New Features", items = {
+                "Hundreds more WoW Forever quests. Everything Quests now knows 312 quests new to WoW Forever, up from 36. Most of them come from the WoW Forever quest data of the AllTheThings addon, which it publishes under the MIT License, and the rest were gathered by playing Forever. 309 of them now have a gold marker where you pick them up and an entry in the Quest Browser: 142 on Zephras Isle, The Great Outdoors and the Camping 101 profession quests in the starting zones of every race, and new quests in Dun Morogh, Elwynn Forest, Westfall, Stormwind City, Ironforge, Orgrimmar and the Undercity, among others. Every one of them is named. Most quests gathered by playing Forever also show where to hand them in.",
+            } },
+            { head = "Improvements", items = {
+                "Forever quests know what they need. Quests gathered on Forever used to carry no level requirement, so a few were marked before you could take them. Now 275 of the 309 Forever quests with markers carry the level they need, 192 are limited by race, and 152 wait until you have finished the quests that lead up to them. A few, such as Show of Force, still carry neither a level nor an earlier quest, so they can still be marked before you are high enough to take them. Class quests are limited to their class, and most of the Camping 101 quests count as profession quests, so \"Profession quests\" under \"Hide these quests on the map\" hides them too.",
+            } },
+            { head = "Known Issues", items = {
+                "Some Skyborne quests are marked for other characters. Many Zephras Isle quests can only be taken by Skyborne characters, but Everything Quests cannot yet record \"Skyborne only\" in its quest data. Most of those quests are marked for every character, and the rest for every character of the same faction, and the Quest Browser can say \"Races: Alliance\" for a quest only the High Order can take.",
+                "A few quests are marked in more than one place. Everything Quests marks a quest at every spot its giver stands, so a giver who moves during a storyline shows each of its quests at all of those spots. One of the Dwarf shaman quests named Call of Earth is marked in Durotar and Mulgore instead of Dun Morogh, because its giver is the one the Horde shaman quests of that name use there.",
+                "Many quest givers new to Forever have no name yet. Their markers still show where to go, but the tooltip and the Quest Browser cannot say who is standing there.",
+            } },
+        },
+    },
+    {
         version = "1.52.0", date = "2026-09-28",
         sections = {
             { head = "Improvements", items = {

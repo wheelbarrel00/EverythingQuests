@@ -41,7 +41,7 @@ Open Options with **`/eqs`**, from the minimap button, from the Everything Quest
 
 Everything Quests has run on **Classic Era (1.15)** since v1.39.0, on **Burning Crusade Classic (2.5)** since v1.41.0, and on **WoW Forever (1.60)**, which is still in beta, since v1.48.0. On Classic Era and Burning Crusade Classic, support is deliberately partial: what ships is what was measured working on a live client, not the whole addon. WoW Forever loads the same feature set and is still being checked there (see below). Elsewhere in this README, "Classic" covers all three unless a flavor is named.
 
-Era and TBC were measured identical across every game API the addon reads, so one implementation covers both. They differ only in their generated dataset — TBC ships its own, because Era quest data has nothing for Outland or for the Blood Elf and Draenei starting zones. Since v1.49.0 WoW Forever has its own dataset too: the Classic Era data adjusted to Forever's maps, plus quests gathered by playing Forever itself. Each flavor's TOC lists exactly one set; they define the same globals and are alternatives, never companions.
+Era and TBC were measured identical across every game API the addon reads, so one implementation covers both. They differ only in their generated dataset — TBC ships its own, because Era quest data has nothing for Outland or for the Blood Elf and Draenei starting zones. Since v1.49.0 WoW Forever has its own dataset too: the Classic Era data adjusted to Forever's maps, plus quests gathered by playing Forever itself and, since v1.53.0, the WoW Forever quest data of [AllTheThings](https://github.com/ATTWoWAddon/AllTheThings). Each flavor's TOC lists exactly one set; they define the same globals and are alternatives, never companions.
 
 **Working on Classic Era and TBC**
 
@@ -63,10 +63,10 @@ Era and TBC were measured identical across every game API the addon reads, so on
 
 Forever runs 1.x content on the modern game client. Everything Quests loads its Classic Era feature set there, without the Chain Guide, World Quests and Quest History.
 
-- **Checked there so far:** the world map and minimap markers, both for the quests in your log and for quests you can pick up, your group's quest progress on markers, your quest progress on item tooltips, and nameplate icons
-- **Included but not yet tested there:** everything else, including the Quest Browser, auto-accept and auto-turn-in, quest links and the rest of the group features. The tracker focus arrow is not available there, because EQ Objective Tracker does not offer quest focus on Forever yet
+- **Checked there so far:** the world map and minimap markers, both for the quests in your log and for quests you can pick up, your group's quest progress on markers, your quest progress on item tooltips, nameplate icons, and the Quest Browser
+- **Included but not yet tested there:** everything else, including auto-accept and auto-turn-in, quest links and the rest of the group features. The tracker focus arrow is not available there, because EQ Objective Tracker does not offer quest focus on Forever yet
 - **One marker per quest.** Forever draws quest markers of its own, so since v1.51.0 Everything Quests no longer draws a second one beside the game's own on the world map, or on the minimap for the quests you track and the quest NPCs near you. The kill, loot and object markers stay, because the game draws nothing like them
-- **A quest database of its own** since v1.49.0. It adds 36 quests new to Forever so far, most of them on Zephras Isle, in Elwynn Forest and in Westfall. Most of them have a marker where you pick them up, a marker where you hand them in and a Quest Browser entry, and more will follow as they are gathered. Quests gathered on Forever do not carry a level requirement yet, so a few may be marked before you are high enough to take them
+- **A quest database of its own** since v1.49.0. Since v1.53.0 it knows 312 quests new to Forever, most of them from the WoW Forever quest data of AllTheThings and the rest gathered by playing Forever. 309 of them have a marker where you pick them up and a Quest Browser entry, 142 of those on Zephras Isle and the rest across the starting zones, the capitals and beyond. Most of the quests gathered by playing also have a marker where you hand them in. They carry the level, races, classes and earlier quests they need where the data knows them, and a few may still be marked before you are high enough to take them. Many Zephras Isle quests are for Skyborne characters only, which Everything Quests cannot record yet, so they are also marked for other characters, and many quest givers new to Forever have no name yet
 - **Four maps drawn over different ground.** Forever draws Stormwind City, Redridge Mountains, Mulgore and Eastern Plaguelands over different ground than Classic Era does, so the markers on those maps are converted to Forever's own. Stormwind and Redridge have been checked in game. Mulgore and Eastern Plaguelands are converted the same way but not yet checked
 - **Skyborne characters** are treated as their faction: a quest open to every race of the Alliance, or of the Horde, is marked for them. A few quests limited to particular races, such as some Stormwind mage quests, stay hidden for Skyborne characters until we can confirm that Forever offers them
 
@@ -184,7 +184,7 @@ Classic only (Classic Era, Burning Crusade Classic and WoW Forever). A search-an
 - **Clickable throughout** — a location opens the world map there and sets a TomTom waypoint; a prerequisite or follow-up navigates to that quest. References the data cannot describe render as plain text rather than a dead link
 - **Who to talk to** — the Starts and Turn in rows name the giver and the finisher. A row is merged per map while a map pin is merged per coordinate, so a row covering several different people names all of them rather than picking one
 - **Entry points** — `/eqs quests [text]`, the button under `/eqs` > General, or right-clicking a gold available-quest marker
-- **Coverage is not total.** It reads the `names`/`gates` tables (3,794 Era / 5,652 TBC) while the coordinate tables cover more, so 357 Era and 508 TBC quests EQ pins on the map are not in the browser. WoW Forever's tables are the Era set plus the Forever quests gathered so far, with a similar gap
+- **Coverage is not total.** It reads the `names`/`gates` tables (3,794 Era / 5,652 TBC) while the coordinate tables cover more, so 357 Era and 508 TBC quests EQ pins on the map are not in the browser. WoW Forever's tables are the Era set plus 309 Forever quests, from AllTheThings and from playing Forever, with a similar gap
 - `/eqsprobe questbrowser` reports the data, a live query, the player's zone, one full decoded record, and whether the browser and the map pins agree
 
 ### Shareable Quest Links
@@ -476,6 +476,7 @@ This project is licensed under the [MIT License](LICENSE).
 - Minimap button powered by **[LibDBIcon](https://www.curseforge.com/wow/addons/libdbicon-1-0)** and **[LibDataBroker](https://www.curseforge.com/wow/addons/libdatabroker-1-1)**
 - Fonts and textures shared with other addons through **[LibSharedMedia](https://www.curseforge.com/wow/addons/libsharedmedia-3-0)**
 - Minimap pin placement powered by **[HereBeDragons](https://www.curseforge.com/wow/addons/herebedragons)**
+- WoW Forever quest data from **[AllTheThings](https://github.com/ATTWoWAddon/AllTheThings)**, used under the MIT License (its notice ships in `Data/AllTheThings MIT LICENSE.txt`)
 - WoW API references from **[Warcraft Wiki](https://warcraft.wiki.gg)**
 
 ---

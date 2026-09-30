@@ -3,21 +3,18 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.52.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.52.0"
+local FEATURE_POPUP_VERSION = "1.53.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.53.0"
 
 local POPUP_BODY = [[
-|cffEBB706Quest tooltips, fixed on two flavors|r
-On WoW Forever, a mob's tooltip no longer shows your quest twice. The game lists it there, along with your group's progress, so Everything Quests leaves it alone. Forever quest items now show your objective and the group members who still need it. On Burning Crusade Classic, the quest lines on mob and item tooltips never appeared at all, and now they do.
+|cffEBB706Hundreds more WoW Forever quests|r
+Everything Quests now knows 312 quests new to WoW Forever, up from 36, most of them from the AllTheThings addon's Forever quest data. 309 of them have a gold marker where you pick them up and a Quest Browser entry: on Zephras Isle, the Camping 101 profession quests in every starting zone, and across Dun Morogh, Elwynn Forest, Stormwind City and more.
 
-|cffEBB706A loot icon on nameplates|r
-An enemy that drops an item your quest needs now shows the Everything Quests logo instead of the skull, so you can tell it apart from an enemy you need to kill.
-
-|cffEBB706Also new|r
-The Quest Browser now says "Races: Alliance" or "Races: Horde" for a quest open to a whole faction, and three more WoW Forever quests have markers, in Loch Modan and Darkshore.
+|cffEBB706Forever quests know what they need|r
+Most Forever quests now carry the level they need, the races and classes that can take them, and the quests that lead up to them, so most are marked only once you can pick them up. Many Skyborne-only quests on Zephras Isle are still marked for other characters too.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
+Thanks to the |cffffffffAllTheThings|r team for publishing their WoW Forever quest data under the MIT License, to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]
