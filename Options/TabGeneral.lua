@@ -740,42 +740,78 @@ ns:GetSubsystem("Options"):AddTab("general", L["General"], function(content)
         end
     end
 
-    if ns:GetSubsystem("TrackerBridge") then
+    local Bridge = ns:GetSubsystem("TrackerBridge")
+    if Bridge then
         local trackerHeader = Options:CreateSectionHeader(content, L["Tracker"])
         placeL(trackerHeader, 0, 16)
 
+        -- Saved in EQ Objective Tracker only on Yes, right before the reload it needs to apply.
+        if Bridge:SupportsBlizzardTracker() then
+            local blizz
+            blizz = Options:CreateCheckbox(content, L["Use Blizzard's quest tracker"],
+                function() return Bridge:GetBlizzardTrackerSetting() end,
+                function(value)
+                    local Dialog = ns:GetSubsystem("Dialog")
+                    if not Dialog then blizz:SetChecked(not value); return end
+                    Dialog:Show({
+                        title    = "Everything Quests",
+                        text     = value and L["Switch to Blizzard's quest tracker? The interface will reload."]
+                            or L["Switch back to the EQ Objective Tracker window? The interface will reload."],
+                        button1  = L["Yes"],
+                        button2  = L["Cancel"],
+                        onAccept = function()
+                            if Bridge:SetBlizzardTrackerSetting(value) then
+                                ReloadUI()
+                                -- Expected to fire only if the client refused the reload. The choice is saved either way.
+                                C_Timer.After(1, function()
+                                    DEFAULT_CHAT_FRAME:AddMessage("|cffEBB706Everything Quests|r "
+                                        .. L["The interface did not reload. Type /reload to finish."])
+                                end)
+                            else
+                                blizz:SetChecked(not value)
+                            end
+                        end,
+                        onCancel = function() blizz:SetChecked(not value) end,
+                    })
+                end,
+                L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."])
+            placeL(blizz, 0, 10)
+        end
+
         local trackerBtn = Options:CreateYellowButton(content, L["Open Tracker Settings"], function()
-            local Bridge = ns:GetSubsystem("TrackerBridge")
-            if Bridge then Bridge:OpenTrackerOptions() end
+            Bridge:OpenTrackerOptions()
         end)
         placeL(trackerBtn, 0, 10)
-        Options:AttachTooltip(trackerBtn, L["Open Tracker Settings"],
-            L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."])
+        -- Blizzard's tracker has no cogwheel to point at.
+        Options:AttachTooltip(trackerBtn, L["Open Tracker Settings"], ns.Compat.BlizzardTrackerInUse()
+            and L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot."]
+            or L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."])
 
-        local eqIconGet, eqIconSet = generalSetting("showEQIcon")
-        local eqIcon = Options:CreateCheckbox(content,
-            L["Show Everything Quests icon on the tracker"],
-            eqIconGet,
-            function(value)
-                eqIconSet(value)
-                local Bridge = ns:GetSubsystem("TrackerBridge")
-                if Bridge then Bridge:ApplyEQIcon() end
-            end,
-            L["Adds the Everything Quests logo at the top right of the tracker, which opens this options window. The tracker's own cogwheel opens the tracker's settings instead. You can also reach this window from the minimap button or by typing /eqs."])
-        placeL(eqIcon, 0, 8)
-
-        if ns:GetSubsystem("ChainGuide") then
-            local chainIconGet, chainIconSet = generalSetting("showChainGuideIcon")
-            local chainIcon = Options:CreateCheckbox(content,
-                L["Show Chain Guide icon on the tracker"],
-                chainIconGet,
+        -- Both icons sit on the EQ Objective Tracker window, which Blizzard's tracker replaces.
+        if not ns.Compat.BlizzardTrackerInUse() then
+            local eqIconGet, eqIconSet = generalSetting("showEQIcon")
+            local eqIcon = Options:CreateCheckbox(content,
+                L["Show Everything Quests icon on the tracker"],
+                eqIconGet,
                 function(value)
-                    chainIconSet(value)
-                    local Bridge = ns:GetSubsystem("TrackerBridge")
-                    if Bridge then Bridge:ApplyChainIcon() end
+                    eqIconSet(value)
+                    Bridge:ApplyEQIcon()
                 end,
-                L["Adds a small chain icon beside the cogwheel at the top right of the tracker, which opens the Chain Guide."])
-            placeL(chainIcon, 0, 2)
+                L["Adds the Everything Quests logo at the top right of the tracker, which opens this options window. The tracker's own cogwheel opens the tracker's settings instead. You can also reach this window from the minimap button or by typing /eqs."])
+            placeL(eqIcon, 0, 8)
+
+            if ns:GetSubsystem("ChainGuide") then
+                local chainIconGet, chainIconSet = generalSetting("showChainGuideIcon")
+                local chainIcon = Options:CreateCheckbox(content,
+                    L["Show Chain Guide icon on the tracker"],
+                    chainIconGet,
+                    function(value)
+                        chainIconSet(value)
+                        Bridge:ApplyChainIcon()
+                    end,
+                    L["Adds a small chain icon beside the cogwheel at the top right of the tracker, which opens the Chain Guide."])
+                placeL(chainIcon, 0, 2)
+            end
         end
     end
 

@@ -121,36 +121,66 @@ function Bridge:ApplyFocusArrow()
     })
 end
 
--- The "only markers for tracked quests" filter reads EQOT's tracked set, and that set answers to
--- no game event, so the map would sit stale until an unrelated quest event wandered by.
-function Bridge:ApplyTrackedRepaint()
-    -- OnDirty carries no id and cannot be unregistered, unlike AddFocusListener, so a second
-    -- registration is permanent and every toggle would repaint twice.
-    if self._trackedRepaint then return end
-    local TS = ns.Compat.TrackedSet()
-    if not (TS and type(TS.OnDirty) == "function") then return end
-    self._trackedRepaint = true
+-- Guarded per method: '## Dependencies:' cannot promise an EQOT new enough to offer the switch.
+function Bridge:SupportsBlizzardTracker()
+    local A = api()
+    return (A and type(A.GetBlizzardTrackerSetting) == "function"
+            and type(A.SetBlizzardTrackerSetting) == "function") and true or false
+end
 
-    -- The set fires once per quest it changes, so a pass that writes many in one frame arrives as
-    -- a burst. A zero delay coalesces whatever lands in that frame into a single repaint.
-    local pending = false
-    local function repaint()
-        pending = false
-        local Cache = ns:GetSubsystem("Cache")
-        if Cache then Cache:InvalidateWatched() end
-        local P = ns:GetSubsystem("MapPOIProvider")
-        if P and P.provider and P.provider.RefreshAllData then
-            P.provider:RefreshAllData()
-        end
-        local MM = ns:GetSubsystem("MinimapQuestPins")
-        if MM and MM.Rebuild then MM:Rebuild() end
+function Bridge:GetBlizzardTrackerSetting()
+    local A = api()
+    return (A and A.GetBlizzardTrackerSetting and A:GetBlizzardTrackerSetting()) and true or false
+end
+
+function Bridge:SetBlizzardTrackerSetting(on)
+    local A = api()
+    return (A and A.SetBlizzardTrackerSetting and A:SetBlizzardTrackerSetting(on)) and true or false
+end
+
+-- A zero delay folds a frame's burst of watch changes into one repaint.
+local repaintPending = false
+local function repaint()
+    repaintPending = false
+    local Cache = ns:GetSubsystem("Cache")
+    if Cache then Cache:InvalidateWatched() end
+    local P = ns:GetSubsystem("MapPOIProvider")
+    if P and P.provider and P.provider.RefreshAllData then
+        P.provider:RefreshAllData()
     end
+    local MM = ns:GetSubsystem("MinimapQuestPins")
+    if MM and MM.Rebuild then MM:Rebuild() end
+end
 
-    pcall(TS.OnDirty, TS, function()
-        if pending then return end
-        pending = true
-        C_Timer.After(0, repaint)
-    end)
+local function requestRepaint()
+    if repaintPending then return end
+    repaintPending = true
+    C_Timer.After(0, repaint)
+end
+
+-- Checked per call, because EQOT's own window empties Blizzard's list behind every add.
+local function watchChanged()
+    if ns.Compat.BlizzardTrackerInUse() then requestRepaint() end
+end
+
+-- Classic's tracked-only filter reads lists EQ hears no quest event for, so changes repaint from here.
+function Bridge:ApplyTrackedRepaint()
+    -- OnDirty and hooksecurefunc both register for good, so this runs once.
+    if self._trackedRepaint then return end
+
+    -- Wired whichever tracker is in use, since EQOT may read that choice after this runs.
+    local classicWatch = not (C_QuestLog and C_QuestLog.GetQuestWatchType)
+        and type(_G.AddQuestWatch) == "function" and type(_G.RemoveQuestWatch) == "function"
+    local TS = ns.Compat.TrackedSet()
+    local fromSet = TS and type(TS.OnDirty) == "function"
+    if not (classicWatch or fromSet) then return end
+    self._trackedRepaint = true
+    if classicWatch then
+        -- Blizzard's Classic shift-click, auto-watch and quest timer all go through these two.
+        hooksecurefunc("AddQuestWatch", watchChanged)
+        hooksecurefunc("RemoveQuestWatch", watchChanged)
+    end
+    if fromSet then pcall(TS.OnDirty, TS, requestRepaint) end
 end
 
 function Bridge:OnEnable()

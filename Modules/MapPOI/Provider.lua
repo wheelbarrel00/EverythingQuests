@@ -444,7 +444,7 @@ function M:OnEnable()
     Events:On("QUEST_REMOVED",          refresh)
     Events:On("QUEST_TURNED_IN",        refresh)
     Events:On("SUPER_TRACKING_CHANGED", refresh)
-    -- Retail's only watch-change signal. On Classic EQOT owns the tracked set and TrackerBridge repaints
+    -- Retail's only watch-change signal. On Classic TrackerBridge repaints
     Events:On("QUEST_WATCH_LIST_CHANGED", refresh)
     -- Blizzard's own markers come and go with these, and every yield depends on them
     if not ns.HAS_CLASSIC_SPAWNS then return end

@@ -35,12 +35,14 @@ function Dialog:_finish(accepted)
     self.opts = nil
     local f = self.frame
     local text = (f and f.editBox:IsShown()) and f.editBox:GetText() or nil
-    if f then f:Hide() end
+    -- Callback before the hide: hidden first, a ReloadUI from Yes was blocked on retail 12.1.
     if accepted then
-        if opts.onAccept then opts.onAccept(text) end
+        if opts.onAccept then xpcall(function() opts.onAccept(text) end, geterrorhandler()) end
     elseif opts.onCancel then
-        opts.onCancel()
+        xpcall(opts.onCancel, geterrorhandler())
     end
+    -- A callback that opened the next dialog keeps the frame up for it.
+    if f and not self.opts then f:Hide() end
 end
 
 function Dialog:Build()

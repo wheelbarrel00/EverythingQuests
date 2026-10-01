@@ -143,6 +143,7 @@ end
 -- An older EQOT satisfies '## Dependencies:' with no filter API, so a nil answer here has to
 -- fall back to refreshing everything rather than refreshing nothing.
 local function trackerFilterState()
+    if ns.Compat.BlizzardTrackerInUse() then return false, nil end
     local T = _G.EQObjectiveTracker
     local DB = T and T.GetModule and T:GetModule("DB")
     if not (DB and DB.Tracker) then return false, nil end
@@ -195,8 +196,8 @@ function Cache:All()
     return self.quests
 end
 
--- The tracked set on Classic lives in EQOT's saved variables and answers to no game event, so a
--- toggle there has to say so itself. Objective-level is enough - refreshDynamicFields recomputes
+-- The tracked set on Classic, EQOT's own or Blizzard's watch list, answers to no game event, so a
+-- change there has to say so itself. Objective-level is enough - refreshDynamicFields recomputes
 -- isWatched for every cached quest, and nothing else about the quest moved.
 function Cache:InvalidateWatched()
     Cache.dirtyObjectives = true

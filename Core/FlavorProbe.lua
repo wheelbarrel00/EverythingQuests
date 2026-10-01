@@ -791,17 +791,20 @@ local function trackedSourceReadings()
     local byID      = resolve("GetQuestLogIndexByID")
     local TS        = ns.Compat.TrackedSet()
     local numWatch  = resolve("GetNumQuestWatches")
+    local blizzard  = ns.Compat.BlizzardTrackerInUse()
 
-    line("    SOURCES  C_QuestLog.GetQuestWatchType=%s  bare IsQuestWatched=%s  EQOT TrackedSet=%s",
-         type(watchType), type(bare), TS and "present" or "absent")
+    line("    SOURCES  C_QuestLog.GetQuestWatchType=%s  bare IsQuestWatched=%s  EQOT TrackedSet=%s  Blizzard's tracker in use=%s",
+         type(watchType), type(bare), TS and "present" or "absent", tostring(blizzard))
     line("    EQ READS: %s",
          (type(watchType) == "function" and "C_QuestLog.GetQuestWatchType")
+         or (blizzard and "bare IsQuestWatched, Blizzard's list or a quest addon's replacement")
          or (TS and "EQOT TrackedSet:IsTracked") or "nothing - every quest is cannot-tell")
     if type(numWatch) == "function" then
         local ok, n = pcall(numWatch)
-        -- Raw only. EQOT measured 0 here on 1.15.9 while watches were changing, so 0 proves nothing
-        line("    GetNumQuestWatches() raw=%s   (0 in every state on Era - not evidence by itself)",
-             ok and tostring(n) or "RAISED")
+        -- Raw only. EQOT measured 0 here on 1.15.9 while its window ran, so there 0 proves nothing
+        line("    GetNumQuestWatches() raw=%s   %s", ok and tostring(n) or "RAISED",
+             blizzard and "(Blizzard's own list, or 0 if another quest tracker empties it)"
+                 or "(EQOT's window keeps this list empty - not evidence by itself)")
     end
 
     local rows, agree, disagree, bareTrue, tsTrue, tsKnown = 0, 0, 0, 0, 0, 0
@@ -813,7 +816,7 @@ local function trackedSourceReadings()
             local ok, v = pcall(watchType, id)
             wt = ok and (v ~= nil) or nil
         end
-        -- Resolved here, not cached on the quest, as EQ no longer reads the bare global
+        -- Resolved here, not cached on the quest, as EQ reads the bare global only under Blizzard's tracker
         if type(byID) == "function" then
             local ok, v = pcall(byID, id)
             if ok and v and v ~= 0 then idx = v end
@@ -844,7 +847,7 @@ local function trackedSourceReadings()
     line("    TOTALS  quests=%d  bare says tracked=%d  EQOT says tracked=%d of %d it knows",
          total, bareTrue, tsTrue, tsKnown)
 
-    -- A regression watch on the bare global EQ deliberately does not read
+    -- A regression watch on the bare global, which EQ reads only under Blizzard's tracker
     if disagree > 0 then
         line("    the bare global and EQOT DISAGREE on %d quest(s), agree on %d. Expected on this",
              disagree, agree)
@@ -858,6 +861,9 @@ local function trackedSourceReadings()
     if TS and tsKnown == 0 and total > 0 then
         line("    EQOT knows none of them yet - its set is nil until its provider seeds it or the")
         line("      player first toggles, and nil means SHOW. Not a fault.")
+    elseif blizzard and type(watchType) ~= "function" then
+        line("    Blizzard's tracker is in use, so EQOT leaves that list alone and the bare global")
+        line("      is the answer, unless another quest addon replaced it with its own list.")
     elseif not TS then
         line("    NO EQOT TrackedSet here. On Classic that leaves nothing able to answer, so every")
         line("      quest reads cannot-tell and the filter correctly hides nothing.")

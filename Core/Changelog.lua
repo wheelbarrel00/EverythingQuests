@@ -2,6 +2,14 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.54.0", date = "2026-09-30",
+        sections = {
+            { head = "New Features", items = {
+                "Use Blizzard's quest tracker. A new checkbox in the Tracker section of the General tab turns off the EQ Objective Tracker window and brings back the game's own quest tracker, for players who prefer its look. The interface reloads to switch, in either direction, and EQ Objective Tracker has the same checkbox at the top of its own General tab. Everything Quests' map markers, tooltips and nameplate icons keep working, and so do EQ Objective Tracker's quest sounds, zone progress bar and, on retail, flight point highlight. The Everything Quests icon on the tracker, and on retail the Chain Guide icon and Get Directions, belong to the tracker window and go with it, so open Everything Quests with /eqs or the minimap button. On Classic Era and Burning Crusade Classic, clicking a quest's map marker still sets a TomTom arrow. \"Only show markers for quests you are tracking\" then follows the quests the game's tracker is watching. On Classic Era and Burning Crusade Classic the game's tracker starts with nothing watched, so shift-click quests in the quest log to watch them, up to the game's limit of five. On WoW Forever the quest you follow in the game's tracker still gets a TomTom arrow. The checkbox appears once EQ Objective Tracker is updated to 1.28.0, released alongside this version. Thanks to diana_winter for the request.",
+            } },
+        },
+    },
+    {
         version = "1.53.0", date = "2026-09-29",
         sections = {
             { head = "New Features", items = {

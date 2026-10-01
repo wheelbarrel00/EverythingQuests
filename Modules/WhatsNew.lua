@@ -3,18 +3,15 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.53.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.53.0"
+local FEATURE_POPUP_VERSION = "1.54.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.54.0"
 
 local POPUP_BODY = [[
-|cffEBB706Hundreds more WoW Forever quests|r
-Everything Quests now knows 312 quests new to WoW Forever, up from 36, most of them from the AllTheThings addon's Forever quest data. 309 of them have a gold marker where you pick them up and a Quest Browser entry: on Zephras Isle, the Camping 101 profession quests in every starting zone, and across Dun Morogh, Elwynn Forest, Stormwind City and more.
-
-|cffEBB706Forever quests know what they need|r
-Most Forever quests now carry the level they need, the races and classes that can take them, and the quests that lead up to them, so most are marked only once you can pick them up. Many Skyborne-only quests on Zephras Isle are still marked for other characters too.
+|cffEBB706Use Blizzard's quest tracker|r
+Prefer the game's own quest tracker? A new checkbox in the Tracker section of the General tab turns off the EQ Objective Tracker window and brings Blizzard's tracker back. The interface reloads to switch, and your map markers, tooltips and the quest sounds keep working. The checkbox appears once EQ Objective Tracker is updated to 1.28.0, and the same one sits at the top of EQ Objective Tracker's own General tab. On Classic Era and Burning Crusade Classic the game's tracker starts with nothing watched, so shift-click quests in the quest log to watch them.
 
 |cffEBB706Thank you|r
-Thanks to the |cffffffffAllTheThings|r team for publishing their WoW Forever quest data under the MIT License, to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
+Thanks to |cffffffffdiana_winter|r for asking for it, to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]

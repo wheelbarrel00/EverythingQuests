@@ -83,10 +83,18 @@ function Compat.CollectQuestLog(out)
     return out, walk(out, flatRow, reported)
 end
 
+-- True while EQOT runs Blizzard's tracker in place of its window, a choice EQOT fixes at login.
+function Compat.BlizzardTrackerInUse()
+    local T = _G.EQObjectiveTracker
+    local A = T and T.GetModule and T:GetModule("API")
+    return (A and type(A.UsesBlizzardTracker) == "function" and A:UsesBlizzardTracker()) and true or false
+end
+
 -- Where the tracked set lives on Classic, resolved in ONE place because the reader below and
 -- the repaint in Modules/TrackerBridge.lua must never disagree about which object owns it.
 -- Absent on retail, where the module is not in EQOT's TOC and C_QuestLog answers instead.
 function Compat.TrackedSet()
+    if Compat.BlizzardTrackerInUse() then return nil end
     local T = _G.EQObjectiveTracker
     local TS = T and T.GetModule and T:GetModule("TrackedSet")
     return (type(TS) == "table" and type(TS.IsTracked) == "function") and TS or nil
@@ -96,12 +104,23 @@ end
 -- pre-namespace IsQuestWatched(logIndex) answered FALSE for all 14 quests while EQOT named 10 of
 -- them tracked. EQOT owns the tracked set on this flavor and empties Blizzard's list behind every
 -- add, so reading that global hides every owned pin - a confident wrong answer, worse than none.
--- Do not wire it back up.
+-- Read it ONLY while Blizzard's tracker is in use, when EQOT leaves that list alone.
 -- Returns nil where nothing can answer, and a caller must treat nil as "cannot tell" and SHOW
 -- the quest - collapsing nil into "not tracked" empties the map by the other route.
 function Compat.IsQuestWatched(questID)
     if method(C_QuestLog, "GetQuestWatchType") then
         return C_QuestLog.GetQuestWatchType(questID) ~= nil
+    end
+    if Compat.BlizzardTrackerInUse() then
+        -- By log index, the way Blizzard's own Vanilla and TBC quest log reads it.
+        local getIndex, watched = _G.GetQuestLogIndexByID, _G.IsQuestWatched
+        if type(getIndex) ~= "function" then return nil end
+        local index = getIndex(questID)
+        if not (index and index > 0) then return nil end
+        -- pcall'd because a quest addon may have replaced or removed the global.
+        local ok, on = pcall(watched, index)
+        if not ok then return nil end
+        return on and true or false
     end
     local TS = Compat.TrackedSet()
     if TS then
