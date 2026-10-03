@@ -42,7 +42,7 @@ function Bridge:ApplyChainIcon()
     local A = api()
     if not A then return end
 
-    -- The Chain Guide is Midnight-only, so elsewhere the icon would sit there doing nothing.
+    -- Only where a TOC lists the Chain Guide, or the icon would sit there doing nothing.
     if not self:ChainIconEnabled() or not ns:GetSubsystem("ChainGuide") then
         A:RemoveHeaderIcon("eq-chainguide")
         return
@@ -116,7 +116,10 @@ function Bridge:ApplyFocusArrow()
             -- EQOT sends one announcement per change with no intervening clear, so a quest EQ
             -- cannot place has to take the old arrow down. Leaving it points TomTom at one quest
             -- while the tracker highlights another.
-            if not (entryID and Arrow:PointAtQuest(entryID)) then Arrow:Clear() end
+            -- An arrow the Chain Guide set for this very quest follows the game's point, which EQ's tables may lack
+            if not (entryID and (Arrow:PointAtQuest(entryID) or (Arrow.Refresh and Arrow:Refresh(entryID)))) then
+                Arrow:Clear()
+            end
         end,
     })
 end

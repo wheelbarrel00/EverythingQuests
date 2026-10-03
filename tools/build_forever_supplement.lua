@@ -3,8 +3,8 @@
 --   lua5.1 tools/build_forever_supplement.lua <eraDir> <outDir> [--att=<AllTheThings>/db/Camelot --questv2=<QuestV2.csv>] [<session.lua> ...]
 --
 -- <eraDir> holds the Era dump build_questcoords.lua reads. <outDir> receives a copy of it, an area
--- table that also covers maps only Forever has, and forever<Kind>DB.lua files in the same row
--- layout. build_questcoords.lua lays those rows over the Era rows when it runs on <outDir>.
+-- table that also covers maps only Forever has, forever<Kind>DB.lua rows that build_questcoords.lua
+-- lays over the Era rows, and foreverStarts.lua, where each quest itself is offered.
 --
 -- Only quests the Era dump does not know become rows. An Era creature, object or item that a new
 -- quest uses keeps its Era row, because the dump's spawn lists are better than what one player saw.
@@ -187,14 +187,18 @@ local function namedObjectives(obj)
     return n
 end
 
-local function mergeDialogRecord(dst, id, r)
+local function mergeDialogRecord(dst, id, r, blind)
     local m = dst[id] or { src = {}, at = {} }
     dst[id] = m
     m.n = m.n or r.n
     m.qlv = m.qlv or r.qlv
     m.rep = m.rep or r.rep
     addCounts(m.src, r.src)
-    addCounts(m.at, r.at)
+    -- A dialog from no source the collector could read still records where the player stood, so that session cannot say whose each place was
+    local placed, named = 0, 0
+    for _, n in pairs(r.at or {}) do placed = placed + n end
+    for _, n in pairs(r.src or {}) do named = named + n end
+    if not blind and placed <= named then addCounts(m.at, r.at) end
 end
 
 for _, key in ipairs(sortedKeys(sessions)) do
@@ -212,8 +216,16 @@ for _, key in ipairs(sortedKeys(sessions)) do
     for id, why in pairs(S.titleMisses or {}) do
         if type(id) == "number" and why == "refused" then refusedByServer[id] = true end
     end
-    for id, r in pairs(S.starts or {}) do mergeDialogRecord(starts, id, r) end
-    for id, r in pairs(S.ends or {}) do mergeDialogRecord(ends, id, r) end
+    -- The dialog log names what a sourceless dialog showed, which a sourced dialog without a position hides from the counts
+    local offeredBlind, activeBlind = {}, {}
+    for _, d in ipairs(S.dialogs or {}) do
+        if type(d) == "table" and not d.src then
+            for _, q in ipairs(d.o or {}) do offeredBlind[q] = true end
+            for _, q in ipairs(d.a or {}) do activeBlind[q] = true end
+        end
+    end
+    for id, r in pairs(S.starts or {}) do mergeDialogRecord(starts, id, r, offeredBlind[id]) end
+    for id, r in pairs(S.ends or {}) do mergeDialogRecord(ends, id, r, activeBlind[id]) end
     for id, objs in pairs(S.prog or {}) do
         for idx, r in pairs(objs) do
             local m = sub(sub(prog, id), idx)
@@ -548,6 +560,7 @@ end
 
 local attStats = { rows = 0, filled = 0, confirmed = 0, mismatched = 0, dropped = 0 }
 local attIssues, attPoints, attBoth, measuredPre = {}, { npc = {}, obj = {} }, {}, {}
+local attGivers = { npc = {}, obj = {} }
 
 local function attMismatch(qid, what, detail)
     attStats.mismatched = attStats.mismatched + 1
@@ -580,7 +593,7 @@ local function mergeATT(qid, row, a, lines)
         for kind, ids in pairs({ npc = a.givers, obj = a.objects }) do
             local need = kind == "npc" and needNpc or needObj
             for _, id in ipairs(ids) do
-                need[id] = true
+                need[id], attGivers[kind][id] = true, true
                 for _, p in ipairs(sole and a.points or {}) do
                     local v = packPoint(p[1], p[2], p[3])
                     if v then local l = sub(attPoints[kind], id); l[#l + 1] = v end
@@ -1027,7 +1040,7 @@ for _, id in ipairs(sortedKeys(needNpc)) do
         if #pts == 0 then pts = collapse(cellsWithBits(u.at or {}, { SEEN_TALK })) end
         if #pts == 0 and attPoints.npc[id] then pts = collapse(attPoints.npc[id]) end
         if #pts == 0 then pts = sightingPoints(u.at) end
-        nRows[id] = { [N_NAME] = u.n or (not attPoints.npc[id] and ("creature " .. id) or nil), [N_SPAWNS] = spawnTable(pts),
+        nRows[id] = { [N_NAME] = u.n or (not attGivers.npc[id] and ("creature " .. id) or nil), [N_SPAWNS] = spawnTable(pts),
                       [N_FACTION] = FACTION_TAG[u.f or ""] }
     end
 end
@@ -1039,7 +1052,7 @@ for _, id in ipairs(sortedKeys(needObj)) do
         if #pts == 0 then pts = collapse(cellsWithBits(u.at or {}, { SEEN_TALK })) end
         for _, v in ipairs(lootPoints(id)) do pts[#pts + 1] = v end
         if #pts == 0 and attPoints.obj[id] then pts = collapse(attPoints.obj[id]) end
-        oRows[id] = { [O_NAME] = u.n or (not attPoints.obj[id] and ("object " .. id) or nil), [O_SPAWNS] = spawnTable(pts) }
+        oRows[id] = { [O_NAME] = u.n or (not attGivers.obj[id] and ("object " .. id) or nil), [O_SPAWNS] = spawnTable(pts) }
     end
 end
 
@@ -1098,6 +1111,48 @@ local function writeBlock(file, varName, rows, what, attFed)
     end
 end
 
+-- Only dialogs that named a creature or object place a quest, the collector outranks ATT on a map, and ATT points carry a 1
+local ownStarts, ownStats = {}, { quests = 0, dialogs = 0, att = 0, contradicted = 0 }
+for _, qid in ipairs(sortedKeys(qRows)) do
+    local st, a = starts[qid], attQuests[qid]
+    local dialogs = {}
+    if st then
+        local usable = true
+        for k in pairs(st.src) do
+            local kind = tostring(k):match("^(%a+):")
+            if kind ~= "npc" and kind ~= "obj" then usable = false end
+        end
+        if usable then dialogs = collapse(byCountThenKey(st.at)) end
+    end
+    local list = {}
+    for _, v in ipairs(dialogs) do
+        local ui, x, y = decode(v)
+        list[#list + 1] = { areaFor(ui), x, y }
+    end
+    for _, p in ipairs(a and a.points or {}) do
+        if packPoint(p[1], p[2], p[3]) then
+            local seenOnMap, near = false, false
+            for _, v in ipairs(dialogs) do
+                local ui, x, y = decode(v)
+                if ui == p[1] then
+                    seenOnMap = true
+                    if math.sqrt((x - p[2]) ^ 2 + (y - p[3]) ^ 2) <= SAME_PLACE * 100 then near = true end
+                end
+            end
+            if seenOnMap and not near then
+                ownStats.contradicted = ownStats.contradicted + 1
+            else
+                list[#list + 1] = { areaFor(p[1]), p[2], p[3], 1 }
+                ownStats.att = ownStats.att + 1
+            end
+        end
+    end
+    if #list > 0 then
+        ownStarts[qid] = list
+        ownStats.quests, ownStats.dialogs = ownStats.quests + 1, ownStats.dialogs + #dialogs
+    end
+end
+
 for _, spec in pairs(BASE_FILES) do
     writeAll(outDir .. "/" .. spec.file, raw[spec.file])
     assert(readAll(outDir .. "/" .. spec.file) == raw[spec.file], "copy of " .. spec.file .. " differs")
@@ -1113,8 +1168,23 @@ writeBlock(OVERLAY_PREFIX .. "NpcDB.lua", "npcData", nRows, "creatures", true)
 writeBlock(OVERLAY_PREFIX .. "ObjectDB.lua", "objectData", oRows, "objects", true)
 writeBlock(OVERLAY_PREFIX .. "ItemDB.lua", "itemData", iRows, "items")
 
+do
+    local parts = { "-- Generated by tools/build_forever_supplement.lua. [questID] = { {areaId, x, y[, 1 for an ATT point]}, ... }, where that quest is offered.\nreturn {\n" }
+    for _, qid in ipairs(sortedKeys(ownStarts)) do parts[#parts + 1] = ("[%d]=%s,\n"):format(qid, ser(ownStarts[qid])) end
+    parts[#parts + 1] = "}\n"
+    local file = outDir .. "/" .. OVERLAY_PREFIX .. "Starts.lua"
+    writeAll(file, table.concat(parts))
+    local back = assert(loadfile(file))()
+    assert(count(back) == count(ownStarts), file .. ": row count changed on reload")
+    for qid, list in pairs(ownStarts) do
+        assert(back[qid] and ser(back[qid]) == ser(list), ("%s: row %d changed on reload"):format(file, qid))
+    end
+end
+
 io.stderr:write(("-- %d session(s) from %d file(s): %d new quest(s), %d creature(s), %d object(s), %d item(s), %d synthetic area(s)\n")
     :format(count(sessions), #sessionFiles, count(qRows), count(nRows), count(oRows), count(iRows), count(synthAreas)))
+io.stderr:write(("-- own starts: %d quest(s), %d dialog place(s), %d ATT point(s), %d ATT point(s) the collector contradicts on their map\n")
+    :format(ownStats.quests, ownStats.dialogs, ownStats.att, ownStats.contradicted))
 for _, line in ipairs(report) do io.stderr:write(line .. "\n") end
 
 -- Every gate inferred for a quest the Era dump knows is graded against the dump on every run.

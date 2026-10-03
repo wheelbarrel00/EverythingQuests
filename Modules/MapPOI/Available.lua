@@ -242,14 +242,33 @@ local function categoryHidden(questID)
     return nil
 end
 
--- Ordered cheapest first, because every check below the masks walks a list.
-local function isAvailable(questID, D, hideLowLevel, floor)
+-- A later step or another branch in the log or done, which keeps the game from offering the quest
+local function ruledOut(questID, D)
+    local nextID = D.chain[questID]
+    if nextID then
+        local nextInLog = logState(nextID)
+        if nextInLog or isCompleted(nextID) then return REASON_LATER_STEP end
+    end
+
+    local excl = D.excl[questID]
+    if excl then
+        for i = 1, #excl do
+            local other = excl[i]
+            local otherInLog = logState(other)
+            if otherInLog or isCompleted(other) then return REASON_BRANCH end
+        end
+    end
+    return nil
+end
+
+-- Unfiltered asks what the game itself would offer, so the map's display filters stay out and the season always counts
+local function isAvailable(questID, D, hideLowLevel, floor, unfiltered)
     if _permaNo[questID] then return false, REASON_RACE_CLASS end
 
     local gates = D.gates[questID]
     if not gates then return false end
 
-    local hiddenBy = categoryHidden(questID)
+    local hiddenBy = not unfiltered and categoryHidden(questID)
     if hiddenBy then return false, hiddenBy end
 
     local flags = math.floor(gates % 1e9 / 1e8)
@@ -281,13 +300,13 @@ local function isAvailable(questID, D, hideLowLevel, floor)
     end
 
     -- The `> 0` test mirrors the low filter and cannot fire here, as the ceiling is above the player.
-    if _hideHigh and _redCeiling then
+    if not unfiltered and _hideHigh and _redCeiling then
         local questLevel = math.floor(gates % 1e11 / 1e9)
         if questLevel > 0 and questLevel >= _redCeiling then return false, REASON_HIGH_LEVEL end
     end
 
     -- Below race, class and level so it counts only what the season costs. Holidays.lua owns the dates
-    if _hideSeason and _holidays and _holidays:IsOutOfSeason(questID) then
+    if (_hideSeason or unfiltered) and _holidays and _holidays:IsOutOfSeason(questID) then
         return false, REASON_HOLIDAY
     end
 
@@ -306,20 +325,8 @@ local function isAvailable(questID, D, hideLowLevel, floor)
         if not parentInLog then return false, REASON_PREREQ end
     end
 
-    local nextID = D.chain[questID]
-    if nextID then
-        local nextInLog = logState(nextID)
-        if nextInLog or isCompleted(nextID) then return false, REASON_LATER_STEP end
-    end
-
-    local excl = D.excl[questID]
-    if excl then
-        for i = 1, #excl do
-            local other = excl[i]
-            local otherInLog = logState(other)
-            if otherInLog or isCompleted(other) then return false, REASON_BRANCH end
-        end
-    end
+    local gone = ruledOut(questID, D)
+    if gone then return false, gone end
 
     if repFails(D.minRep[questID], true) then return false, REASON_REPUTATION end
     if repFails(D.maxRep[questID], false) then return false, REASON_REPUTATION end
@@ -540,14 +547,35 @@ function M:RepGate(questID, which)
 end
 
 -- The SAME gate the map pass asks, for one quest, so the browser and the map cannot disagree
-function M:Explain(questID)
+function M:Explain(questID, unfiltered)
     local D = data()
     if not (D and questID and D.gates[questID]) then return nil end
     ensure()
-    if _available[questID] then return true end
+    -- Not for an unfiltered answer, which applies the season even where the map's pass did not
+    if not unfiltered and _available[questID] then return true end
     -- A pass can stop before reading the player (the option off), and the browser still owes an answer
     if not _prepared and not preparePass() then return nil end
+    if unfiltered then return isAvailable(questID, D, false, nil, true) end
     return isAvailable(questID, D, _hideLowLevel, _floor)
+end
+
+-- Explain names only the first gate that fails, and a prerequisite still missing would hide a branch already lost
+function M:RuledOut(questID)
+    local D = data()
+    if not (D and questID and D.gates[questID]) then return nil end
+    ensure()
+    if not _prepared and not preparePass() then return nil end
+    return ruledOut(questID, D)
+end
+
+-- Race and class alone, the two gates no amount of play changes. Nil when the character cannot be read
+function M:CanEverTake(questID)
+    local D = data()
+    local gates = D and questID and D.gates[questID]
+    if not gates then return nil end
+    if not ((_raceBit or _raceEveryOf) and _classBit) then readPlayer() end
+    if not ((_raceBit or _raceEveryOf) and _classBit) then return nil end
+    return raceAllows(math.floor(gates % 1e8 / 1e4)) and hasBit(gates % 1e4, _classBit)
 end
 
 -- An item-started quest reaches over a thousand points on one map. One spot can hold over two dozen quests

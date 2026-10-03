@@ -58,6 +58,10 @@ local function sourceText(kind)
     return nil
 end
 
+-- The same sentences for the Chain Guide's tooltips, so a reason never reads two ways
+function QB:ReasonText(reason) return reasonText(reason) end
+function QB:SourceText(kind) return sourceText(kind) end
+
 QB._rowPool,  QB._rowActive  = {}, {}
 QB._linePool, QB._lineActive = {}, {}
 
@@ -102,14 +106,24 @@ local function detailLineClick(self)
         QB:Select(self._questID)
     elseif self._mapID then
         QB:GoTo(self._mapID, self._px, self._py, self._title)
+    elseif self._chainID then
+        local CG = ns:GetSubsystem("ChainGuide")
+        if CG then
+            -- The browser's strata sits above the guide's, so it would open out of sight behind this window
+            if QB.frame then QB.frame:Hide() end
+            CG:Open()
+            CG:NavigateChain(self._chainID, self._chainQuest)
+        end
     end
 end
 
 local function detailLineEnter(self)
-    if not (self._questID or self._mapID) then return end
+    if not (self._questID or self._mapID or self._chainID) then return end
     GameTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT")
     if self._questID then
         GameTooltip:SetText(L["Click to open this quest"], 1, 0.82, 0)
+    elseif self._chainID then
+        GameTooltip:SetText(L["Find this quest in EQ's Chain Guide"], 1, 0.82, 0)
     else
         GameTooltip:SetText(L["Click to open the map here and set a waypoint"], 1, 0.82, 0)
     end
@@ -161,6 +175,7 @@ local function releaseLines()
         thin(d.text)
         d:SetHeight(LINE_H)
         d._questID, d._mapID, d._px, d._py, d._title = nil, nil, nil, nil, nil
+        d._chainID, d._chainQuest = nil, nil
         QB._linePool[#QB._linePool + 1] = d
         QB._lineActive[i] = nil
     end
@@ -365,10 +380,11 @@ local function line(parent, text, opts)
         -- already been given its width - a zero width canvas reports one line for everything.
         d:SetHeight(math.max(LINE_H, d.text:GetStringHeight() + 2))
     end
-    if opts.questID or opts.mapID then
+    if opts.questID or opts.mapID or opts.chainID then
         d:EnableMouse(true)
         d._questID = opts.questID
         d._mapID, d._px, d._py, d._title = opts.mapID, opts.x, opts.y, opts.title
+        d._chainID, d._chainQuest = opts.chainID, opts.chainQuest
     else
         d.hl:SetAlpha(0)
     end
@@ -507,6 +523,15 @@ function QB:RenderDetails()
     if record.parent then refs(canvas, { record.parent }, L["Part of"]) end
     if record.chain  then refs(canvas, { record.chain },  L["Leads to"]) end
     refs(canvas, record.excl, L["Instead of"])
+
+    local CS = ns:GetSubsystem("ChainGuideClassicSource")
+    local chainID = CS and CS:ChainForQuest(record.id)
+    local Database = chainID and ns:GetSubsystem("ChainGuideDatabase")
+    local chain = Database and Database.chains[chainID]
+    if chain then
+        header(canvas, L["Chain"])
+        line(canvas, chain.name, { indent = 10, color = MUTED, chainID = chainID, chainQuest = record.id })
+    end
 
     canvas:SetHeight(math.max(1, _cursorY + 8))
 end

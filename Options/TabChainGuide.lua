@@ -48,11 +48,15 @@ ns:GetSubsystem("Options"):AddTab("chainGuide", L["Chain Guide"], function(conte
             CG:RenderCurrent()
         end
     end
-    local unrouted = Options:CreateCheckbox(content,
-        L["Show unrouted questlines"],
-        unroutedGet, unroutedSet,
-        L["API discoveries not in our routing table."])
-    unrouted:SetPoint("TOPLEFT", login, "BOTTOMLEFT", 0, -2)
+    -- Only the retail quest line source discovers chains outside the routing table
+    local unrouted = login
+    if ns:GetSubsystem("ChainGuideQuestLineSource") then
+        unrouted = Options:CreateCheckbox(content,
+            L["Show unrouted questlines"],
+            unroutedGet, unroutedSet,
+            L["API discoveries not in our routing table."])
+        unrouted:SetPoint("TOPLEFT", login, "BOTTOMLEFT", 0, -2)
+    end
 
     local function mapPinsGet()
         local DB = ns:GetSubsystem("DB")

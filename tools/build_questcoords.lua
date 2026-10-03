@@ -12,7 +12,8 @@
 --                  question and puts a finished quest's pin back on the field you farmed.)
 --                 (srcnames: names for the creatures and objects that start or finish a quest,
 --                  one for every id the available and turnin tables reference, bar an unnamed
---                  supplement source. Rerun it whenever either of those is regenerated.)
+--                  supplement source or an Era placeholder only supplement quests use. Rerun it
+--                  whenever either of those is regenerated.)
 --     encoding  packed | table                (default packed - see the memory note below)
 --     uiMapId   optional, emit one zone only, for a pilot
 --
@@ -208,6 +209,18 @@ for name, baseFlavor in pairs(OVERLAYS) do
             report[#report + 1] = ("%s +%d ~%d"):format(t[2], added, replaced)
         end
         io.stderr:write(("-- overlay %s: %s\n"):format(name, table.concat(report, ", ")))
+    end
+end
+
+-- foreverStarts.lua holds { [questID] = { {areaId, x, y[, 1 for an ATT point]}, ... } }, where that quest is offered on Forever.
+local ownStarts
+do
+    local path = dir .. "/foreverStarts.lua"
+    local f = io.open(path, "rb")
+    if f then
+        f:close()
+        assert(PREFIX == "classic", "Forever start points cannot be applied to " .. PREFIX .. " data")
+        ownStarts = assert(loadfile(path))()
     end
 end
 
@@ -520,10 +533,65 @@ end
 -- objective is, which is why the available table documents its own kinds rather than sharing.
 local START_NPC, START_OBJECT, START_ITEM = 1, 2, 3
 
+-- The supplement merges a giver's repeat visits within one map unit, so evidence that close is the same spot.
+local SAME_SPOT = 1.0
+local ownStats = { quests = 0, kept = 0, dropped = 0, added = 0 }
+
+-- A giver in several places offers each quest at only some, and evidence far from every spot is a spot of the quest's own.
+local function ownPoints(pts, own, sb)
+    local usable, usableOn, setAside = {}, {}, {}
+    for j = 1, #own do
+        local ui = area2ui[own[j][1]]
+        -- ATT reads some converted maps in Era space and some in Forever space, so its points choose nothing there
+        if ui and own[j][4] == 1 and mapFix and mapFix[ui] then
+            setAside[ui] = true
+        elseif ui then
+            usable[#usable + 1] = own[j]
+            usableOn[ui] = true
+        end
+    end
+    if #usable == 0 then return pts end
+    ownStats.quests = ownStats.quests + 1
+    local out, touched = {}, {}
+    for i = 1, #pts do
+        local p = pts[i]
+        local ui = area2ui[p.a]
+        -- A map whose only evidence was set aside has nothing to choose between its giver's spots with
+        local keep = p.k == START_ITEM or (setAside[ui] and not usableOn[ui]) or false
+        for j = 1, #usable do
+            local e = usable[j]
+            if area2ui[e[1]] == area2ui[p.a] and (p.x - e[2]) ^ 2 + (p.y - e[3]) ^ 2 <= SAME_SPOT ^ 2 then
+                keep = true
+                if p.k ~= START_ITEM then touched[j] = true end
+            end
+        end
+        if keep then out[#out + 1] = p; ownStats.kept = ownStats.kept + 1 else ownStats.dropped = ownStats.dropped + 1 end
+    end
+    local kind, givers = START_NPC, sb[1]
+    if type(givers) ~= "table" or #givers == 0 then kind, givers = START_OBJECT, sb[2] end
+    if type(givers) ~= "table" or #givers == 0 then return out end
+    local src = math.min(unpack(givers))
+    local added = {}
+    for j = 1, #usable do
+        local e = usable[j]
+        local dup = touched[j]
+        for _, a in ipairs(added) do
+            if area2ui[a.a] == area2ui[e[1]] and (a.x - e[2]) ^ 2 + (a.y - e[3]) ^ 2 <= SAME_SPOT ^ 2 then dup = true end
+        end
+        if not dup then
+            local p = { a = e[1], x = e[2], y = e[3], k = kind, s = src }
+            added[#added + 1] = p
+            out[#out + 1] = p
+            ownStats.added = ownStats.added + 1
+        end
+    end
+    return out
+end
+
 -- Module scope rather than inside the available mode, because the srcnames mode has to gather
 -- the very same points to know which names the shipped table will reference. Two copies of this
 -- walk could drift and leave a name missing for a pin that asks for one.
-local function startPoints(q)
+local function giverPoints(q)
     local pts, sb = {}, q[Q_STARTEDBY]
     if type(sb) ~= "table" then return pts end
     if type(sb[1]) == "table" then
@@ -555,6 +623,12 @@ local function startPoints(q)
         end
     end
     return pts
+end
+
+local function startPoints(q, id)
+    local own, sb = ownStarts and ownStarts[id], q[Q_STARTEDBY]
+    if own and type(sb) == "table" then return ownPoints(giverPoints(q), own, sb) end
+    return giverPoints(q)
 end
 
 -- 0.01 merges spawns within about 1% of a zone into one pin, roughly the pin's own width.
@@ -965,7 +1039,7 @@ if mode == "available" then
     for i = 1, #ids do
         local id = ids[i]
         local q = quests[id]
-        local byMap = clusterSimple(startPoints(q))
+        local byMap = clusterSimple(startPoints(q, id))
 
         local maps = {}
         for m in pairs(byMap) do
@@ -1231,6 +1305,10 @@ if mode == "available" then
     io.stderr:write(("-- gate rows: pre=%d preAll=%d excl=%d chain=%d parent=%d skill=%d minRep=%d maxRep=%d names=%d\n")
         :format(countTbl(pre), countTbl(preAll), countTbl(excl), countTbl(chain),
                 countTbl(parent), countTbl(skill), countTbl(minRep), countTbl(maxRep), countTbl(names)))
+    if ownStarts then
+        io.stderr:write(("-- own starts: %d quest(s) with their own evidence, %d giver spot(s) kept, %d dropped, %d added\n")
+            :format(ownStats.quests, ownStats.kept, ownStats.dropped, ownStats.added))
+    end
     return
 end
 
@@ -1377,20 +1455,21 @@ if mode == "srcnames" then
     -- emitters run rather than by taking every quest giver in the dump. A giver with no spawn
     -- record produces no point, so listing it here would be a name nothing can ask for.
     local wantNpc, wantObj = {}, {}
+    local eraWants = { npc = {}, obj = {} }
 
     local function want(set, id)
         if type(id) == "number" and id > 0 then set[id] = true end
     end
 
-    local function harvest(byMap)
+    local function harvest(byMap, era)
         for m, list in pairs(byMap) do
             if (not zoneFilter) or m == zoneFilter then
                 for j = 1, #list do
                     local kind, src = list[j].k, list[j].s
                     -- Only the two kinds that carry one. An item start and an entrance reach
                     -- here with src nil, and the emitters assert that they stay 0.
-                    if kind == START_NPC then want(wantNpc, src)
-                    elseif kind == START_OBJECT then want(wantObj, src) end
+                    if kind == START_NPC then want(wantNpc, src); if era then want(eraWants.npc, src) end
+                    elseif kind == START_OBJECT then want(wantObj, src); if era then want(eraWants.obj, src) end end
                 end
             end
         end
@@ -1398,8 +1477,9 @@ if mode == "srcnames" then
 
     for i = 1, #ids do
         local q = quests[ids[i]]
-        harvest(clusterSimple(startPoints(q)))
-        harvest(clusterSimple(turninPoints(q)))
+        local era = not (overlaid[quests] and overlaid[quests][ids[i]])
+        harvest(clusterSimple(startPoints(q, ids[i])), era)
+        harvest(clusterSimple(turninPoints(q)), era)
     end
 
     local parts = {
@@ -1436,11 +1516,16 @@ if mode == "srcnames" then
             local id = sorted[i]
             local row = db[id]
             local nm = row and row[NAME]
-            if type(nm) == "string" and nm ~= "" then
+            -- An Era name marked UNUSED or [PH] that only supplement quests use is a placeholder Forever reused, so it shows none.
+            local stub = type(nm) == "string" and (nm:find("UNUSED", 1, true) or nm:find("^%[PH%]")) ~= nil
+                         and not eraWants[label][id]
+            if type(nm) == "string" and nm ~= "" and not stub then
                 parts[#parts + 1] = ("\t[%d]=%q,\n"):format(id, nm)
                 expect[label][id] = nm
                 counts[label] = counts[label] + 1
             elseif overlaid[db] and overlaid[db][id] then
+                unnamedOverlay[label] = unnamedOverlay[label] + 1
+            elseif stub then
                 unnamedOverlay[label] = unnamedOverlay[label] + 1
             else
                 missing[label] = missing[label] + 1
@@ -1454,7 +1539,7 @@ if mode == "srcnames" then
     emit("obj", wantObj, objects)
     parts[#parts + 1] = "}\n"
     if unnamedOverlay.npc + unnamedOverlay.obj > 0 then
-        table.insert(parts, tableAt, ("-- %d creature(s) and %d object(s) from the Forever supplement have no name yet, so their pins and Quest Browser lines show none.\n")
+        table.insert(parts, tableAt, ("-- %d creature(s) and %d object(s) used only by Forever supplement quests have no name yet, so their pins and Quest Browser lines show none.\n")
             :format(unnamedOverlay.npc, unnamedOverlay.obj))
     end
     local text = table.concat(parts)

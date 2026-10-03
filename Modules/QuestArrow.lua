@@ -4,7 +4,7 @@ local _, ns = ...
 -- one after the other retargets instead of leaving two arrows that cannot clear each other.
 local Arrow = ns:RegisterSubsystem("QuestArrow", {})
 
-local _uid
+local _uid, _questID, _title
 
 local function tomtom()
     local T = _G.TomTom
@@ -25,7 +25,7 @@ function Arrow:Clear()
     end
 end
 
-function Arrow:Set(mapID, x, y, title)
+function Arrow:Set(mapID, x, y, title, questID)
     local T = tomtom()
     if not (T and mapID and x and y) then return false end
     self:Clear()
@@ -35,8 +35,21 @@ function Arrow:Set(mapID, x, y, title)
         from  = "Everything Quests",
         crazy = true,
     })
-    if ok then _uid = uid end
+    if ok then _uid, _questID, _title = uid, questID, title end
     return ok and true or false
+end
+
+function Arrow:Holds(questID)
+    return questID ~= nil and _uid ~= nil and _questID == questID
+end
+
+-- The game's point moves as objectives finish, and TomTom drops a waypoint on arrival, so a held arrow is set again
+function Arrow:Refresh(questID)
+    if not self:Holds(questID) then return false end
+    local m, x, y
+    if C_QuestLog and C_QuestLog.GetNextWaypoint then m, x, y = C_QuestLog.GetNextWaypoint(questID) end
+    if m and x and y and (x ~= 0 or y ~= 0) then self:Set(m, x, y, _title, questID) end
+    return true
 end
 
 local function playerMap()
@@ -85,8 +98,8 @@ end
 -- knows a quest it is authoritative, so there is no fall through to the objective table for
 -- one that does - 475 quests hand in on a different map from their objective and every one of
 -- them would point at the wrong zone.
-function Arrow:PointAtQuest(questID)
-    if not questID then return false end
+function Arrow:PointFor(questID)
+    if not questID then return nil end
 
     local Cache = ns:GetSubsystem("Cache")
     local q = Cache and Cache:Get(questID)
@@ -95,11 +108,16 @@ function Arrow:PointAtQuest(questID)
     if q and ns.QuestIsDone and ns.QuestIsDone(q) then
         mapID, x, y = turnInPoint(questID)
         if not mapID and ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID] then
-            return false
+            return nil
         end
     end
     if not mapID then mapID, x, y = objectivePoint(questID) end
-    if not mapID then return false end
+    if not mapID then return nil end
+    return mapID, x, y, q and q.title
+end
 
-    return self:Set(mapID, x, y, q and q.title)
+function Arrow:PointAtQuest(questID)
+    local mapID, x, y, title = self:PointFor(questID)
+    if not mapID then return false end
+    return self:Set(mapID, x, y, title)
 end

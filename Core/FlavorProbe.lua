@@ -347,7 +347,7 @@ function Probe:Quest()
         "IsAltKeyDown", "hooksecurefunc", "SetItemRef",
     })
 
-    line("ChainGuide and WorldQuests - expected absent on Classic:")
+    line("The retail Chain Guide sources and World Quests APIs - neither module is listed on Era, TBC or Forever:")
     present({
         "C_QuestLine.GetAvailableQuestLines", "C_QuestLine.GetQuestLineQuests",
         "C_QuestLine.GetQuestLineInfo", "C_CampaignInfo.GetCampaignID",
@@ -2792,12 +2792,71 @@ function Probe:Group()
     line("  they are working quests you do not have, which nothing draws yet.")
 end
 
+function Probe:ChainGuide()
+    out("chain guide")
+
+    local CS = ns:GetSubsystem("ChainGuideClassicSource")
+    local Database = ns:GetSubsystem("ChainGuideDatabase")
+    if not (CS and Database) then
+        line("  ChainGuideClassicSource %s, ChainGuideDatabase %s.", CS and "present" or "ABSENT",
+             Database and "present" or "ABSENT")
+        line("  Retail reads its chains from the client's quest lines and Era and TBC list no Chain Guide, so there is nothing to read here.")
+        return
+    end
+
+    line("1. the chains built from the quest tables:")
+    CS:Ensure()
+    local s = CS.stats
+    line("  built=%s  chains=%s  quests=%s  zones=%s  unplaced=%s  widest row=%s  build ms=%s",
+         tostring(CS._built), val(s.chains), val(s.quests), val(s.categories), val(s.unplaced),
+         val(s.widest), s.ms and ("%.1f"):format(s.ms) or "nil")
+
+    line("2. the zone you stand in:")
+    local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    local catID = CS:CategoryForPlayer()
+    local cat = catID and Database.categories[catID]
+    line("  player map=%s  zone with chains=%s (%s)", val(mapID), val(catID), cat and val(cat.name) or "none")
+    if cat then
+        local ids = {}
+        for id, chain in pairs(Database.chains) do
+            if chain.category == catID then ids[#ids + 1] = id end
+        end
+        table.sort(ids)
+        line("  %d chain(s) here, the first 5 by id:", #ids)
+        for i = 1, math.min(5, #ids) do
+            local chain = Database.chains[ids[i]]
+            local done, active, total = CS:Progress(chain)
+            local step = CS:NextStep(chain)
+            line("  [%d] %s  items=%d  range=%s-%s  done=%d active=%d total=%d  next=%s (%s)",
+                 ids[i], val(chain.name), #chain.items,
+                 val(chain.range and chain.range[1]), val(chain.range and chain.range[2]),
+                 done, active, total, val(step and step.id), step and val(CS:Status(step.id)) or "-")
+        end
+    end
+
+    line("3. the tracked chain:")
+    local DB = ns:GetSubsystem("DB")
+    -- Read before the getter, which saves a re-keyed id over the stored one
+    line("  stored id=%s", val(DB and DB.char and DB.char.trackedChainID))
+    local CG = ns:GetSubsystem("ChainGuide")
+    local trackedID = CG and CG.GetTrackedChainID and CG:GetTrackedChainID()
+    local tracked = trackedID and Database.chains[trackedID]
+    line("  tracked id=%s  known=%s", val(trackedID), tostring(tracked ~= nil))
+    if tracked then
+        local step = CS:NextStep(tracked)
+        local start = step and CS:StartPoint(step.id)
+        line("  next=%s (%s)  start point=%s %s,%s", val(step and step.id), step and val(CS:Status(step.id)) or "-",
+             val(start and start.mapID), val(start and start.x), val(start and start.y))
+    end
+end
+
 local SECTIONS = {
     media   = Probe.Media,
     group   = Probe.Group,
     xp      = Probe.XP,
     available = Probe.Available,
     questbrowser = Probe.QuestBrowser,
+    chainguide = Probe.ChainGuide,
     map     = Probe.Map,
     poi     = Probe.POI,
     pins    = Probe.Pins,
@@ -2833,12 +2892,12 @@ function Probe:Run(msg)
         return
     end
     if which ~= "" then
-        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, available, questbrowser, group, flare, quest, port, tooltip, xp, events, ui, misc, or none for all",
+        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, available, questbrowser, chainguide, group, flare, quest, port, tooltip, xp, events, ui, misc, or none for all",
             which)
         return
     end
     out("EQ %s - full flavor probe", tostring(ns.VERSION))
-    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "available", "questbrowser", "group", "quest", "events", "ui" }) do
+    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "available", "questbrowser", "chainguide", "group", "quest", "events", "ui" }) do
         runSection(self, name, SECTIONS[name])
     end
     -- tooltip, mappoi, flare and xp need setup, and flare and xp mutate, so a blind run leaves them out

@@ -147,9 +147,8 @@ ns:GetSubsystem("Options"):AddTab("about", L["About"], function(content)
         .. "    -    " .. L["for WoW %s"]:format(clientVer) .. CLOSE)
     Y = Y - 22
 
-    -- Gated on the subsystem it names, like COMMANDS above, so neither flavor is described
-    -- with features its TOC does not load
-    body(WHITE .. (ns:GetSubsystem("ChainGuide")
+    -- Gated on a retail-only Chain Guide source, as WoW Forever lists the guide but not the retail features named here
+    body(WHITE .. (ns:GetSubsystem("ChainGuideQuestLineSource")
         and L["A unified replacement for the Blizzard quest experience: a custom tracker, world-map overlays, quest history, and a Midnight chain guide."]
         or L["A unified replacement for the Blizzard quest experience: a custom tracker, objective markers on the map and minimap, nameplate quest icons, and a browser for the quests you have not picked up yet."])
         .. CLOSE)

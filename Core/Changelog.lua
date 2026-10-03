@@ -2,6 +2,27 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "1.55.0", date = "2026-10-03",
+        sections = {
+            { head = "New Features", items = {
+                "The Chain Guide on WoW Forever. The Chain Guide window now opens on WoW Forever too. Forever has no quest line data of its own for Classic quests, so the guide builds its chains from Everything Quests' own quest data the first time you open it: every quest your character can take, joined to the quests that lead to it and follow it. A chain is named after its first quest, and chains are grouped by the zone where they start, with zones listed by level and the guide first opening on your current zone. Each quest shows whether you have done it, have it in your log, can pick it up now or cannot yet, and hovering it names who gives it and, where Everything Quests knows it, who takes it back and, when you cannot take it yet, why. Quests you skipped by finishing a later step, or closed off by taking another branch, are shown as such and left out of the chain's progress. A quest with many follow-ups that lead nowhere else, such as the Camping 101 quests, shows them in a gold frame of their own rows rather than one very wide row. Right-click a quest to open it in the Quest Browser, which now names the chain a quest belongs to. Track a chain to see its quests on the world map, use Continue for a TomTom arrow to your next step, and search by quest name or ID. The quest log's details now have a Chain button that opens the quest's chain, and EQ Objective Tracker's Chain Guide icon, its Get Directions menu entry, Shift-click on the minimap button and the Chain Guide key binding all work on Forever now, along with the Chain Guide tab in /eqs.",
+            } },
+            { head = "Improvements", items = {
+                "Quests new to Forever are marked where they are offered. Such a quest used to be marked at every spot its giver stands, so a giver who moves during a storyline marked each of its quests at all of those spots. Each quest new to Forever is now marked where it is actually offered, so those extra markers are gone, and one of the Dwarf shaman quests named Call of Earth is now marked in Dun Morogh instead of Durotar and Mulgore.",
+                "More WoW Forever quests. Everything Quests now knows 323 quests new to WoW Forever, up from 312: six more gathered by playing Forever, and five that had no place to pick them up until now. 319 of them have a marker where you pick them up and a Quest Browser entry, all of them named, and 280 of those carry the level they need.",
+                "A maximize button for the Chain Guide. A button beside the close button fills your screen with the Chain Guide window and puts it back the way it was, and the window remembers which you chose. This applies on retail too.",
+            } },
+            { head = "Bug Fixes", items = {
+                "The Chain Guide's resize grip never showed. The grip in the window's bottom right corner never drew, so nothing told you the window could be resized. It now shows in gold, with \"Drag to resize\" beside it until you first resize or maximize the window, on retail and WoW Forever.",
+            } },
+            { head = "Known Issues", items = {
+                "Some Skyborne quests are marked for other characters. Many Zephras Isle quests can only be taken by Skyborne characters, but Everything Quests cannot yet record \"Skyborne only\" in its quest data, so they are marked for other characters, a character who is not Skyborne can see a Zephras Isle zone in the Chain Guide, and the Quest Browser can say \"Races: Alliance\" for a quest only the High Order can take.",
+                "Some Chain Guide zones belong to the other faction. Alliance characters see an Orgrimmar zone holding the Horde's Ahn'Qiraj war effort quests, and Horde characters an Ironforge zone holding the Alliance's, because those quests carry no faction in the quest data. Warlock class chains also list the other faction's warlock trainer, because the quest data gives a few of their quests to the wrong faction.",
+                "Many quest givers new to Forever have no name yet. Their markers still show where to go, but the tooltip, the Quest Browser and the Chain Guide cannot say who is standing there.",
+            } },
+        },
+    },
+    {
         version = "1.54.0", date = "2026-09-30",
         sections = {
             { head = "New Features", items = {

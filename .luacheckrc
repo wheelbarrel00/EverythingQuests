@@ -62,6 +62,7 @@ read_globals = {
     "StaticPopup_Show", "StaticPopup_Hide", "StaticPopupDialogs",
     "ShowUIPanel", "HideUIPanel", "ReloadUI", "OpenQuestLog", "ToggleQuestLog",
     "OpenWorldMap", "SearchBoxTemplate_OnTextChanged", "ChatEdit_InsertLink",
+    "MaximizeMinimizeButtonFrameMixin",
     "GetTime", "time", "date", "GetCVar", "GetCVarBool", "SetCVar", "GetLocale", "GetRealmName",
     "Ambiguate", "RAID_CLASS_COLORS",
     "GetCursorPosition", "GetInstanceInfo", "GetQuestUiMapID", "GetQuestID",

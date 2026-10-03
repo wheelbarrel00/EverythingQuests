@@ -56,9 +56,17 @@ function C:PruneStaleRecords(now, ttl)
     return removed
 end
 
+-- Where the Classic data loads, the availability gate's own reads, so the guide and the map cannot disagree
+local function classicGate()
+    return ns.CLASSIC_QUEST_AVAILABLE and ns:GetSubsystem("AvailableQuests")
+end
+
 function C:IsQuestCompleted(questID)
     if not questID then return false end
-    if C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted
+    local A = classicGate()
+    if A then
+        return A:IsCompleted(questID) and true or false
+    elseif C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted
         and C_QuestLog.IsQuestFlaggedCompleted(questID) then
         return true
     end
@@ -66,9 +74,10 @@ function C:IsQuestCompleted(questID)
 end
 
 function C:IsQuestActive(questID)
-    if not (questID and C_QuestLog and C_QuestLog.GetLogIndexForQuestID) then
-        return false
-    end
+    if not questID then return false end
+    local A = classicGate()
+    if A then return (A:InLog(questID)) and true or false end
+    if not (C_QuestLog and C_QuestLog.GetLogIndexForQuestID) then return false end
     return C_QuestLog.GetLogIndexForQuestID(questID) ~= nil
 end
 
@@ -90,6 +99,10 @@ local _cpStatus = {}
 local _cpKeys   = {}
 function C:ChainProgress(chain)
     if not chain then return 0, 0, 0 end
+    if chain._generated then
+        local CS = ns:GetSubsystem("ChainGuideClassicSource")
+        if CS then return CS:Progress(chain) end
+    end
     local DB = ns:GetSubsystem("ChainGuideDatabase")
     DB:NormalizeChain(chain)
     local items = chain.items

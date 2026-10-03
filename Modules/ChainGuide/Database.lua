@@ -13,6 +13,11 @@ function DBmod:RegisterChain(id, def)
     self.chains[id] = def
 end
 
+function DBmod:EnsureGenerated()
+    local CS = ns:GetSubsystem("ChainGuideClassicSource")
+    if CS then CS:Ensure() end
+end
+
 function DBmod:CurrentCharacter()
     if self._char then return self._char end
     -- Two-step on purpose - "UnitClass and UnitClass(...)" is a binary expression, so it truncates to the first return and the locale-independent token lands nil

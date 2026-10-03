@@ -12,9 +12,30 @@ local MIN_W           = 760
 local MIN_H           = 460
 local DEFAULT_W       = 1160
 local DEFAULT_H       = 720
+local SCREEN_MARGIN   = 30
 local PANES_TOP       = -(TITLE_BAR_H + NAV_BAR_H + PANE_GAP)
 
 CG.railRowPool = {}; CG.railRowsActive = {}
+
+local function guideCfg()
+    local DB = ns:GetSubsystem("DB")
+    return DB and DB.db and DB.db.profile and DB.db.profile.chainGuide
+end
+
+local function hideResizeHint(f)
+    local cfg = guideCfg()
+    if cfg then cfg.resizeHintSeen = true end
+    if f.resizeHint then f.resizeHint:Hide() end
+end
+
+-- The screen in the window's own units, since the window carries a scale of its own
+local function fitToScreen(f)
+    local s = f:GetScale() or 1
+    f:ClearAllPoints()
+    f:SetPoint("CENTER", UIParent, "CENTER")
+    f:SetSize(math.max(UIParent:GetWidth() / s - SCREEN_MARGIN * 2, MIN_W),
+              math.max(UIParent:GetHeight() / s - SCREEN_MARGIN * 2, MIN_H))
+end
 
 local function onRowClick(self)
     if self.navKind == "cat" then
@@ -139,6 +160,22 @@ function CG:Build()
     close:SetPoint("RIGHT", -2, 0)
     close:SetScript("OnClick", function() f:Hide() end)
 
+    -- Blizzard's world map button, where the client has it. Its Minimize means back to the size you dragged
+    if MaximizeMinimizeButtonFrameMixin then
+        local mm = CreateFrame("Frame", nil, titleBar, "MaximizeMinimizeButtonFrameTemplate")
+        mm:SetPoint("RIGHT", close, "LEFT", -1, 0)
+        -- The template pins level 510, which would draw it over other dialog windows
+        local level = close:GetFrameLevel()
+        mm:SetFrameLevel(level)
+        mm.MaximizeButton:SetFrameLevel(level + 1)
+        mm.MinimizeButton:SetFrameLevel(level + 1)
+        mm:SetOnMaximizedCallback(function() self:SetMaximized(true) end)
+        mm:SetOnMinimizedCallback(function() self:SetMaximized(false) end)
+        local cfg = guideCfg()
+        if cfg and cfg.maximized then mm:Maximize(true, true) else mm:Minimize(true, true) end
+        f.maxMinBtn = mm
+    end
+
     local nav = CreateFrame("Frame", nil, f)
     nav:SetHeight(NAV_BAR_H)
     nav:SetPoint("TOPLEFT", 0, -TITLE_BAR_H)
@@ -258,19 +295,40 @@ function CG:Build()
     f:SetResizable(true)
     if f.SetResizeBounds then f:SetResizeBounds(MIN_W, MIN_H) end
     local grip = CreateFrame("Button", nil, f)
-    grip:SetSize(20, 20)
-    grip:SetPoint("BOTTOMRIGHT", -5, 5)
+    grip:SetSize(16, 16)
+    grip:SetPoint("BOTTOMRIGHT", -1, 1)
     grip:SetFrameLevel((f:GetFrameLevel() or 0) + 20)
-    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrip-Up")
-    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrip-Highlight")
-    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrip-Down")
-    grip:SetHitRectInsets(-14, 0, -14, 0)
-    grip:SetScript("OnMouseDown", function() f:StartSizing("BOTTOMRIGHT") end)
+    -- Blizzard's chat grabber art. The SizeGrip path this used before drew nothing in game
+    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    grip:GetNormalTexture():SetVertexColor(1.0, 0.82, 0.0)
+    grip:GetPushedTexture():SetVertexColor(1.0, 0.82, 0.0)
+
+    -- On the grip's level so the panes cannot cover it, and gone once the window has been resized
+    local hint = grip:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    hint:SetPoint("RIGHT", grip, "LEFT", -4, 0)
+    hint:SetText(L["Drag to resize"])
+    hint:SetTextColor(0.92, 0.72, 0.02, 0.85)
+    f.resizeHint = hint
+    local hintCfg = guideCfg()
+    if hintCfg and hintCfg.resizeHintSeen then hint:Hide() end
+
+    grip:SetScript("OnMouseDown", function()
+        local cfg = guideCfg()
+        if cfg and cfg.maximized then
+            cfg.maximized = nil
+            self._restorePoint = nil
+            if f.maxMinBtn then f.maxMinBtn:Minimize(true, true) end
+        end
+        f:StartSizing("BOTTOMRIGHT")
+    end)
     grip:SetScript("OnMouseUp", function()
         f:StopMovingOrSizing()
         local DB  = ns:GetSubsystem("DB")
         local cfg = DB and DB.db and DB.db.profile and DB.db.profile.chainGuide
         if cfg then cfg.width, cfg.height = f:GetWidth(), f:GetHeight() end
+        hideResizeHint(f)
         self:RenderCurrent()
     end)
     grip:SetScript("OnEnter", function(self2)
@@ -293,6 +351,10 @@ function CG:Build()
     end
 
     self:NavigateHome()
+    -- Generated chains are filed by zone, so the first open lands on the one you are standing in. Back returns home
+    local CS = ns:GetSubsystem("ChainGuideClassicSource")
+    local here = CS and CS:CategoryForPlayer()
+    if here then self:NavigateCategory(here) end
 end
 
 function CG:ApplySettings()
@@ -300,6 +362,34 @@ function CG:ApplySettings()
     local DB = ns:GetSubsystem("DB")
     local cfg = DB and DB.db and DB.db.profile and DB.db.profile.chainGuide
     if cfg and cfg.scale then self.frame:SetScale(cfg.scale) end
+    if cfg and cfg.maximized then
+        fitToScreen(self.frame)
+        -- A refit can shrink the scroll range under the current offset, and no render follows it
+        local pane = self.frame.detailPane
+        if pane and pane._cvClampScroll then C_Timer.After(0, pane._cvClampScroll) end
+    end
+end
+
+function CG:SetMaximized(on)
+    local f = self.frame
+    if not f then return end
+    local cfg = guideCfg()
+    if cfg then cfg.maximized = on and true or nil end
+    if on then
+        local point, rel, relPoint, x, y = f:GetPoint(1)
+        self._restorePoint = point and { point, rel, relPoint, x, y } or nil
+        fitToScreen(f)
+        hideResizeHint(f)
+    else
+        local w = (cfg and cfg.width)  or DEFAULT_W
+        local h = (cfg and cfg.height) or DEFAULT_H
+        f:SetSize(math.max(w, MIN_W), math.max(h, MIN_H))
+        f:ClearAllPoints()
+        local p = self._restorePoint
+        if p then f:SetPoint(p[1], p[2], p[3], p[4], p[5]) else f:SetPoint("CENTER") end
+        self._restorePoint = nil
+    end
+    self:RenderCurrent()
 end
 
 function CG:OnEnable()
@@ -374,6 +464,12 @@ end
 
 function CG:NavigateChain(chainID, highlightQuestID)
     local H = ns:GetSubsystem("ChainGuideHistory")
+    local cur = H:Current()
+    local chain = ns:GetSubsystem("ChainGuideDatabase").chains[chainID]
+    -- History refuses a repeat of the shown chain, which would leave a generated chain on the old quest
+    if highlightQuestID and cur and cur.type == "chain" and cur.id == chainID and chain and chain._generated then
+        cur.highlight = highlightQuestID
+    end
     H:Push({ type = "chain", id = chainID, highlight = highlightQuestID })
     self:RenderCurrent()
 end
@@ -382,6 +478,7 @@ function CG:FindChainForQuest(questID)
     local Database = ns:GetSubsystem("ChainGuideDatabase")
     local QLS      = ns:GetSubsystem("ChainGuideQuestLineSource")
     if not Database then return nil end
+    Database:EnsureGenerated()
 
     if QLS then
         for id in pairs(Database.categories) do QLS:EnsureZoneChains(id) end
@@ -410,36 +507,54 @@ end
 local SEARCH_MAX_ATTEMPTS = 6
 local SEARCH_RETRY_DELAY  = 0.4
 
+-- Generated chains come from shipped tables, so a search answers at once and never asks the server for a title
+local function classicSource()
+    return ns:GetSubsystem("ChainGuideClassicSource")
+end
+
+local function questName(questID)
+    local CS = classicSource()
+    if CS then
+        local A = ns:GetSubsystem("AvailableQuests")
+        local D = A and A:Data()
+        return D and D.gates[questID] and CS:Title(questID) or nil
+    end
+    return ns.Util.QuestTitle(questID)
+end
+
 function CG:SearchByQuestID(questID, _attempt)
     _attempt = _attempt or 1
+    local CS = classicSource()
 
-    if C_QuestLog and C_QuestLog.RequestLoadQuestByID then
+    if not CS and C_QuestLog and C_QuestLog.RequestLoadQuestByID then
         C_QuestLog.RequestLoadQuestByID(questID)
     end
 
     local chainID = self:FindChainForQuest(questID)
     if chainID then
         self:NavigateChain(chainID, questID)
-        local name = ns.Util.QuestTitle(questID)
+        local name = questName(questID)
         print((L["|cffEBB706EQ Chain Guide:|r found quest |cffffffff%d|r%s — jumping to its chain."])
             :format(questID, name and (" (" .. name .. ")") or ""))
         return
     end
 
-    if _attempt < SEARCH_MAX_ATTEMPTS then
+    if not CS and _attempt < SEARCH_MAX_ATTEMPTS then
         C_Timer.After(SEARCH_RETRY_DELAY, function()
             if self.frame and self.frame:IsShown() then self:SearchByQuestID(questID, _attempt + 1) end
         end)
         return
     end
 
-    local name = ns.Util.QuestTitle(questID)
+    local name = questName(questID)
     print((L["|cffEBB706EQ Chain Guide:|r quest |cffffffff%d|r%s isn't in any chain I know about."])
         :format(questID, name and (" (" .. name .. ")") or ""))
-    print(("  Wowhead: https://www.wowhead.com/quest=%d"):format(questID))
+    if not CS then print(("  Wowhead: https://www.wowhead.com/quest=%d"):format(questID)) end
 end
 
 function CG:FindChainByName(needle)
+    local CS = classicSource()
+    if CS then return CS:FindByName(needle) end
     local Database = ns:GetSubsystem("ChainGuideDatabase")
     local QLS      = ns:GetSubsystem("ChainGuideQuestLineSource")
     if not (Database and needle and needle ~= "") then return nil end
@@ -496,7 +611,7 @@ function CG:SearchByName(text, _attempt)
     if chainID then
         self:NavigateChain(chainID, questID)
         local Database = ns:GetSubsystem("ChainGuideDatabase")
-        local label = (questID and ns.Util.QuestTitle(questID))
+        local label = (questID and questName(questID))
                       or (Database and Database.chains[chainID] and Database.chains[chainID].name)
                       or text
         print((L["|cffEBB706EQ Chain Guide:|r found |cffffffff%s|r — jumping to its chain."])
@@ -504,7 +619,7 @@ function CG:SearchByName(text, _attempt)
         return
     end
 
-    if _attempt < SEARCH_MAX_ATTEMPTS then
+    if not classicSource() and _attempt < SEARCH_MAX_ATTEMPTS then
         C_Timer.After(SEARCH_RETRY_DELAY, function()
             if self.frame and self.frame:IsShown() then self:SearchByName(text, _attempt + 1) end
         end)
@@ -520,6 +635,7 @@ function CG:Forward() local H = ns:GetSubsystem("ChainGuideHistory"); H:Forward(
 
 function CG:RenderCurrent()
     if not self.frame then return end
+    ns:GetSubsystem("ChainGuideDatabase"):EnsureGenerated()
     local H = ns:GetSubsystem("ChainGuideHistory")
     local state = H:Current() or { type = "home" }
 
@@ -549,7 +665,14 @@ end
 
 function CG:GetTrackedChainID()
     local DB = ns:GetSubsystem("DB")
-    return DB and DB.char and DB.char.trackedChainID
+    local id = DB and DB.char and DB.char.trackedChainID
+    local CS = ns:GetSubsystem("ChainGuideClassicSource")
+    local moved = id and CS and CS:ResolveChainID(id)
+    if moved and moved ~= id then
+        DB.char.trackedChainID = moved
+        return moved
+    end
+    return id
 end
 
 function CG:GetTrackedChain()
@@ -557,6 +680,7 @@ function CG:GetTrackedChain()
     if not id then return nil end
     local Database = ns:GetSubsystem("ChainGuideDatabase")
     if not Database then return nil end
+    Database:EnsureGenerated()
     if not Database.chains[id] then
         local QLS = ns:GetSubsystem("ChainGuideQuestLineSource")
         if QLS and QLS.EnsureZoneChains and Database.categories then
@@ -630,14 +754,25 @@ function CG:RenderCategories()
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT",  prev, "BOTTOMLEFT",  0, prev == hdr and -4 or -1)
             row:SetPoint("TOPRIGHT", content, "TOPRIGHT", -8, 0)
+            local range = entry.def.levelRange
             row.title:ClearAllPoints()
             row.title:SetPoint("LEFT", 8, 0)
-            row.title:SetPoint("RIGHT", -8, 0)
+            row.title:SetPoint("RIGHT", range and -50 or -8, 0)
             local catName = entry.def.name or ("Category " .. entry.id)
             row.title:SetText(catName)
             row.title:SetTextColor(1, 1, 1)
             row.navKind, row.navID = "cat", entry.id
-            setRowTooltip(row, catName)
+            if range and range[1] == range[2] then
+                row.suffix:SetText(tostring(range[1]))
+                row.suffix:SetTextColor(0.7, 0.7, 0.7)
+                setRowTooltip(row, catName, (L["Level %d"]):format(range[1]))
+            elseif range then
+                row.suffix:SetText(("%d-%d"):format(range[1], range[2]))
+                row.suffix:SetTextColor(0.7, 0.7, 0.7)
+                setRowTooltip(row, catName, (L["Level %d–%d"]):format(range[1], range[2]))
+            else
+                setRowTooltip(row, catName)
+            end
             prev = row
             shown = shown + 1
         end
@@ -679,6 +814,15 @@ function CG:RenderChains(activeCatID, activeChainID)
         local ao, bo = a.def._campaignOrder, b.def._campaignOrder
         if ao and bo then return ao < bo end
         if ao or bo then return ao ~= nil end
+        -- Generated chains read as a leveling path, lowest level first, then by name and id
+        if a.def._generated and b.def._generated then
+            local al = a.def.range and a.def.range[1] or math.huge
+            local bl = b.def.range and b.def.range[1] or math.huge
+            if al ~= bl then return al < bl end
+            local an, bn = a.def.name, b.def.name
+            if an ~= bn then return an < bn end
+            return a.id < b.id
+        end
         return (a.def.name or "") < (b.def.name or "")
     end)
 

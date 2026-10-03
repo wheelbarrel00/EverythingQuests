@@ -1,6 +1,6 @@
 <h1 align="center">Everything Quests</h1>
 <p align="center">
-  <strong>A unified replacement for the Blizzard quest experience — objective tracker, world-map overlays, nameplate quest icons, an account-wide quest history, and a Midnight chain guide. Runs on retail, Classic Era, Burning Crusade Classic and, as a work in progress, WoW Forever.</strong>
+  <strong>A unified replacement for the Blizzard quest experience — objective tracker, world-map overlays, nameplate quest icons, an account-wide quest history, and a quest chain guide. Runs on retail, Classic Era, Burning Crusade Classic and, as a work in progress, WoW Forever.</strong>
 </p>
 <p align="center">
   <a href="https://ko-fi.com/wheelbarrel00"><img src="https://img.shields.io/badge/Support-Ko--fi-FF5E5B?style=flat-square&logo=ko-fi" alt="Support on Ko-fi" /></a>
@@ -24,7 +24,7 @@ Everything Quests replaces Blizzard's quest tracking and builds on the rest of i
 1. An on-screen **objective tracker** that replaces the default ObjectiveTrackerFrame, provided by [EQ Objective Tracker](https://www.curseforge.com/wow/addons/eq-objective-tracker) and installed automatically alongside this addon
 2. **Nameplate Quest Icons** — a quest icon plus the remaining count or percent on objective mobs in the 3D world
 3. Interactive **World Quest pins** on the world map and zone maps, plus a docked World Quests panel (retail)
-4. A standalone **Chain Guide** window for browsing Midnight quest chains (retail)
+4. A standalone **Chain Guide** window for browsing quest chains: Midnight's on retail, and on WoW Forever every chain your character can take
 5. An account-wide **Quest History** log with six views and a backfill of past completions (retail)
 6. Branded **Quest POI** overlays on zone maps, and on Classic, objective spawn markers on both the world map and the minimap
 7. A **Quest Browser** on Classic, for looking up almost any quest in the game before you accept it, plus **shareable quest links** in chat on every flavor
@@ -39,7 +39,7 @@ Open Options with **`/eqs`**, from the minimap button, from the Everything Quest
 
 ## Classic support
 
-Everything Quests has run on **Classic Era (1.15)** since v1.39.0, on **Burning Crusade Classic (2.5)** since v1.41.0, and on **WoW Forever (1.60)**, which is still in beta, since v1.48.0. On Classic Era and Burning Crusade Classic, support is deliberately partial: what ships is what was measured working on a live client, not the whole addon. WoW Forever loads the same feature set and is still being checked there (see below). Elsewhere in this README, "Classic" covers all three unless a flavor is named.
+Everything Quests has run on **Classic Era (1.15)** since v1.39.0, on **Burning Crusade Classic (2.5)** since v1.41.0, and on **WoW Forever (1.60)**, which is still in beta, since v1.48.0. On Classic Era and Burning Crusade Classic, support is deliberately partial: what ships is what was measured working on a live client, not the whole addon. WoW Forever loads the same feature set plus a Chain Guide of its own, and is still being checked there (see below). Elsewhere in this README, "Classic" covers all three unless a flavor is named.
 
 Era and TBC were measured identical across every game API the addon reads, so one implementation covers both. They differ only in their generated dataset — TBC ships its own, because Era quest data has nothing for Outland or for the Blood Elf and Draenei starting zones. Since v1.49.0 WoW Forever has its own dataset too: the Classic Era data adjusted to Forever's maps, plus quests gathered by playing Forever itself and, since v1.53.0, the WoW Forever quest data of [AllTheThings](https://github.com/ATTWoWAddon/AllTheThings). Each flavor's TOC lists exactly one set; they define the same globals and are alternatives, never companions.
 
@@ -61,18 +61,22 @@ Era and TBC were measured identical across every game API the addon reads, so on
 
 **WoW Forever**
 
-Forever runs 1.x content on the modern game client. Everything Quests loads its Classic Era feature set there, without the Chain Guide, World Quests and Quest History.
+Forever runs 1.x content on the modern game client. Everything Quests loads its Classic Era feature set there, plus a Chain Guide of its own (see "Chain Guide" below), without World Quests and Quest History.
 
-- **Checked there so far:** the world map and minimap markers, both for the quests in your log and for quests you can pick up, your group's quest progress on markers, your quest progress on item tooltips, nameplate icons, the Quest Browser, the TomTom arrow for the quest you follow (with EQ Objective Tracker 1.27.0 or later), and switching to Blizzard's own quest tracker
+- **Checked there so far:** the world map and minimap markers, both for the quests in your log and for quests you can pick up, your group's quest progress on markers, your quest progress on item tooltips, nameplate icons, the Quest Browser, the Chain Guide and the quest log's Chain button, the TomTom arrow for the quest you follow (with EQ Objective Tracker 1.27.0 or later), and switching to Blizzard's own quest tracker
 - **Included but not yet tested there:** everything else, including auto-accept and auto-turn-in, quest links and the rest of the group features
 - **One marker per quest.** Forever draws quest markers of its own, so since v1.51.0 Everything Quests no longer draws a second one beside the game's own on the world map, or on the minimap for the quests you track and the quest NPCs near you. The kill, loot and object markers stay, because the game draws nothing like them
-- **A quest database of its own** since v1.49.0. Since v1.53.0 it knows 312 quests new to Forever, most of them from the WoW Forever quest data of AllTheThings and the rest gathered by playing Forever. 309 of them have a marker where you pick them up and a Quest Browser entry, 142 of those on Zephras Isle and the rest across the starting zones, the capitals and beyond. Most of the quests gathered by playing also have a marker where you hand them in. They carry the level, races, classes and earlier quests they need where the data knows them, and a few may still be marked before you are high enough to take them. Many Zephras Isle quests are for Skyborne characters only, which Everything Quests cannot record yet, so they are also marked for other characters, and many quest givers new to Forever have no name yet
+- **A quest database of its own** since v1.49.0. Since v1.55.0 it knows 323 quests new to Forever, most of them from the WoW Forever quest data of AllTheThings and the rest gathered by playing Forever. 319 of them have a marker where you pick them up and a Quest Browser entry, 142 of those on Zephras Isle and the rest across the starting zones, the capitals and beyond. Since v1.55.0 each of them is marked where it is actually offered, rather than at every spot its giver stands. Most of the quests gathered by playing also have a marker where you hand them in. They carry the level, races, classes and earlier quests they need where the data knows them, and a few may still be marked before you are high enough to take them. Many Zephras Isle quests are for Skyborne characters only, which Everything Quests cannot record yet, so they are also marked for other characters, and many quest givers new to Forever have no name yet
 - **Four maps drawn over different ground.** Forever draws Stormwind City, Redridge Mountains, Mulgore and Eastern Plaguelands over different ground than Classic Era does, so the markers on those maps are converted to Forever's own. Stormwind and Redridge have been checked in game. Mulgore and Eastern Plaguelands are converted the same way but not yet checked
 - **Skyborne characters** are treated as their faction: a quest open to every race of the Alliance, or of the Horde, is marked for them. A few quests limited to particular races, such as some Stormwind mage quests, stay hidden for Skyborne characters until we can confirm that Forever offers them
 
 **Retail-only**
 
-The **Chain Guide** (the authored chain data is Midnight content, and on Classic Era and TBC `C_QuestLine` and `C_CampaignInfo` are absent as well), the **World Quests** panel (no world quests exist), and **Quest History** (on Classic Era and TBC, `GetTitleForQuestID` and `RequestLoadQuestByID` are both absent, so a backfilled row could never resolve its own name). WoW Forever leaves out the same three.
+The **World Quests** panel (no world quests exist) and **Quest History** (on Classic Era and TBC, `GetTitleForQuestID` and `RequestLoadQuestByID` are both absent, so a backfilled row could never resolve its own name). WoW Forever leaves out both.
+
+**Not yet on Classic Era and TBC**
+
+The **Chain Guide** runs on retail and WoW Forever. Retail's chains are Midnight content read through `C_QuestLine` and `C_CampaignInfo`, which Classic Era and TBC lack, and WoW Forever builds its own from Everything Quests' quest data.
 
 Each omission is declared by name in `EverythingQuests_Vanilla.toc`, `EverythingQuests_TBC.toc` and `EverythingQuests_Camelot.toc` (the WoW Forever manifest) with a `# check-toc: omit` directive, and `tools/check_toc.py` errors if one goes stale.
 
@@ -94,9 +98,9 @@ Nothing was lost in the move. Existing users keep their position, size, fonts, c
 |---|---|
 | **Tracker settings** | The cogwheel at the top right of the tracker, or `/eqot` |
 | **Everything Quests settings** | The Everything Quests logo beside the cogwheel, the minimap button, or `/eqs` |
-| **Chain Guide** (retail) | The chain icon on the tracker, or `/eqs chain` |
+| **Chain Guide** (retail and WoW Forever) | The chain icon on the tracker, or `/eqs chain` |
 
-The Everything Quests icon on the tracker, and on retail the Chain Guide icon, can each be switched off under `/eqs` > General. On retail, Everything Quests also adds **Get Directions** to a quest's right-click menu on the tracker.
+The Everything Quests icon on the tracker, and on retail and WoW Forever the Chain Guide icon, can each be switched off under `/eqs` > General. On retail and WoW Forever, Everything Quests also adds **Get Directions** to a quest's right-click menu on the tracker.
 
 **Prefer Blizzard's own tracker?** Tick **Use Blizzard's quest tracker** in the Tracker section of `/eqs` > General, or the same checkbox on EQ Objective Tracker's General tab. The interface reloads, the tracker window is gone and the game's own quest tracker is back, while everything else in Everything Quests keeps working. The tracker icons and Get Directions go with the window, so open Everything Quests with `/eqs` or the minimap button. "Only show markers for quests you are tracking" then follows the game's own tracked quests. On Classic Era and Burning Crusade Classic the game's tracker starts with nothing watched, so shift-click quests in the quest log to watch them, up to the game's limit of five. Untick the box to get the tracker window back, again after a reload.
 
@@ -131,18 +135,28 @@ Replaces Blizzard's world quest icons with custom pins on both the world map and
 - **Account-wide completion cache** — Shared across characters
 
 ### Chain Guide
-A standalone three-pane window for browsing hand-authored quest chains, plus live campaign data straight from Blizzard's `C_CampaignInfo`. Retail only.
+A standalone three-pane window for browsing quest chains. On retail it shows hand-authored quest chains plus live campaign data straight from Blizzard's `C_CampaignInfo`, and since v1.55.0 WoW Forever builds chains of its own (see below). Items marked (retail) are retail only.
 
 - **Layout** — Categories (left), Chains (middle), Quest Details (right)
 - **Browser navigation** — Back / Forward buttons with full history
-- **Hand-authored overlays** — Prerequisite branching overrides Blizzard's API chains where the API is incomplete. Branching is authored only, never inferred from quest-type APIs
-- **Cross-character completion** — Tracks completion of every chain across every character on your account
-- **Completion-date tooltips** — Hover any quest in a chain to see when (or whether) you completed it
-- **Live campaign chapters** — Campaigns render from `C_CampaignInfo` chapter by chapter, so a new patch chapter appears without a data update
+- **Hand-authored overlays** (retail) — Prerequisite branching overrides Blizzard's API chains where the API is incomplete. Branching is authored only, never inferred from quest-type APIs
+- **Cross-character completion** (retail) — Tracks completion of every chain across every character on your account
+- **Completion-date tooltips** (retail) — Hover any quest in a chain to see when (or whether) you completed it
+- **Live campaign chapters** (retail) — Campaigns render from `C_CampaignInfo` chapter by chapter, so a new patch chapter appears without a data update
 - **Click-to-waypoint** — Click any quest in a chain to point you at it and open the world map there. Uses [TomTom](https://www.curseforge.com/wow/addons/tomtom)'s arrow when installed (recommended). Without TomTom, a quest already in your log is super-tracked, and otherwise the coordinates are printed in chat as the map opens. Blizzard's own map waypoint is deliberately never written, because it taints shared map state
 - **Lazy-built** — The window is constructed on first toggle to keep load times minimal
+- **Resizable** — Drag the gold grip in the bottom right corner, or use the maximize button beside the close button to fill the screen and back. The window remembers which you chose
+- **Chain button** — The quest log's details pane has a Chain button that opens the quest's chain
 
 Currently covers the Midnight expansion: **Eversong Woods**, **Zul'Aman**, **Harandar**, **Arator**, **Voidstorm**, **The Sunstrider Omnium**, **Void Acropolis** and **The Coiled Isle**, plus the live **Midnight Campaign**, **The War of Light and Shadow** and **The Curse of Ula'tek** storylines.
+
+**On WoW Forever** the game has no quest line data for Classic quests, so the Chain Guide builds its chains from Everything Quests' own quest data the first time you open it:
+
+- **Every chain your character can take** — quests joined to the quests that lead to them and follow them, each chain named after its first quest and filed under the zone where it starts. Zones are listed by level, with their level range, and the guide first opens on your current zone
+- **Where you stand** — each quest shows whether you have done it, have it in your log, can pick it up now or cannot yet. A quest you skipped by finishing a later step, or closed off by taking another branch, is shown as such and left out of the chain's progress
+- **Tooltips** — who gives a quest, who takes it back where Everything Quests knows it, and, when you cannot take it yet, why, in the Quest Browser's own words. Right-click a quest to open it in the Quest Browser, which names the chain a quest belongs to
+- **Wide chains stay readable** — a quest with many follow-ups that lead nowhere else, such as the Camping 101 quests, shows them in a gold frame of their own rows
+- **Track, Continue and search** — track a chain to see its quests on the world map, use Continue for a TomTom arrow to your next step, and search by quest name or ID
 
 ### Quest History
 An account-wide log of every quest turn-in across every character. Open with `/eqs history` or the History tab in Options. Retail only.
@@ -186,11 +200,11 @@ Classic only (Classic Era, Burning Crusade Classic and WoW Forever). A search-an
 - **Clickable throughout** — a location opens the world map there and sets a TomTom waypoint; a prerequisite or follow-up navigates to that quest. References the data cannot describe render as plain text rather than a dead link
 - **Who to talk to** — the Starts and Turn in rows name the giver and the finisher. A row is merged per map while a map pin is merged per coordinate, so a row covering several different people names all of them rather than picking one
 - **Entry points** — `/eqs quests [text]`, the button under `/eqs` > General, or right-clicking a gold available-quest marker
-- **Coverage is not total.** It reads the `names`/`gates` tables (3,794 Era / 5,652 TBC) while the coordinate tables cover more, so 357 Era and 508 TBC quests EQ pins on the map are not in the browser. WoW Forever's tables are the Era set plus 309 Forever quests, from AllTheThings and from playing Forever, with a similar gap
+- **Coverage is not total.** It reads the `names`/`gates` tables (3,794 Era / 5,652 TBC) while the coordinate tables cover more, so 357 Era and 508 TBC quests EQ pins on the map are not in the browser. WoW Forever's tables are the Era set plus 319 Forever quests, from AllTheThings and from playing Forever, with a similar gap
 - `/eqsprobe questbrowser` reports the data, a live query, the player's zone, one full decoded record, and whether the browser and the map pins agree
 
 ### Shareable Quest Links
-Shift-click a quest marker on the map or a row or a detail line in the Quest Browser (on retail, a map marker or a Chain Guide node) with a chat box open, and the quest drops into chat as `[[18] The Defias Brotherhood (155)]`. On Classic, a reader running Everything Quests sees a colored, clickable link that opens their Quest Browser on that quest.
+Shift-click a quest marker on the map, a row or a detail line in the Quest Browser, or a Chain Guide node with a chat box open (retail has no Quest Browser, and Classic Era and TBC no Chain Guide), and the quest drops into chat as `[[18] The Defias Brotherhood (155)]`. On Classic, a reader running Everything Quests sees a colored, clickable link that opens their Quest Browser on that quest.
 
 - **The wire form is plain text on purpose.** The client refuses to send a hyperlink type it does not know, so a custom link arrives empty for every recipient, and the one type it does know cannot name a quest that is not already in your log. Plain text reads correctly with no addon at all and carries the ID, which is what lets a receiver rebuild a real link locally
 - **Byte-compatible with the established Classic quest addon's format**, so its users get rich links from Everything Quests and Everything Quests users get rich links from them, with no addon-to-addon channel on either side
@@ -224,7 +238,7 @@ LibDataBroker-powered launcher compatible with Titan Panel, Arcana (formerly Cho
 | Click | Action |
 |---|---|
 | **Left-click** | Open the Blizzard quest log |
-| **Shift+Left-click** | Open the Chain Guide (retail) |
+| **Shift+Left-click** | Open the Chain Guide (retail and WoW Forever) |
 | **Right-click** | Open Options |
 | **Drag** | Reposition around the minimap |
 
@@ -246,7 +260,7 @@ LibDataBroker-powered launcher compatible with Titan Panel, Arcana (formerly Cho
 | `/eqs discover [zone]` | Print quest-line discovery info for the current zone (optional hint) |
 | `/eqsprobe [section]` | Print what EQ found on the running client (also `/eqs flavorprobe`). Ships on every flavor |
 
-On Classic Era, Burning Crusade Classic and WoW Forever the Chain Guide, discover, History and session commands resolve to nothing, since those subsystems are not loaded there. `/eqs quests` is the reverse: it is Classic-only, because retail already opens any quest in Blizzard's own quest log.
+On Classic Era and Burning Crusade Classic the Chain Guide, discover, History and session commands resolve to nothing, since those subsystems are not loaded there, and on WoW Forever the discover, History and session commands do. `/eqs quests` is the reverse: it is Classic-only, because retail already opens any quest in Blizzard's own quest log.
 
 Tracker settings have their own panel and commands — see `/eqot` and `/eqot status`.
 
@@ -266,7 +280,7 @@ Tracker settings have their own panel and commands — see `/eqot` and `/eqot st
 | `/eqs zonedump [zone]` | Dump the zone-progress routing table and its live counts |
 | `/eqs profile [show \| reset \| mem on \| mem off \| memhog \| auto on \| auto off \| auto list]` | Built-in profiler with hot-path auto-instrument |
 
-These are mostly retail tools. The Chain Guide and profiler commands do nothing on the Classic flavors, where those parts are not loaded.
+These are mostly retail tools. `/eqs profile` does nothing on the Classic flavors, where the profiler is not loaded, and `/eqs chaindump` works only on retail and WoW Forever. The rest print what the client has, often that an API is unavailable.
 
 `/eqsprobe` sections: `media`, `map`, `poi`, `pins`, `minimap`, `available`, `questbrowser`, `group`, `mappoi`, `flare`, `quest`, `port`, `tooltip`, `xp`, `events`, `ui`, `misc`. No argument runs all except `tooltip`, `mappoi`, `flare` and `xp`, each of which needs something set up first — and `flare` and `xp` both mutate state, so `/reload` after using `flare`.
 
@@ -279,7 +293,7 @@ Bindable from **Esc > Options > Key Bindings > AddOns > Everything Quests**:
 | Action | Default |
 |---|---|
 | Toggle Options | (unbound) |
-| Toggle Chain Guide (retail) | (unbound) |
+| Toggle Chain Guide (retail and WoW Forever) | (unbound) |
 
 ---
 
@@ -289,11 +303,11 @@ Bindable from **Esc > Options > Key Bindings > AddOns > Everything Quests**:
 |---|---|
 | **General** | Two columns, with the map, tooltip and nameplate settings on the right. World-map quest pins, pin scale, objective pins per quest, quests you can pick up and their level and holiday filters (Classic), minimap objective pins (Classic), auto-accept / auto-turn-in / join group quests, the Immersion hand-off (when Immersion is installed), **quest announcements**, **party quest progress**, pin rings, markers for tracked quests only, fading markers under your position, **coordinates**, dungeon / repeatable / profession quest filters (Classic), quest progress on tooltips, the Quest Browser button (Classic), Use Blizzard's quest tracker, Open Tracker Settings and the tracker icons, options window scale, update notice style, **quest icons on nameplates** with their position, size and offsets, reset to defaults, profile management, show / hide minimap button |
 | **World Quests** | Master switch, world map pins, zone quest list and its sort order, per-reward filters, per-faction filters, pin scale |
-| **Chain Guide** | Open on login, window scale, unrouted questlines, the tracked chain on the world map, cross-character chain cache stats and reset, prune stale entries |
+| **Chain Guide** | Open on login, window scale, unrouted questlines (retail), the tracked chain on the world map, cross-character chain cache stats and reset, prune stale entries |
 | **History** | Record completed quests, maximum entries kept, backfill from past completions, re-scan missing names, restore from backup, wipe history |
 | **About** | Version, changelog, commands, credits, and links |
 
-Every section gates on the subsystem it drives rather than on a flavor check, so on Classic Era, Burning Crusade Classic and WoW Forever only General and About appear and no control is left inert. Tracker and appearance settings live in EQ Objective Tracker's own panel — the Open Tracker Settings button on the General tab opens it, or type `/eqot`.
+Every section gates on the subsystem it drives rather than on a flavor check, so on Classic Era and Burning Crusade Classic only General and About appear, on WoW Forever the Chain Guide tab as well, and no control is left inert. Tracker and appearance settings live in EQ Objective Tracker's own panel — the Open Tracker Settings button on the General tab opens it, or type `/eqot`.
 
 ---
 
@@ -324,7 +338,7 @@ Every section gates on the subsystem it drives rather than on a flavor check, so
 **Required:** **[EQ Objective Tracker](https://www.curseforge.com/wow/addons/eq-objective-tracker)** — provides the objective tracker. Addon managers install it automatically; a manual install needs both folders. All other libraries are bundled.
 
 **Optional:**
-- **[TomTom](https://www.curseforge.com/wow/addons/tomtom)** — recommended on retail for the Chain Guide, and effectively required on Classic Era and Burning Crusade Classic: clicking a quest or an objective marker uses TomTom's on-screen arrow, and those clients have no built-in waypoint system to fall back on. On WoW Forever a marker click uses the game's own super-tracking, and with TomTom installed the quest you follow also gets TomTom's arrow (with EQ Objective Tracker 1.27.0 or later). TomTom also serves the Quest Browser's location links there
+- **[TomTom](https://www.curseforge.com/wow/addons/tomtom)** — recommended on retail and WoW Forever for the Chain Guide, and effectively required on Classic Era and Burning Crusade Classic: clicking a quest or an objective marker uses TomTom's on-screen arrow, and those clients have no built-in waypoint system to fall back on. On WoW Forever a marker click uses the game's own super-tracking, and with TomTom installed the quest you follow also gets TomTom's arrow (with EQ Objective Tracker 1.27.0 or later). TomTom also serves the Quest Browser's location links there
 - [TitanClassic](https://www.curseforge.com/wow/addons/titan-panel-classic), Arcana (formerly ChocolateBar), or [ElvUI](https://www.tukui.org/) — display the minimap button on a data-broker bar instead of around the minimap
 - **[ElvUI](https://www.tukui.org/)** — ElvUI ships its own nameplate quest icons. When detected, EQ's version defaults off and a one-time dialog asks which to use; choose either, and your pick is remembered. No conflict either way
 
@@ -350,8 +364,8 @@ EverythingQuests/
 ├── EverythingQuests.toc              # Retail manifest, module load order
 ├── EverythingQuests_Vanilla.toc      # Classic Era manifest, omissions declared inline
 ├── EverythingQuests_TBC.toc          # Burning Crusade Classic manifest, same shape
-├── EverythingQuests_Camelot.toc      # WoW Forever manifest, the Classic Era file set
-│                                     #   with Forever's own data files
+├── EverythingQuests_Camelot.toc      # WoW Forever manifest, the Classic Era file set,
+│                                     #   the Chain Guide and Forever's own data files
 ├── Bindings.xml                      # Keybinding declarations
 ├── Core/                             # Init, Compat, DB, Events, Profiler, Cache, Util,
 │                                     #   Media, Dialog, QuestRewards, Changelog, FlavorProbe
@@ -361,7 +375,8 @@ EverythingQuests/
 │   ├── Minimap/                      # LibDataBroker launcher + Classic objective pins
 │   ├── Nameplates/                   # Nameplate quest icons (QuestIcons.lua)
 │   ├── WorldQuests/                  # World/zone map pins, docked panel
-│   ├── ChainGuide/                   # Chain browser window + campaign source
+│   ├── ChainGuide/                   # Chain browser window, campaign source and
+│   │                                 #   the WoW Forever chain builder
 │   ├── MapPOI/                       # Quest POI overlays, Classic spawn markers,
 │   │                                 #   available-quest pins, the holiday season gate
 │   ├── QuestBrowser/                 # Classic quest lookup window (Data + Frame)

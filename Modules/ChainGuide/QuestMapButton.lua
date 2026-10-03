@@ -3,6 +3,10 @@ local L = ns.L
 local QMB = ns:RegisterSubsystem("ChainGuideQuestMapButton", {})
 
 local function findChainFor(questID)
+    -- WoW Forever builds its chains on first use, so the loop below can miss them until something has asked
+    local Classic = ns:GetSubsystem("ChainGuideClassicSource")
+    if Classic then return Classic:ChainForQuest(questID) end
+
     local Database = ns:GetSubsystem("ChainGuideDatabase")
     if not (Database and Database.chains and questID) then return nil end
 
@@ -73,12 +77,21 @@ local function onClick()
     end
 
     local chainID = findChainFor(qid)
+    local Classic = ns:GetSubsystem("ChainGuideClassicSource")
     if chainID then
         local CG = ns:GetSubsystem("ChainGuide")
         if CG then
             if CG.Open          then CG:Open()                end
-            if CG.NavigateChain then CG:NavigateChain(chainID) end
+            -- A generated chain opens at its top, so it is given the quest to scroll to, as a search hit is
+            if CG.NavigateChain then CG:NavigateChain(chainID, Classic and qid or nil) end
         end
+        return
+    end
+
+    -- The link below opens Wowhead's retail quest page, so Forever answers as the guide's own search does
+    if Classic then
+        DEFAULT_CHAT_FRAME:AddMessage((L["|cffEBB706EQ Chain Guide:|r quest |cffffffff%d|r%s isn't in any chain I know about."])
+            :format(qid, " (" .. Classic:Title(qid) .. ")"))
         return
     end
 
@@ -129,9 +142,11 @@ local function ensureButton()
         local tip = ns.Util.PinTooltip()
         tip:SetOwner(self, "ANCHOR_TOPLEFT")
         tip:SetText(L["Find this quest in EQ's Chain Guide"], 1, 1, 1)
-        tip:AddLine(
-            L["Falls back to a Wowhead link in chat if EQ doesn't have a chain for this quest yet."],
-            0.7, 0.7, 0.7, true)
+        if not ns:GetSubsystem("ChainGuideClassicSource") then
+            tip:AddLine(
+                L["Falls back to a Wowhead link in chat if EQ doesn't have a chain for this quest yet."],
+                0.7, 0.7, 0.7, true)
+        end
         tip:Show()
     end)
     b:SetScript("OnLeave", function() ns.Util.PinTooltip():Hide() end)

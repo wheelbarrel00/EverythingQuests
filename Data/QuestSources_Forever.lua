@@ -17,7 +17,7 @@ local _, ns = ...
 --
 -- English. The client cannot name a creature it has never seen and offers no way to
 -- ask by id on this flavor, so unlike a quest title there is nothing to prefer over it.
--- 61 creature(s) and 6 object(s) from the Forever supplement have no name yet, so their pins and Quest Browser lines show none.
+-- 62 creature(s) and 9 object(s) used only by Forever supplement quests have no name yet, so their pins and Quest Browser lines show none.
 ns.CLASSIC_QUEST_SOURCES = {
 npc = {
 	[167]="Morhan Coppertongue",
@@ -1597,6 +1597,7 @@ npc = {
 	[257554]="Halaan Hawk-Eye",
 	[263113]="Myriaal Mistwake",
 	[263399]="Sam Sarsaparilla",
+	[270269]="Arbal",
 },
 obj = {
 	[31]="Old Lion Statue",
@@ -1798,5 +1799,6 @@ obj = {
 	[181073]="Fragrant Cauldron",
 	[186420]="Syndicate Documents",
 	[187273]="Suspicious Hoofprint",
+	[415107]="Burned-Out Remains",
 },
 }

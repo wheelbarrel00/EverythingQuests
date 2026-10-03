@@ -2,6 +2,25 @@ local _, ns = ...
 
 local W = ns:RegisterSubsystem("ChainGuideWaypoint", {})
 
+-- Listed only where the Classic quest tables load, so its presence is the flavor test
+local function classicSource()
+    return ns:GetSubsystem("ChainGuideClassicSource")
+end
+
+local function titleOf(questID)
+    local CS = classicSource()
+    if CS then return CS:Title(questID) end
+    return ns.Util.QuestTitle(questID, true)
+end
+
+-- Era and TBC have no GetLogIndexForQuestID, so the Classic tables read the log through the same gate as the map
+local function inLog(questID)
+    local Characters = classicSource() and ns:GetSubsystem("ChainGuideCharacters")
+    if Characters then return Characters:IsQuestActive(questID) end
+    return C_QuestLog and C_QuestLog.GetLogIndexForQuestID
+           and C_QuestLog.GetLogIndexForQuestID(questID) ~= nil or false
+end
+
 local function cacheTable()
     local DB = ns:GetSubsystem("DB")
     if not (DB and DB.chainCache) then return nil end
@@ -74,6 +93,12 @@ end
 function W:Resolve(questID, chain)
     if not questID then return nil end
 
+    local CS = classicSource()
+    if CS then
+        local p = CS:StartPoint(questID)
+        if p then return p.mapID, p.x, p.y end
+    end
+
     local m, x, y = cacheGet(questID)
     if m then return m, x, y end
 
@@ -83,7 +108,7 @@ function W:Resolve(questID, chain)
         return static.m, static.x, static.y
     end
 
-    if C_QuestLine and C_QuestLine.GetQuestLineInfo then
+    if not CS and C_QuestLine and C_QuestLine.GetQuestLineInfo then
         local maps = candidateMaps(chain)
         for i = 1, #maps do
             local info = C_QuestLine.GetQuestLineInfo(questID, maps[i])
@@ -97,8 +122,12 @@ function W:Resolve(questID, chain)
     return nil
 end
 
-function W:SetWaypoint(mapID, x, y, title)
-    if TomTom and TomTom.AddWaypoint then
+function W:SetWaypoint(mapID, x, y, title, questID)
+    if classicSource() then
+        -- The one arrow slot the map pins and the tracker focus already share, so a click here retargets it
+        local Arrow = ns:GetSubsystem("QuestArrow")
+        if Arrow and Arrow:Available() and Arrow:Set(mapID, x, y, title, questID) then return true end
+    elseif TomTom and TomTom.AddWaypoint then
         TomTom:AddWaypoint(mapID, x, y, { title = title, from = "Everything Quests" })
         return true
     end
@@ -135,6 +164,11 @@ local function openMap(mapID)
 end
 
 local function liveWaypoint(questID)
+    local Arrow = classicSource() and ns:GetSubsystem("QuestArrow")
+    if Arrow and Arrow.PointFor then
+        local m, x, y = Arrow:PointFor(questID)
+        if m and x and y then return m, x, y end
+    end
     if C_QuestLog and C_QuestLog.GetNextWaypoint then
         local m, x, y = C_QuestLog.GetNextWaypoint(questID)
         if m and x and y and (x ~= 0 or y ~= 0) then return m, x, y end
@@ -157,14 +191,13 @@ end
 
 function W:ResolveForPin(questID, chain)
     if not questID then return nil end
-    local inLog = C_QuestLog and C_QuestLog.GetLogIndexForQuestID
-                  and C_QuestLog.GetLogIndexForQuestID(questID) ~= nil
-    if inLog then
+    local onQuest = inLog(questID)
+    if onQuest then
         local m, x, y = liveWaypoint(questID)
         if m and x and y then return m, x, y, true end
     end
     local m, x, y = self:Resolve(questID, chain)
-    if m and x and y then return m, x, y, inLog or false end
+    if m and x and y then return m, x, y, onQuest end
     return nil
 end
 
@@ -187,12 +220,14 @@ function W:_goToInLog(questID, title)
     -- is absent, and gating on TomTom first made that message unreachable from this path while
     -- the not-in-log path printed it - the same click said different things about the same quest.
     if wm and wx and wy then
-        self:SetWaypoint(wm, wx, wy, title)
+        self:SetWaypoint(wm, wx, wy, title, questID)
     else
         -- Silence read as a dead button. The client returning no position is a normal answer, not
         -- a failure, and saying so beats a click that appears to do nothing.
-        print(("|cffEBB706EQ|r: |cffffffff%s|r is super-tracked and the map is open, but the game has not given a position for its next objective, so there is no arrow to set."):format(
-            title or "Quest"))
+        local why = classicSource() and "no position is known for its next objective"
+                    or "the game has not given a position for its next objective"
+        print(("|cffEBB706EQ|r: |cffffffff%s|r is super-tracked and the map is open, but %s, so there is no arrow to set."):format(
+            title or "Quest", why))
     end
     openMap(wm or (C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")))
     return true
@@ -218,6 +253,10 @@ end
 
 local function nextActionableStep(chain)
     if not chain then return nil end
+    if chain._generated then
+        local CS = classicSource()
+        if CS then return CS:NextStep(chain) end
+    end
     local Database   = ns:GetSubsystem("ChainGuideDatabase")
     local Characters = ns:GetSubsystem("ChainGuideCharacters")
     if not (Database and Characters) then return nil end
@@ -274,45 +313,43 @@ function W:AdvanceWaypoint(chain)
     local step = nextActionableStep(chain)
     if not (step and step.id) then return nil end
     local id = step.id
-    local inLog = C_QuestLog and C_QuestLog.GetLogIndexForQuestID
-                  and C_QuestLog.GetLogIndexForQuestID(id)
-    if inLog then
+    if inLog(id) then
         if C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
             local cur = C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID()
             if cur ~= id then C_SuperTrack.SetSuperTrackedQuestID(id) end
         end
         if TomTom and TomTom.AddWaypoint then
             local wm, wx, wy = liveWaypoint(id)
-            if wm and wx and wy then self:SetWaypoint(wm, wx, wy, ns.Util.QuestTitle(id, true)) end
+            if wm and wx and wy then self:SetWaypoint(wm, wx, wy, titleOf(id), id) end
         end
     elseif TomTom and TomTom.AddWaypoint then
         local m, x, y = self:Resolve(id, chain)
-        if m and x and y then self:SetWaypoint(m, x, y, ns.Util.QuestTitle(id, true)) end
+        if m and x and y then self:SetWaypoint(m, x, y, titleOf(id)) end
     end
     return step
 end
 
 function W:GoTo(questID, chain)
-    local title = ns.Util.QuestTitle(questID, true)
+    local title = titleOf(questID)
 
     local navID, navTitle = questID, title
-    local clickedInLog = C_QuestLog and C_QuestLog.GetLogIndexForQuestID
-                         and C_QuestLog.GetLogIndexForQuestID(questID) ~= nil
-    if chain and not clickedInLog then
+    if chain and not inLog(questID) then
         local Characters = ns:GetSubsystem("ChainGuideCharacters")
-        if Characters and not Characters:IsQuestCompleted(questID) then
+        local CS = chain._generated and classicSource()
+        -- A quest the game offers you right now is a step in its own right, wherever it sits in the chain
+        local offered = CS and CS:Status(questID) == "available"
+        if Characters and not offered and not Characters:IsQuestCompleted(questID) then
             local step = nextActionableStep(chain)
             if step and step.id and step.id ~= questID then
                 navID    = step.id
-                navTitle = ns.Util.QuestTitle(step.id, true) or navTitle
+                navTitle = titleOf(step.id) or navTitle
                 print(("|cffEBB706EQ|r: |cffffffff%s|r comes later in |cffffffff%s|r — directions set to your next step, |cffffffff%s|r."):format(
                     title, chain.name or "this chain", navTitle))
             end
         end
     end
 
-    if C_QuestLog and C_QuestLog.GetLogIndexForQuestID
-       and C_QuestLog.GetLogIndexForQuestID(navID) then
+    if inLog(navID) then
         return self:_goToInLog(navID, navTitle)
     end
 

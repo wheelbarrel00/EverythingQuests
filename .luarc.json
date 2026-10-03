@@ -138,6 +138,7 @@
     "MapCanvasDataProviderMixin",
     "MapCanvasMixin",
     "MapCanvasPinMixin",
+    "MaximizeMinimizeButtonFrameMixin",
     "Menu",
     "MenuUtil",
     "Minimap",

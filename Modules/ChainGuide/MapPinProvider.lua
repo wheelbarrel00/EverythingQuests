@@ -59,6 +59,7 @@ function providerMixin:_DoRefresh()
     if not mapID then return end
 
     local char = Database:CurrentCharacter()
+    local CS = chain._generated and ns:GetSubsystem("ChainGuideClassicSource")
     local nextStep = W.NextActionableStep and W:NextActionableStep(chain)
     local nextID = nextStep and nextStep.id
 
@@ -68,7 +69,8 @@ function providerMixin:_DoRefresh()
         if raw and raw.type ~= "chain" and not raw.breadcrumb then
             local item = Database:GetVariation(raw, char)
             local qid  = item and item.id
-            if qid and not _seen[qid] then
+            -- A quest closed by a later step or another branch would be pinned as one still to come
+            if qid and not _seen[qid] and not (CS and CS:IsClosed(qid)) then
                 local rm, rx, ry, inLog = W:ResolveForPin(qid, chain)
                 if rm == mapID and rx and ry then
                     _seen[qid] = true

@@ -58,7 +58,8 @@ function Pin:OnMouseEnter()
     if not self.questID then return end
     local tip = ns.Util.PinTooltip()
     tip:SetOwner(self, "ANCHOR_RIGHT")
-    local title = ns.Util.QuestTitle and ns.Util.QuestTitle(self.questID, true)
+    local CS = ns:GetSubsystem("ChainGuideClassicSource")
+    local title = CS and CS:Title(self.questID) or (ns.Util.QuestTitle and ns.Util.QuestTitle(self.questID, true))
     tip:SetText(title or ("Quest #" .. tostring(self.questID)), 1.0, 0.82, 0.0, 1, true)
     local txt = STATUS_TEXT[self.status]
     if txt then

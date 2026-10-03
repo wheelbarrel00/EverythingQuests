@@ -3,15 +3,21 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.54.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.54.0"
+local FEATURE_POPUP_VERSION = "1.55.0"
+local POPUP_TITLE           = "What's New in Everything Quests v1.55.0"
 
 local POPUP_BODY = [[
-|cffEBB706Use Blizzard's quest tracker|r
-Prefer the game's own quest tracker? A new checkbox in the Tracker section of the General tab turns off the EQ Objective Tracker window and brings Blizzard's tracker back. The interface reloads to switch, and your map markers, tooltips and the quest sounds keep working. The checkbox appears once EQ Objective Tracker is updated to 1.28.0, and the same one sits at the top of EQ Objective Tracker's own General tab. On Classic Era and Burning Crusade Classic the game's tracker starts with nothing watched, so shift-click quests in the quest log to watch them.
+|cffEBB706The Chain Guide on WoW Forever|r
+The Chain Guide now opens on WoW Forever, built from Everything Quests' own quest data. Browse every quest chain your character can take, zone by zone, see what you have done and what comes next, and hover a quest to learn who gives it and why you cannot take it yet. Right-click a quest to open it in the Quest Browser, track a chain on the world map, or use Continue for a TomTom arrow to your next step. The quest log has a Chain button too.
+
+|cffEBB706Forever quests where they are offered|r
+Each quest new to Forever is now marked where it is actually offered, not at every spot its giver stands, and Everything Quests knows 323 Forever quests.
+
+|cffEBB706A bigger Chain Guide window|r
+On retail and Forever, a maximize button fills your screen with the Chain Guide, and the resize grip in its corner now shows.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffdiana_winter|r for asking for it, to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
+Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who asked for the Chain Guide on Forever and sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]
