@@ -3,21 +3,24 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "1.55.0"
-local POPUP_TITLE           = "What's New in Everything Quests v1.55.0"
+local FEATURE_POPUP_VERSION = "2.0.0"
+local POPUP_TITLE           = "What's New in Everything Quests v2.0.0"
 
 local POPUP_BODY = [[
-|cffEBB706The Chain Guide on WoW Forever|r
-The Chain Guide now opens on WoW Forever, built from Everything Quests' own quest data. Browse every quest chain your character can take, zone by zone, see what you have done and what comes next, and hover a quest to learn who gives it and why you cannot take it yet. Right-click a quest to open it in the Quest Browser, track a chain on the world map, or use Continue for a TomTom arrow to your next step. The quest log has a Chain button too.
+|cffEBB706A new options window|r
+Type |cffffffff/eqs|r for a redesigned options window in the same style as EQ Objective Tracker 2.0: a sidebar with an icon for each tab, and settings grouped into cards. Map settings have a Map tab of their own, and the reset, clear and wipe buttons sit in red at the bottom of their tab. Every setting keeps its saved value.
 
-|cffEBB706Forever quests where they are offered|r
-Each quest new to Forever is now marked where it is actually offered, not at every spot its giver stands, and Everything Quests knows 323 Forever quests.
+|cffEBB706Prompts and menus to match|r
+Prompts, such as switching trackers or naming a new profile, use the new look, and so does the world quest right-click menu on retail.
 
-|cffEBB706A bigger Chain Guide window|r
-On retail and Forever, a maximize button fills your screen with the Chain Guide, and the resize grip in its corner now shows.
+|cffEBB706A world quest fix|r
+On retail the zone quest list now works with the world map pins switched off.
+
+|cffEBB706Coming next|r
+The Chain Guide, the Quest Browser, History and What's New windows keep their current look for now. They get the same new look in a future update, starting with the Chain Guide.
 
 |cffEBB706Thank you|r
-Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who asked for the Chain Guide on Forever and sends reports and suggestions.
+Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
 
 |cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
 ]]

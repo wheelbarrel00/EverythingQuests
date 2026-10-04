@@ -7,7 +7,6 @@ local PAD          = 6
 local ROW_H        = 32
 local ROW_GAP      = 2
 local ICON_SIZE    = 26
-local PIN_TEMPLATE = "EQWorldQuestPinTemplate"
 
 Z.rowPool   = {}
 Z.activeRows = {}
@@ -58,30 +57,7 @@ local function buildRow(parent)
     r:SetScript("OnClick", function(self, button)
         if not self.questID then return end
         if button == "RightButton" then
-            if MenuUtil and MenuUtil.CreateContextMenu then
-                local Watch = ns:GetSubsystem("WQWatchPersist")
-                local tracked = Watch and Watch.IsWatched and Watch:IsWatched(self.questID)
-                MenuUtil.CreateContextMenu(self, function(_, root)
-                    root:CreateTitle(questTitle(self.questID))
-                    if tracked then
-                        root:CreateButton(L["Untrack Quest"], function()
-                            if Watch and Watch.Untrack then Watch:Untrack(self.questID) end
-                        end)
-                    else
-                        root:CreateButton(L["Track Quest"], function()
-                            if Watch and Watch.Track then Watch:Track(self.questID) end
-                        end)
-                    end
-                    root:CreateButton(L["Super-track (follow arrow)"], function()
-                        if C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
-                            C_SuperTrack.SetSuperTrackedQuestID(self.questID)
-                        end
-                    end)
-                    root:CreateButton(L["Search on Wowhead"], function()
-                        ns:ShowURL("https://www.wowhead.com/quest=" .. tostring(self.questID))
-                    end)
-                end)
-            end
+            ns.ShowWorldQuestMenu(self.questID)
         else
             if C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
                 C_SuperTrack.SetSuperTrackedQuestID(self.questID)
@@ -129,21 +105,16 @@ function Z:Render(list)
     if not (mapInfo and mapInfo.mapType == zoneType) then releaseAll(); return 0, nil end
 
     local WQ = ns:GetSubsystem("WQWorldMap")
-    if not (WQ and WQ.shadow and WQ.shadow.EnumeratePinsByTemplate) then
-        releaseAll(); return 0, nil
-    end
+    if not (WQ and WQ.Quests) then releaseAll(); return 0, nil end
 
-    local pins = {}
-    for pin in WQ.shadow:EnumeratePinsByTemplate(PIN_TEMPLATE) do
-        if pin.questID then
-            pins[#pins + 1] = pin
-        end
-    end
+    local quests, count = WQ:Quests()
+    local found = {}
+    for i = 1, count do found[i] = quests[i] end
 
-    if #pins == 0 then releaseAll(); return 0, nil end
+    if #found == 0 then releaseAll(); return 0, nil end
 
     local sortMode = (DB and DB.db.profile.worldQuests.zoneListSort) or "time"
-    table.sort(pins, function(a, b)
+    table.sort(found, function(a, b)
         if sortMode == "alpha" then
             return (questTitle(a.questID) or "") < (questTitle(b.questID) or "")
         elseif sortMode == "type" then
@@ -167,23 +138,23 @@ function Z:Render(list)
 
     releaseAll()
     local y = 0
-    for i = 1, #pins do
-        local pin = pins[i]
+    for i = 1, #found do
+        local q = found[i]
         local row = acquireRow(list)
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT",  list, "TOPLEFT",  0, -y)
         row:SetPoint("TOPRIGHT", list, "TOPRIGHT", 0, -y)
-        row.questID = pin.questID
+        row.questID = q.questID
 
         local Rewards = ns:GetSubsystem("WQRewards")
         if Rewards and Rewards.ApplyToTexture then
-            Rewards:ApplyToTexture(row.icon, pin.reward)
+            Rewards:ApplyToTexture(row.icon, q.reward)
         end
 
-        row.title:SetText(questTitle(pin.questID))
+        row.title:SetText(questTitle(q.questID))
 
         local mins = C_TaskQuest and C_TaskQuest.GetQuestTimeLeftMinutes
-                     and C_TaskQuest.GetQuestTimeLeftMinutes(pin.questID)
+                     and C_TaskQuest.GetQuestTimeLeftMinutes(q.questID)
         row.timeText:SetText(Util.WQTimeLong(mins))
         row.timeText:SetTextColor(Util.WQTimeColor(mins))
         row:Show()
@@ -191,5 +162,5 @@ function Z:Render(list)
         y = y + ROW_H + ROW_GAP
     end
 
-    return y, L["%s — %d quests"]:format(mapInfo.name, #pins)
+    return y, L["%s — %d quests"]:format(mapInfo.name, #found)
 end

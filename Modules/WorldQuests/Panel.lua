@@ -12,7 +12,6 @@ local PAD         = 6
 local TITLE_H     = 24
 local SUBHEADER_H = 18
 local BAR_W       = 18
-local PIN_TEMPLATE = "EQWorldQuestPinTemplate"
 
 local BG_COLOR   = { 0, 0, 0, 0.9 }
 -- Gold, not EQ brand red, so the docked panel reads as part of the map chrome
@@ -93,7 +92,7 @@ function P:Build()
     self.frame = f
 end
 
--- The tab gates on this, not raw pin presence, so it can never invite-open onto an empty panel
+-- The side tab gates on this, so it never opens onto an empty panel
 function P:HasContent()
     local DB = ns:GetSubsystem("DB")
     if not (DB and DB.db.profile.worldQuests.enabled ~= false) then return false end
@@ -111,10 +110,9 @@ function P:HasContent()
         local zoneType = (Enum and Enum.UIMapType and Enum.UIMapType.Zone) or 3
         if mapInfo and mapInfo.mapType == zoneType then
             local WQ = ns:GetSubsystem("WQWorldMap")
-            if WQ and WQ.shadow and WQ.shadow.EnumeratePinsByTemplate then
-                for _ in WQ.shadow:EnumeratePinsByTemplate(PIN_TEMPLATE) do
-                    return true
-                end
+            if WQ and WQ.Quests then
+                local _, count = WQ:Quests()
+                if count > 0 then return true end
             end
         end
     end

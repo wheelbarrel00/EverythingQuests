@@ -56,7 +56,7 @@ Era and TBC were measured identical across every game API the addon reads, so on
 - **Coordinates** on the world map and under the minimap, with a slider for how many decimals to show
 - **Two more ways to quiet a busy map** on top of the filters above, both off by default: leave out markers for quests you have untracked, and fade markers sitting on top of your own position
 - **Quest announcements** and **party quest progress**, shown on quest markers and tooltips, which also reads the progress the established Classic quest addon shares. **Joining group quests automatically** is included too, but has not been checked in game yet
-- **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, the **focus arrow**, and the **`/eqs`** options window (General and About tabs)
+- **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, the **focus arrow**, and the **`/eqs`** options window (General, Map and About tabs)
 - All bundled locales
 
 **WoW Forever**
@@ -180,13 +180,13 @@ Custom quest pins on zone maps. On retail the icon sits in a red ring; on Classi
 
 - **Aggregated tooltips** — hovering lists every quest whose nearest pin is within reach, nearest first, so overlapping pins stop hiding each other. The reach is measured in pin widths, so it stays a constant on-screen distance at any zoom. The tooltip carries the quest level, its objectives and its experience reward
 - **Your group on the marker** — for a quest in your own log, the tooltip lists the group members on the quest under the cursor, with their progress (see Group Quest Features)
-- **Fixed size at every zoom** — `SetScalingLimits(1, s, s)` collapses Blizzard's zoom lerp to a constant, with a per-map-type factor so continent and world maps draw smaller. A scale slider and a per-quest pin limit live under `/eqs` > General
+- **Fixed size at every zoom** — `SetScalingLimits(1, s, s)` collapses Blizzard's zoom lerp to a constant, with a per-map-type factor so continent and world maps draw smaller. A scale slider and a per-quest pin limit live under `/eqs` > Map
 - **On Classic** — in-progress pins come from `Data/QuestSpawns_*.lua` and carry objective art rather than a `!`, marking every clustered location a quest can be advanced, with a per-quest minimum separation applied at read time so a low limit still spreads across the zone
 - **Turn-in pins on Classic** — a finished quest is placed from `Data/QuestTurnIn_*.lua`, at every map where it can be handed in. That table is authoritative once it knows a quest, because on Classic Era alone 475 quests hand in on a different map from their objective
 - **Available quest pins on Classic** — gold `!` markers for quests you can pick up but have not accepted, from `Data/QuestAvailable_*.lua`, gated on level, race, class, prerequisites, reputation and completion. Pins merge by location rather than by quest
 - **Source names on start and turn-in pins** — the creature or object each of those points belongs to is packed alongside its coordinate, and named from `Data/QuestSources_*.lua`. Creature and object IDs overlap numerically, so the point's *kind* decides which of the two name tables to read; nothing infers it from the ID. A quest that starts from a looted item stores no source, because its dropper could be either
 - **Holiday quests follow their season** — a Lunar Festival or Brewfest quest is pinned only while that world event is running, from `Data/QuestHolidays_*.lua`. On by default. The one date that moves each year fails open, so a year the table does not list shows those quests rather than hiding them
-- **Filters for a busy map**, all under `/eqs` > General — leave out dungeon, repeatable or profession quests, hide quests below your level using the game's own gray threshold, or hide the ones it colors red for you. That last one is off by default, because a red quest is still worth knowing about if you mean to come back for it
+- **Filters for a busy map**, all under `/eqs` > Map — leave out dungeon, repeatable or profession quests, hide quests below your level using the game's own gray threshold, or hide the ones it colors red for you. That last one is off by default, because a red quest is still worth knowing about if you mean to come back for it
 
 ### Minimap Objective Pins
 The same objective markers on the minimap, for the zone you are standing in, powered by HereBeDragons-Pins. Classic only, and keyed on `C_Map.GetBestMapForUnit` rather than the open world map. Pins are hover-only so clicks pass through to the minimap underneath.
@@ -299,15 +299,18 @@ Bindable from **Esc > Options > Key Bindings > AddOns > Everything Quests**:
 
 ## Options
 
+The options window shares EQ Objective Tracker's look: a sidebar of tabs, settings grouped into cards with their descriptions in tooltips, some settings dimmed while the setting they depend on is off, and Reset all settings, Clear chain cache and Wipe history, which cannot be undone, in red at the bottom of their tabs.
+
 | Tab | Settings |
 |---|---|
-| **General** | Two columns, with the map, tooltip and nameplate settings on the right. World-map quest pins, pin scale, objective pins per quest, quests you can pick up and their level and holiday filters (Classic), minimap objective pins (Classic), auto-accept / auto-turn-in / join group quests, the Immersion hand-off (when Immersion is installed), **quest announcements**, **party quest progress**, pin rings, markers for tracked quests only, fading markers under your position, **coordinates**, dungeon / repeatable / profession quest filters (Classic), quest progress on tooltips, the Quest Browser button (Classic), Use Blizzard's quest tracker, Open Tracker Settings and the tracker icons, options window scale, update notice style, **quest icons on nameplates** with their position, size and offsets, reset to defaults, profile management, show / hide minimap button |
-| **World Quests** | Master switch, world map pins, zone quest list and its sort order, per-reward filters, per-faction filters, pin scale |
+| **General** | Auto-accept / auto-turn-in / join group quests, the Immersion hand-off (when Immersion is installed), show / hide minimap button, options window scale, update notice style, **quest announcements**, **party quest progress**, the Quest Browser button (Classic), Use Blizzard's quest tracker, Open Tracker Settings and the tracker icons, profile management, reset to defaults |
+| **Map** | World-map quest pins, pin scale, objective pins per quest, pin rings, markers for tracked quests only, fading markers under your position, minimap objective pins (Classic), quests you can pick up with their level and holiday filters (Classic), dungeon / repeatable / profession quest filters (Classic), **coordinates**, quest progress on tooltips, **quest icons on nameplates** with their position, size and offsets |
+| **World Quests** | Master switch, world map pins, zone quest list and its sort order, per-reward filters, per-faction filters by expansion, pin scale |
 | **Chain Guide** | Open on login, window scale, unrouted questlines (retail), the tracked chain on the world map, cross-character chain cache stats and reset, prune stale entries |
 | **History** | Record completed quests, maximum entries kept, backfill from past completions, re-scan missing names, restore from backup, wipe history |
-| **About** | Version, changelog, commands, credits, and links |
+| **About** | Version, what Everything Quests does on your version of the game, commands, my other addons, credits, links, and the changelog of recent versions |
 
-Every section gates on the subsystem it drives rather than on a flavor check, so on Classic Era and Burning Crusade Classic only General and About appear, on WoW Forever the Chain Guide tab as well, and no control is left inert. Tracker and appearance settings live in EQ Objective Tracker's own panel — the Open Tracker Settings button on the General tab opens it, or type `/eqot`.
+Each version of the game lists only the tabs it loads, so on Classic Era and Burning Crusade Classic only General, Map and About appear, and on WoW Forever the Chain Guide tab as well. Inside a tab, every section gates on the subsystem it drives rather than on a flavor check. Tracker and appearance settings live in EQ Objective Tracker's own panel — the Open Tracker Settings button on the General tab opens it, or type `/eqot`.
 
 ---
 
@@ -344,7 +347,7 @@ Every section gates on the subsystem it drives rather than on a flavor check, so
 
 ### Bundled Libraries
 
-LibStub, CallbackHandler-1.0, AceDB-3.0, AceComm-3.0 with ChatThrottleLib, AceEvent-3.0, AceTimer-3.0, LibSharedMedia-3.0, LibDataBroker-1.1, LibDBIcon-1.0, LibMapPinHandler, and HereBeDragons-2.0 / HereBeDragons-Pins-2.0.
+LibStub, CallbackHandler-1.0, AceDB-3.0, AceComm-3.0 with ChatThrottleLib, AceEvent-3.0, AceTimer-3.0, LibSharedMedia-3.0, LibDataBroker-1.1, LibDBIcon-1.0, LibMapPinHandler, HereBeDragons-2.0 / HereBeDragons-Pins-2.0, and EverythingUI-1.0, the settings window, prompts and menus shared with EQ Objective Tracker.
 
 HereBeDragons is listed by the three Classic TOCs only. HBD-Pins calls `WorldMapFrame:AddDataProvider` at file scope on the real map canvas, which is precisely what LibMapPinHandler's shadow canvas exists to keep EQ away from on retail, where the AreaPOI taint crash is live. Retail safety rests on the file not being listed, not on `LibStub` returning nil.
 
@@ -409,11 +412,11 @@ EverythingQuests/
 │                                     #   one set; they define the same globals
 ├── tools/                            # TOC and locale-format gates, plus their own
 │                                     #   self-tests, and the quest data generators
-└── Options/                          # General, World Quests, Chain Guide,
+└── Options/                          # General, Map, World Quests, Chain Guide,
                                       #   History, About tabs
 ```
 
-Modules register into Core subsystems at load time and listen for events through a shared callback dispatcher, so multiple modules can safely react to the same WoW event without stepping on each other. `Core/Events.lua` wraps `RegisterEvent` in a `pcall` and records refused event names, because `RegisterEvent` raises rather than no-ops on an event the client does not know — several events EQ uses do exactly that on Classic Era and TBC. `Core/Dialog.lua` provides a custom confirmation/prompt frame used in place of Blizzard's `StaticPopupDialogs` for every EQ-defined dialog, so EQ can't taint Blizzard's shared Quit/Logout popups.
+Modules register into Core subsystems at load time and listen for events through a shared callback dispatcher, so multiple modules can safely react to the same WoW event without stepping on each other. `Core/Events.lua` wraps `RegisterEvent` in a `pcall` and records refused event names, because `RegisterEvent` raises rather than no-ops on an event the client does not know — several events EQ uses do exactly that on Classic Era and TBC. `Core/Dialog.lua` hands every EQ-defined dialog to EverythingUI's own prompt frame instead of Blizzard's `StaticPopupDialogs`, so EQ can't taint Blizzard's shared Quit/Logout popups.
 
 `Core/Compat.lua` is the capability layer. It defines exactly two `ns.Has` flags, because a flag is only legitimate where existence and behavior agree — many quest APIs are present on Classic and return nothing, so their gate is the TOC rather than a runtime check.
 
@@ -493,6 +496,7 @@ This project is licensed under the [MIT License](LICENSE).
 - Minimap button powered by **[LibDBIcon](https://www.curseforge.com/wow/addons/libdbicon-1-0)** and **[LibDataBroker](https://www.curseforge.com/wow/addons/libdatabroker-1-1)**
 - Fonts and textures shared with other addons through **[LibSharedMedia](https://www.curseforge.com/wow/addons/libsharedmedia-3-0)**
 - Minimap pin placement powered by **[HereBeDragons](https://www.curseforge.com/wow/addons/herebedragons)**
+- The options window's font is **[Barlow](https://github.com/jpt/barlow)**, used under the SIL Open Font License (its notice ships in `Libs/EverythingUI/Media/Fonts/OFL.txt`)
 - WoW Forever quest data from **[AllTheThings](https://github.com/ATTWoWAddon/AllTheThings)**, used under the MIT License (its notice ships in `Data/AllTheThings MIT LICENSE.txt`)
 - WoW API references from **[Warcraft Wiki](https://warcraft.wiki.gg)**
 

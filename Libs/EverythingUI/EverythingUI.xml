@@ -1,0 +1,13 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+    <Script file="EverythingUI.lua"/>
+    <Script file="Tokens.lua"/>
+    <Script file="Context.lua"/>
+    <Script file="Kit.lua"/>
+    <Script file="Controls.lua"/>
+    <Script file="Dropdown.lua"/>
+    <Script file="ColorPicker.lua"/>
+    <Script file="Card.lua"/>
+    <Script file="Window.lua"/>
+    <Script file="Dialog.lua"/>
+    <Script file="Menu.lua"/>
+</Ui>

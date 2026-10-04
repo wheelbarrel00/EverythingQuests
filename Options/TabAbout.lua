@@ -1,19 +1,13 @@
 local _, ns = ...
 local L = ns.L
 
-local math_max, math_min = math.max, math.min
-
-local GOLD  = "|cffEBB706"
-local MUTED = "|cffb3b3b3"
-local WHITE = "|cffe6e6e6"
-local CLOSE = "|r"
+local Options = ns:GetSubsystem("Options")
 
 local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/everything-quests"
 local GITHUB_URL     = "https://github.com/wheelbarrel00/EverythingQuests"
 local BUG_URL        = "https://github.com/wheelbarrel00/EverythingQuests/issues"
 
--- sub names the subsystem that serves the command, so a flavor that does not load that
--- module lists no command it would silently ignore
+-- sub names the subsystem that serves the command, so a flavor without it does not list the command
 local COMMANDS = {
     { cmd = "/eqs",          desc = L["Open or close the options window"] },
     { cmd = "/eqs chain",    desc = L["Open the Chain Guide"], sub = "ChainGuide" },
@@ -25,9 +19,11 @@ local COMMANDS = {
     { cmd = "/eqs about",    desc = L["Open this About tab"] },
 }
 
--- name is rendered raw, not through L[], so adding a row here costs no locale key.
--- The 180 offset on the CurseForge link is the name column width - keep names short enough.
+-- Names are drawn raw, not through L[], so a row costs no locale key
 local OTHER_ADDONS = {
+    { name = "EQ Objective Tracker",
+      cf   = "https://www.curseforge.com/wow/addons/eq-objective-tracker",
+      gh   = "https://github.com/wheelbarrel00/EQObjectiveTracker" },
     { name = "Everything Delves",
       cf   = "https://www.curseforge.com/wow/addons/everything-delves",
       gh   = "https://github.com/wheelbarrel00/EverythingDelves" },
@@ -41,218 +37,164 @@ local OTHER_ADDONS = {
 
 local THANKS = "Spydawg2233, Zox, LightsBeacon, Fostot, DrahgunFyre, ChipW0lf, tanglies"
 
-ns:GetSubsystem("Options"):AddTab("about", L["About"], function(content)
-    local Options = ns:GetSubsystem("Options")
+local CREDITS = {
+    { name = "DrahgunFyre", tail = L[" for the many features, fixes, and reports that keep shaping Everything Quests."] },
+    { name = "Zox",         tail = L[" for the many hours spent translating Everything Quests into French."] },
+    { name = "Malevi4",     tail = L[" for the many hours spent translating Everything Quests into Russian."] },
+    { name = "labrie75",    tail = L[" for the many hours spent translating Everything Quests into Korean."] },
+    { name = "Keriaovo",    tail = L[" for the many hours spent translating Everything Quests into Simplified Chinese."] },
+    { name = "BNS333",      tail = L[" for the many hours spent translating Everything Quests into Traditional Chinese."] },
+    { name = "Stonetwist",  tail = L[" for the many hours spent translating Everything Quests into German."] },
+}
 
-    local scroll = CreateFrame("ScrollFrame", nil, content, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 0, -4)
-    scroll:SetPoint("BOTTOMRIGHT", -26, 4)
-    scroll:EnableMouseWheel(true)
-    scroll:SetScript("OnMouseWheel", function(self, delta)
-        local maxScroll = self:GetVerticalScrollRange() or 0
-        local new = math_min(maxScroll, math_max(0, (self:GetVerticalScroll() or 0) - delta * 36))
-        self:SetVerticalScroll(new)
-    end)
+local function colorCode(ui, name)
+    local r, g, b = ui:Color(name)
+    return ("|cff%02x%02x%02x"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5),
+                                       math.floor(b * 255 + 0.5))
+end
 
-    -- The live width is not resolved at build time, so width and wrap are constants sized to the 1020-wide window
-    local SC_W, WRAP, LEFT = 940, 900, 4
-    local sc = CreateFrame("Frame", nil, scroll)
-    sc:SetSize(SC_W, 1)
-    scroll:SetScrollChild(sc)
-
-    local Y = -6
-
-    local function header(text)
-        local fs = Options:CreateSectionHeader(sc, text)
-        fs:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
-        local line = sc:CreateTexture(nil, "ARTWORK")
-        line:SetHeight(1)
-        line:SetColorTexture(0.30, 0.30, 0.30, 0.8)
-        line:SetPoint("TOPLEFT", fs, "BOTTOMLEFT", 0, -3)
-        line:SetWidth(WRAP - LEFT)
-        Y = Y - 28
+-- The Chain Guide's sources tell the three clients apart: retail's quest lines, Forever's own build
+local function description()
+    local lead
+    if ns:GetSubsystem("ChainGuideQuestLineSource") then
+        lead = L["Better questing across the whole game: markers for your quests on the world map, world quests with reward and faction filters, a guide to Midnight's quest chains, a history of every quest you turn in, and quest progress on nameplates."]
+    elseif ns:GetSubsystem("ChainGuide") then
+        lead = L["Better questing for WoW Forever: objective markers on the world map and minimap, every quest giver with something for you, a guide to the quest chains, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."]
+    else
+        lead = L["Better questing for Classic: objective markers on the world map and minimap, every quest giver with something for you, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."]
     end
+    return lead .. " " .. L["Its objective tracker is EQ Objective Tracker, a separate addon that installs with it."]
+end
 
-    local function body(text, indent, size)
-        size = size or 12
-        local fs = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        fs:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT + (indent or 0), Y)
-        fs:SetFont(fs:GetFont(), size)
-        fs:SetWidth(WRAP - (indent or 0))
-        fs:SetJustifyH("LEFT")
-        fs:SetWordWrap(true)
-        fs:SetText(text)
-        local h = fs:GetStringHeight() or size
-        if h < size then h = size end
-        Y = Y - h - 4
-    end
+local function introCard(self, content, stack)
+    local card = stack(self:CreateGroup(content, nil))
 
-    local function gap(px) Y = Y - (px or 8) end
-
-    local function makeLink(label, onClick)
-        local b = CreateFrame("Button", nil, sc)
-        b:SetHeight(16)
-        local t = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        t:SetPoint("LEFT", b, "LEFT", 0, 0)
-        t:SetText(label)
-        t:SetTextColor(0.92, 0.72, 0.02)
-        b.text = t
-        b:SetWidth((t:GetStringWidth() or 40) + 2)
-        b:SetScript("OnClick", onClick)
-        b:SetScript("OnEnter", function(s) s.text:SetTextColor(1, 1, 1) end)
-        b:SetScript("OnLeave", function(s) s.text:SetTextColor(0.92, 0.72, 0.02) end)
-        return b
-    end
-
-    local function linkRow(links)
-        local prev
-        for i, lk in ipairs(links) do
-            local b = makeLink(lk.label, lk.onClick)
-            if i == 1 then
-                b:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
-            else
-                local sep = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-                sep:SetText(MUTED .. "  |  " .. CLOSE)
-                sep:SetPoint("LEFT", prev, "RIGHT", 2, 0)
-                b:SetPoint("LEFT", sep, "RIGHT", 2, 0)
-            end
-            prev = b
-        end
-        Y = Y - 24
-    end
-
-    local ver = (C_AddOns and C_AddOns.GetAddOnMetadata
-                 and C_AddOns.GetAddOnMetadata(ns.NAME, "Version"))
-                 or ns.VERSION or "?"
-
-    local title = sc:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
-    title:SetFont(title:GetFont(), 22, "OUTLINE")
-    title:SetText("Everything Quests")
-    title:SetTextColor(0.635, 0.000, 0.039)   -- #a2000a brand red
-    Y = Y - 28
-
-    -- The client names its own version, because a hardcoded one is a translated key and went
-    -- two patches stale while also naming the wrong game on both Classic flavors
+    local ver = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(ns.NAME, "Version"))
+        or ns.VERSION or "?"
+    -- The client names its own version, because a hardcoded one went stale and named the wrong game on Classic
     local clientVer = "?"
     if type(_G.GetBuildInfo) == "function" then
         local okBuild, v = pcall(GetBuildInfo)
         if okBuild and type(v) == "string" and v ~= "" then clientVer = v end
     end
 
-    local sub = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    sub:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
-    sub:SetText(GOLD .. "v" .. ver .. CLOSE
-        .. MUTED .. "    " .. L["by Wheelbarrel00"]
-        .. "    -    " .. L["for WoW %s"]:format(clientVer) .. CLOSE)
-    Y = Y - 22
+    local blurb = self:CreateTextBlock(content)
+    blurb:AddLine(L["Version %s"]:format(ver) .. " " .. L["by Wheelbarrel00"] .. "   "
+        .. colorCode(self, "muted") .. L["for WoW %s"]:format(clientVer) .. "|r", "value")
+    blurb:AddLine(description())
+    card:Add(blurb, { fitHeight = true })
 
-    -- Gated on a retail-only Chain Guide source, as WoW Forever lists the guide but not the retail features named here
-    body(WHITE .. (ns:GetSubsystem("ChainGuideQuestLineSource")
-        and L["A unified replacement for the Blizzard quest experience: a custom tracker, world-map overlays, quest history, and a Midnight chain guide."]
-        or L["A unified replacement for the Blizzard quest experience: a custom tracker, objective markers on the map and minimap, nameplate quest icons, and a browser for the quests you have not picked up yet."])
-        .. CLOSE)
-    gap(10)
-
-    local links = {
+    local links = CreateFrame("Frame", nil, content)
+    links:SetHeight(self:Spacing("buttonHeight"))
+    local list = {
         { label = L["Join our Discord"], onClick = function() ns:ShowDiscord() end },
         { label = L["CurseForge"],       onClick = function() ns:ShowURL(CURSEFORGE_URL) end },
         { label = L["GitHub"],           onClick = function() ns:ShowURL(GITHUB_URL) end },
         { label = L["Report a Bug"],     onClick = function() ns:ShowURL(BUG_URL) end },
     }
     if ns:GetSubsystem("WhatsNew") then
-        links[#links + 1] = { label = L["What's New"], onClick = function()
-            local WN = ns:GetSubsystem("WhatsNew"); if WN and WN.Show then WN:Show() end
+        list[#list + 1] = { label = L["What's New"], onClick = function()
+            local WN = ns:GetSubsystem("WhatsNew")
+            if WN and WN.Show then WN:Show() end
         end }
     end
-    linkRow(links)
-    gap(8)
+    local prev
+    for _, lk in ipairs(list) do
+        local b = self:CreateButton(content, lk.label, nil, lk.onClick)
+        if prev then
+            b:SetPoint("LEFT", prev, "RIGHT", self:Spacing("buttonGap"), 0)
+        else
+            b:SetPoint("LEFT", links, "LEFT")
+        end
+        prev = b
+    end
+    card:Add(links, { fill = true })
+end
 
-    header(L["Commands"])
+local function commandsCard(self, content, stack)
+    local card = stack(self:CreateGroup(content, L["Commands"]))
     for _, c in ipairs(COMMANDS) do
         if not c.sub or ns:GetSubsystem(c.sub) then
-            local cmd = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            cmd:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
-            cmd:SetText(GOLD .. c.cmd .. CLOSE)
-            local d = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            d:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT + 120, Y)
-            d:SetText(WHITE .. c.desc .. CLOSE)
-            Y = Y - 18
+            local row = self:CreateTextRow(content, c.cmd, c.desc)
+            row.label:SetTextColor(self:Color("text"))
+            card:Add(row, { height = self:Spacing("listRowHeight") })
         end
     end
-    gap(2)
     if ns:GetSubsystem("Minimap") then
-        body(MUTED .. L["Tip: right-click the minimap button to open Options."] .. CLOSE, 0, 11)
+        local tip = self:CreateTextBlock(content)
+        tip:AddLine(L["Tip: right-click the minimap button to open Options."], "hint")
+        card:Add(tip, { fitHeight = true })
     end
-    gap(10)
+end
 
-    header(L["Tutorials"])
-    body(MUTED .. L["Video tutorials are coming soon."] .. CLOSE)
-    gap(10)
+local function tutorialsCard(self, content, stack)
+    local card = stack(self:CreateGroup(content, L["Tutorials"]))
+    local note = self:CreateTextBlock(content)
+    note:AddLine(L["Video tutorials are coming soon."], "hint")
+    card:Add(note, { fitHeight = true })
+end
 
-    header(L["More Add-ons by Wheelbarrel00"])
+local function addonsCard(self, content, stack)
+    local card = stack(self:CreateGroup(content, L["More Add-ons by Wheelbarrel00"]))
     for _, a in ipairs(OTHER_ADDONS) do
-        local n = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        n:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
-        n:SetText(WHITE .. a.name .. CLOSE)
-        local cfLink = makeLink(L["CurseForge"], function() ns:ShowURL(a.cf) end)
-        cfLink:SetPoint("LEFT", n, "LEFT", 180, 0)
-        local sep = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        sep:SetText(MUTED .. "  |  " .. CLOSE)
-        sep:SetPoint("LEFT", cfLink, "RIGHT", 2, 0)
-        local ghLink = makeLink(L["GitHub"], function() ns:ShowURL(a.gh) end)
-        ghLink:SetPoint("LEFT", sep, "RIGHT", 2, 0)
-        Y = Y - 20
+        local row = self:CreateTextRow(content, a.name, "")
+        row.label:SetTextColor(self:Color("text"))
+        card:Add(row)
+        -- On the row's text column, which the card moves past its widest name in any client font
+        local cf = self:CreateButton(content, L["CurseForge"], nil, function() ns:ShowURL(a.cf) end, nil, "ghost")
+        cf:SetPoint("LEFT", row.text, "LEFT", 0, 0)
+        local gh = self:CreateButton(content, L["GitHub"], nil, function() ns:ShowURL(a.gh) end, nil, "ghost")
+        gh:SetPoint("LEFT", cf, "RIGHT", self:Spacing("buttonGap"), 0)
     end
-    gap(10)
+end
 
-    header(L["Thanks"])
-    body(WHITE .. L["Built with feedback, reports, and ideas from the community — especially "]
-        .. GOLD .. THANKS .. CLOSE .. WHITE .. L[". Thank you!"] .. CLOSE)
-    body(WHITE .. L["Special thanks to "] .. GOLD .. "DrahgunFyre" .. CLOSE .. WHITE
-        .. L[" for the many features, fixes, and reports that keep shaping Everything Quests."] .. CLOSE)
-    body(WHITE .. L["Special thanks to "] .. GOLD .. "Zox" .. CLOSE .. WHITE
-        .. L[" for the many hours spent translating Everything Quests into French."] .. CLOSE)
-    body(WHITE .. L["Special thanks to "] .. GOLD .. "Malevi4" .. CLOSE .. WHITE
-        .. L[" for the many hours spent translating Everything Quests into Russian."] .. CLOSE)
-    body(WHITE .. L["Special thanks to "] .. GOLD .. "labrie75" .. CLOSE .. WHITE
-        .. L[" for the many hours spent translating Everything Quests into Korean."] .. CLOSE)
-    body(WHITE .. L["Special thanks to "] .. GOLD .. "Keriaovo" .. CLOSE .. WHITE
-        .. L[" for the many hours spent translating Everything Quests into Simplified Chinese."] .. CLOSE)
-    body(WHITE .. L["Special thanks to "] .. GOLD .. "BNS333" .. CLOSE .. WHITE
-        .. L[" for the many hours spent translating Everything Quests into Traditional Chinese."] .. CLOSE)
-    body(WHITE .. L["Special thanks to "] .. GOLD .. "Stonetwist" .. CLOSE .. WHITE
-        .. L[" for the many hours spent translating Everything Quests into German."] .. CLOSE)
-    gap(10)
+local function thanksCard(self, content, stack)
+    local card = stack(self:CreateGroup(content, L["Thanks"]))
+    local bright = colorCode(self, "text")
+    -- |r falls back to the line's own color, so only the names need an escape
+    local community = self:CreateTextBlock(content)
+    community:AddLine(L["Built with feedback, reports, and ideas from the community — especially "]
+        .. bright .. THANKS .. "|r" .. L[". Thank you!"])
+    card:Add(community, { fitHeight = true })
+    for _, c in ipairs(CREDITS) do
+        local credit = self:CreateTextBlock(content)
+        credit:AddLine(L["Special thanks to "] .. bright .. c.name .. "|r" .. c.tail)
+        card:Add(credit, { fitHeight = true })
+    end
+end
 
-    header(L["Changelog"])
+local function changelogCard(self, content, stack)
+    local card = stack(self:CreateGroup(content, L["Changelog"]))
+    local muted = colorCode(self, "muted")
+    -- A raise here leaves the library's SelectTab with every tab hidden, so a version-less entry is skipped
     for _, entry in ipairs(ns.Changelog or {}) do
-        local vh = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        vh:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
-        vh:SetFont(vh:GetFont(), 13, "OUTLINE")
-        vh:SetText(GOLD .. "v" .. entry.version .. CLOSE
-            .. MUTED .. "    " .. (entry.date or "") .. CLOSE)
-        Y = Y - 18
-        for _, sec in ipairs(entry.sections or {}) do
-            local sh = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            sh:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT + 10, Y)
-            sh:SetFont(sh:GetFont(), 11, "OUTLINE")
-            sh:SetTextColor(0.635, 0.000, 0.039)   -- #a2000a brand red
-            sh:SetText(sec.head)
-            Y = Y - 16
-            for _, item in ipairs(sec.items or {}) do
-                body(WHITE .. "- " .. item .. CLOSE, 18, 11)
+        if entry.version then
+            local block = self:CreateTextBlock(content)
+            block:AddLine(entry.version .. "   " .. muted .. (entry.date or "") .. "|r", "value")
+            for _, sec in ipairs(entry.sections or {}) do
+                block:AddLine(sec.head or "", "groupLabel", { gap = 10 })
+                for _, item in ipairs(sec.items or {}) do
+                    block:AddLine(item, "label", { bullet = "-" })
+                end
             end
-            gap(2)
+            card:Add(block, { fitHeight = true })
         end
-        gap(8)
     end
+    card:Add(self:CreateButton(content, L["Older versions are on CurseForge"], nil,
+        function() ns:ShowURL(CURSEFORGE_URL) end, nil, "ghost"))
+end
 
-    local older = makeLink(L["Older versions are on CurseForge"],
-        function() ns:ShowURL(CURSEFORGE_URL) end)
-    older:SetPoint("TOPLEFT", sc, "TOPLEFT", LEFT, Y)
-    Y = Y - 28
-
-    sc:SetHeight(math_max(1, -Y + 10))
-    if scroll.UpdateScrollChildRect then scroll:UpdateScrollChildRect() end
-end, true)
+Options:RegisterTab({
+    id    = "about",
+    title = L["About"],
+    order = 60,
+    build = function(self, content)
+        local stack = Options.CardStack(self)
+        introCard(self, content, stack)
+        commandsCard(self, content, stack)
+        tutorialsCard(self, content, stack)
+        addonsCard(self, content, stack)
+        thanksCard(self, content, stack)
+        changelogCard(self, content, stack)
+    end,
+})

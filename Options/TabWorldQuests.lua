@@ -3,12 +3,16 @@ local L = ns.L
 
 local Options = ns:GetSubsystem("Options")
 
+-- The game's own icons carry a beveled border that looks heavy at 16 px beside a flat checkbox
+local ICON_TRIM = { 0.08, 0.92, 0.08, 0.92 }
+local EXPANSION_ROW = 32
+
 local function refreshWQ()
     local WQ = ns:GetSubsystem("WQWorldMap")
     if WQ and WQ.Refresh then WQ:Refresh() end
 end
 
-local function wqSetting(key)
+local function wqSetting(key, after)
     return
         function()
             local DB = ns:GetSubsystem("DB")
@@ -18,6 +22,7 @@ local function wqSetting(key)
             local DB = ns:GetSubsystem("DB")
             if DB then DB.db.profile.worldQuests[key] = value end
             refreshWQ()
+            if after then after() end
         end
 end
 
@@ -61,6 +66,13 @@ local EXPANSION_NAMES = {
     [11] = L["Midnight"],
 }
 
+local SORT_OPTIONS = {
+    { value = "time",    label = L["Time left"] },
+    { value = "type",    label = L["Reward"]    },
+    { value = "faction", label = L["Faction"]   },
+    { value = "alpha",   label = L["A-Z"]       },
+}
+
 local function setAllFilters(value)
     local DB = ns:GetSubsystem("DB")
     if not DB then return end
@@ -75,6 +87,7 @@ local function factionGet(fid)
     if not DB then return true end
     return DB.db.profile.worldQuests.factionFilters[fid] ~= false
 end
+
 local function factionSet(fid, value)
     local DB = ns:GetSubsystem("DB")
     if not DB then return end
@@ -114,172 +127,149 @@ local function listFactionsByExpansion()
     return groups
 end
 
-Options:AddTab("worldQuests", L["World Quests"], function(content)
-    local header = Options:CreateSectionHeader(content, L["World Quests"])
-    header:SetPoint("TOPLEFT", 8, -8)
+-- Column-major, so an alphabetical list reads down the left column, then the right
+local function twoColumns(self, card, boxes, into)
+    local rows = math.ceil(#boxes / 2)
+    for i = 1, rows do
+        local row = card:Add(boxes[i])
+        local right = boxes[i + rows]
+        if right then
+            right:ClearAllPoints()
+            right:SetPoint("LEFT", row, "CENTER", self:Spacing("rowPadding"), 0)
+        end
+    end
+    for _, box in ipairs(boxes) do into[#into + 1] = box end
+end
 
-    local function wqMasterGet()
+local function worldQuestsCard(self, content, stack, w)
+    local card = stack(self:CreateGroup(content, L["World Quests"]))
+
+    w.masterOn = function()
         local DB = ns:GetSubsystem("DB")
         return not DB or DB.db.profile.worldQuests.enabled ~= false
     end
-    local function wqMasterSet(v)
-        local DB = ns:GetSubsystem("DB")
-        if DB then DB.db.profile.worldQuests.enabled = v and true or false end
-        refreshWQ()
-    end
-    local wqMaster = Options:CreateCheckbox(content,
-        L["Enable World Quests map features"],
-        wqMasterGet, wqMasterSet,
-        L["Off: Everything Quests stops putting World Quests on the map — no world-map pins, no reward summary box, no zone quest list. The boxes below do nothing while this is off. This switch is ONLY for World Quests. It does NOT remove the red \"!\" / \"?\" quest rings — those are your normal quests, and you turn them off on the General tab. It also does NOT change the World Quests list in your tracker (that's on the Tracker tab)."])
-    wqMaster:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -16)
+    card:Add(self:CreateCheckbox(content, L["Enable World Quests map features"], w.masterOn,
+        function(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then DB.db.profile.worldQuests.enabled = v and true or false end
+            refreshWQ()
+            w.sync()
+        end,
+        L["Off: Everything Quests stops putting World Quests on the map - no world-map pins, no reward summary box, no zone quest list. The boxes below do nothing while this is off. This switch is ONLY for World Quests. It does NOT remove the red \"!\" / \"?\" quest rings - those are your normal quests, and you turn them off on the Map tab. It also does NOT change the World Quests list in your tracker (that's on EQ Objective Tracker's Tracker tab)."]))
 
-    local showWMGet, showWMSet = wqSetting("showOnWorldMap")
-    local showWM = Options:CreateCheckbox(
-        content, L["Show world quest pins on the world map"],
-        showWMGet, showWMSet)
-    showWM:SetPoint("TOPLEFT", wqMaster, "BOTTOMLEFT", 0, -2)
+    local worldMapGet, worldMapSet = wqSetting("showOnWorldMap", w.sync)
+    w.worldMapOn = worldMapGet
+    w.worldMap = self:CreateCheckbox(content, L["Show world quest pins on the world map"], worldMapGet, worldMapSet)
+    card:Add(w.worldMap, { dependent = true })
 
-    local showZMGet, showZMSet = wqSetting("showOnZoneMap")
-    local showZM = Options:CreateCheckbox(
-        content, L["Show zone quest list on zone maps"],
-        showZMGet, showZMSet)
-    showZM:SetPoint("TOPLEFT", showWM, "BOTTOMLEFT", 0, -2)
+    local zoneListGet, zoneListSet = wqSetting("showOnZoneMap", w.sync)
+    w.zoneListOn = zoneListGet
+    w.zoneList = self:CreateCheckbox(content, L["Show zone quest list on zone maps"], zoneListGet, zoneListSet)
+    card:Add(w.zoneList, { dependent = true })
+end
 
-    local filtersHeader = Options:CreateSectionHeader(content, L["Filters by reward type"])
-    filtersHeader:SetPoint("TOPLEFT", showZM, "BOTTOMLEFT", 0, -24)
+local function filtersCard(self, content, stack, w)
+    local card = stack(self:CreateGroup(content, L["Filters by reward type"]))
 
-    local allBtn = Options:CreateYellowButton(content, L["Enable All"], function() setAllFilters(true) end)
-    allBtn:SetSize(90, 22)
-    allBtn:SetPoint("LEFT", filtersHeader, "RIGHT", 16, 0)
-
-    local noneBtn = Options:CreateYellowButton(content, L["Disable All"], function() setAllFilters(false) end)
-    noneBtn:SetSize(90, 22)
-    noneBtn:SetPoint("LEFT", allBtn, "RIGHT", 6, 0)
-
-    local filterCheckboxes = {}
-    local prev = filtersHeader
-    for i, row in ipairs(FILTER_ROWS) do
+    local boxes = {}
+    for _, row in ipairs(FILTER_ROWS) do
         local get, set = filterSetting(row.key)
-        local cb = Options:CreateCheckbox(content, row.label, get, set)
-        cb:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, i == 1 and -8 or -2)
-
-        local icon = cb:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(14, 14)
-        icon:SetPoint("LEFT", cb, "RIGHT", 4, 1)
-        icon:SetTexture(row.icon)
-        if row.coords then
-            icon:SetTexCoord(row.coords[1], row.coords[2], row.coords[3], row.coords[4])
-        end
-        cb.label:ClearAllPoints()
-        cb.label:SetPoint("LEFT", icon, "RIGHT", 6, 0)
-
-        filterCheckboxes[#filterCheckboxes + 1] = cb
-        prev = cb
+        local cb = self:CreateCheckbox(content, row.label, get, set, nil, row.icon)
+        local c = row.coords or ICON_TRIM
+        cb.icon:SetTexCoord(c[1], c[2], c[3], c[4])
+        boxes[#boxes + 1] = cb
     end
+    twoColumns(self, card, boxes, w.filters)
 
-    local function syncCheckboxes()
-        local DB = ns:GetSubsystem("DB")
-        if not DB then return end
-        for i, row in ipairs(FILTER_ROWS) do
-            filterCheckboxes[i]:SetChecked(DB.db.profile.worldQuests.filters[row.key] and true or false)
-        end
+    local function setAll(value)
+        setAllFilters(value)
+        for _, cb in ipairs(boxes) do cb:Refresh() end
     end
-    allBtn:HookScript("OnClick",  syncCheckboxes)
-    noneBtn:HookScript("OnClick", syncCheckboxes)
+    local all = self:CreateButton(content, L["Enable All"], nil, function() setAll(true) end)
+    local none = self:CreateButton(content, L["Disable All"], nil, function() setAll(false) end)
+    card:Add(all)
+    none:SetPoint("LEFT", all, "RIGHT", self:Spacing("buttonGap"), 0)
+    w.filters[#w.filters + 1] = all
+    w.filters[#w.filters + 1] = none
+end
 
-    local factionHeader = Options:CreateSectionHeader(content, L["Filter by faction"])
-    factionHeader:SetPoint("TOPLEFT", header, "TOPLEFT", 460, 0)
-
-    Options:AttachTooltip(factionHeader, L["Filter by faction"],
+local function factionCard(self, content, stack, w)
+    local card = stack(self:CreateGroup(content, L["Filter by faction"]))
+    self:AttachTooltip(card.label, L["Filter by faction"],
         L["Uncheck a faction to hide its world quests on the map."])
-
-    local scroll = CreateFrame("ScrollFrame", nil, content, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", factionHeader, "BOTTOMLEFT", 0, -8)
-    scroll:SetSize(380, 260)
-
-    local list = CreateFrame("Frame", nil, scroll)
-    list:SetSize(360, 1)
-    scroll:SetScrollChild(list)
-
-    do
-        -- This used to borrow the tracker's scroll bar colors. The tracker owns its own
-        -- settings in EQ Objective Tracker now, and they should not govern a panel over here,
-        -- so this draws the same default it always did without reaching across.
-        local sBar = scroll.ScrollBar or scroll.scrollBar
-        if sBar then
-            local s = { r = 0.60, g = 0.60, b = 0.65, a = 0.25 }
-            local sbBG = content:CreateTexture(nil, "BORDER")
-            sbBG:SetPoint("TOPLEFT",     sBar, "TOPLEFT",    -1, 0)
-            sbBG:SetPoint("BOTTOMRIGHT", sBar, "BOTTOMRIGHT", 1, 0)
-            sbBG:SetColorTexture(s.r or 0.60, s.g or 0.60, s.b or 0.65, s.a or 0.25)
-        end
-    end
 
     local groups = listFactionsByExpansion()
     if #groups == 0 then
-        local empty = list:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-        empty:SetPoint("TOPLEFT", 0, 0)
-        empty:SetText(L["No major factions unlocked on this character yet."])
-        list:SetHeight(20)
-    else
-        local y = 0
-        for _, g in ipairs(groups) do
-            local groupLabel = list:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            groupLabel:SetPoint("TOPLEFT", 0, -y)
-            groupLabel:SetText(g.name)
-            groupLabel:SetTextColor(0.92, 0.72, 0.02)
-            y = y + 18
+        card:Add(self:CreateText(content, L["No major factions unlocked on this character yet."], "hint"))
+        return
+    end
+    for _, g in ipairs(groups) do
+        local name = self:CreateText(content, g.name, "groupLabel")
+        card:Add(name, { height = EXPANSION_ROW })
+        w.filters[#w.filters + 1] = name
 
-            local underline = list:CreateTexture(nil, "ARTWORK")
-            underline:SetColorTexture(0.635, 0.0, 0.039, 0.7)
-            underline:SetSize(360, 1)
-            underline:SetPoint("TOPLEFT", 0, -y + 2)
-            y = y + 4
-
-            for _, data in ipairs(g.factions) do
-                local fid = data.factionID
-                local labelText = L["%s  |cffaaaaaa(Renown %d)|r"]:format(
-                    data.name or L["Faction %d"]:format(fid), data.renownLevel or 0)
-                local cb = Options:CreateCheckbox(list, labelText,
-                    function() return factionGet(fid) end,
-                    function(v) factionSet(fid, v) end)
-                cb:SetPoint("TOPLEFT", 6, -y)
-                y = y + 22
-            end
-
-            y = y + 6
+        local boxes = {}
+        for _, data in ipairs(g.factions) do
+            local fid = data.factionID
+            local label = L["%s  |cffaaaaaa(Renown %d)|r"]:format(
+                data.name or L["Faction %d"]:format(fid), data.renownLevel or 0)
+            boxes[#boxes + 1] = self:CreateCheckbox(content, label,
+                function() return factionGet(fid) end,
+                function(v) factionSet(fid, v) end)
         end
-        list:SetHeight(y)
+        twoColumns(self, card, boxes, w.filters)
     end
+end
 
-    local displayHeader = Options:CreateSectionHeader(content, L["Display"])
-    displayHeader:SetPoint("TOPLEFT", scroll, "BOTTOMLEFT", 0, -16)
-
-    local SORT_OPTIONS = {
-        { value = "time",    label = L["Time left"] },
-        { value = "type",    label = L["Reward"]    },
-        { value = "faction", label = L["Faction"]   },
-        { value = "alpha",   label = L["A-Z"]       },
-    }
-    local sortGet, sortSet = wqSetting("zoneListSort")
-    local sortRadio = Options:CreateRadioGroup(content, L["Sort zone quest list by"],
-        SORT_OPTIONS, sortGet, sortSet)
-    sortRadio:SetPoint("TOPLEFT", displayHeader, "BOTTOMLEFT", 0, -8)
-
-    local function pinScaleGet()
-        local DB = ns:GetSubsystem("DB")
-        return DB and DB.db.profile.worldQuests.pinScale or 1.0
-    end
-    local function pinScaleSet(value)
-        local DB = ns:GetSubsystem("DB")
-        if DB then DB.db.profile.worldQuests.pinScale = value end
-        refreshWQ()
-    end
-    local pinSlider = Options:CreateSlider(content, L["World map pin scale"],
-        0.5, 2.0, 0.05, pinScaleGet, pinScaleSet)
-    pinSlider:SetPoint("TOPLEFT", sortRadio, "BOTTOMLEFT", 0, -16)
-    pinSlider:SetWidth(280)
-
-    Options:AttachTooltip(displayHeader, L["Display"],
+local function displayCard(self, content, stack, w)
+    local card = stack(self:CreateGroup(content, L["Display"]))
+    self:AttachTooltip(card.label, L["Display"],
         L["Filters apply immediately when the world map is open."])
-end)
+
+    local sortGet, sortSet = wqSetting("zoneListSort")
+    w.sort = self:CreateDropdown(content, L["Sort zone quest list by"], SORT_OPTIONS, sortGet, sortSet)
+    card:Add(w.sort)
+
+    w.scale = self:CreateSlider(content, L["World map pin scale"], 0.5, 2.0, 0.05,
+        function()
+            local DB = ns:GetSubsystem("DB")
+            return DB and DB.db.profile.worldQuests.pinScale or 1.0
+        end,
+        function(value)
+            local DB = ns:GetSubsystem("DB")
+            if DB then DB.db.profile.worldQuests.pinScale = value end
+            refreshWQ()
+        end)
+    card:Add(w.scale)
+end
+
+Options:RegisterTab({
+    id    = "worldQuests",
+    title = L["World Quests"],
+    order = 30,
+    build = function(self, content)
+        local stack = Options.CardStack(self)
+        local w = { filters = {} }
+        -- A row dims only while it does nothing: the filters feed both the pins and the zone list
+        w.sync = function()
+            local on = w.masterOn() and true or false
+            local pins = on and w.worldMapOn() and true or false
+            local list = on and w.zoneListOn() and true or false
+            self:SetDependent(w.worldMap, on)
+            self:SetDependent(w.zoneList, on)
+            for _, c in ipairs(w.filters) do self:SetDependent(c, pins or list) end
+            self:SetDependent(w.sort, list)
+            self:SetDependent(w.scale, pins)
+        end
+        content._sync = w.sync
+
+        worldQuestsCard(self, content, stack, w)
+        filtersCard(self, content, stack, w)
+        factionCard(self, content, stack, w)
+        displayCard(self, content, stack, w)
+        w.sync()
+    end,
+    refresh = function(_, content)
+        if content._sync then content._sync() end
+    end,
+})

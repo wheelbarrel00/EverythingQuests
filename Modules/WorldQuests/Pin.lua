@@ -23,13 +23,11 @@ function Pin:OnLoad()
     self:SetScalingLimits(1, 0.6, 1.4)
     self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
-    -- The label sits on the map art, where bright terrain swallows it without an outline and
-    -- shadow.
+    -- Outlined and shadowed, because bright map terrain swallows a plain label
     local path, size, flags = self.timeText:GetFont()
     if path and size then
         self.timeText:SetFont(path, size, "OUTLINE")
-        -- Read back rather than trusting the return. A font that does not take leaves the string
-        -- BLANK, which is worse than no outline, and the return value differs across flavors.
+        -- Read back, because a font that does not take leaves the string blank, which is worse than no outline
         if not self.timeText:GetFont() then
             self.timeText:SetFont(path, size, flags)
         end
@@ -38,7 +36,7 @@ function Pin:OnLoad()
     self.timeText:SetShadowOffset(1, -1)
 end
 
--- Required empty stub - the canvas calls this on every pin and its absence trips the assert at MapCanvas.lua:280
+-- Empty on purpose, because retail's inherited one calls the protected SetPassThroughButtons
 function Pin:CheckMouseButtonPassthrough() end
 
 function Pin:OnAcquired(questID, x, y, reward)
@@ -110,51 +108,40 @@ function Pin:OnMouseLeave()
     end
 end
 
-local function pinContextMenu(pin)
-    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
-    local questID = pin.questID
+function _ns.ShowWorldQuestMenu(questID)
+    local Options = _ns:GetSubsystem("Options")
+    if not (questID and Options and Options.ui) then return end
     local Watch = _ns:GetSubsystem("WQWatchPersist")
-    local tracked = Watch and Watch.IsTracked and Watch:IsTracked(questID)
-    if not tracked and C_QuestLog and C_QuestLog.GetQuestWatchType then
-        tracked = C_QuestLog.GetQuestWatchType(questID) ~= nil
+    local title = C_TaskQuest and C_TaskQuest.GetQuestInfoByQuestID and C_TaskQuest.GetQuestInfoByQuestID(questID)
+    if not title or title == "" then title = L["World Quest #"] .. tostring(questID) end
+
+    local track
+    if Watch and Watch.IsWatched and Watch:IsWatched(questID) then
+        track = { text = L["Untrack Quest"], onClick = function() if Watch.Untrack then Watch:Untrack(questID) end end }
+    else
+        track = { text = L["Track Quest"], onClick = function() if Watch and Watch.Track then Watch:Track(questID) end end }
     end
 
-    local title = (C_TaskQuest and C_TaskQuest.GetQuestInfoByQuestID
-                   and C_TaskQuest.GetQuestInfoByQuestID(questID))
-                  or (L["World Quest #"] .. tostring(questID))
-
-    MenuUtil.CreateContextMenu(pin, function(_owner, root)
-        root:CreateTitle(title)
-
-        if tracked then
-            root:CreateButton(L["Untrack Quest"], function()
-                if Watch and Watch.Untrack then Watch:Untrack(questID) end
-            end)
-        else
-            root:CreateButton(L["Track Quest"], function()
-                if Watch and Watch.Track then Watch:Track(questID) end
-            end)
-        end
-
-        root:CreateButton(L["Super-track (follow arrow)"], function()
+    Options.ui:ShowMenu({
+        { kind = "title", text = title },
+        track,
+        { text = L["Super-track (follow arrow)"], onClick = function()
             if C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
                 C_SuperTrack.SetSuperTrackedQuestID(questID)
             end
-        end)
-
-        root:CreateButton(L["Search on Wowhead"], function()
+        end },
+        { text = L["Search on Wowhead"], onClick = function()
             _ns:ShowURL("https://www.wowhead.com/quest=" .. tostring(questID))
-        end)
-
-        root:CreateDivider()
-        root:CreateButton(L["Cancel"], function() end)
-    end)
+        end },
+        { kind = "divider" },
+        { text = L["Cancel"] },
+    }, WorldMapFrame)
 end
 
 function Pin:OnClick(button)
     if not self.questID then return end
     if button == "RightButton" then
-        pinContextMenu(self)
+        _ns.ShowWorldQuestMenu(self.questID)
     else
         if C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
             C_SuperTrack.SetSuperTrackedQuestID(self.questID)

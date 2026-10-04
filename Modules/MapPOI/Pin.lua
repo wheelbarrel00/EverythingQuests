@@ -628,7 +628,7 @@ function Pin:OnMouseLeave()
     ns.Util.PinTooltip():Hide()
 end
 
--- Required stub - MapCanvas calls this on every pin and asserts if the method is missing
+-- Empty on purpose, because the retail client's inherited one calls the protected SetPassThroughButtons
 function Pin:CheckMouseButtonPassthrough()
 end
 

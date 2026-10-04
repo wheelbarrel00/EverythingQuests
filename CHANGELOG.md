@@ -5,6 +5,28 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-10-03
+
+A new look for the options window, in the same style as EQ Objective Tracker 2.0, with prompts and menus to match.
+
+### New Features
+
+- **A new options window.** /eqs opens a redesigned options window in the same style as EQ Objective Tracker 2.0: a sidebar with an icon for each tab, and every setting grouped into cards, with its description in the tooltip as before. Map settings have a Map tab of their own (quest pins, pin size and limit, quests you can pick up and their filters on Classic, coordinates, tooltips and nameplate icons), and the General tab keeps auto-questing, announcements, party progress, the Quest Browser on Classic, the tracker and profiles. Some settings, such as the nameplate icon's position and size or the coordinate decimals, are dimmed while the setting they depend on is off. On retail the World Quests reward and faction filters sit in two columns, with every faction in one card under its expansion. Reset all settings, Clear chain cache and Wipe history, which cannot be undone, sit in red at the bottom of their tab. The About tab has a new description of what Everything Quests does on your version of the game, and lists EQ Objective Tracker first among my other addons. Every setting keeps its saved value.
+
+### Improvements
+
+- **Prompts and menus in the same style.** Everything Quests' prompts, such as switching trackers, resetting settings, naming a new profile or copying a link, use the new look, and so does the right-click menu of a world quest pin or of a quest in the zone list on retail.
+
+### Bug Fixes
+
+- **The zone quest list showed nothing with world map pins off.** On retail the list of world quests beside a zone map was built from the world map pins, so with "Show world quest pins on the world map" off it stayed empty. It now lists the zone's world quests whether the pins are shown or not.
+- **The zone list menu could act on another quest.** A menu opened from the zone list could track or follow a different world quest if the list refreshed while it was open. It now always acts on the quest you right-clicked.
+- **A Russian word in the changelog showed as empty boxes.** On English, German, French and other clients whose main font has no Cyrillic letters, the About tab now draws that line in a font that has them.
+
+### Notes
+
+- Everything Quests' other windows, the Chain Guide, the Quest Browser, History and What's New, keep their current look for now and get the same new look in a future update, starting with the Chain Guide.
+
 ## [1.55.0] - 2026-10-03
 
 The Chain Guide comes to WoW Forever, built from Everything Quests' own quest data, and quests new to Forever are now marked where each one is offered.

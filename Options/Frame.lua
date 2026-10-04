@@ -2,220 +2,98 @@ local _, ns = ...
 local L = ns.L
 
 local Options = ns:RegisterSubsystem("Options", {})
-Options.tabs = {}
-Options.tabOrder = {}
 
-local TAB_BG_ACTIVE   = ns.Util.color.tabActive
-local TAB_BG_INACTIVE = ns.Util.color.tabInactive
-local FRAME_BG        = ns.Util.color.optionsBg
-local HEADER_RED      = ns.Util.color.headerRed
-local YELLOW          = ns.Util.color.buttonYellow
-local TAB_HEIGHT      = 28
-local TAB_PADDING_X   = 18
+local HEADER_RED = ns.Util.color.headerRed
+local YELLOW     = ns.Util.color.buttonYellow
 
--- ownScroll means the builder creates its own scroll frame, so this must not wrap it in a
--- second one - two nested UIPanelScrollFrameTemplates draw two scroll bars side by side
-function Options:AddTab(id, label, builder, ownScroll)
-    self.tabs[id] = { id = id, label = label, builder = builder, ownScroll = ownScroll }
-    self.tabOrder[#self.tabOrder + 1] = id
+local EUI = LibStub("EverythingUI-1.0")
+
+local TAB_ICONS = {
+    general = "icon-general", map = "icon-map", worldQuests = "icon-globe",
+    chainGuide = "icon-chain", history = "icon-history", about = "icon-about",
+}
+
+local ui = EUI:NewContext({
+    id      = "EQ",
+    title   = "Everything Quests",
+    version = ns.VERSION or "2.0.0",
+    accent  = EUI.tokens.accents.EQ.accent,
+    L       = L,
+    tooltip = ns.Util.PinTooltip,
+    discord = function() ns:ShowDiscord() end,
+    -- Looked up here, not in the library, because the locale scanner skips Libs/ and would drop these keys
+    labels  = {
+        discord         = L["Join our Discord!"],
+        discordTipTitle = L["Join our Discord"],
+        discordTip      = L["Click to copy the invite link."],
+    },
+    getLastTab = function()
+        local DB = ns:GetSubsystem("DB")
+        return DB and DB.char and DB.char.lastOptionsTab
+    end,
+    setLastTab = function(id)
+        local DB = ns:GetSubsystem("DB")
+        if DB and DB.char then DB.char.lastOptionsTab = id end
+    end,
+    getWindowScale = function()
+        local DB = ns:GetSubsystem("DB")
+        return DB and DB.db and DB.db.global and DB.db.global.optionsWindowScale
+    end,
+    setWindowScale = function(v)
+        local DB = ns:GetSubsystem("DB")
+        if DB and DB.db and DB.db.global then DB.db.global.optionsWindowScale = v end
+    end,
+})
+Options.ui = ui
+
+local function iconFor(id)
+    return TAB_ICONS[id] and ui:Texture(TAB_ICONS[id])
 end
 
-local function styleTabButton(btn, active)
-    local c = active and TAB_BG_ACTIVE or TAB_BG_INACTIVE
-    btn.bg:SetColorTexture(c[1], c[2], c[3], c[4])
-    btn.text:SetTextColor(1, 1, 1, 1)
+-- Tab files load after this one and register themselves, so the nav lists only what the TOC loaded
+function Options:RegisterTab(def)
+    ui:RegisterTab({
+        id      = def.id,
+        title   = def.title,
+        order   = def.order,
+        icon    = iconFor(def.id),
+        footer  = def.footer,
+        build   = def.build,
+        refresh = def.refresh,
+    })
+end
+
+-- Each card anchors to the last one placed, so a card this client leaves out leaves no gap
+function Options.CardStack(ctx)
+    local prev
+    return function(card)
+        if prev then
+            card:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -ctx:Spacing("groupGap"))
+            card:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, -ctx:Spacing("groupGap"))
+        else
+            card:SetPoint("TOPLEFT")
+            card:SetPoint("TOPRIGHT")
+        end
+        prev = card
+        return card
+    end
 end
 
 function Options:Build()
     if self.frame then return end
-    local f = CreateFrame("Frame", "EQOptionsFrame", UIParent, "BackdropTemplate")
-    f:SetSize(1020, 720)
-    -- Left edge rather than CENTER, because the tracker's own options window is the same size and
-    -- also centers, so the two used to land exactly on top of each other.
+    local f = ui:BuildSettings("EQOptionsFrame")
+    -- Left edge, because EQ Objective Tracker's options window is the same size and centers
+    f:ClearAllPoints()
     f:SetPoint("LEFT", UIParent, "LEFT", 16, 0)
-    f:SetFrameStrata("DIALOG")
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop",  f.StopMovingOrSizing)
-    -- No position is persisted, so without this a window dragged off screen stays there for the
-    -- rest of the session with nothing to drag it back by.
-    f:SetClampedToScreen(true)
-    f:Hide()
-
-    f:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    f:SetBackdropColor(unpack(FRAME_BG))
-    f:SetBackdropBorderColor(0.635, 0.000, 0.039, 1.0)
-
-    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.title:SetPoint("TOP", 0, -14)
-    f.title:SetText("Everything Quests")
-    f.title:SetTextColor(unpack(HEADER_RED))
-    f.title:SetFont(f.title:GetFont(), 25, "OUTLINE")
-
-    f.version = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.version:SetPoint("TOPRIGHT", -34, -14)
-    f.version:SetText("v" .. (ns.VERSION or "1.55.0"))
-    f.version:SetTextColor(unpack(YELLOW))
-
-    f.discord = CreateFrame("Button", nil, f)
-    f.discord.icon = f.discord:CreateTexture(nil, "OVERLAY")
-    f.discord.icon:SetSize(16, 16)
-    f.discord.icon:SetPoint("LEFT", 0, 0)
-    f.discord.icon:SetTexture("Interface\\AddOns\\EverythingQuests\\Media\\Textures\\discord.tga")
-    f.discord.text = f.discord:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.discord.text:SetPoint("LEFT", f.discord.icon, "RIGHT", 5, 0)
-    f.discord.text:SetText(L["Join our Discord!"])
-    f.discord.text:SetTextColor(unpack(YELLOW))
-    f.discord:SetSize(16 + 5 + f.discord.text:GetStringWidth() + 4, 18)
-    f.discord:SetPoint("TOPLEFT", 14, -15)
-    f.discord:SetScript("OnClick", function() ns:ShowDiscord() end)
-    f.discord:SetScript("OnEnter", function(s)
-        s.text:SetTextColor(1, 1, 1)
-        GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
-        GameTooltip:SetText(L["Join our Discord"], YELLOW[1], YELLOW[2], YELLOW[3])
-        GameTooltip:AddLine("Click to copy the invite link.", 0.8, 0.8, 0.8)
-        GameTooltip:Show()
-    end)
-    f.discord:SetScript("OnLeave", function(s)
-        s.text:SetTextColor(unpack(YELLOW))
-        GameTooltip:Hide()
-    end)
-
-    local close = CreateFrame("Button", nil, f)
-    close:SetSize(20, 20)
-    close:SetPoint("TOPRIGHT", -8, -10)
-    local closeBg = close:CreateTexture(nil, "BACKGROUND")
-    closeBg:SetAllPoints()
-    closeBg:SetColorTexture(0, 0, 0, 0.9)
-    local closeText = close:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    closeText:SetPoint("CENTER")
-    closeText:SetText("X")
-    closeText:SetTextColor(1, 1, 1, 1)
-    close:SetScript("OnClick", function() f:Hide() end)
-
-    f.tabStrip = CreateFrame("Frame", nil, f)
-    f.tabStrip:SetPoint("TOPLEFT", 12, -44)
-    f.tabStrip:SetPoint("TOPRIGHT", -12, -44)
-    f.tabStrip:SetHeight(TAB_HEIGHT)
-
-    f.tabButtons = {}
-    f.tabContent = CreateFrame("Frame", nil, f)
-    f.tabContent:SetPoint("TOPLEFT", 12, -44 - TAB_HEIGHT - 6)
-    f.tabContent:SetPoint("BOTTOMRIGHT", -12, 12)
-
     self.frame = f
-    self:RebuildTabs()
-end
-
-function Options:RebuildTabs()
-    local f = self.frame
-    if not f then return end
-    for _, b in pairs(f.tabButtons) do b:Hide() end
-
-    local x = 0
-    for _, id in ipairs(self.tabOrder) do
-        local tab = self.tabs[id]
-        local btn = f.tabButtons[id]
-        if not btn then
-            btn = CreateFrame("Button", nil, f.tabStrip)
-            btn:SetHeight(TAB_HEIGHT)
-            btn.bg = btn:CreateTexture(nil, "BACKGROUND")
-            btn.bg:SetAllPoints()
-            btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            btn.text:SetPoint("CENTER")
-            btn:SetScript("OnClick", function() Options:SelectTab(id) end)
-            f.tabButtons[id] = btn
-        end
-        btn.text:SetText(tab.label)
-        btn:SetWidth(btn.text:GetStringWidth() + TAB_PADDING_X * 2)
-        btn:ClearAllPoints()
-        btn:SetPoint("LEFT", f.tabStrip, "LEFT", x, 0)
-        x = x + btn:GetWidth() + 4
-        styleTabButton(btn, false)
-        btn:Show()
-    end
-    local DB = ns:GetSubsystem("DB")
-    local saved = DB and DB.char.lastOptionsTab
-    local active = (saved and self.tabs[saved]) and saved or self.tabOrder[1]
-    if self.tabs[active] then self:SelectTab(active) end
 end
 
 function Options:SelectTab(id)
-    local f = self.frame
-    if not f then return end
-    for tabId, btn in pairs(f.tabButtons) do
-        styleTabButton(btn, tabId == id)
-    end
-    if self.activeContent then self.activeContent:Hide() end
-    local tab = self.tabs[id]
-    if tab and tab.builder then
-        if not tab.panel then
-            if tab.ownScroll then
-                local host = CreateFrame("Frame", nil, f.tabContent)
-                host:SetPoint("TOPLEFT", 0, 0)
-                host:SetPoint("BOTTOMRIGHT", 0, 0)
-                tab.panel        = host
-                tab.contentFrame = host
-                tab.builder(host)
-            else
-                local scroll = CreateFrame("ScrollFrame", nil, f.tabContent, "UIPanelScrollFrameTemplate")
-                scroll:SetPoint("TOPLEFT", 0, 0)
-                scroll:SetPoint("BOTTOMRIGHT", -24, 0)
-                scroll:EnableMouseWheel(true)
-                scroll:SetScript("OnMouseWheel", function(sf, delta)
-                    local range = sf:GetVerticalScrollRange()
-                    local v = math.min(range, math.max(0, sf:GetVerticalScroll() - delta * 40))
-                    sf:SetVerticalScroll(v)
-                end)
-                local child = CreateFrame("Frame", nil, scroll)
-                child:SetSize(1, 1500)
-                scroll:SetScrollChild(child)
-                scroll:SetScript("OnSizeChanged", function(_, w) if w and w > 0 then child:SetWidth(w) end end)
-                if scroll:GetWidth() > 0 then child:SetWidth(scroll:GetWidth()) end
-                tab.panel        = scroll
-                tab.contentFrame = child
-                tab.builder(child)
-                -- Measured next frame - the layout has not resolved yet, so the height would be wrong now
-                C_Timer.After(0, function()
-                    local top = child:GetTop()
-                    if not top then return end
-                    local lowest = top
-                    for _, c in ipairs({ child:GetChildren() }) do
-                        local b = c:GetBottom()
-                        if b and b < lowest then lowest = b end
-                    end
-                    child:SetHeight((top - lowest) + 28)
-                end)
-            end
-        end
-        tab.panel:Show()
-        self.activeContent = tab.panel
-    end
-    local DB = ns:GetSubsystem("DB")
-    if DB then DB.char.lastOptionsTab = id end
+    ui:SelectTab(id)
 end
 
 function Options:ApplyWindowScale()
-    local f = self.frame
-    if not f then return end
-    local DB = ns:GetSubsystem("DB")
-    local s = DB and DB.db and DB.db.global and DB.db.global.optionsWindowScale
-    if type(s) ~= "number" or s <= 0 then s = 1 end
-    -- SetScale re-reads anchor offsets in the new scale, so a dragged window jumps unless its center is restored
-    local cx, cy = f:GetCenter()
-    local oldEff = f:GetEffectiveScale()
-    f:SetScale(s)
-    if cx and cy and oldEff then
-        local newEff = f:GetEffectiveScale()
-        f:ClearAllPoints()
-        f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx * oldEff / newEff, cy * oldEff / newEff)
-    end
+    ui:ApplyWindowScale()
 end
 
 function Options:Toggle()
@@ -225,8 +103,8 @@ end
 
 function Options:Show()
     self:Build()
-    self:ApplyWindowScale()
-    self.frame:Show()
+    -- ToggleSettings would close a window that is already open
+    if not self.frame:IsShown() then ui:ToggleSettings() end
     self.frame:Raise()
     local CG = ns:GetSubsystem("ChainGuide")
     if CG and CG.frame and CG.frame:IsShown() then CG.frame:Hide() end

@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Burning Crusade Classic support is limited and growing - see the What's New notice.
 ## Author: Wheelbarrel00
-## Version: 1.55.0
+## Version: 2.0.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -84,6 +84,7 @@
 # MapCanvasMixin at FILE SCOPE, which is safe here only because /eqsprobe pins measured that
 # as a table on TBC.
 Libs\LibStub\LibStub.lua
+Libs\EverythingUI\EverythingUI.xml
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 Libs\AceDB-3.0\AceDB-3.0.xml
 
@@ -124,7 +125,7 @@ Core\Events.lua
 Core\Cache.lua
 Core\Util.lua
 
-# ns.Util.color is read at FILE SCOPE by Core/Dialog.lua and Options/Frame.lua, so Core/Util
+# ns.Util.color is read at FILE SCOPE by Options/Frame.lua and Modules/WhatsNew.lua, so Core/Util
 # precedes both. Dialog backs the Reset and profile prompts and the Discord link.
 Core\Dialog.lua
 Core\Changelog.lua
@@ -189,11 +190,12 @@ Modules\Tooltips\QuestTooltips.lua
 # Reads ns.L at FILE SCOPE, so every locale must precede it.
 Modules\MapCoords.lua
 
-# Options/Frame.lua registers /eqs and must precede the tabs, which call AddTab at FILE SCOPE.
+# Options/Frame.lua registers /eqs and must precede the tabs, which register themselves at FILE SCOPE.
 # Each tab section is gated on the subsystem it drives, so the tabs not listed here simply do
 # not appear and the controls for absent modules are skipped rather than left inert.
 Options\Frame.lua
 Options\TabGeneral.lua
+Options\TabMap.lua
 Options\TabAbout.lua
 
 # The six Data files below are the TBC dataset and define exactly the same globals as the Era

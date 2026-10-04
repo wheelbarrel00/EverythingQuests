@@ -2160,6 +2160,15 @@ function Probe:Misc()
     else
         line("EQOT API module: EQObjectiveTracker global absent")
     end
+
+    -- The newest copy any family addon loaded draws for all of them, so this names whose copy won
+    local eui, euiMinor
+    if LibStub then eui, euiMinor = LibStub("EverythingUI-1.0", true) end
+    if eui then
+        line("EverythingUI-1.0 minor %s from %s", tostring(euiMinor), tostring(eui.host))
+    else
+        line("EverythingUI-1.0 not loaded")
+    end
 end
 
 local minimapLogAgainstRows, minimapGivers

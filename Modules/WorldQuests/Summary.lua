@@ -5,7 +5,6 @@ local S = ns:RegisterSubsystem("WQSummary", {})
 
 local ROW_H      = 18
 local ICON_SIZE  = 14
-local PIN_TEMPLATE = "EQWorldQuestPinTemplate"
 
 S.rowPool   = {}
 S.activeRows = {}
@@ -65,11 +64,13 @@ end
 
 function S:GetCounts()
     local WQ = ns:GetSubsystem("WQWorldMap")
-    if not (WQ and WQ.shadow and WQ.shadow.EnumeratePinsByTemplate) then return nil end
+    if not (WQ and WQ.Quests) then return nil end
 
+    local quests, count = WQ:Quests()
     local counts = {}
-    for pin in WQ.shadow:EnumeratePinsByTemplate(PIN_TEMPLATE) do
-        local cat = pin.reward and pin.reward.category
+    for i = 1, count do
+        local reward = quests[i].reward
+        local cat = reward and reward.category
         if cat then counts[cat] = (counts[cat] or 0) + 1 end
     end
     return counts

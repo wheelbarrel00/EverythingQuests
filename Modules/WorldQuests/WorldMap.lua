@@ -31,6 +31,24 @@ local function isExpiredWQ(questID)
     return false
 end
 
+-- Kept with the world map pins off too, because the zone list reads it
+M._quests, M._questCount = {}, 0
+
+local function keep(questID, reward)
+    local n = M._questCount + 1
+    local e = M._quests[n]
+    if e then
+        e.questID, e.reward = questID, reward
+    else
+        M._quests[n] = { questID = questID, reward = reward }
+    end
+    M._questCount = n
+end
+
+function M:Quests()
+    return self._quests, self._questCount
+end
+
 local providerMixin = CreateFromMixins(MapCanvasDataProviderMixin)
 
 function providerMixin:OnAdded(mapCanvas)
@@ -39,6 +57,7 @@ function providerMixin:OnAdded(mapCanvas)
 end
 
 function providerMixin:RemoveAllData()
+    M._questCount = 0
     if self:GetMap() then
         self:GetMap():RemoveAllPinsByTemplate(PIN_TEMPLATE)
     end
@@ -70,15 +89,16 @@ function providerMixin:_AcquirePins()
     if not mapID then return end
 
     local DB = ns:GetSubsystem("DB")
-    if not (DB and DB.db.profile.worldQuests.enabled ~= false
-            and DB.db.profile.worldQuests.showOnWorldMap) then return end
+    local wq = DB and DB.db.profile.worldQuests
+    if not (wq and wq.enabled ~= false and (wq.showOnWorldMap or wq.showOnZoneMap)) then return end
+    local drawPins = wq.showOnWorldMap
 
     local quests = getWorldQuests(mapID)
     if not quests then return end
 
     local Rewards = ns:GetSubsystem("WQRewards")
-    local filters = DB.db.profile.worldQuests.filters
-    local factionFilters = DB.db.profile.worldQuests.factionFilters or {}
+    local filters = wq.filters
+    local factionFilters = wq.factionFilters or {}
 
     if self._loadAttemptsMapID ~= mapID then
         self._loadAttemptsMapID = mapID
@@ -128,7 +148,8 @@ function providerMixin:_AcquirePins()
                     end
                 end
                 if categoryAllowed and factionAllowed then
-                    map:AcquirePin(PIN_TEMPLATE, questID, x, y, reward)
+                    keep(questID, reward)
+                    if drawPins then map:AcquirePin(PIN_TEMPLATE, questID, x, y, reward) end
                 end
             end
         end
@@ -237,7 +258,4 @@ function M:OnEnable()
     Events:On("SUPER_TRACKING_CHANGED", function()
         if WorldMapFrame and WorldMapFrame:IsShown() then self:UpdateSelections() end
     end)
-
-    -- Do NOT hooksecurefunc WorldMap_WorldQuestDataProviderMixin.RefreshAllData - it spreads EQ taint to every map refresh
-    -- and gets EQ blamed for the systemic AreaPOI secret-value bug. The events above plus the ticker already cover all changes.
 end
