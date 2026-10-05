@@ -135,9 +135,9 @@ Replaces Blizzard's world quest icons with custom pins on both the world map and
 - **Account-wide completion cache** — Shared across characters
 
 ### Chain Guide
-A standalone three-pane window for browsing quest chains. On retail it shows hand-authored quest chains plus live campaign data straight from Blizzard's `C_CampaignInfo`, and since v1.55.0 WoW Forever builds chains of its own (see below). Items marked (retail) are retail only.
+A standalone window for browsing quest chains, in the same style as the options window since v2.1.0. On retail it shows hand-authored quest chains plus live campaign data straight from Blizzard's `C_CampaignInfo`, and since v1.55.0 WoW Forever builds chains of its own (see below). Items marked (retail) are retail only.
 
-- **Layout** — Categories (left), Chains (middle), Quest Details (right)
+- **Layout** — a zone picker at the top left and that zone's chains listed below it, with the chain you pick on the right as quest cards. Each card marks a quest you can pick up, have in your log or have done, and NEXT marks your next step. The search field under the zone picker jumps to the quest it finds and highlights it
 - **Browser navigation** — Back / Forward buttons with full history
 - **Hand-authored overlays** (retail) — Prerequisite branching overrides Blizzard's API chains where the API is incomplete. Branching is authored only, never inferred from quest-type APIs
 - **Cross-character completion** (retail) — Tracks completion of every chain across every character on your account
@@ -145,7 +145,7 @@ A standalone three-pane window for browsing quest chains. On retail it shows han
 - **Live campaign chapters** (retail) — Campaigns render from `C_CampaignInfo` chapter by chapter, so a new patch chapter appears without a data update
 - **Click-to-waypoint** — Click any quest in a chain to point you at it and open the world map there. Uses [TomTom](https://www.curseforge.com/wow/addons/tomtom)'s arrow when installed (recommended). Without TomTom, a quest already in your log is super-tracked, and otherwise the coordinates are printed in chat as the map opens. Blizzard's own map waypoint is deliberately never written, because it taints shared map state
 - **Lazy-built** — The window is constructed on first toggle to keep load times minimal
-- **Resizable** — Drag the gold grip in the bottom right corner, or use the maximize button beside the close button to fill the screen and back. The window remembers which you chose
+- **Resizable** — Drag the grip in the bottom right corner, or use the maximize button beside the close button to fill the screen and back. The window remembers which you chose, and at a large window scale it shrinks to fit your screen
 - **Chain button** — The quest log's details pane has a Chain button that opens the quest's chain
 
 Currently covers the Midnight expansion: **Eversong Woods**, **Zul'Aman**, **Harandar**, **Arator**, **Voidstorm**, **The Sunstrider Omnium**, **Void Acropolis** and **The Coiled Isle**, plus the live **Midnight Campaign**, **The War of Light and Shadow** and **The Curse of Ula'tek** storylines.
@@ -155,7 +155,7 @@ Currently covers the Midnight expansion: **Eversong Woods**, **Zul'Aman**, **Har
 - **Every chain your character can take** — quests joined to the quests that lead to them and follow them, each chain named after its first quest and filed under the zone where it starts. Zones are listed by level, with their level range, and the guide first opens on your current zone
 - **Where you stand** — each quest shows whether you have done it, have it in your log, can pick it up now or cannot yet. A quest you skipped by finishing a later step, or closed off by taking another branch, is shown as such and left out of the chain's progress
 - **Tooltips** — who gives a quest, who takes it back where Everything Quests knows it, and, when you cannot take it yet, why, in the Quest Browser's own words. Right-click a quest to open it in the Quest Browser, which names the chain a quest belongs to
-- **Wide chains stay readable** — a quest with many follow-ups that lead nowhere else, such as the Camping 101 quests, shows them in a gold frame of their own rows
+- **Wide chains stay readable** — a quest with many follow-ups that lead nowhere else, such as the Camping 101 quests, shows them in a panel of their own rows
 - **Track, Continue and search** — track a chain to see its quests on the world map, use Continue for a TomTom arrow to your next step, and search by quest name or ID
 
 ### Quest History

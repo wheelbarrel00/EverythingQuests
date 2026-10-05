@@ -248,39 +248,33 @@ L["Turn in"] = true
 L["Right-click for quest details"] = true
 L["Level %d–%d"] = true
 L["Click to open this chain"] = true
-L["Pick a chain on the left to view its quests."] = true
-L["Untrack"] = true
-L["Track"] = true
 L["%d/%d done"] = true
 L["%d active"] = true
 L["|cffff9933%d skipped|r"] = true
-L["Lv %d  •  ID %d"] = true
+L["Show the navigation panel to pick a chain."] = true
+L["Pick a chain on the left to view its quests."] = true
+L["Untrack"] = true
+L["Track"] = true
+L["(no quests defined for this chain yet)"] = true
+L["(optional)"] = true
 L["ON QUEST"] = true
 L["NEXT"] = true
-L["(optional)"] = true
 L["Continue"] = true
 L["Track this chain"] = true
 L["Follow this chain — its quests pin on the world map (next step highlighted) and your waypoint auto-advances to the next step as you complete it. Works even with this window closed. Click again to stop."] = true
-L["(no quests defined for this chain yet)"] = true
 
 -- ─── Modules/ChainGuide/Frame.lua ───
-L["Hide the navigation panel"] = true
-L["Collapse the category and chain list so the graph fills the whole window. Click again to bring it back."] = true
-L["Back"] = true
-L["Forward"] = true
-L["Home"] = true
+L["Drag to resize"] = true
 L["Options"] = true
 L["Find quest"] = true
 L["Type a quest name or its ID to jump to the chain that contains it."] = true
-L["Go"] = true
-L["Categories"] = true
-L["Drag to resize"] = true
-L["|cffEBB706EQ Chain Guide:|r found quest |cffffffff%d|r%s — jumping to its chain."] = true
-L["|cffEBB706EQ Chain Guide:|r quest |cffffffff%d|r%s isn't in any chain I know about."] = true
-L["|cffEBB706EQ Chain Guide:|r found |cffffffff%s|r — jumping to its chain."] = true
-L["|cffEBB706EQ Chain Guide:|r no chain quest matches |cffffffff%s|r."] = true
-L["Pick a category"] = true
 L["Chains"] = true
+L["Hide the navigation panel"] = true
+L["Collapse the zone picker, search and chain list so the graph fills the whole window. Click again to bring them back."] = true
+L["Show the navigation panel"] = true
+L["Back"] = true
+L["Forward"] = true
+L["No chain quest matches \"%s\"."] = true
 L["%d / %d quests done"] = true
 
 -- ─── Modules/ChainGuide/MapPin.lua ───
@@ -289,6 +283,7 @@ L["On this quest"] = true
 L["Comes later in the chain"] = true
 
 -- ─── Modules/ChainGuide/QuestMapButton.lua ───
+L["|cffEBB706EQ Chain Guide:|r quest |cffffffff%d|r%s isn't in any chain I know about."] = true
 L["Chain"] = true
 L["Find this quest in EQ's Chain Guide"] = true
 L["Falls back to a Wowhead link in chat if EQ doesn't have a chain for this quest yet."] = true

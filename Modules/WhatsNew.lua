@@ -3,21 +3,18 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "2.0.0"
-local POPUP_TITLE           = "What's New in Everything Quests v2.0.0"
+local FEATURE_POPUP_VERSION = "2.1.0"
+local POPUP_TITLE           = "What's New in Everything Quests v2.1.0"
 
 local POPUP_BODY = [[
-|cffEBB706A new options window|r
-Type |cffffffff/eqs|r for a redesigned options window in the same style as EQ Objective Tracker 2.0: a sidebar with an icon for each tab, and settings grouped into cards. Map settings have a Map tab of their own, and the reset, clear and wipe buttons sit in red at the bottom of their tab. Every setting keeps its saved value.
+|cffEBB706A new look for the Chain Guide|r
+On retail and WoW Forever the Chain Guide now has the same style as the options window: a zone picker with the zone's chains listed below it, and quest cards that mark your next step and the quests you are on.
 
-|cffEBB706Prompts and menus to match|r
-Prompts, such as switching trackers or naming a new profile, use the new look, and so does the world quest right-click menu on retail.
-
-|cffEBB706A world quest fix|r
-On retail the zone quest list now works with the world map pins switched off.
+|cffEBB706Search answers in the window|r
+Type a quest's name or ID under the zone picker and the Chain Guide jumps straight to it.
 
 |cffEBB706Coming next|r
-The Chain Guide, the Quest Browser, History and What's New windows keep their current look for now. They get the same new look in a future update, starting with the Chain Guide.
+The What's New window, the Quest Browser and History get the same new look in coming updates.
 
 |cffEBB706Thank you|r
 Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.

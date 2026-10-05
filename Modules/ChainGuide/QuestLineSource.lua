@@ -87,6 +87,11 @@ local function resolveMapIDs(cat, catID)
     return out
 end
 
+function QLS:CategoryMapIDs(catID)
+    local Database = ns:GetSubsystem("ChainGuideDatabase")
+    return resolveMapIDs(Database and Database.categories[catID], catID)
+end
+
 local function appendMapIDOverride(catID, mapID)
     local DB = ns:GetSubsystem("DB")
     if not (DB and DB.db) then return end

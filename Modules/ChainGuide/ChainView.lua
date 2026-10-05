@@ -3,18 +3,35 @@ local L = ns.L
 
 local CV = ns:RegisterSubsystem("ChainGuideView", {})
 
-local PAD            = 10
-local HEADER_H       = 44
-local CELL_W         = 210
-local CELL_H         = 34
-local COL_PITCH      = 224
-local ROW_PITCH      = 72
-local STATUS_ICON_PX = 14
-local CONNECTOR_PX   = 3
-
-local PAN_CLICK_THRESH    = 5
-local PAN_CLICK_THRESH_SQ = PAN_CLICK_THRESH * PAN_CLICK_THRESH
-local WHEEL_STEP          = ROW_PITCH
+local CELL_W        = 232
+local CELL_H        = 46
+local COL_PITCH     = 256
+local ROW_PITCH     = 72
+local GAP           = ROW_PITCH - CELL_H
+local PAD_X         = 24
+local PAD_Y         = 16
+local FAN_PAD       = 8
+local FAN_LINE_EDGE = 24
+local LINE_PX       = 2
+local ICON_PX       = 16
+local CARD_PAD      = 10
+local TEXT_LEFT     = 34
+local TITLE_TOP     = 7
+local LINE2_TOP     = 26
+local NEXT_EDGE     = 3
+local TAG_GAP       = 6
+local LINE2_MID     = LINE2_TOP + 8
+local BRANCH_ALPHA  = 0.55
+local HEAD_H        = 76
+-- Clear of the window's three 32 px list buttons, which end at 116
+local HEAD_LEFT     = 128
+local HEAD_SIDE     = 24
+local BUTTON_TOP    = 12
+local META_TOP      = 48
+local META_GAP      = 12
+local PROGRESS_W    = 120
+local SCROLL_LEAD   = 20
+local SEP           = "  \226\128\162  "
 
 local _metaParts = {}
 local _nodes     = {}
@@ -22,10 +39,10 @@ local _resolved  = {}
 local _statuses  = {}
 local _reasons   = {}
 local _revConn   = {}
-local _chainComplete = {}
 local _slotLoserOf   = {}
 local _slotWinner    = {}
 local _titleRequested = {}
+local _fanL, _fanT, _fanR, _fanB = {}, {}, {}, {}
 
 local function slotRank(s)
     if s == "complete" or s == "turnin" or s == "active" then return 4 end
@@ -34,25 +51,26 @@ local function slotRank(s)
     return 1
 end
 
-local STATUS = {
-    complete  = { atlas = "common-icon-checkmark",                color = { 0.55, 0.55, 0.55 } },
-    turnin    = { atlas = "QuestTurnin",                          color = { 1.00, 0.82, 0.00 } },
-    active    = { atlas = "Quest-Available",                      color = { 1.00, 1.00, 1.00 } },
-    pending   = { atlas = nil,                                    color = { 0.78, 0.78, 0.78 } },
-    skipped   = { atlas = "common-icon-redx",                     color = { 1.00, 0.65, 0.00 } },
-    chainnav  = { atlas = "Garr_LevelUpgradeArrow",               color = { 0.92, 0.72, 0.02 } },
-    locked    = { atlas = nil,                                    color = { 0.45, 0.45, 0.45 } },
-    available = { atlas = nil,                                    color = { 1.00, 0.95, 0.60 } },
-    passed    = { atlas = "common-icon-redx",                     color = { 0.60, 0.50, 0.40 } },
-    branch    = { atlas = nil,                                    color = { 0.45, 0.45, 0.45 } },
+-- The gossip window's quest icons, an unfinished quest's "?" dimmed
+local GOSSIP_AVAILABLE = "Interface\\GossipFrame\\AvailableQuestIcon"
+local GOSSIP_ACTIVE    = "Interface\\GossipFrame\\ActiveQuestIcon"
+local ICON = {
+    available = { file = GOSSIP_AVAILABLE, shade = 1 },
+    active    = { file = GOSSIP_ACTIVE,    shade = 0.55 },
+    turnin    = { file = GOSSIP_ACTIVE,    shade = 1 },
+    complete  = { lib = "check",           color = "muted" },
+    skipped   = { lib = "close",           color = "muted" },
+    passed    = { lib = "close",           color = "muted" },
+    chainnav  = { lib = "chevron-right",   color = "accentHi" },
+}
+local TITLE_COLOR = {
+    complete = "muted", skipped = "muted", passed = "muted", branch = "muted", locked = "muted", pending = "label",
 }
 
--- The gossip window's quest icons, with an unfinished quest's "?" dimmed
-local CLASSIC_ICON = {
-    available = { "Interface\\GossipFrame\\AvailableQuestIcon", 1 },
-    active    = { "Interface\\GossipFrame\\ActiveQuestIcon",    0.55 },
-    turnin    = { "Interface\\GossipFrame\\ActiveQuestIcon",    1 },
-}
+local function ui()
+    local O = ns:GetSubsystem("Options")
+    return O and O.ui
+end
 
 local function classicSource()
     return ns:GetSubsystem("ChainGuideClassicSource")
@@ -65,10 +83,13 @@ local function hasPage(questID)
     return D and D.gates[questID] ~= nil or false
 end
 
+local function stripColor(s)
+    return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+end
+
 CV.nodePool, CV.activeNodes = {}, {}
-CV.linePool, CV.activeLines = {}, {}
-CV.dotPool,  CV.activeDots  = {}, {}
-CV.boxPool,  CV.activeBoxes = {}, {}
+CV.barPool,  CV.activeBars  = {}, {}
+CV.fanPool,  CV.activeFans  = {}, {}
 
 function CV:OnEnable()
     local Events = ns:GetSubsystem("Events")
@@ -95,77 +116,74 @@ function CV:OnEnable()
     end
 end
 
-local function safeSetAtlas(tex, atlas)
-    if not atlas then tex:SetTexture(nil); return false end
-    if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
-        tex:SetAtlas(atlas, false)
-        return true
-    end
-    tex:SetTexture("Interface\\GossipFrame\\AvailableQuestIcon")
-    tex:SetTexCoord(0, 1, 0, 1)
-    return false
-end
-
 local nodeOnEnter, nodeOnLeave, nodeOnClick
 
-local function buildNode(parent)
-    local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
+local function buildNode(ctx, parent)
+    local b = CreateFrame("Button", nil, parent)
     b:SetSize(CELL_W, CELL_H)
+    ctx:Paint(b, "surface", "surfaceBorder")
 
-    b.bg = b:CreateTexture(nil, "BACKGROUND")
-    b.bg:SetAllPoints()
-    b.bg:SetColorTexture(0.08, 0.08, 0.08, 0.95)
-
-    b.border = b:CreateTexture(nil, "BORDER")
-    b.border:SetAllPoints()
-    b.border:SetColorTexture(0.20, 0.20, 0.20, 1)
-
-    b.inner = b:CreateTexture(nil, "ARTWORK")
-    b.inner:SetPoint("TOPLEFT", 1, -1)
-    b.inner:SetPoint("BOTTOMRIGHT", -1, 1)
-    b.inner:SetColorTexture(0.05, 0.05, 0.05, 0.95)
-
-    b.statusIcon = b:CreateTexture(nil, "OVERLAY")
-    b.statusIcon:SetSize(STATUS_ICON_PX, STATUS_ICON_PX)
-    b.statusIcon:SetPoint("TOPLEFT", 4, -3)
-
-    b.title = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    b.title:SetPoint("TOPLEFT",  STATUS_ICON_PX + 7, -3)
-    b.title:SetPoint("TOPRIGHT", -6, -3)
-    b.title:SetJustifyH("LEFT")
-    b.title:SetWordWrap(false)
-    b.title:SetMaxLines(1)
-
-    b.subtitle = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    b.subtitle:SetPoint("BOTTOMLEFT",  6, 4)
-    b.subtitle:SetPoint("BOTTOMRIGHT", -6, 4)
-    b.subtitle:SetJustifyH("LEFT")
-    b.subtitle:SetWordWrap(false)
+    b.hit = b:CreateTexture(nil, "BACKGROUND", nil, 1)
+    b.hit:SetAllPoints()
+    b.hit:SetColorTexture(ctx:Color("accentSoft"))
+    b.hit:Hide()
 
     b.hl = b:CreateTexture(nil, "HIGHLIGHT")
     b.hl:SetAllPoints()
-    b.hl:SetColorTexture(1, 1, 1, 0.06)
+    b.hl:SetColorTexture(ctx:Color("hover"))
 
-    b.searchGlow = b:CreateTexture(nil, "BACKGROUND", nil, -2)
-    b.searchGlow:SetPoint("TOPLEFT", -3, 3)
-    b.searchGlow:SetPoint("BOTTOMRIGHT", 3, -3)
-    b.searchGlow:SetColorTexture(0.92, 0.72, 0.02, 0.95)
-    b.searchGlow:Hide()
+    b.nextEdge = b:CreateTexture(nil, "ARTWORK")
+    b.nextEdge:SetPoint("TOPLEFT")
+    b.nextEdge:SetPoint("BOTTOMLEFT")
+    b.nextEdge:SetWidth(NEXT_EDGE)
+    b.nextEdge:SetColorTexture(ctx:Color("accent"))
+    b.nextEdge:Hide()
+
+    b.statusIcon = b:CreateTexture(nil, "OVERLAY")
+    b.statusIcon:SetSize(ICON_PX, ICON_PX)
+    b.statusIcon:SetPoint("TOPLEFT", CARD_PAD, -(TITLE_TOP + 1))
+
+    b.title = ctx:CreateText(b, "", "value")
+    b.title:SetPoint("TOPLEFT", TEXT_LEFT, -TITLE_TOP)
+    b.title:SetPoint("TOPRIGHT", -CARD_PAD, -TITLE_TOP)
+    b.title:SetWordWrap(false)
+
+    b.tag = ctx:CreateTag(b, "", "accent")
+    b.tag:SetPoint("TOPLEFT", TEXT_LEFT, -LINE2_TOP)
+    b.tag:Hide()
+
+    b.subtitle = ctx:CreateText(b, "", "hint")
+    b.subtitle:SetWordWrap(false)
 
     b:SetScript("OnEnter", nodeOnEnter)
     b:SetScript("OnLeave", nodeOnLeave)
     b:SetScript("OnClick", nodeOnClick)
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-
-    -- Propagate to the canvas so a drag-pan can start on a node - nodeOnClick suppresses pan-gesture clicks
-    if b.SetPropagateMouseClicks then b:SetPropagateMouseClicks(true) end
-
     return b
 end
 
-local function acquireNode(parent)
+local propagateClicks
+
+local function propagateActive()
+    for _, b in ipairs(CV.activeNodes) do propagateClicks(b) end
+end
+
+-- Lets a press reach the canvas so a drag can start on a card, set once combat ends since the call is restricted
+propagateClicks = function(b)
+    if b._propagates or not b.SetPropagateMouseClicks then return end
+    if InCombatLockdown() then
+        local Events = ns:GetSubsystem("Events")
+        if Events and Events.RunWhenOutOfCombat then Events:RunWhenOutOfCombat("eq.chainview.clicks", propagateActive) end
+        return
+    end
+    b:SetPropagateMouseClicks(true)
+    b._propagates = true
+end
+
+local function acquireNode(ctx, parent)
     local b = tremove(CV.nodePool)
-    if not b then b = buildNode(parent) end
+    if not b then b = buildNode(ctx, parent) end
+    propagateClicks(b)
     b:SetParent(parent)
     b:ClearAllPoints()
     b:Show()
@@ -178,134 +196,92 @@ local function releaseNodes()
         local b = CV.activeNodes[i]
         b:Hide()
         b:ClearAllPoints()
-        b._ref, b._chain, b._reason = nil, nil, nil
+        b._ref, b._chain, b._reason, b._status, b._navKind = nil, nil, nil, nil, nil
         b.statusIcon:SetTexture(nil)
+        b.statusIcon:SetTexCoord(0, 1, 0, 1)
         b.statusIcon:SetVertexColor(1, 1, 1, 1)
-        b.border:SetColorTexture(0.20, 0.20, 0.20, 1)
-        if b.searchGlow then b.searchGlow:Hide() end
+        b.hit:Hide()
+        b.nextEdge:Hide()
+        b.tag:Hide()
+        b:SetAlpha(1)
         CV.nodePool[#CV.nodePool + 1] = b
         CV.activeNodes[i] = nil
     end
 end
 
-local function acquireLine(parent)
-    local line = tremove(CV.linePool)
-    if not line then
-        line = parent:CreateLine(nil, "BACKGROUND")
-        line:SetThickness(CONNECTOR_PX)
-    else
-        line:SetParent(parent)
-    end
-    line:Show()
-    CV.activeLines[#CV.activeLines + 1] = line
-    return line
-end
-
-local function releaseLines()
-    for i = #CV.activeLines, 1, -1 do
-        local line = CV.activeLines[i]
-        line:Hide()
-        line:ClearAllPoints()
-        line:SetColorTexture(1, 1, 1, 1)
-        CV.linePool[#CV.linePool + 1] = line
-        CV.activeLines[i] = nil
-    end
-end
-
-local DOT_PX = 9
-local function acquireDot(parent)
-    local d = tremove(CV.dotPool)
-    if not d then
-        d = parent:CreateTexture(nil, "ARTWORK")
-        d:SetSize(DOT_PX, DOT_PX)
-    else
-        d:SetParent(parent)
-    end
-    d:Show()
-    CV.activeDots[#CV.activeDots + 1] = d
-    return d
-end
-
-local function releaseDots()
-    for i = #CV.activeDots, 1, -1 do
-        local d = CV.activeDots[i]
-        d:Hide()
-        d:ClearAllPoints()
-        CV.dotPool[#CV.dotPool + 1] = d
-        CV.activeDots[i] = nil
-    end
-end
-
-local function acquireBox(parent)
-    local t = tremove(CV.boxPool)
+local function acquireBar(ctx, canvas)
+    local t = tremove(CV.barPool)
     if not t then
-        t = parent:CreateTexture(nil, "BACKGROUND", nil, -8)
-    else
-        t:SetParent(parent)
+        t = canvas:CreateTexture(nil, "BACKGROUND")
+        t:SetColorTexture(ctx:Color("borderStrong"))
     end
     t:Show()
-    CV.activeBoxes[#CV.activeBoxes + 1] = t
+    CV.activeBars[#CV.activeBars + 1] = t
     return t
 end
 
-local function releaseBoxes()
-    for i = #CV.activeBoxes, 1, -1 do
-        local t = CV.activeBoxes[i]
+local function releaseBars()
+    for i = #CV.activeBars, 1, -1 do
+        local t = CV.activeBars[i]
         t:Hide()
         t:ClearAllPoints()
-        CV.boxPool[#CV.boxPool + 1] = t
-        CV.activeBoxes[i] = nil
+        CV.barPool[#CV.barPool + 1] = t
+        CV.activeBars[i] = nil
     end
 end
 
-local EDGE_DONE = { 0.22, 0.42, 0.25, 0.55 }
-local EDGE_TODO = { 0.52, 0.52, 0.56, 0.70 }
-local FAN_FILL  = { 0.92, 0.72, 0.02, 0.06 }
-local FAN_EDGE  = { 0.92, 0.72, 0.02, 0.45 }
-local FAN_PAD   = 6
-
-local _centerX = 0
--- A margin around the canvas for wrapped fans' frames, and none on chains without one
-local _insetX  = 0
-local _fanL, _fanT, _fanR, _fanB = {}, {}, {}, {}
-
-local function segment(canvas, x1, y1, x2, y2, r, g, b, a)
-    local line = acquireLine(canvas)
-    line:SetStartPoint("TOPLEFT", canvas, x1, y1)
-    line:SetEndPoint(  "TOPLEFT", canvas, x2, y2)
-    line:SetColorTexture(r, g, b, a)
+local function acquireFan(ctx, canvas)
+    local f = tremove(CV.fanPool)
+    if not f then
+        f = CreateFrame("Frame", nil, canvas)
+        ctx:Paint(f, "chrome", "surfaceBorder")
+    end
+    -- On the canvas's own level, so the cards in it draw over it
+    f:SetFrameLevel(canvas:GetFrameLevel())
+    f:Show()
+    CV.activeFans[#CV.activeFans + 1] = f
+    return f
 end
 
-local function cellCenterX(col) return _insetX + col * COL_PITCH + CELL_W * 0.5 end
-local function cellCenterY(row) return -(row * ROW_PITCH + CELL_H * 0.5) end
-
-local function prereqComplete(items, idx, Characters)
-    if items[idx].type == "chain" then return _chainComplete[idx] end
-    return Characters:IsQuestCompleted(_resolved[idx].id)
+local function releaseFans()
+    for i = #CV.activeFans, 1, -1 do
+        local f = CV.activeFans[i]
+        f:Hide()
+        f:ClearAllPoints()
+        CV.fanPool[#CV.fanPool + 1] = f
+        CV.activeFans[i] = nil
+    end
 end
 
-local function rect(canvas, left, top, w, h, c)
-    local t = acquireBox(canvas)
-    t:SetPoint("TOPLEFT", canvas, "TOPLEFT", left, top)
-    t:SetSize(w, h)
-    t:SetColorTexture(c[1], c[2], c[3], c[4])
+-- One straight run of a connector, in canvas units growing down
+local function run(ctx, canvas, x1, y1, x2, y2)
+    local bar = acquireBar(ctx, canvas)
+    local half = LINE_PX / 2
+    if x1 == x2 then
+        bar:SetPoint("TOPLEFT", canvas, "TOPLEFT", x1 - half, -math.min(y1, y2))
+        bar:SetSize(LINE_PX, math.max(LINE_PX, math.abs(y2 - y1)))
+    else
+        bar:SetPoint("TOPLEFT", canvas, "TOPLEFT", math.min(x1, x2) - half, -(y1 - half))
+        bar:SetSize(math.abs(x2 - x1) + LINE_PX, LINE_PX)
+    end
 end
 
--- One frame and one line for a wrapped fan, since a line to each of its quests would run through the rows above
-local function drawFan(canvas, items, hub, cols, rows, Characters)
-    local left = _insetX + _fanL[hub] * COL_PITCH - FAN_PAD
-    local top  = -(_fanT[hub] * ROW_PITCH) + FAN_PAD
-    local w    = (_fanR[hub] - _fanL[hub]) * COL_PITCH + CELL_W + FAN_PAD * 2
-    local h    = (_fanB[hub] - _fanT[hub]) * ROW_PITCH + CELL_H + FAN_PAD * 2
-    rect(canvas, left, top, w, h, FAN_FILL)
-    rect(canvas, left, top, w, 1, FAN_EDGE)
-    rect(canvas, left, top - h + 1, w, 1, FAN_EDGE)
-    rect(canvas, left, top, 1, h, FAN_EDGE)
-    rect(canvas, left + w - 1, top, 1, h, FAN_EDGE)
-    local hx = cellCenterX(cols[hub])
-    local lx = math.min(math.max(hx, left + CELL_W * 0.25), left + w - CELL_W * 0.25)
-    local c = prereqComplete(items, hub, Characters) and EDGE_DONE or EDGE_TODO
-    segment(canvas, hx, cellCenterY(rows[hub]), lx, top, c[1], c[2], c[3], c[4])
+-- Down, across in the gap above the child's row, and down again, so a split or a merge shares one run
+local function elbow(ctx, canvas, x1, y1, x2, y2)
+    local mid = y2 - GAP / 2
+    run(ctx, canvas, x1, y1, x1, mid)
+    if x1 ~= x2 then run(ctx, canvas, x1, mid, x2, mid) end
+    run(ctx, canvas, x2, mid, x2, y2)
+end
+
+-- Two cards side by side in one row, as a curated retail chain can place them, are joined straight across
+local function link(ctx, canvas, sx, sy, dx, dy)
+    if sy ~= dy then
+        elbow(ctx, canvas, sx + CELL_W / 2, sy + CELL_H, dx + CELL_W / 2, dy)
+        return
+    end
+    local y = sy + CELL_H / 2
+    if sx < dx then run(ctx, canvas, sx + CELL_W, y, dx, y) else run(ctx, canvas, dx + CELL_W, y, sx, y) end
 end
 
 local function statusForQuestItem(item, Characters)
@@ -319,24 +295,30 @@ local function statusForQuestItem(item, Characters)
     return "pending"
 end
 
+-- EQ's own tooltip, which the library hides when a drag starts and when the window closes
+local function cardTip()
+    return ns.Util.PinTooltip()
+end
+
 local function buildQuestTooltip(item, statusKey)
+    local tip = cardTip()
     local title = ns.Util.QuestTitle(item.id) or item.name or ("Quest #" .. tostring(item.id))
-    GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
-    GameTooltip:SetText(title, 1, 0.82, 0)
+    tip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
+    tip:SetText(title, 1, 0.82, 0)
     if statusKey == "complete" then
-        GameTooltip:AddLine(L["Completed"], 0.5, 1, 0.5)
+        tip:AddLine(L["Completed"], 0.5, 1, 0.5)
     elseif statusKey == "turnin" then
-        GameTooltip:AddLine(L["Ready to turn in"], 1, 0.82, 0)
+        tip:AddLine(L["Ready to turn in"], 1, 0.82, 0)
     elseif statusKey == "active" then
-        GameTooltip:AddLine(L["In your quest log"], 1, 1, 1)
+        tip:AddLine(L["In your quest log"], 1, 1, 1)
     elseif statusKey == "skipped" then
-        GameTooltip:AddLine(L["Skipped"], 1.0, 0.65, 0.0)
-        GameTooltip:AddLine(L["A later quest in this chain has already passed this one."], 0.7, 0.7, 0.7, true)
-        GameTooltip:AddLine(L["May be worth going back to pick up."], 0.7, 0.7, 0.7, true)
+        tip:AddLine(L["Skipped"], 1.0, 0.65, 0.0)
+        tip:AddLine(L["A later quest in this chain has already passed this one."], 0.7, 0.7, 0.7, true)
+        tip:AddLine(L["May be worth going back to pick up."], 0.7, 0.7, 0.7, true)
     else
-        GameTooltip:AddLine(L["Not started"], 0.7, 0.7, 0.7)
+        tip:AddLine(L["Not started"], 0.7, 0.7, 0.7)
     end
-    GameTooltip:AddLine("ID: " .. tostring(item.id), 0.5, 0.5, 0.5)
+    tip:AddLine("ID: " .. tostring(item.id), 0.5, 0.5, 0.5)
 
     -- GetQuestDifficultyLevel returns 0 until quest data is cached
     if item.id and C_QuestLog and C_QuestLog.GetQuestDifficultyLevel then
@@ -344,9 +326,9 @@ local function buildQuestTooltip(item, statusKey)
         if lvl and lvl > 0 then
             local c = GetQuestDifficultyColor and GetQuestDifficultyColor(lvl)
             if c then
-                GameTooltip:AddLine((L["Level %d"]):format(lvl), c.r, c.g, c.b)
+                tip:AddLine((L["Level %d"]):format(lvl), c.r, c.g, c.b)
             else
-                GameTooltip:AddLine((L["Level %d"]):format(lvl), 0.8, 0.8, 0.8)
+                tip:AddLine((L["Level %d"]):format(lvl), 0.8, 0.8, 0.8)
             end
         end
     end
@@ -354,16 +336,17 @@ local function buildQuestTooltip(item, statusKey)
     if item.id then
         if QuestUtil and QuestUtil.GetQuestClassificationDetails then
             local cls, ctext = QuestUtil.GetQuestClassificationDetails(item.id, true)
+            -- A Questline classification says nothing inside a chain
             local isPlainStoryline = Enum and Enum.QuestClassification
-                                     and cls == Enum.QuestClassification.Questline  -- suppress: every chain member is Questline
+                                     and cls == Enum.QuestClassification.Questline
             if ctext and ctext ~= "" and not isPlainStoryline then
-                GameTooltip:AddLine(ctext, 0.90, 0.78, 0.45)
+                tip:AddLine(ctext, 0.90, 0.78, 0.45)
             end
         end
         if C_QuestLog and C_QuestLog.GetQuestTagInfo then
             local tag = C_QuestLog.GetQuestTagInfo(item.id)
             if tag and tag.tagName and tag.tagName ~= "" then
-                GameTooltip:AddLine(tag.tagName, 0.55, 0.75, 0.95)
+                tip:AddLine(tag.tagName, 0.55, 0.75, 0.95)
             end
         end
     end
@@ -373,9 +356,9 @@ local function buildQuestTooltip(item, statusKey)
         local t = R:GetCompletionTime(item.id)
         if t then
             if t > 0 then
-                GameTooltip:AddLine(L["Completed: "] .. date("%Y-%m-%d %H:%M", t), 0.55, 0.85, 0.55)
+                tip:AddLine(L["Completed: "] .. date("%Y-%m-%d %H:%M", t), 0.55, 0.85, 0.55)
             else
-                GameTooltip:AddLine(L["Completed (before tracking)"], 0.55, 0.85, 0.55)
+                tip:AddLine(L["Completed (before tracking)"], 0.55, 0.85, 0.55)
             end
         end
     end
@@ -384,48 +367,50 @@ local function buildQuestTooltip(item, statusKey)
     if QR then
         -- Completed quests are gone from the log and the API reports their objectives as 0/N, so skip them
         if statusKey ~= "complete" then
-            local hadObjectives = QR:RenderObjectives(GameTooltip, item.id)
-            if hadObjectives then GameTooltip:AddLine(" ") end
+            local hadObjectives = QR:RenderObjectives(tip, item.id)
+            if hadObjectives then tip:AddLine(" ") end
         end
-        QR:RenderRewards(GameTooltip, item.id)
+        QR:RenderRewards(tip, item.id)
     end
 
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(L["Shift-click to link in chat"], 0.6, 0.6, 0.6)
-    GameTooltip:Show()
+    tip:AddLine(" ")
+    tip:AddLine(L["Shift-click to link in chat"], 0.6, 0.6, 0.6)
+    tip:Show()
 end
 
 local function addPlace(header, p)
     if not p then return end
+    local tip = cardTip()
     local QBD  = ns:GetSubsystem("QuestBrowserData")
     local QB   = ns:GetSubsystem("QuestBrowser")
     local zone = (QBD and QBD:ZoneName(p.mapID)) or ("map " .. tostring(p.mapID))
     local who  = p.name or (QB and QB.SourceText and QB:SourceText(p.kind))
-    GameTooltip:AddLine(header, 0.92, 0.72, 0.02)
-    GameTooltip:AddLine(who and (who .. "  -  " .. zone) or zone, 0.8, 0.8, 0.8, true)
+    tip:AddLine(header, 0.92, 0.72, 0.02)
+    tip:AddLine(who and (who .. "  -  " .. zone) or zone, 0.8, 0.8, 0.8, true)
 end
 
 -- Described from the shipped tables, as the Quest Browser's page is
 local function buildClassicTooltip(item, statusKey, reason)
+    local tip = cardTip()
     local CS = classicSource()
     local A  = ns:GetSubsystem("AvailableQuests")
     local QB = ns:GetSubsystem("QuestBrowser")
-    GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
-    GameTooltip:SetText(CS:Title(item.id), 1, 0.82, 0)
+    tip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
+    tip:SetText(CS:Title(item.id), 1, 0.82, 0)
     if statusKey == "complete" then
-        GameTooltip:AddLine(L["Completed"], 0.5, 1, 0.5)
+        tip:AddLine(L["Completed"], 0.5, 1, 0.5)
     elseif statusKey == "turnin" then
-        GameTooltip:AddLine(L["Ready to turn in"], 1, 0.82, 0)
+        tip:AddLine(L["Ready to turn in"], 1, 0.82, 0)
     elseif statusKey == "active" then
-        GameTooltip:AddLine(L["In your quest log"], 1, 1, 1)
+        tip:AddLine(L["In your quest log"], 1, 1, 1)
     elseif statusKey == "available" then
-        GameTooltip:AddLine(L["You can pick this up now."], 0.3, 1, 0.3)
+        tip:AddLine(L["You can pick this up now."], 0.3, 1, 0.3)
     else
         local why = reason and QB and QB.ReasonText and QB:ReasonText(reason)
         if why then
-            GameTooltip:AddLine(why, 1, 0.6, 0.3, true)
+            tip:AddLine(why, 1, 0.6, 0.3, true)
         else
-            GameTooltip:AddLine(L["Not started"], 0.7, 0.7, 0.7)
+            tip:AddLine(L["Not started"], 0.7, 0.7, 0.7)
         end
     end
 
@@ -433,36 +418,37 @@ local function buildClassicTooltip(item, statusKey, reason)
     if lvl then
         local c = GetQuestDifficultyColor and GetQuestDifficultyColor(lvl)
         if c then
-            GameTooltip:AddLine((L["Level %d"]):format(lvl), c.r, c.g, c.b)
+            tip:AddLine((L["Level %d"]):format(lvl), c.r, c.g, c.b)
         else
-            GameTooltip:AddLine((L["Level %d"]):format(lvl), 0.8, 0.8, 0.8)
+            tip:AddLine((L["Level %d"]):format(lvl), 0.8, 0.8, 0.8)
         end
     end
     local req = A and A:RequiredLevel(item.id)
     if req and req > 1 then
-        GameTooltip:AddLine((L["Requires level %d"]):format(req), 0.8, 0.8, 0.8)
+        tip:AddLine((L["Requires level %d"]):format(req), 0.8, 0.8, 0.8)
     end
 
     addPlace(L["Starts"], CS:StartPoint(item.id))
     addPlace(L["Turn in"], CS:FinishPoint(item.id))
-    GameTooltip:AddLine("ID: " .. tostring(item.id), 0.5, 0.5, 0.5)
+    tip:AddLine("ID: " .. tostring(item.id), 0.5, 0.5, 0.5)
 
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(L["Shift-click to link in chat"], 0.6, 0.6, 0.6)
-    if QB and QB.Open and hasPage(item.id) then GameTooltip:AddLine(L["Right-click for quest details"], 0.6, 0.6, 0.6) end
-    GameTooltip:Show()
+    tip:AddLine(" ")
+    tip:AddLine(L["Shift-click to link in chat"], 0.6, 0.6, 0.6)
+    if QB and QB.Open and hasPage(item.id) then tip:AddLine(L["Right-click for quest details"], 0.6, 0.6, 0.6) end
+    tip:Show()
 end
 
 local function buildChainNavTooltip(item)
+    local tip = cardTip()
     local Database = ns:GetSubsystem("ChainGuideDatabase")
     local sub = Database and Database.chains[item.id]
-    GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
-    GameTooltip:SetText((sub and sub.name) or ("Chain #" .. tostring(item.id)), 0.92, 0.72, 0.02)
+    tip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
+    tip:SetText((sub and sub.name) or ("Chain #" .. tostring(item.id)), 0.92, 0.72, 0.02)
     if sub and sub.range then
-        GameTooltip:AddLine((L["Level %d–%d"]):format(sub.range[1], sub.range[2]), 0.7, 0.7, 0.7)
+        tip:AddLine((L["Level %d–%d"]):format(sub.range[1], sub.range[2]), 0.7, 0.7, 0.7)
     end
-    GameTooltip:AddLine(L["Click to open this chain"], 1, 1, 1)
-    GameTooltip:Show()
+    tip:AddLine(L["Click to open this chain"], 1, 1, 1)
+    tip:Show()
 end
 
 local function onNodeClickQuest(item, chain)
@@ -478,10 +464,14 @@ local function onNodeClickChain(item)
     if CG and CG.NavigateChain then CG:NavigateChain(item.id) end
 end
 
+local function areaOf(node)
+    local canvas = node:GetParent()
+    return canvas and canvas._area
+end
+
 function nodeOnEnter(self)
-    local canvas = self:GetParent()
-    local pane = canvas and canvas._pane
-    if pane and pane._panning then return end
+    local area = areaOf(self)
+    if area and area:IsPanGesture() then return end
     if self._navKind == "chain" then
         buildChainNavTooltip(self._ref)
     elseif self._chain and self._chain._generated and classicSource() then
@@ -492,25 +482,12 @@ function nodeOnEnter(self)
 end
 
 function nodeOnLeave()
-    GameTooltip:Hide()
+    cardTip():Hide()
 end
 
 function nodeOnClick(self, button)
-    local canvas = self:GetParent()
-    local pane = canvas and canvas._pane
-    if pane and pane._panning then
-        if pane._panMoved then return end
-        -- OnUpdate may not have run between press and click, so re-check live travel (order is OnMouseDown then OnClick then OnMouseUp)
-        if pane._panStartX then
-            local scale = canvas:GetEffectiveScale()
-            if scale and scale ~= 0 then
-                local cx, cy = GetCursorPosition()
-                local tx = cx / scale - pane._panStartX
-                local ty = cy / scale - pane._panStartY
-                if (tx * tx + ty * ty) > PAN_CLICK_THRESH_SQ then return end
-            end
-        end
-    end
+    local area = areaOf(self)
+    if area and area:IsPanGesture() then return end
     -- Only a generated chain's quest has a Quest Browser page, so a right-click does nothing anywhere else
     if button == "RightButton" then
         if self._navKind ~= "chain" and self._chain and self._chain._generated and hasPage(self._ref.id) then
@@ -541,87 +518,6 @@ local function onTrackClick(self)
         CG:ClearTrackedChainID()
     else
         CG:SetTrackedChainID(id)
-    end
-end
-
-local function stopPan(canvas)
-    local pane = canvas._pane
-    if pane then pane._panning = false end
-    canvas:SetScript("OnUpdate", nil)
-    if SetCursor then SetCursor(nil) end
-end
-
-local function canvasOnUpdate(self)
-    local pane = self._pane
-    if not (pane and pane._panning) then return end
-    -- Button can be released off-frame, so live button state is the authoritative stop signal
-    if not (IsMouseButtonDown and IsMouseButtonDown("LeftButton")) then stopPan(self); return end
-
-    local scale = self:GetEffectiveScale()
-    if not scale or scale == 0 then return end
-    local cx, cy = GetCursorPosition()
-    cx, cy = cx / scale, cy / scale
-    local dx = cx - pane._panLastX
-    local dy = cy - pane._panLastY
-    pane._panLastX, pane._panLastY = cx, cy
-
-    if not pane._panMoved then
-        local tx, ty = cx - pane._panStartX, cy - pane._panStartY
-        if (tx * tx + ty * ty) > PAN_CLICK_THRESH_SQ then
-            pane._panMoved = true
-            if GameTooltip then GameTooltip:Hide() end
-        end
-    end
-
-    local sc = pane._cvScroll
-    if not sc then return end
-    -- Scroll Y grows down while screen Y grows up, hence the opposite signs on the two axes
-    local hmax = sc:GetHorizontalScrollRange() or 0
-    local vmax = sc:GetVerticalScrollRange()   or 0
-    sc:SetHorizontalScroll(math.max(0, math.min(hmax, (sc:GetHorizontalScroll() or 0) - dx)))
-    sc:SetVerticalScroll(  math.max(0, math.min(vmax, (sc:GetVerticalScroll()   or 0) + dy)))
-end
-
-local function canvasOnMouseDown(self, button)
-    if button ~= "LeftButton" then return end
-    local pane = self._pane
-    if not pane then return end
-    local sc = pane._cvScroll
-    if not sc then return end
-    if (sc:GetHorizontalScrollRange() or 0) <= 0 and (sc:GetVerticalScrollRange() or 0) <= 0 then
-        return
-    end
-    local scale = self:GetEffectiveScale()
-    if not scale or scale == 0 then return end
-    local cx, cy = GetCursorPosition()
-    cx, cy = cx / scale, cy / scale
-    pane._panLastX,  pane._panLastY  = cx, cy
-    pane._panStartX, pane._panStartY = cx, cy
-    pane._panMoved = false
-    pane._panning  = true
-    self:SetScript("OnUpdate", canvasOnUpdate)
-    if SetCursor then SetCursor("UI_MOVE_CURSOR") end
-end
-
-local function canvasOnMouseUp(self)
-    if self._pane and self._pane._panning then stopPan(self) end
-end
-
-local function canvasOnHide(self)
-    if self._pane and self._pane._panning then stopPan(self) end
-end
-
--- Wheel lives on the scroll child because enabling mouse on the parent would steal mouse focus
-local function canvasOnMouseWheel(self, delta)
-    local pane = self._pane
-    local sc = pane and pane._cvScroll
-    if not sc then return end
-    if IsShiftKeyDown and IsShiftKeyDown() then
-        local hmax = sc:GetHorizontalScrollRange() or 0
-        sc:SetHorizontalScroll(math.max(0, math.min(hmax, (sc:GetHorizontalScroll() or 0) - delta * WHEEL_STEP)))
-    else
-        local vmax = sc:GetVerticalScrollRange() or 0
-        sc:SetVerticalScroll(math.max(0, math.min(vmax, (sc:GetVerticalScroll() or 0) - delta * WHEEL_STEP)))
     end
 end
 
@@ -667,45 +563,78 @@ local function computeLayout(items)
     return cols, rows, maxCol, maxRow
 end
 
-function CV:Render(pane, chain, highlightQuestID)
-    self:_ensureUI(pane)
-    releaseNodes()
-    releaseLines()
-    releaseDots()
-    releaseBoxes()
+local function showHeader(pane, on)
+    pane._cvTitle:SetShown(on)
+    pane._cvMeta:SetShown(on)
+    pane._cvProgress:SetShown(on)
+    pane._cvTrack:SetShown(on)
+    if not on then pane._cvContinue:Hide() end
+end
 
+local function showEmpty(pane, text)
+    pane._cvEmpty:SetText(text or "")
+    pane._cvEmpty:SetShown(text ~= nil)
+end
+
+local function setMeta(pane, chain, complete, active, total, skipped, oneLevel)
+    wipe(_metaParts)
+    if chain.range then
+        local lo, hi = chain.range[1], chain.range[2]
+        if oneLevel and lo == hi then
+            _metaParts[#_metaParts + 1] = (L["Level %d"]):format(lo)
+        else
+            _metaParts[#_metaParts + 1] = (L["Level %d–%d"]):format(lo, hi)
+        end
+    end
+    if total > 0 then
+        _metaParts[#_metaParts + 1] = (L["%d/%d done"]):format(complete, total)
+        if active > 0 then _metaParts[#_metaParts + 1] = (L["%d active"]):format(active) end
+        if skipped and skipped > 0 then
+            _metaParts[#_metaParts + 1] = stripColor((L["|cffff9933%d skipped|r"]):format(skipped))
+        end
+    end
+    local meta = pane._cvMeta
+    meta:SetWidth(0)
+    meta:SetText(table.concat(_metaParts, SEP))
+    -- Cut short of the header's right edge, so the progress bar after it stays inside the window
+    local room = (pane._cvHead:GetWidth() or 0) - HEAD_LEFT - HEAD_SIDE - META_GAP - PROGRESS_W
+    if room > 0 and (meta:GetStringWidth() or 0) > room then meta:SetWidth(room) end
+    pane._cvProgress:SetProgress(total > 0 and complete / total or 0)
+end
+
+function CV:Render(pane, chain, highlightQuestID, again)
+    local ctx = ui()
+    self:_ensureUI(pane, ctx)
+    releaseNodes()
+    releaseBars()
+    releaseFans()
+
+    local area = pane._cvArea
     pane._cvContinue:Hide()
     pane._cvContinue._nextID, pane._cvContinue._chain = nil, nil
 
-    -- Only genuine navigations auto-scroll, not passive re-renders - _cvRenderedChain is set on the success path so a cold navigation's first non-empty render still counts as one
-    local navChanged = (chain ~= pane._cvScrolledChain)
+    -- Scrolls only for a new chain or quest, a chain's first render with quests, or a quest named again
+    local navChanged = again or (chain ~= pane._cvScrolledChain)
                        or (highlightQuestID ~= pane._cvScrolledHighlight)
                        or (chain ~= pane._cvRenderedChain)
     pane._cvScrolledChain     = chain
     pane._cvScrolledHighlight = highlightQuestID
 
     if not chain then
-        pane._cvHeader:SetText("")
-        pane._cvMeta:SetText(L["Pick a chain on the left to view its quests."])
-        pane._cvMeta:SetTextColor(0.6, 0.6, 0.6)
-        pane._cvEmpty:Hide()
-        pane._cvCanvas:SetSize(1, 1)
-        pane._cvTrack:Hide()
+        showHeader(pane, false)
+        area:SetContentSize(1, 1)
+        local CG = ns:GetSubsystem("ChainGuide")
+        showEmpty(pane, (CG and CG._railCollapsed) and L["Show the navigation panel to pick a chain."]
+                        or L["Pick a chain on the left to view its quests."])
         return
     end
+    showHeader(pane, true)
 
     local CG = ns:GetSubsystem("ChainGuide")
     pane._cvTrack._chainID = chain.id
     local tracking = CG and chain.id and CG:IsTrackingChain(chain.id)
     pane._cvTrack:SetText(tracking and L["Untrack"] or L["Track"])
-    if pane._cvTrack.text then
-        if tracking then
-            pane._cvTrack.text:SetTextColor(0.27, 0.85, 0.27)
-        else
-            pane._cvTrack.text:SetTextColor(0.92, 0.72, 0.02)
-        end
-    end
-    pane._cvTrack:Show()
+    if pane._cvTrack.Fit then pane._cvTrack:Fit() end
 
     local Database   = ns:GetSubsystem("ChainGuideDatabase")
     local Characters = ns:GetSubsystem("ChainGuideCharacters")
@@ -713,32 +642,32 @@ function CV:Render(pane, chain, highlightQuestID)
     if QLS then QLS:EnsureChainItems(chain) end
     Database:NormalizeChain(chain)
 
+    pane._cvTitle:SetText(chain.name or "Chain")
     local items = chain.items
     if not items or #items == 0 then
-        pane._cvHeader:SetText(chain.name or "Chain")
         local complete, active, total = Characters:ChainProgress(chain)
-        wipe(_metaParts)
-        if chain.range then
-            _metaParts[#_metaParts + 1] = (L["Level %d–%d"]):format(chain.range[1], chain.range[2])
-        end
-        if total > 0 then
-            _metaParts[#_metaParts + 1] = (L["%d/%d done"]):format(complete, total)
-            if active > 0 then _metaParts[#_metaParts + 1] = (L["%d active"]):format(active) end
-        end
-        pane._cvMeta:SetText(table.concat(_metaParts, "  •  "))
-        pane._cvMeta:SetTextColor(0.75, 0.75, 0.75)
-        pane._cvCanvas:SetSize(1, 1)
-        pane._cvEmpty:Show()
+        setMeta(pane, chain, complete, active, total)
+        area:SetContentSize(1, 1)
+        showEmpty(pane, L["(no quests defined for this chain yet)"])
         return
     end
-    pane._cvEmpty:Hide()
+    showEmpty(pane, nil)
 
     local cols, rows, maxCol, maxRow = computeLayout(items)
-    _insetX = 0
+    local insetX = 0
     for i = 1, #items do
-        if items[i].fan then _insetX = FAN_PAD; break end
+        if items[i].fan then insetX = FAN_PAD; break end
     end
-    _centerX = _insetX + (maxCol * 0.5) * COL_PITCH + CELL_W * 0.5
+    local contentW = maxCol * COL_PITCH + CELL_W + insetX * 2
+    local contentH = maxRow * ROW_PITCH + CELL_H + insetX * 2
+    -- A chain narrower than the view is centered in it
+    local viewW = area.scroll and area.scroll:GetWidth() or 0
+    local left = PAD_X + insetX
+    if viewW > contentW + PAD_X * 2 then left = (viewW - contentW) / 2 + insetX end
+    local top = PAD_Y + insetX
+    local function cellX(col) return left + col * COL_PITCH end
+    local function cellY(row) return top + row * ROW_PITCH end
+
     local char = Database:CurrentCharacter()
     local CS = chain._generated and classicSource() or nil
     local A  = CS and ns:GetSubsystem("AvailableQuests")
@@ -804,59 +733,39 @@ function CV:Render(pane, chain, highlightQuestID)
         end
     end
 
-    pane._cvHeader:SetText(chain.name or "Chain")
     local complete, active, total = Characters:ChainProgress(chain)
-    wipe(_metaParts)
-    if chain.range then
-        local lo, hi = chain.range[1], chain.range[2]
-        if CS and lo == hi then
-            _metaParts[#_metaParts + 1] = (L["Level %d"]):format(lo)
-        else
-            _metaParts[#_metaParts + 1] = (L["Level %d–%d"]):format(lo, hi)
-        end
-    end
-    if total > 0 then
-        _metaParts[#_metaParts + 1] = (L["%d/%d done"]):format(complete, total)
-        if active > 0 then _metaParts[#_metaParts + 1] = (L["%d active"]):format(active) end
-        if skippedCount > 0 then
-            _metaParts[#_metaParts + 1] = (L["|cffff9933%d skipped|r"]):format(skippedCount)
-        end
-    end
-    pane._cvMeta:SetText(table.concat(_metaParts, "  •  "))
-    pane._cvMeta:SetTextColor(0.75, 0.75, 0.75)
+    setMeta(pane, chain, complete, active, total, skippedCount, CS ~= nil)
 
     local WP       = ns:GetSubsystem("ChainGuideWaypoint")
     local nextStep = WP and WP.NextActionableStep and WP:NextActionableStep(chain)
     local nextID   = nextStep and nextStep.id
 
     wipe(_nodes)
-    wipe(_chainComplete)
     local nodes = _nodes
-    local highlightRow
-    local nextRow
-    local highlightCol, nextCol
+    local canvas = area.content
+    local highlightRow, highlightCol, nextRow, nextCol
     for i = 1, #items do
         local resolved = _resolved[i]
-        local node = acquireNode(pane._cvCanvas)
-        node:SetPoint("TOPLEFT", pane._cvCanvas, "TOPLEFT",
-            _insetX + cols[i] * COL_PITCH,
-            -(rows[i] * ROW_PITCH))
+        local node = acquireNode(ctx, canvas)
+        node:SetPoint("TOPLEFT", canvas, "TOPLEFT", cellX(cols[i]), -cellY(rows[i]))
 
-        local statusKey, title, subtitle
+        local statusKey = _statuses[i]
+        local title, line2
+        local inLog, isNext = false, false
         if resolved.type == "chain" then
             local sub = Database.chains[resolved.id]
-            title    = (sub and sub.name) or ("Chain #" .. tostring(resolved.id))
+            title = (sub and sub.name) or ("Chain #" .. tostring(resolved.id))
             statusKey = "chainnav"
             if sub then
                 local sc, _, st = Characters:ChainProgress(sub)
                 if st > 0 then
-                    subtitle = (L["%d/%d done"]):format(sc, st)
-                    if sc >= st then statusKey = "complete"; _chainComplete[i] = true end
+                    line2 = (L["%d/%d done"]):format(sc, st)
+                    if sc >= st then statusKey = "complete" end
                 else
-                    subtitle = "View chain >"
+                    line2 = "View chain >"
                 end
             else
-                subtitle = "View chain >"
+                line2 = "View chain >"
             end
         else
             local id = resolved.id
@@ -876,41 +785,51 @@ function CV:Render(pane, chain, highlightQuestID)
                 lvl   = id and C_QuestLog and C_QuestLog.GetQuestDifficultyLevel
                         and C_QuestLog.GetQuestDifficultyLevel(id)
             end
-            statusKey = _statuses[i]
-            if lvl and lvl > 0 then
-                subtitle = (L["Lv %d  •  ID %d"]):format(lvl, id)
-            elseif id then
-                subtitle = ("ID %d"):format(id)
-            else
-                subtitle = ""
+            local parts = {}
+            if lvl and lvl > 0 then parts[#parts + 1] = (L["Level %d"]):format(lvl) end
+            if statusKey == "passed" or statusKey == "skipped" then
+                parts[#parts + 1] = L["Skipped"]
+            elseif CS then
+                local p = CS:StartPoint(id)
+                if p and p.name then parts[#parts + 1] = p.name end
             end
-            if statusKey == "active" or statusKey == "turnin" then
-                subtitle = "|cff4db8ff" .. L["ON QUEST"] .. "|r  •  " .. subtitle
-            elseif id and nextID and id == nextID then
-                subtitle = "|cffEBB706" .. L["NEXT"] .. "|r  •  " .. subtitle
-            end
-        end
-
-        node.title:SetText(title)
-        node.title:SetTextColor(unpack(STATUS[statusKey].color))
-        node.subtitle:SetText(subtitle or ("ID " .. tostring(resolved.id)))
-
-        local icon = CS and CLASSIC_ICON[statusKey]
-        if icon then
-            node.statusIcon:SetTexture(icon[1])
-            node.statusIcon:SetTexCoord(0, 1, 0, 1)
-            node.statusIcon:SetVertexColor(icon[2], icon[2], icon[2], 1)
-            node.statusIcon:Show()
-        elseif STATUS[statusKey].atlas then
-            safeSetAtlas(node.statusIcon, STATUS[statusKey].atlas)
-            node.statusIcon:Show()
-        else
-            node.statusIcon:Hide()
+            line2 = table.concat(parts, SEP)
+            inLog = statusKey == "active" or statusKey == "turnin"
+            isNext = id ~= nil and nextID ~= nil and id == nextID
         end
 
         if resolved.breadcrumb then
-            node.title:SetTextColor(0.55, 0.55, 0.40)
-            node.subtitle:SetText(L["(optional)"])
+            line2 = L["(optional)"]
+        end
+
+        node.title:SetText(title)
+        node.title:SetTextColor(ctx:Color((resolved.breadcrumb and "muted") or TITLE_COLOR[statusKey] or "text"))
+        node:SetAlpha(statusKey == "branch" and BRANCH_ALPHA or 1)
+
+        node.subtitle:ClearAllPoints()
+        if inLog or isNext then
+            node.tag:SetText(inLog and L["ON QUEST"] or L["NEXT"])
+            node.tag:SetStyle(inLog and "outline" or "accent")
+            node.tag:Show()
+            node.subtitle:SetPoint("LEFT", node.tag, "RIGHT", TAG_GAP, 0)
+        else
+            node.subtitle:SetPoint("LEFT", node, "TOPLEFT", TEXT_LEFT, -LINE2_MID)
+        end
+        node.subtitle:SetPoint("RIGHT", node, "TOPRIGHT", -CARD_PAD, -LINE2_MID)
+        node.subtitle:SetText(line2 or "")
+        node.nextEdge:SetShown(isNext)
+
+        local icon = ICON[statusKey]
+        if icon and icon.file then
+            node.statusIcon:SetTexture(icon.file)
+            node.statusIcon:SetVertexColor(icon.shade, icon.shade, icon.shade, 1)
+            node.statusIcon:Show()
+        elseif icon then
+            node.statusIcon:SetTexture(ctx:Texture(icon.lib))
+            node.statusIcon:SetVertexColor(ctx:Color(icon.color))
+            node.statusIcon:Show()
+        else
+            node.statusIcon:Hide()
         end
 
         node._ref     = resolved
@@ -920,26 +839,18 @@ function CV:Render(pane, chain, highlightQuestID)
         node._navKind = (resolved.type == "chain") and "chain" or "quest"
 
         if highlightQuestID and resolved.type ~= "chain" and resolved.id == highlightQuestID then
-            node.searchGlow:Show()
-            highlightRow = rows[i]
-            highlightCol = cols[i]
+            node.hit:Show()
+            highlightRow, highlightCol = rows[i], cols[i]
         end
-
-        if nextID and resolved.type ~= "chain" and resolved.id == nextID then
-            node.border:SetColorTexture(0.92, 0.72, 0.02, 1)
-            nextRow = rows[i]
-            nextCol = cols[i]
-        end
+        if isNext then nextRow, nextCol = rows[i], cols[i] end
 
         nodes[i] = node
-
         if _slotLoserOf[i] then
             node:Hide()
             nodes[i] = nil
         end
     end
 
-    local canvas = pane._cvCanvas
     wipe(_fanL); wipe(_fanT); wipe(_fanR); wipe(_fanB)
     for i = 1, #items do
         local hub = items[i].fan
@@ -952,74 +863,38 @@ function CV:Render(pane, chain, highlightQuestID)
             end
         end
     end
-    for hub in pairs(_fanL) do drawFan(canvas, items, hub, cols, rows, Characters) end
+    -- One panel and one line for a wrapped fan, since a line to each of its quests would run through the rows above
+    for hub in pairs(_fanL) do
+        local fx, fy = cellX(_fanL[hub]) - FAN_PAD, cellY(_fanT[hub]) - FAN_PAD
+        local fw = (_fanR[hub] - _fanL[hub]) * COL_PITCH + CELL_W + FAN_PAD * 2
+        local fh = (_fanB[hub] - _fanT[hub]) * ROW_PITCH + CELL_H + FAN_PAD * 2
+        local panel = acquireFan(ctx, canvas)
+        panel:SetPoint("TOPLEFT", canvas, "TOPLEFT", fx, -fy)
+        panel:SetSize(fw, fh)
+        local hx = cellX(cols[hub]) + CELL_W / 2
+        local lx = math.min(math.max(hx, fx + FAN_LINE_EDGE), fx + fw - FAN_LINE_EDGE)
+        elbow(ctx, canvas, hx, cellY(rows[hub]) + CELL_H, lx, fy)
+    end
 
-    local gapParSet, gapParList, gapKidList, gapEdgeN, gapDone = {}, {}, {}, {}, {}
     for i = 1, #items do
         local it = items[i]
-        if it.connections and not (it.fan and _fanL[it.fan]) then
-            local R = rows[i]
-            if not gapParSet[R] then
-                gapParSet[R] = {}; gapParList[R] = {}; gapKidList[R] = {}
-                gapEdgeN[R] = 0; gapDone[R] = true
-            end
-            local pset = gapParSet[R]
-            local counted = false
+        if it.connections and nodes[i] and not (it.fan and _fanL[it.fan]) then
             for _, src in ipairs(it.connections) do
-                if nodes[src] and nodes[i] then
-                    if not pset[src] then
-                        pset[src] = true
-                        local pl = gapParList[R]; pl[#pl + 1] = src
-                    end
-                    gapEdgeN[R] = gapEdgeN[R] + 1
-                    if not prereqComplete(items, src, Characters) then gapDone[R] = false end
-                    counted = true
-                end
-            end
-            if counted then local kl = gapKidList[R]; kl[#kl + 1] = i end
-        end
-    end
-
-    for R, parList in pairs(gapParList) do
-        local kidList = gapKidList[R]
-        local nP, nC = #parList, #kidList
-        if nP >= 2 and nC >= 2 and gapEdgeN[R] == nP * nC then
-            local dotRow = (rows[parList[1]] + R) * 0.5
-            local dotX, dotY = _centerX, cellCenterY(dotRow)
-            for k = 1, nP do
-                local p  = parList[k]
-                local pc = prereqComplete(items, p, Characters) and EDGE_DONE or EDGE_TODO
-                segment(canvas, cellCenterX(cols[p]), cellCenterY(rows[p]), dotX, dotY, pc[1], pc[2], pc[3], pc[4])
-            end
-            local gc = gapDone[R] and EDGE_DONE or EDGE_TODO
-            for k = 1, nC do
-                local ch = kidList[k]
-                segment(canvas, dotX, dotY, cellCenterX(cols[ch]), cellCenterY(rows[ch]), gc[1], gc[2], gc[3], gc[4])
-            end
-            local dot = acquireDot(canvas)
-            dot:SetPoint("CENTER", canvas, "TOPLEFT", dotX, dotY)
-            dot:SetColorTexture(gc[1], gc[2], gc[3], 1)
-        else
-            for k = 1, nC do
-                local ch = kidList[k]
-                local cxp, cyp = cellCenterX(cols[ch]), cellCenterY(rows[ch])
-                for _, src in ipairs(items[ch].connections) do
-                    if nodes[src] and nodes[ch] then
-                        local pc = prereqComplete(items, src, Characters) and EDGE_DONE or EDGE_TODO
-                        segment(canvas, cellCenterX(cols[src]), cellCenterY(rows[src]), cxp, cyp, pc[1], pc[2], pc[3], pc[4])
-                    end
+                if nodes[src] then
+                    link(ctx, canvas, cellX(cols[src]), cellY(rows[src]), cellX(cols[i]), cellY(rows[i]))
                 end
             end
         end
     end
 
-    local canvasW = maxCol * COL_PITCH + CELL_W + _insetX * 2
-    local canvasH = maxRow * ROW_PITCH + CELL_H + _insetX
-    pane._cvCanvas:SetSize(math.max(canvasW, 1), math.max(canvasH, 1))
+    -- At least the view's size, since the wheel and the drag live on the content
+    local viewH = area.scroll and area.scroll:GetHeight() or 0
+    area:SetContentSize(math.max(contentW + PAD_X * 2, viewW), math.max(contentH + PAD_Y * 2, viewH))
 
     if nextStep and nextID then
         pane._cvContinue._nextID = nextID
         pane._cvContinue._chain  = chain
+        if pane._cvContinue.Fit then pane._cvContinue:Fit() end
         pane._cvContinue:Show()
     end
 
@@ -1030,87 +905,61 @@ function CV:Render(pane, chain, highlightQuestID)
     -- A generated chain opens at its top left corner, unless a search or link named a quest
     local topLeft = CS and not highlightRow
     if (scrollRow or topLeft) and navChanged then
-        pane._cvScrollY = topLeft and 0 or scrollRow * ROW_PITCH
-        pane._cvScrollX = (not topLeft) and (_insetX + (scrollCol or 0) * COL_PITCH) or nil
+        pane._cvScrollY = topLeft and 0 or math.max(0, cellY(scrollRow) - SCROLL_LEAD)
+        pane._cvScrollX = topLeft and 0 or math.max(0, cellX(scrollCol or 0) - math.max(0, (viewW - CELL_W) * 0.5))
         C_Timer.After(0, pane._cvDoScroll)
     else
         C_Timer.After(0, pane._cvClampScroll)
     end
 end
 
-function CV:_ensureUI(pane)
+function CV:_ensureUI(pane, ctx)
     if pane._cvBuilt then return end
     pane._cvBuilt = true
 
-    local Options = ns:GetSubsystem("Options")
-    pane._cvContinue = Options:CreateYellowButton(pane, L["Continue"], onContinueClick)
-    pane._cvContinue:SetSize(110, 24)
-    pane._cvContinue:SetPoint("TOPRIGHT", pane, "TOPRIGHT", -PAD, -PAD)
+    local head = CreateFrame("Frame", nil, pane)
+    head:SetPoint("TOPLEFT")
+    head:SetPoint("TOPRIGHT")
+    head:SetHeight(HEAD_H)
+    ctx:Paint(head, nil, "divider", "B")
+    pane._cvHead = head
+
+    pane._cvContinue = ctx:CreateButton(head, L["Continue"], nil, onContinueClick, nil, "primary")
+    pane._cvContinue:SetPoint("TOPRIGHT", head, "TOPRIGHT", -HEAD_SIDE, -BUTTON_TOP)
     pane._cvContinue:Hide()
 
-    pane._cvTrack = Options:CreateYellowButton(pane, L["Track"], onTrackClick)
-    pane._cvTrack:SetSize(96, 24)
-    pane._cvTrack:SetPoint("TOPRIGHT", pane._cvContinue, "TOPLEFT", -6, 0)
-    pane._cvTrack:Hide()
-    Options:AttachTooltip(pane._cvTrack, L["Track this chain"],
+    pane._cvTrack = ctx:CreateButton(head, L["Track"], nil, onTrackClick)
+    pane._cvTrack:SetPoint("TOPRIGHT", pane._cvContinue, "TOPLEFT", -ctx:Spacing("buttonGap"), 0)
+    ctx:AttachTooltip(pane._cvTrack, L["Track this chain"],
         L["Follow this chain — its quests pin on the world map (next step highlighted) and your waypoint auto-advances to the next step as you complete it. Works even with this window closed. Click again to stop."])
 
-    pane._cvHeader = pane:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    pane._cvHeader:SetPoint("TOPLEFT",  PAD, -PAD)
-    pane._cvHeader:SetPoint("TOPRIGHT", pane._cvTrack, "TOPLEFT", -8, 0)
-    pane._cvHeader:SetJustifyH("LEFT")
-    pane._cvHeader:SetWordWrap(false)
-    pane._cvHeader:SetTextColor(1.0, 0.82, 0.0)
+    pane._cvTitle = ctx:CreateText(head, "", "title")
+    pane._cvTitle:SetPoint("LEFT", head, "TOPLEFT", HEAD_LEFT, -(BUTTON_TOP + 16))
+    pane._cvTitle:SetPoint("RIGHT", pane._cvTrack, "LEFT", -META_GAP, 0)
+    pane._cvTitle:SetWordWrap(false)
 
-    pane._cvMeta = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._cvMeta:SetPoint("TOPLEFT",  pane._cvHeader, "BOTTOMLEFT",  0, -2)
-    pane._cvMeta:SetPoint("TOPRIGHT", pane._cvHeader, "BOTTOMRIGHT", 0, -2)
-    pane._cvMeta:SetJustifyH("LEFT")
-    pane._cvMeta:SetTextColor(0.7, 0.7, 0.7)
+    pane._cvMeta = ctx:CreateText(head, "", "hint")
+    pane._cvMeta:SetPoint("TOPLEFT", head, "TOPLEFT", HEAD_LEFT, -META_TOP)
+    pane._cvMeta:SetWordWrap(false)
 
-    local scroll = CreateFrame("ScrollFrame", nil, pane, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT",     PAD, -HEADER_H)
-    scroll:SetPoint("BOTTOMRIGHT", -PAD - 20, PAD)
-    pane._cvScroll = scroll
+    pane._cvProgress = ctx:CreateProgressBar(head, PROGRESS_W)
+    pane._cvProgress:SetPoint("LEFT", pane._cvMeta, "RIGHT", META_GAP, 0)
+
+    local area = ctx:CreateScrollArea(pane, { pan = true, wheelStep = ROW_PITCH })
+    area:SetPoint("TOPLEFT", head, "BOTTOMLEFT", 0, -1)
+    area:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT")
+    pane._cvArea = area
+
+    pane._cvEmpty = ctx:CreateEmptyState(area, "")
+    pane._cvEmpty:Hide()
 
     pane._cvDoScroll = function()
-        local sc = pane._cvScroll
-        if not (sc and sc:IsShown()) then return end
-        if pane._panning then return end
-        if sc.UpdateScrollChildRect then sc:UpdateScrollChildRect() end
-        local maxv = sc:GetVerticalScrollRange() or 0
-        sc:SetVerticalScroll(math.min(maxv, math.max(0, (pane._cvScrollY or 0) - 20)))
-        local maxh   = sc:GetHorizontalScrollRange() or 0
-        local viewW  = sc:GetWidth() or 0
-        local targetX = pane._cvScrollX and (pane._cvScrollX - math.max(0, (viewW - CELL_W) * 0.5)) or 0
-        sc:SetHorizontalScroll(math.min(maxh, math.max(0, targetX)))
+        if not area:IsShown() or area:IsPanGesture() then return end
+        area:ScrollTo(pane._cvScrollX or 0, pane._cvScrollY or 0)
     end
 
-    -- A resize leaves the old offsets in place, so a narrower canvas would stay scrolled past its edge
     pane._cvClampScroll = function()
-        local sc = pane._cvScroll
-        if not (sc and sc:IsShown()) or pane._panning then return end
-        if sc.UpdateScrollChildRect then sc:UpdateScrollChildRect() end
-        sc:SetHorizontalScroll(math.min(sc:GetHorizontalScroll() or 0, sc:GetHorizontalScrollRange() or 0))
-        sc:SetVerticalScroll(math.min(sc:GetVerticalScroll() or 0, sc:GetVerticalScrollRange() or 0))
+        if not area:IsShown() or area:IsPanGesture() then return end
+        area:ClampScroll()
     end
-
-    local canvas = CreateFrame("Frame", nil, scroll)
-    canvas:SetSize(1, 1)
-    scroll:SetScrollChild(canvas)
-    pane._cvCanvas = canvas
-
-    canvas._pane = pane
-    canvas:EnableMouse(true)
-    canvas:EnableMouseWheel(true)
-    canvas:SetScript("OnMouseDown",  canvasOnMouseDown)
-    canvas:SetScript("OnMouseUp",    canvasOnMouseUp)
-    canvas:SetScript("OnMouseWheel", canvasOnMouseWheel)
-    canvas:SetScript("OnHide",       canvasOnHide)
-
-    pane._cvEmpty = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._cvEmpty:SetPoint("TOPLEFT", scroll, "TOPLEFT", PAD, -PAD)
-    pane._cvEmpty:SetTextColor(0.55, 0.55, 0.55)
-    pane._cvEmpty:SetText(L["(no quests defined for this chain yet)"])
-    pane._cvEmpty:Hide()
 end

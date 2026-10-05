@@ -105,7 +105,7 @@ function kit.ShowTip(getTip, owner, title, body, anchor)
         tip:ClearAllPoints()
         local column = owner:GetParent()
         local dx = 0
-        if column and column._controls then
+        if column and column._euiColumn then
             local ox, cx = owner:GetCenter(), column:GetCenter()
             -- Measured in the window's scale and offset in the tooltip's, which hangs off UIParent.
             if ox and cx then dx = (cx - ox) * owner:GetEffectiveScale() / tip:GetEffectiveScale() end

@@ -17,6 +17,7 @@ local SWATCH_W, SWATCH_H = 60, 12
 local SWATCH_GAP = 8
 local SPEAKER = 20
 local SPEAKER_GAP = 4
+local SUFFIX_GAP = 8
 -- The family's no-sound value. Previewing it can only ever be silent.
 local NO_SOUND = "NONE"
 
@@ -60,10 +61,16 @@ local function popup(ctx)
 end
 
 local function placeText(holder, left)
+    local suffix = holder.suffix
+    local after = suffix and (suffix:GetText() or "") ~= ""
     for _, fs in ipairs({ holder.text, holder.data }) do
         fs:ClearAllPoints()
         fs:SetPoint("LEFT", left, 0)
-        fs:SetPoint("RIGHT", -PAD, 0)
+        if after then
+            fs:SetPoint("RIGHT", suffix, "LEFT", -SUFFIX_GAP, 0)
+        else
+            fs:SetPoint("RIGHT", -PAD, 0)
+        end
     end
 end
 
@@ -124,6 +131,9 @@ local function newRow(ctx, p)
     b.text:SetWordWrap(false)
     b.data = kit.DataText(b)
     b.data:SetWordWrap(false)
+    b.suffix = kit.Text(ctx, b, "hint")
+    b.suffix:SetPoint("RIGHT", -PAD, 0)
+    b.suffix:SetJustifyH("RIGHT")
     return b
 end
 
@@ -136,7 +146,10 @@ local function showList(ctx, anchor, opts, onPick, decorate, current, previewFon
     local base = UIParent:GetEffectiveScale()
     p:SetScale((base and base > 0) and (anchor:GetEffectiveScale() / base) or 1)
     kit.SnapLines(p.edges)
-    p.owner = ctx._window
+    -- Closed with the window it opened in, a main window as well as the settings window.
+    local owner = anchor
+    while owner and not owner._euiWindow do owner = owner:GetParent() end
+    p.owner = owner or ctx._window
     p.tooltip = ctx.opts.tooltip
 
     local rowH, maxRows = sp.popupRowHeight, sp.popupMaxRows
@@ -169,6 +182,7 @@ local function showList(ctx, anchor, opts, onPick, decorate, current, previewFon
         b:ClearAllPoints()
         b:SetPoint("TOPLEFT",  p.content, "TOPLEFT",  0, -(i - 1) * rowH)
         b:SetPoint("TOPRIGHT", p.content, "TOPRIGHT", 0, -(i - 1) * rowH)
+        b.suffix:SetText(opt.suffix or "")
         decorateRow(b, opt.value, decorate)
         -- Marked so 42 fonts or 27 sounds do not open with nothing saying which one is in use.
         local isActive = (opt.value == current)
@@ -214,7 +228,8 @@ local function showList(ctx, anchor, opts, onPick, decorate, current, previewFon
 end
 
 -- options is a list of { value =, label = } pairs, or a function returning one that is
--- re-read on every open. The setter receives the VALUE, so a translated label can never
+-- re-read on every open. An option's suffix, such as a level range, sits at the right end of its
+-- row and of the closed field. The setter receives the VALUE, so a translated label can never
 -- reach the profile and a setter never has to compare against a display string.
 -- decorate(frame, value) draws a preview on the closed field and on every row. Passed by
 -- pickers whose values are not self-describing, such as a status bar texture.
@@ -273,26 +288,40 @@ function Context:CreateDropdown(content, label, options, getter, setter, tooltip
     end
     btn.text = kit.Text(self, btn, "label")
     btn.data = kit.DataText(btn)
-    for _, fs in ipairs({ btn.text, btn.data }) do
-        fs:SetPoint("LEFT", decorate and (PAD + SWATCH_W + SWATCH_GAP) or PAD, 0)
-        fs:SetPoint("RIGHT", -(PAD + sp.chevron + PAD), 0)
-        fs:SetWordWrap(false)
-    end
     local chevron = kit.Icon(self, btn, "chevron-down", sp.chevron, "muted")
     chevron:SetPoint("RIGHT", -PAD, 0)
+    btn.suffix = kit.Text(self, btn, "hint")
+    btn.suffix:SetPoint("RIGHT", chevron, "LEFT", -PAD, 0)
+    btn.suffix:SetJustifyH("RIGHT")
+    local function placeField()
+        local after = (btn.suffix:GetText() or "") ~= ""
+        for _, fs in ipairs({ btn.text, btn.data }) do
+            fs:ClearAllPoints()
+            fs:SetPoint("LEFT", decorate and (PAD + SWATCH_W + SWATCH_GAP) or PAD, 0)
+            if after then
+                fs:SetPoint("RIGHT", btn.suffix, "LEFT", -SUFFIX_GAP, 0)
+            else
+                fs:SetPoint("RIGHT", -(PAD + sp.chevron + PAD), 0)
+            end
+            fs:SetWordWrap(false)
+        end
+    end
+    placeField()
 
     local function refresh()
         local current = getter()
         if decorate then decorate(btn, current) end
         -- Hidden rather than left to look broken.
         if speaker then speaker:SetShown(current ~= nil and current ~= NO_SOUND) end
-        local shown = tostring(current or "")
+        local shown, suffix = tostring(current or ""), ""
         for _, opt in ipairs(resolveOptions()) do
             if opt.value == current then
-                shown = opt.label
+                shown, suffix = opt.label, opt.suffix or ""
                 break
             end
         end
+        btn.suffix:SetText(suffix)
+        placeField()
         setLabel(ctx, btn, shown, previewFont and previewFont(current), "text")
     end
     refresh()

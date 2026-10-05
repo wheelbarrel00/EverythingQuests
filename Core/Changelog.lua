@@ -2,6 +2,21 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.1.0", date = "2026-10-05",
+        sections = {
+            { head = "New Features", items = {
+                "A new look for the Chain Guide. On retail and WoW Forever the Chain Guide window now has the same style as the options window and EQ Objective Tracker 2.0. A zone picker at the top of the left panel lists every zone that has chains, on WoW Forever with its level range, and the chains of the zone you pick sit in one list below it, each with how many of its quests you have done, a map pin on the chain you track and a check on a finished one. Each quest is a card with its name and, on a second line, its level, and on WoW Forever who gives it. The game's own \"!\" and \"?\" mark a quest you can pick up or have in your log, a check marks a quest you have done, a NEXT tag and an accent edge mark your next step, and an ON QUEST tag marks a quest you are on. The lines between quests run at right angles, and on WoW Forever a quest with many follow-ups shows them in a panel of their own. A chain narrower than the window is centered in it. Above the chain sit its name, its level range, how much of it you have done and a progress bar, with the Track and Continue buttons, and the buttons to hide or show the left panel and to go back and forward. The title bar names the zone you are looking at, beside the options, maximize and close buttons. Tooltips, dragging to pan, the mouse wheel, Shift-click to link a quest in chat and, on WoW Forever, right-click to open the Quest Browser work as before.",
+            } },
+            { head = "Improvements", items = {
+                "Search answers in the window. Type a quest's name or ID in the field under the zone picker and the Chain Guide jumps to that quest and highlights it, even in the chain already shown. A search that finds nothing says so under the field instead of in chat.",
+                "The Chain Guide stays on your screen. Escape now closes the window outside combat, and at a large window scale it shrinks to fit your screen instead of running off the top of it, coming back to its own size when the scale goes down.",
+            } },
+            { head = "Notes", items = {
+                "Coming next. The What's New window, the Quest Browser on Classic Era, Burning Crusade Classic and WoW Forever, and History on retail get the same new look in coming updates.",
+            } },
+        },
+    },
+    {
         version = "2.0.0", date = "2026-10-03",
         sections = {
             { head = "New Features", items = {

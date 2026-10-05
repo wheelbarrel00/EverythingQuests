@@ -3,19 +3,21 @@ local L = ns.L
 
 local CG = ns:RegisterSubsystem("ChainGuide", {})
 
-local PANE_GAP        = 6
-local TITLE_BAR_H     = 22
-local NAV_BAR_H       = 28
-local RAIL_W          = 250
-local ROW_H           = 22
-local MIN_W           = 760
-local MIN_H           = 460
-local DEFAULT_W       = 1160
-local DEFAULT_H       = 720
-local SCREEN_MARGIN   = 30
-local PANES_TOP       = -(TITLE_BAR_H + NAV_BAR_H + PANE_GAP)
-
-CG.railRowPool = {}; CG.railRowsActive = {}
+local SIDEBAR_W   = 280
+local MIN_W       = 760
+local MIN_H       = 460
+local DEFAULT_W   = 1100
+local DEFAULT_H   = 720
+local SIDE_PAD    = 12
+local FIELD_GAP   = 8
+local NOTE_GAP    = 6
+local LABEL_GAP   = 16
+local LIST_GAP    = 6
+local BUTTON_SIZE = 32
+local BUTTON_GAP  = 2
+local HEAD_LEFT   = 16
+local HEAD_TOP    = 12
+local HINT_GAP    = 4
 
 local function guideCfg()
     local DB = ns:GetSubsystem("DB")
@@ -28,373 +30,197 @@ local function hideResizeHint(f)
     if f.resizeHint then f.resizeHint:Hide() end
 end
 
--- The screen in the window's own units, since the window carries a scale of its own
-local function fitToScreen(f)
-    local s = f:GetScale() or 1
-    f:ClearAllPoints()
-    f:SetPoint("CENTER", UIParent, "CENTER")
-    f:SetSize(math.max(UIParent:GetWidth() / s - SCREEN_MARGIN * 2, MIN_W),
-              math.max(UIParent:GetHeight() / s - SCREEN_MARGIN * 2, MIN_H))
-end
-
-local function onRowClick(self)
-    if self.navKind == "cat" then
-        CG:NavigateCategory(self.navID)
-    elseif self.navKind == "chain" then
-        CG:NavigateChain(self.navID)
+local function sortedCategories(self)
+    if self._sortedCategories then return self._sortedCategories end
+    local Database = ns:GetSubsystem("ChainGuideDatabase")
+    local cats = {}
+    for id, c in pairs(Database.categories) do
+        cats[#cats + 1] = { id = id, def = c }
     end
+    table.sort(cats, function(a, b)
+        local ao = a.def.order or math.huge
+        local bo = b.def.order or math.huge
+        if ao ~= bo then return ao < bo end
+        return (a.def.name or "") < (b.def.name or "")
+    end)
+    self._sortedCategories = cats
+    return cats
 end
-local function onRowEnter(self)
-    if not self._ttTitle then return end
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText(self._ttTitle, 1, 0.82, 0, 1, true)
-    if self._ttSub and self._ttSub ~= "" then
-        GameTooltip:AddLine(self._ttSub, 0.7, 0.7, 0.7)
+
+local function rangeText(range)
+    if not range then return nil end
+    if range[1] == range[2] then return tostring(range[1]) end
+    return ("%d-%d"):format(range[1], range[2])
+end
+
+function CG:ZoneOptions()
+    local Database = ns:GetSubsystem("ChainGuideDatabase")
+    local QLS      = ns:GetSubsystem("ChainGuideQuestLineSource")
+    if not Database then return {} end
+    Database:EnsureGenerated()
+    if QLS then
+        for id in pairs(Database.categories) do QLS:EnsureZoneChains(id) end
     end
-    GameTooltip:Show()
-end
-local function onRowLeave() GameTooltip:Hide() end
-
-local function buildListRow(parent)
-    local r = CreateFrame("Button", nil, parent)
-    r:SetHeight(ROW_H)
-    local hl = r:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.08)
-    local sel = r:CreateTexture(nil, "BACKGROUND")
-    sel:SetAllPoints()
-    sel:SetColorTexture(0.92, 0.72, 0.02, 0.18)
-    sel:Hide()
-    r.selectedTex = sel
-
-    r.title = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    r.title:SetPoint("LEFT", 8, 0)
-    r.title:SetPoint("RIGHT", -50, 0)
-    r.title:SetJustifyH("LEFT")
-    r.title:SetWordWrap(false)
-
-    r.suffix = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.suffix:SetPoint("RIGHT", -8, 0)
-    r.suffix:SetJustifyH("RIGHT")
-    r.suffix:SetTextColor(0.92, 0.72, 0.02)
-
-    r.completeIcon = r:CreateTexture(nil, "OVERLAY")
-    r.completeIcon:SetSize(12, 12)
-    r.completeIcon:SetPoint("RIGHT", r.suffix, "LEFT", -4, 0)
-    r.completeIcon:Hide()
-
-    r:SetScript("OnClick", onRowClick)
-    r:SetScript("OnEnter", onRowEnter)
-    r:SetScript("OnLeave", onRowLeave)
-    return r
-end
-
-local function acquireRow(pool, active, parent)
-    return ns.Util.AcquirePooled(pool, active, parent, buildListRow)
-end
-
-local function releaseAllRows(pool, active)
-    for i = #active, 1, -1 do
-        local r = active[i]
-        r:Hide()
-        r:ClearAllPoints()
-        r.navKind, r.navID = nil, nil
-        r._ttTitle, r._ttSub = nil, nil
-        r.selectedTex:Hide()
-        r.suffix:SetText("")
-        r.suffix:SetTextColor(0.92, 0.72, 0.02)
-        if r.completeIcon then r.completeIcon:Hide() end
-        pool[#pool + 1] = r
-        active[i] = nil
+    local hasChains = {}
+    for _, c in pairs(Database.chains) do hasChains[c.category] = true end
+    local out = {}
+    for _, entry in ipairs(sortedCategories(self)) do
+        if hasChains[entry.id] then
+            out[#out + 1] = {
+                value  = entry.id,
+                label  = entry.def.name or ("Category " .. entry.id),
+                suffix = rangeText(entry.def.levelRange),
+            }
+        end
     end
+    return out
 end
 
-local function setCheckAtlas(tex)
-    if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("common-icon-checkmark") then
-        tex:SetAtlas("common-icon-checkmark", false)
-    else
-        tex:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
-        tex:SetTexCoord(0, 1, 0, 1)
+-- Forever's own zone, else a category listing your map or a parent of it, else the first
+function CG:HomeCategory()
+    local CS = ns:GetSubsystem("ChainGuideClassicSource")
+    local here = CS and CS:CategoryForPlayer()
+    if here then return here end
+    local Database = ns:GetSubsystem("ChainGuideDatabase")
+    local QLS = ns:GetSubsystem("ChainGuideQuestLineSource")
+    local zones = self:ZoneOptions()
+    local map = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    local seen = 0
+    while map and map > 0 and seen < 8 do
+        for _, z in ipairs(zones) do
+            local def = Database.categories[z.value]
+            local maps = (QLS and QLS.CategoryMapIDs and QLS:CategoryMapIDs(z.value)) or (def and def.mapIDs) or {}
+            for _, m in ipairs(maps) do
+                if m == map then return z.value end
+            end
+        end
+        local info = C_Map.GetMapInfo and C_Map.GetMapInfo(map)
+        map = info and info.parentMapID
+        seen = seen + 1
     end
+    return zones[1] and zones[1].value
 end
 
-local function setRowTooltip(row, title, sub)
-    row._ttTitle = title
-    row._ttSub   = sub
+local function iconButton(ctx, parent, icon, title, body, onClick)
+    local b = ctx:CreateIconButton(parent, icon, BUTTON_SIZE)
+    b:SetScript("OnClick", onClick)
+    ctx:AttachTooltip(b, title, body)
+    return b
+end
+
+local function placeListLabel(f)
+    local above = f.searchNote:IsShown() and f.searchNote or f.search
+    f.listLabel:ClearAllPoints()
+    f.listLabel:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -LABEL_GAP)
+    f.list:ClearAllPoints()
+    f.list:SetPoint("TOPLEFT", f.listLabel, "BOTTOMLEFT", -SIDE_PAD, -LIST_GAP)
+    f.list:SetPoint("BOTTOMRIGHT", f.sidebar, "BOTTOMRIGHT", 0, 0)
 end
 
 function CG:Build()
     if self.frame then return end
-
-    local f = CreateFrame("Frame", "EQChainGuideFrame", UIParent, "BackdropTemplate")
-    f:SetSize(1160, 720)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop",  f.StopMovingOrSizing)
-    f:Hide()
-
-    f:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    f:SetBackdropColor(unpack(ns.Util.color.optionsBg))
-    f:SetBackdropBorderColor(0.635, 0.000, 0.039, 1.0)
-
-    local titleBar = CreateFrame("Frame", nil, f)
-    titleBar:SetHeight(TITLE_BAR_H)
-    titleBar:SetPoint("TOPLEFT", 1, -1)
-    titleBar:SetPoint("TOPRIGHT", -1, -1)
-    local tbg = titleBar:CreateTexture(nil, "ARTWORK")
-    tbg:SetAllPoints()
-    tbg:SetColorTexture(0, 0, 0, 0.85)
-    f.title = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.title:SetPoint("LEFT", 12, 0)
-    f.title:SetText(L["Chain Guide"])
-    f.title:SetTextColor(1.0, 0.82, 0.0)
-    local close = CreateFrame("Button", nil, titleBar, "UIPanelCloseButton")
-    close:SetPoint("RIGHT", -2, 0)
-    close:SetScript("OnClick", function() f:Hide() end)
-
-    -- Blizzard's world map button, where the client has it. Its Minimize means back to the size you dragged
-    if MaximizeMinimizeButtonFrameMixin then
-        local mm = CreateFrame("Frame", nil, titleBar, "MaximizeMinimizeButtonFrameTemplate")
-        mm:SetPoint("RIGHT", close, "LEFT", -1, 0)
-        -- The template pins level 510, which would draw it over other dialog windows
-        local level = close:GetFrameLevel()
-        mm:SetFrameLevel(level)
-        mm.MaximizeButton:SetFrameLevel(level + 1)
-        mm.MinimizeButton:SetFrameLevel(level + 1)
-        mm:SetOnMaximizedCallback(function() self:SetMaximized(true) end)
-        mm:SetOnMinimizedCallback(function() self:SetMaximized(false) end)
-        local cfg = guideCfg()
-        if cfg and cfg.maximized then mm:Maximize(true, true) else mm:Minimize(true, true) end
-        f.maxMinBtn = mm
-    end
-
-    local nav = CreateFrame("Frame", nil, f)
-    nav:SetHeight(NAV_BAR_H)
-    nav:SetPoint("TOPLEFT", 0, -TITLE_BAR_H)
-    nav:SetPoint("TOPRIGHT", 0, -TITLE_BAR_H)
-    local nbg = nav:CreateTexture(nil, "BACKGROUND")
-    nbg:SetAllPoints()
-    nbg:SetColorTexture(0, 0, 0, 0.4)
-
     local Options = ns:GetSubsystem("Options")
-    local function navBtn(label, onClick)
-        local b = Options:CreateYellowButton(nav, label, onClick)
-        b:SetSize(70, 22)
-        return b
-    end
-    f.collapseBtn = navBtn("<<", function() self:SetRailCollapsed(not self._railCollapsed) end)
-    f.collapseBtn:SetSize(30, 22)
-    Options:AttachTooltip(f.collapseBtn, L["Hide the navigation panel"],
-        L["Collapse the category and chain list so the graph fills the whole window. Click again to bring it back."])
+    local ctx = Options.ui
 
-    f.backBtn = navBtn(L["Back"],    function() self:Back()    end)
-    f.fwdBtn  = navBtn(L["Forward"], function() self:Forward() end)
-    f.homeBtn = navBtn(L["Home"],    function() self:NavigateHome() end)
-    f.collapseBtn:SetPoint("LEFT", 8, 0)
-    f.backBtn:SetPoint("LEFT", f.collapseBtn, "RIGHT", 6, 0)
-    f.fwdBtn:SetPoint("LEFT", f.backBtn, "RIGHT", 4, 0)
-    f.homeBtn:SetPoint("LEFT", f.fwdBtn, "RIGHT", 4, 0)
+    local f = ctx:CreateWindow({
+        name = "EQChainGuideFrame", title = L["Chain Guide"],
+        width = DEFAULT_W, height = DEFAULT_H, minWidth = MIN_W, minHeight = MIN_H,
+        sidebarWidth = SIDEBAR_W, gripTip = L["Drag to resize"],
+        getSize = function()
+            local cfg = guideCfg()
+            if cfg then return cfg.width, cfg.height end
+        end,
+        setSize = function(w, h)
+            local cfg = guideCfg()
+            if cfg then cfg.width, cfg.height = w, h end
+        end,
+        getMaximized = function()
+            local cfg = guideCfg()
+            return cfg and cfg.maximized or false
+        end,
+        setMaximized = function(on)
+            local cfg = guideCfg()
+            if cfg then cfg.maximized = on or nil end
+        end,
+        onResize = function(win)
+            hideResizeHint(win)
+            self:RenderCurrent()
+        end,
+    })
+    self.frame = f
 
-    f.optionsBtn = navBtn(L["Options"], function()
+    f:AddHeaderButton("icon-settings", L["Options"], nil, function()
         Options:Show()
         Options:SelectTab("chainGuide")
     end)
-    f.optionsBtn:SetPoint("RIGHT", -8, 0)
 
-    local searchLabel = nav:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    searchLabel:SetText(L["Find quest"])
-    searchLabel:SetTextColor(0.92, 0.72, 0.02)
-    searchLabel:SetPoint("LEFT", f.homeBtn, "RIGHT", 20, 0)
+    -- On the grip's level, so the graph cannot cover it, and gone once the window has been resized
+    f.resizeHint = ctx:CreateText(f.grip, L["Drag to resize"], "hint")
+    f.resizeHint:SetPoint("RIGHT", f.grip, "LEFT", -HINT_GAP, 0)
+    local cfg = guideCfg()
+    if cfg and cfg.resizeHintSeen then f.resizeHint:Hide() end
 
-    local search = CreateFrame("EditBox", nil, nav, "InputBoxTemplate")
-    search:SetSize(150, 18)
-    search:SetPoint("LEFT", searchLabel, "RIGHT", 10, 0)
-    search:SetAutoFocus(false)
-    search:SetMaxLetters(64)
-    search:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    f.searchBox = search
-    Options:AttachTooltip(search, L["Find quest"],
-        L["Type a quest name or its ID to jump to the chain that contains it."])
+    local side = f.sidebar
+    f.zonePicker = ctx:CreateDropdown(side, nil, function() return self:ZoneOptions() end,
+        function() return self._activeCatID end,
+        function(id) self:NavigateCategory(id) end)
+    f.zonePicker:SetPoint("TOPLEFT", side, "TOPLEFT", SIDE_PAD, -SIDE_PAD)
+    f.zonePicker:SetPoint("TOPRIGHT", side, "TOPRIGHT", -SIDE_PAD, -SIDE_PAD)
 
-    local function runSearch()
-        local text = search:GetText()
-        text = text and text:match("^%s*(.-)%s*$")
-        search:ClearFocus()
-        if not text or text == "" then return end
-        search:SetText("")
-        if text:match("^%d+$") then
-            CG:SearchByQuestID(tonumber(text))
-        else
-            CG:SearchByName(text)
-        end
-    end
-    search:SetScript("OnEnterPressed", runSearch)
+    f.search = ctx:CreateSearchField(side, L["Find quest"], function(text) self:RunSearch(text) end,
+        L["Find quest"], L["Type a quest name or its ID to jump to the chain that contains it."])
+    f.search:SetPoint("TOPLEFT", f.zonePicker, "BOTTOMLEFT", 0, -FIELD_GAP)
+    f.search:SetPoint("TOPRIGHT", f.zonePicker, "BOTTOMRIGHT", 0, -FIELD_GAP)
 
-    local goBtn = navBtn(L["Go"], runSearch)
-    goBtn:SetSize(40, 22)
-    goBtn:SetPoint("LEFT", search, "RIGHT", 8, 0)
+    f.searchNote = ctx:CreateText(side, "", "hint")
+    f.searchNote:SetPoint("TOPLEFT", f.search, "BOTTOMLEFT", 0, -NOTE_GAP)
+    f.searchNote:SetPoint("TOPRIGHT", f.search, "BOTTOMRIGHT", 0, -NOTE_GAP)
+    f.searchNote:SetWordWrap(true)
+    f.searchNote:Hide()
 
-    local function makePane()
-        local p = CreateFrame("Frame", nil, f, "BackdropTemplate")
-        local pbg = p:CreateTexture(nil, "BACKGROUND")
-        pbg:SetAllPoints()
-        pbg:SetColorTexture(0, 0, 0, 0.4)
-        return p
-    end
-    f.railPane   = makePane()
-    f.detailPane = makePane()
+    f.listLabel = ctx:CreateHeading(side, L["Chains"])
+    f.list = ctx:CreateList(side, function(id) self:NavigateChain(id) end)
+    placeListLabel(f)
 
-    f.railPane:SetPoint("TOPLEFT",    PANE_GAP, PANES_TOP)
-    f.railPane:SetPoint("BOTTOMLEFT", PANE_GAP, PANE_GAP)
-    f.railPane:SetWidth(RAIL_W)
+    local body = f.body
+    f.hideListBtn = iconButton(ctx, body, "icon-sidebar", L["Hide the navigation panel"],
+        L["Collapse the zone picker, search and chain list so the graph fills the whole window. Click again to bring them back."],
+        function() self:SetRailCollapsed(true) end)
+    f.hideListBtn:SetPoint("TOPLEFT", body, "TOPLEFT", HEAD_LEFT, -HEAD_TOP)
+    f.showListBtn = iconButton(ctx, body, "icon-sidebar", L["Show the navigation panel"], nil,
+        function() self:SetRailCollapsed(false) end)
+    f.showListBtn:SetPoint("TOPLEFT", body, "TOPLEFT", HEAD_LEFT, -HEAD_TOP)
+    f.backBtn = iconButton(ctx, body, "chevron-left", L["Back"], nil, function() self:Back() end)
+    f.backBtn:SetPoint("LEFT", f.hideListBtn, "RIGHT", BUTTON_GAP, 0)
+    f.fwdBtn = iconButton(ctx, body, "chevron-right", L["Forward"], nil, function() self:Forward() end)
+    f.fwdBtn:SetPoint("LEFT", f.backBtn, "RIGHT", BUTTON_GAP, 0)
 
-    f.detailPane:SetPoint("BOTTOMRIGHT", -PANE_GAP, PANE_GAP)
-
-    local function header(parent, text)
-        local h = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        h:SetPoint("TOPLEFT", 8, -6)
-        h:SetTextColor(0.635, 0.0, 0.039)
-        h:SetText(text)
-        return h
+    local CV = ns:GetSubsystem("ChainGuideView")
+    CV:_ensureUI(body, ctx)
+    -- The chain header, built after these buttons, spans the same corner, so they are raised over it
+    for _, b in ipairs({ f.hideListBtn, f.showListBtn, f.backBtn, f.fwdBtn }) do
+        b:SetFrameLevel(body._cvHead:GetFrameLevel() + 1)
     end
 
-    local railScroll = CreateFrame("ScrollFrame", nil, f.railPane, "UIPanelScrollFrameTemplate")
-    railScroll:SetPoint("TOPLEFT",     0, 0)
-    railScroll:SetPoint("BOTTOMRIGHT", -22, 0)
-    local railContent = CreateFrame("Frame", nil, railScroll)
-    railContent:SetSize(RAIL_W - 22, 1)
-    railScroll:SetScrollChild(railContent)
-    f.railScroll  = railScroll
-    f.railContent = railContent
-
-    local crumb = CreateFrame("Button", nil, railContent)
-    crumb:SetHeight(16)
-    crumb:SetPoint("TOPLEFT",  8, -6)
-    crumb:SetPoint("TOPRIGHT", -8, -6)
-    local crumbHL = crumb:CreateTexture(nil, "HIGHLIGHT")
-    crumbHL:SetAllPoints()
-    crumbHL:SetColorTexture(1, 1, 1, 0.08)
-    crumb.text = crumb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    crumb.text:SetPoint("LEFT", 2, 0)
-    crumb.text:SetText("< " .. L["Categories"])
-    crumb.text:SetTextColor(0.92, 0.72, 0.02)
-    crumb:SetScript("OnClick", function() self:NavigateHome() end)
-    crumb:Hide()
-    f.railCrumb = crumb
-
-    f.railHeader = header(railContent, L["Categories"])
-
-    f:SetResizable(true)
-    if f.SetResizeBounds then f:SetResizeBounds(MIN_W, MIN_H) end
-    local grip = CreateFrame("Button", nil, f)
-    grip:SetSize(16, 16)
-    grip:SetPoint("BOTTOMRIGHT", -1, 1)
-    grip:SetFrameLevel((f:GetFrameLevel() or 0) + 20)
-    -- Blizzard's chat grabber art. The SizeGrip path this used before drew nothing in game
-    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    grip:GetNormalTexture():SetVertexColor(1.0, 0.82, 0.0)
-    grip:GetPushedTexture():SetVertexColor(1.0, 0.82, 0.0)
-
-    -- On the grip's level so the panes cannot cover it, and gone once the window has been resized
-    local hint = grip:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hint:SetPoint("RIGHT", grip, "LEFT", -4, 0)
-    hint:SetText(L["Drag to resize"])
-    hint:SetTextColor(0.92, 0.72, 0.02, 0.85)
-    f.resizeHint = hint
-    local hintCfg = guideCfg()
-    if hintCfg and hintCfg.resizeHintSeen then hint:Hide() end
-
-    grip:SetScript("OnMouseDown", function()
-        local cfg = guideCfg()
-        if cfg and cfg.maximized then
-            cfg.maximized = nil
-            self._restorePoint = nil
-            if f.maxMinBtn then f.maxMinBtn:Minimize(true, true) end
-        end
-        f:StartSizing("BOTTOMRIGHT")
-    end)
-    grip:SetScript("OnMouseUp", function()
-        f:StopMovingOrSizing()
-        local DB  = ns:GetSubsystem("DB")
-        local cfg = DB and DB.db and DB.db.profile and DB.db.profile.chainGuide
-        if cfg then cfg.width, cfg.height = f:GetWidth(), f:GetHeight() end
-        hideResizeHint(f)
-        self:RenderCurrent()
-    end)
-    grip:SetScript("OnEnter", function(self2)
-        GameTooltip:SetOwner(self2, "ANCHOR_LEFT")
-        GameTooltip:AddLine(L["Drag to resize"])
-        GameTooltip:Show()
-    end)
-    grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    f.resizeGrip = grip
-
-    self.frame = f
-
-    do
-        local DB  = ns:GetSubsystem("DB")
-        local cfg = DB and DB.db and DB.db.profile and DB.db.profile.chainGuide
-        local w = (cfg and cfg.width)  or DEFAULT_W
-        local h = (cfg and cfg.height) or DEFAULT_H
-        f:SetSize(math.max(w, MIN_W), math.max(h, MIN_H))
-        self:SetRailCollapsed(cfg and cfg.railCollapsed or false)
-    end
-
-    self:NavigateHome()
-    -- Generated chains are filed by zone, so the first open lands on the one you are standing in. Back returns home
-    local CS = ns:GetSubsystem("ChainGuideClassicSource")
-    local here = CS and CS:CategoryForPlayer()
-    if here then self:NavigateCategory(here) end
+    self:SetRailCollapsed(cfg and cfg.railCollapsed or false)
+    local home = self:HomeCategory()
+    if home then self:NavigateCategory(home) else self:NavigateHome() end
 end
 
 function CG:ApplySettings()
     if not self.frame then return end
-    local DB = ns:GetSubsystem("DB")
-    local cfg = DB and DB.db and DB.db.profile and DB.db.profile.chainGuide
-    if cfg and cfg.scale then self.frame:SetScale(cfg.scale) end
-    if cfg and cfg.maximized then
-        fitToScreen(self.frame)
-        -- A refit can shrink the scroll range under the current offset, and no render follows it
-        local pane = self.frame.detailPane
-        if pane and pane._cvClampScroll then C_Timer.After(0, pane._cvClampScroll) end
-    end
-end
-
-function CG:SetMaximized(on)
-    local f = self.frame
-    if not f then return end
     local cfg = guideCfg()
-    if cfg then cfg.maximized = on and true or nil end
-    if on then
-        local point, rel, relPoint, x, y = f:GetPoint(1)
-        self._restorePoint = point and { point, rel, relPoint, x, y } or nil
-        fitToScreen(f)
-        hideResizeHint(f)
-    else
-        local w = (cfg and cfg.width)  or DEFAULT_W
-        local h = (cfg and cfg.height) or DEFAULT_H
-        f:SetSize(math.max(w, MIN_W), math.max(h, MIN_H))
-        f:ClearAllPoints()
-        local p = self._restorePoint
-        if p then f:SetPoint(p[1], p[2], p[3], p[4], p[5]) else f:SetPoint("CENTER") end
-        self._restorePoint = nil
+    if cfg and cfg.scale then self.frame:SetScale(cfg.scale) end
+    self.frame:Refit()
+    if self.frame:IsMaximized() then
+        -- A refit can shrink the scroll range under the current offset, and no render follows it
+        local body = self.frame.body
+        if body and body._cvClampScroll then C_Timer.After(0, body._cvClampScroll) end
     end
-    self:RenderCurrent()
 end
 
 function CG:OnEnable()
-    local DB = ns:GetSubsystem("DB")
-    local cfg = DB and DB.db and DB.db.profile and DB.db.profile.chainGuide
+    local cfg = guideCfg()
     if cfg and cfg.showOnLogin then
         C_Timer.After(0.5, function() self:Open() end)
     end
@@ -405,6 +231,7 @@ local function hideOptions()
     if O and O.frame and O.frame:IsShown() then O.frame:Hide() end
 end
 
+-- Drawn again once shown, because a centered chain is placed from the view's width
 function CG:Toggle()
     self:Build()
     self:ApplySettings()
@@ -412,7 +239,9 @@ function CG:Toggle()
         self.frame:Hide()
     else
         hideOptions()
+        self:CancelSearch()
         self.frame:Show()
+        self:RenderCurrent()
     end
 end
 
@@ -421,7 +250,9 @@ function CG:Open()
     self:ApplySettings()
     if not self.frame:IsShown() then
         hideOptions()
+        self:CancelSearch()
         self.frame:Show()
+        self:RenderCurrent()
     end
 end
 
@@ -429,25 +260,12 @@ function CG:SetRailCollapsed(collapsed)
     local f = self.frame
     if not f then return end
     self._railCollapsed = collapsed and true or false
-
-    f.detailPane:ClearAllPoints()
-    if self._railCollapsed then
-        f.railPane:Hide()
-        f.detailPane:SetPoint("TOPLEFT",     f, "TOPLEFT",     PANE_GAP, PANES_TOP)
-        f.detailPane:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PANE_GAP, PANE_GAP)
-        if f.collapseBtn then f.collapseBtn.text:SetText(">>") end
-    else
-        f.railPane:Show()
-        f.detailPane:SetPoint("TOPLEFT",     f.railPane, "TOPRIGHT", PANE_GAP, 0)
-        f.detailPane:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PANE_GAP, PANE_GAP)
-        if f.collapseBtn then f.collapseBtn.text:SetText("<<") end
-    end
-
-    local DB  = ns:GetSubsystem("DB")
-    local cfg = DB and DB.db and DB.db.profile and DB.db.profile.chainGuide
+    f:SetSidebarShown(not self._railCollapsed)
+    f.hideListBtn:SetShown(not self._railCollapsed)
+    f.showListBtn:SetShown(self._railCollapsed)
+    local cfg = guideCfg()
     if cfg then cfg.railCollapsed = self._railCollapsed end
-
-    self:RenderDetail(self._activeChainID, self._activeHighlight)
+    self:RenderCurrent()
 end
 
 function CG:NavigateHome()
@@ -458,6 +276,7 @@ end
 
 function CG:NavigateCategory(catID)
     local H = ns:GetSubsystem("ChainGuideHistory")
+    self:CancelSearch()
     H:Push({ type = "category", id = catID })
     self:RenderCurrent()
 end
@@ -465,12 +284,14 @@ end
 function CG:NavigateChain(chainID, highlightQuestID)
     local H = ns:GetSubsystem("ChainGuideHistory")
     local cur = H:Current()
-    local chain = ns:GetSubsystem("ChainGuideDatabase").chains[chainID]
-    -- History refuses a repeat of the shown chain, which would leave a generated chain on the old quest
-    if highlightQuestID and cur and cur.type == "chain" and cur.id == chainID and chain and chain._generated then
+    -- History refuses a repeat of the shown chain, which would leave the highlight on the old quest
+    if highlightQuestID and cur and cur.type == "chain" and cur.id == chainID then
         cur.highlight = highlightQuestID
     end
+    self:CancelSearch()
     H:Push({ type = "chain", id = chainID, highlight = highlightQuestID })
+    -- A quest named again is scrolled to again, even when it is the one already shown
+    self._scrollAgain = highlightQuestID ~= nil
     self:RenderCurrent()
 end
 
@@ -507,25 +328,48 @@ end
 local SEARCH_MAX_ATTEMPTS = 6
 local SEARCH_RETRY_DELAY  = 0.4
 
--- Generated chains come from shipped tables, so a search answers at once and never asks the server for a title
 local function classicSource()
     return ns:GetSubsystem("ChainGuideClassicSource")
 end
 
-local function questName(questID)
-    local CS = classicSource()
-    if CS then
-        local A = ns:GetSubsystem("AvailableQuests")
-        local D = A and A:Data()
-        return D and D.gates[questID] and CS:Title(questID) or nil
-    end
-    return ns.Util.QuestTitle(questID)
+function CG:SetSearchNote(text)
+    local f = self.frame
+    if not f then return end
+    f.searchNote:SetText(text or "")
+    f.searchNote:SetShown(text ~= nil)
+    placeListLabel(f)
 end
 
-function CG:SearchByQuestID(questID, _attempt)
+-- Ends the retries of an earlier search, so a late answer never lands over a newer one
+function CG:CancelSearch()
+    self._searchGen = (self._searchGen or 0) + 1
+    self:SetSearchNote(nil)
+end
+
+function CG:RunSearch(text)
+    if not (text and text ~= "") then return end
+    if self.frame then self.frame.search:SetText("") end
+    self:CancelSearch()
+    if text:match("^%d+$") then
+        self:SearchByQuestID(tonumber(text), nil, text, self._searchGen)
+    else
+        self:SearchByName(text, nil, self._searchGen)
+    end
+end
+
+function CG:SearchMissed(text)
+    self:SetSearchNote((L["No chain quest matches \"%s\"."]):format(text))
+end
+
+local function searchLive(self, gen)
+    return self.frame and self.frame:IsShown() and gen == self._searchGen
+end
+
+function CG:SearchByQuestID(questID, _attempt, text, gen)
     _attempt = _attempt or 1
     local CS = classicSource()
 
+    -- A generated chain's titles are shipped, so its search never asks the server
     if not CS and C_QuestLog and C_QuestLog.RequestLoadQuestByID then
         C_QuestLog.RequestLoadQuestByID(questID)
     end
@@ -533,23 +377,17 @@ function CG:SearchByQuestID(questID, _attempt)
     local chainID = self:FindChainForQuest(questID)
     if chainID then
         self:NavigateChain(chainID, questID)
-        local name = questName(questID)
-        print((L["|cffEBB706EQ Chain Guide:|r found quest |cffffffff%d|r%s — jumping to its chain."])
-            :format(questID, name and (" (" .. name .. ")") or ""))
         return
     end
 
     if not CS and _attempt < SEARCH_MAX_ATTEMPTS then
         C_Timer.After(SEARCH_RETRY_DELAY, function()
-            if self.frame and self.frame:IsShown() then self:SearchByQuestID(questID, _attempt + 1) end
+            if searchLive(self, gen) then self:SearchByQuestID(questID, _attempt + 1, text, gen) end
         end)
         return
     end
 
-    local name = questName(questID)
-    print((L["|cffEBB706EQ Chain Guide:|r quest |cffffffff%d|r%s isn't in any chain I know about."])
-        :format(questID, name and (" (" .. name .. ")") or ""))
-    if not CS then print(("  Wowhead: https://www.wowhead.com/quest=%d"):format(questID)) end
+    self:SearchMissed(text or tostring(questID))
 end
 
 function CG:FindChainByName(needle)
@@ -605,37 +443,42 @@ function CG:FindChainByName(needle)
     return nil
 end
 
-function CG:SearchByName(text, _attempt)
+function CG:SearchByName(text, _attempt, gen)
     _attempt = _attempt or 1
     local chainID, questID = self:FindChainByName(text)
     if chainID then
         self:NavigateChain(chainID, questID)
-        local Database = ns:GetSubsystem("ChainGuideDatabase")
-        local label = (questID and questName(questID))
-                      or (Database and Database.chains[chainID] and Database.chains[chainID].name)
-                      or text
-        print((L["|cffEBB706EQ Chain Guide:|r found |cffffffff%s|r — jumping to its chain."])
-            :format(label))
         return
     end
 
     if not classicSource() and _attempt < SEARCH_MAX_ATTEMPTS then
         C_Timer.After(SEARCH_RETRY_DELAY, function()
-            if self.frame and self.frame:IsShown() then self:SearchByName(text, _attempt + 1) end
+            if searchLive(self, gen) then self:SearchByName(text, _attempt + 1, gen) end
         end)
         return
     end
 
-    print((L["|cffEBB706EQ Chain Guide:|r no chain quest matches |cffffffff%s|r."])
-        :format(text))
+    self:SearchMissed(text)
 end
 
-function CG:Back()    local H = ns:GetSubsystem("ChainGuideHistory"); H:Back();    self:RenderCurrent() end
-function CG:Forward() local H = ns:GetSubsystem("ChainGuideHistory"); H:Forward(); self:RenderCurrent() end
+function CG:Back()
+    local H = ns:GetSubsystem("ChainGuideHistory")
+    self:CancelSearch()
+    H:Back()
+    self:RenderCurrent()
+end
+
+function CG:Forward()
+    local H = ns:GetSubsystem("ChainGuideHistory")
+    self:CancelSearch()
+    H:Forward()
+    self:RenderCurrent()
+end
 
 function CG:RenderCurrent()
     if not self.frame then return end
-    ns:GetSubsystem("ChainGuideDatabase"):EnsureGenerated()
+    local Database = ns:GetSubsystem("ChainGuideDatabase")
+    Database:EnsureGenerated()
     local H = ns:GetSubsystem("ChainGuideHistory")
     local state = H:Current() or { type = "home" }
 
@@ -646,20 +489,21 @@ function CG:RenderCurrent()
     if state.type == "category" then
         activeCatID = state.id
     elseif state.type == "chain" then
-        local Database = ns:GetSubsystem("ChainGuideDatabase")
+        -- A retail chain the questline source dropped, as "Show unrouted questlines" does, is looked for again first
+        local QLS = ns:GetSubsystem("ChainGuideQuestLineSource")
+        if not Database.chains[state.id] and QLS then
+            for catID in pairs(Database.categories) do QLS:EnsureZoneChains(catID) end
+        end
         local chain = Database.chains[state.id]
         activeCatID   = chain and chain.category
         activeChainID = state.id
     end
 
+    self._activeCatID     = activeCatID
     self._activeChainID   = activeChainID
     self._activeHighlight = state.highlight
 
-    if activeCatID then
-        self:RenderChains(activeCatID, activeChainID)
-    else
-        self:RenderCategories()
-    end
+    self:RenderChains(activeCatID, activeChainID)
     self:RenderDetail(activeChainID, state.highlight)
 end
 
@@ -712,164 +556,85 @@ function CG:OnTrackedChainChanged()
     if self.frame and self.frame:IsShown() then self:RenderCurrent() end
 end
 
-function CG:RenderCategories()
-    releaseAllRows(self.railRowPool, self.railRowsActive)
-    local Database = ns:GetSubsystem("ChainGuideDatabase")
-    local QLS      = ns:GetSubsystem("ChainGuideQuestLineSource")
-
-    local content = self.frame.railContent
-    self.frame.railCrumb:Hide()
-    local hdr = self.frame.railHeader
-    hdr:ClearAllPoints()
-    hdr:SetPoint("TOPLEFT", 8, -6)
-    hdr:SetText(L["Categories"])
-
-    if QLS then
-        for id in pairs(Database.categories) do QLS:EnsureZoneChains(id) end
-    end
-    local hasChains = {}
-    for _, c in pairs(Database.chains) do hasChains[c.category] = true end
-
-    local prev = hdr
-    if not self._sortedCategories then
-        local cats = {}
-        for id, c in pairs(Database.categories) do
-            cats[#cats + 1] = { id = id, def = c }
-        end
-        table.sort(cats, function(a, b)
-            local ao = a.def.order or math.huge
-            local bo = b.def.order or math.huge
-            if ao ~= bo then return ao < bo end
-            return (a.def.name or "") < (b.def.name or "")
-        end)
-        self._sortedCategories = cats
-    end
-    local cats = self._sortedCategories
-
-    local shown = 0
-    for i = 1, #cats do
-        local entry = cats[i]
-        if hasChains[entry.id] then
-            local row = acquireRow(self.railRowPool, self.railRowsActive, content)
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT",  prev, "BOTTOMLEFT",  0, prev == hdr and -4 or -1)
-            row:SetPoint("TOPRIGHT", content, "TOPRIGHT", -8, 0)
-            local range = entry.def.levelRange
-            row.title:ClearAllPoints()
-            row.title:SetPoint("LEFT", 8, 0)
-            row.title:SetPoint("RIGHT", range and -50 or -8, 0)
-            local catName = entry.def.name or ("Category " .. entry.id)
-            row.title:SetText(catName)
-            row.title:SetTextColor(1, 1, 1)
-            row.navKind, row.navID = "cat", entry.id
-            if range and range[1] == range[2] then
-                row.suffix:SetText(tostring(range[1]))
-                row.suffix:SetTextColor(0.7, 0.7, 0.7)
-                setRowTooltip(row, catName, (L["Level %d"]):format(range[1]))
-            elseif range then
-                row.suffix:SetText(("%d-%d"):format(range[1], range[2]))
-                row.suffix:SetTextColor(0.7, 0.7, 0.7)
-                setRowTooltip(row, catName, (L["Level %d–%d"]):format(range[1], range[2]))
-            else
-                setRowTooltip(row, catName)
-            end
-            prev = row
-            shown = shown + 1
-        end
-    end
-
-    local stride = ROW_H + 1
-    content:SetHeight(22 + 4 + math.max(shown, 1) * stride + 8)
-end
-
 function CG:RenderChains(activeCatID, activeChainID)
-    releaseAllRows(self.railRowPool, self.railRowsActive)
-    local Database  = ns:GetSubsystem("ChainGuideDatabase")
+    local f = self.frame
+    local Database   = ns:GetSubsystem("ChainGuideDatabase")
     local Characters = ns:GetSubsystem("ChainGuideCharacters")
     local QLS = ns:GetSubsystem("ChainGuideQuestLineSource")
 
-    local content = self.frame.railContent
-    local crumb = self.frame.railCrumb
-    crumb:Show()
-    local hdr = self.frame.railHeader
-    hdr:ClearAllPoints()
-    hdr:SetPoint("TOPLEFT", crumb, "BOTTOMLEFT", 0, -6)
-
-    if not activeCatID then
-        hdr:SetText(L["Pick a category"])
-        content:SetHeight(60)
-        return
+    local zone = activeCatID and Database.categories[activeCatID]
+    f:SetSection(zone and zone.name or nil)
+    -- Its options walk every zone's chains, so the picker is read again only when the zone changes
+    if activeCatID ~= self._pickerCatID then
+        f.zonePicker:Refresh()
+        self._pickerCatID = activeCatID
     end
 
-    if QLS then QLS:EnsureZoneChains(activeCatID) end
-
-    local catName = Database.categories[activeCatID] and Database.categories[activeCatID].name
-    hdr:SetText(catName or L["Chains"])
-
-    local chains = {}
-    for id, c in pairs(Database.chains) do
-        if c.category == activeCatID then chains[#chains + 1] = { id = id, def = c } end
-    end
-    table.sort(chains, function(a, b)
-        local ao, bo = a.def._campaignOrder, b.def._campaignOrder
-        if ao and bo then return ao < bo end
-        if ao or bo then return ao ~= nil end
-        -- Generated chains read as a leveling path, lowest level first, then by name and id
-        if a.def._generated and b.def._generated then
-            local al = a.def.range and a.def.range[1] or math.huge
-            local bl = b.def.range and b.def.range[1] or math.huge
-            if al ~= bl then return al < bl end
-            local an, bn = a.def.name, b.def.name
-            if an ~= bn then return an < bn end
-            return a.id < b.id
+    local rows = {}
+    if activeCatID then
+        if QLS then QLS:EnsureZoneChains(activeCatID) end
+        local chains = {}
+        for id, c in pairs(Database.chains) do
+            if c.category == activeCatID then chains[#chains + 1] = { id = id, def = c } end
         end
-        return (a.def.name or "") < (b.def.name or "")
-    end)
+        table.sort(chains, function(a, b)
+            local ao, bo = a.def._campaignOrder, b.def._campaignOrder
+            if ao and bo then return ao < bo end
+            if ao or bo then return ao ~= nil end
+            -- Generated chains read as a leveling path, lowest level first, then by name and id
+            if a.def._generated and b.def._generated then
+                local al = a.def.range and a.def.range[1] or math.huge
+                local bl = b.def.range and b.def.range[1] or math.huge
+                if al ~= bl then return al < bl end
+                local an, bn = a.def.name, b.def.name
+                if an ~= bn then return an < bn end
+                return a.id < b.id
+            end
+            return (a.def.name or "") < (b.def.name or "")
+        end)
 
-    if QLS then
+        local selectedIndex
         for i = 1, #chains do
-            QLS:EnsureChainItems(chains[i].def)
+            local entry = chains[i]
+            if QLS then QLS:EnsureChainItems(entry.def) end
+            local name = entry.def.name or ("Chain " .. entry.id)
+            local complete, _, total = Characters:ChainProgress(entry.def)
+            local done = total > 0 and complete >= total
+            local icons = {}
+            if self:IsTrackingChain(entry.id) then icons[#icons + 1] = { name = "icon-map", color = "accentHi" } end
+            if done then icons[#icons + 1] = { name = "check", color = "muted" } end
+            rows[#rows + 1] = {
+                key      = entry.id,
+                text     = name,
+                value    = total > 0 and ("%d/%d"):format(complete, total) or nil,
+                selected = entry.id == activeChainID,
+                muted    = done,
+                icons    = icons,
+                tip      = { name, total > 0 and (L["%d / %d quests done"]):format(complete, total) or nil },
+            }
+            if entry.id == activeChainID then selectedIndex = i end
         end
-    end
-
-    local prev = hdr
-    for i = 1, #chains do
-        local entry = chains[i]
-        local row = acquireRow(self.railRowPool, self.railRowsActive, content)
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT",  prev, "BOTTOMLEFT",  0, prev == hdr and -4 or -1)
-        row:SetPoint("TOPRIGHT", content, "TOPRIGHT", -8, 0)
-        row.title:ClearAllPoints()
-        row.title:SetPoint("LEFT", 8, 0)
-        row.title:SetPoint("RIGHT", -50, 0)
-        local chainName = entry.def.name or ("Chain " .. entry.id)
-        row.title:SetText(chainName)
-        row.title:SetTextColor(1, 1, 1)
-        local complete, _, total = Characters:ChainProgress(entry.def)
-        if total > 0 then
-            row.suffix:SetText(("%d/%d"):format(complete, total))
-            if complete >= total then
-                row.suffix:SetTextColor(0.30, 0.85, 0.30)
-                row.title:SetTextColor(0.65, 0.65, 0.65)
-                setCheckAtlas(row.completeIcon)
-                row.completeIcon:Show()
+        f.list:SetRows(rows)
+        -- Only a new zone or chain moves the list, so a list scrolled by hand stays put through log updates
+        -- and through Back to the zone it shows
+        local listKey = tostring(activeCatID) .. "/" .. tostring(activeChainID)
+        if listKey ~= self._listScrolledFor then
+            local stay = not selectedIndex and activeCatID == self._listZone
+            if stay or f.list:ScrollToRow(selectedIndex or 1) then
+                self._listScrolledFor, self._listZone = listKey, activeCatID
             end
         end
-        if entry.id == activeChainID then row.selectedTex:Show() end
-        row.navKind, row.navID = "chain", entry.id
-        setRowTooltip(row, chainName,
-            total > 0 and (L["%d / %d quests done"]):format(complete, total) or nil)
-        prev = row
+    else
+        f.list:SetRows(rows)
+        self._listScrolledFor, self._listZone = nil, nil
     end
-
-    local stride = ROW_H + 1
-    local totalH = 28 + 22 + 4 + math.max(#chains, 1) * stride + 8
-    content:SetHeight(totalH)
 end
 
 function CG:RenderDetail(activeChainID, highlightQuestID)
     local CV = ns:GetSubsystem("ChainGuideView")
     local Database = ns:GetSubsystem("ChainGuideDatabase")
     local chain = activeChainID and Database.chains[activeChainID]
-    CV:Render(self.frame.detailPane, chain, highlightQuestID)
+    local again = self._scrollAgain
+    self._scrollAgain = nil
+    CV:Render(self.frame.body, chain, highlightQuestID, again)
 end

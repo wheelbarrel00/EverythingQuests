@@ -8,6 +8,8 @@
     <Script file="ColorPicker.lua"/>
     <Script file="Card.lua"/>
     <Script file="Window.lua"/>
+    <Script file="MainWindow.lua"/>
+    <Script file="Widgets.lua"/>
     <Script file="Dialog.lua"/>
     <Script file="Menu.lua"/>
 </Ui>

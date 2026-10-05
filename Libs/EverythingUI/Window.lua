@@ -154,6 +154,7 @@ local function buildTabs(ctx, area, footer)
         bar:SetPoint("BOTTOMRIGHT", -(SCROLLBAR_INSET + side), SCROLLBAR_BOTTOM)
         content:SetWidth(width - side)
         content._controls = {}
+        content._euiColumn = true
         t._holder, t._scroll, t._content = holder, scroll, content
         if t.preview then
             -- In the tab's holder, so it shows and hides with the tab.
