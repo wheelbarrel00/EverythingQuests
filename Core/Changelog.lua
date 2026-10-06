@@ -2,6 +2,34 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.2.0", date = "2026-10-06",
+        sections = {
+            { head = "New Features", items = {
+                "A new look for the Quest Browser. On Classic Era, Burning Crusade Classic and WoW Forever the Quest Browser now has the same style as the options window and the Chain Guide, in a larger window you can resize and maximize, which remembers its size and closes with Escape. The search field, the menu of all quests, the ones available to you, the ones in your log or the ones you have done, and This zone only sit above the list, and while This zone only is ticked the title bar names your zone. In the list, quests you can pick up now, by the same rules and filters as the map's gold markers, and quests in your log stand out, the others are dimmed, and quests you have done carry a check. The quest you pick fills the right side: a line saying where you stand, marked with the game's own \"!\" and \"?\" or a check, then its requirements, where it starts, its objectives, where it is handed in and what it is part of, leads to or rules out, each in a card of its own. A new Get Directions button opens the map and points you at the quest: for a quest in your log where its arrow points, and otherwise where it starts or is handed in, on your own map when it can be. The search field's tooltip now explains quotes and quest IDs.",
+                "A new look for Quest History. On retail the History window now has the same style, in a larger window you can resize and maximize, which remembers its size and closes with Escape. Its six tabs become three pages in a side panel: Quests, Chain Timeline and Stats. Quests lists your turn-ins in two-line rows with the character, the zone and how long you held each quest, with search, character, date and type filters and a sort by date, name or type. Chain Timeline lists every chain you have made progress in, and a click on one shows the date of each of its quests. Stats gathers Streak, Activity, Totals, Trends and This Session as cards on one page, with large figures, the activity heatmap and the trend bars in the accent color, and each change against the day or week before keeps its plus or minus sign, no longer colored green or red. The whole Stats page now updates as you turn in quests and earn gold while it is showing. Re-scan names and Export sit at the foot of the side panel, and Export opens the page's text in a window to copy it from, the Stats page with every card in it.",
+                "A new look for What's New. The notice after an update now has the same style, with the Discord button beside the close button. Escape now closes it too, and counts as having read it.",
+            } },
+            { head = "Improvements", items = {
+                "Chain Guide lines that no longer seem to join unlinked quests. Where the lines into a row of quests would have shared one run, so that a quest seemed to lead to one it does not, each set of quests with the same quests before them now gets a lane of its own, a few pixels apart, and a lane breaks where another line crosses it. Hovering a quest card lights up its own lines in the accent color, in every chain.",
+                "Long labels in the options window. The Discord button in German, French and Russian and the Chain Guide tab in French now wrap onto a second line instead of being cut off. With this version installed, EQ Objective Tracker's settings window gets the same fix.",
+                "Windows that come to the front. A click on the Chain Guide, the Quest Browser, History or What's New brings it in front of the others, the Chain Guide opened from History comes to the front, and EQ Objective Tracker's settings window opens in front of them. A window opened during combat closes with Escape once combat ends.",
+                "What's New keeps your choice. Unticking \"Don't show these again\" now brings back the way you had the notice shown, Popup or Chat, even after a reload.",
+            } },
+            { head = "Bug Fixes", items = {
+                "The options window's scale readout now shows the scale in use when your screen cannot fit the one you picked, instead of the old figure until you changed tab.",
+                "Chain Guide lines are now a whole number of screen pixels wide, where some drew 2 pixels wide and others 3.",
+                "The Chain Guide's \"Drag to resize\" hint is no longer covered by the sideways scroll bar.",
+                "A Chain Guide search in another alphabet that finds nothing now shows what you typed under the field, where Cyrillic or Chinese text could come out as empty boxes on a client in English or another language written in the Latin alphabet.",
+                "One Zul'Aman chain drew its leftmost quest card cut off at the window's left edge.",
+                "Right-clicking a History row now opens the Chain Guide scrolled to that quest, and finds a quest that is one of a step's alternatives, which it used to say was not part of any chain.",
+            } },
+            { head = "Notes", items = {
+                "One look across the windows. The options window, the Chain Guide, the Quest Browser, History and What's New now share one look.",
+                "Patch 12.1.5. On retail Everything Quests now loads on patch 12.1.5 without the out-of-date warning, and no longer lists 12.0.5.",
+            } },
+        },
+    },
+    {
         version = "2.1.0", date = "2026-10-05",
         sections = {
             { head = "New Features", items = {

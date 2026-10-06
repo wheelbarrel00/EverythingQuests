@@ -43,8 +43,8 @@ function Session:OnEnable()
         if xpReward    and xpReward    > 0 then s.xp   = (s.xp   or 0) + xpReward    end
         if moneyReward and moneyReward > 0 then s.gold = (s.gold or 0) + moneyReward end
         local HF = ns:GetSubsystem("HistoryFrame")
-        if HF and HF.frame and HF.frame:IsShown() and HF._activeTab == "session" then
-            HF:Render()
+        if HF and HF.IsShowing and HF:IsShowing("stats") then
+            HF:RenderSoon()
         end
     end)
 end

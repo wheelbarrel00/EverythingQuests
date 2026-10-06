@@ -229,6 +229,8 @@ function Context:CreateWindow(spec)
     f:SetSize(clampSize(spec, savedSize(spec)))
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
+    -- A click brings it in front of the other windows that share its strata
+    f:SetToplevel(true)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:SetClampedToScreen(true)

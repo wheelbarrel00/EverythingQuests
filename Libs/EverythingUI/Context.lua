@@ -124,6 +124,11 @@ function Context:Texture(name)
     return lib.media .. "Textures\\" .. name
 end
 
+-- For a host that shows typed or player text in a string of its own (decision 14)
+function Context:NeedsClientFont(s)
+    return lib.kit.NeedsClientFont(s)
+end
+
 function Context:Font(name)
     local tokens = lib.tokens
     local t = tokens.typography[name]

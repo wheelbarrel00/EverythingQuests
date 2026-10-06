@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Classic Era support is limited and growing - see the What's New notice.
 ## Author: Wheelbarrel00
-## Version: 2.1.0
+## Version: 2.2.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -122,8 +122,8 @@ Core\Events.lua
 Core\Cache.lua
 Core\Util.lua
 
-# ns.Util.color is read at FILE SCOPE by Options/Frame.lua and Modules/WhatsNew.lua, so Core/Util
-# precedes both. Dialog backs the Reset and profile prompts and the Discord link.
+# ns.Util.color is read at FILE SCOPE by Options/Frame.lua, so Core/Util precedes it. Dialog
+# backs the Reset and profile prompts and the Discord link.
 Core\Dialog.lua
 Core\Changelog.lua
 

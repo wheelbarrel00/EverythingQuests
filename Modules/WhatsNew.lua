@@ -3,52 +3,49 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "2.1.0"
-local POPUP_TITLE           = "What's New in Everything Quests v2.1.0"
+local FEATURE_POPUP_VERSION = "2.2.0"
 
-local POPUP_BODY = [[
-|cffEBB706A new look for the Chain Guide|r
-On retail and WoW Forever the Chain Guide now has the same style as the options window: a zone picker with the zone's chains listed below it, and quest cards that mark your next step and the quests you are on.
+-- In English, as the changelog is: each section a heading and its paragraph.
+local POPUP_SECTIONS = {
+    { "A new look for the Quest Browser and History", "On Classic the Quest Browser, and on retail History, now have the same style as the options window and the Chain Guide: a side panel on the left, the details in cards, and a window you can resize. The Quest Browser gains a Get Directions button, and History's Stats page gathers every chart and figure in one place." },
+    { "Chain Guide lines that no longer run together", "Quests with the same quests before them get a lane of their own, so a line no longer seems to join quests that are not linked, and hovering a quest lights up its lines." },
+    { "One look across the windows", "The options window, the Chain Guide, the Quest Browser, History and What's New now share one look, and on retail Everything Quests loads on patch 12.1.5 without the out-of-date warning." },
+}
 
-|cffEBB706Search answers in the window|r
-Type a quest's name or ID under the zone picker and the Chain Guide jumps straight to it.
+local TRANSLATORS = { "Zox", "Malevi4", "labrie75", "BNS333", "Keriaovo", "Stonetwist" }
 
-|cffEBB706Coming next|r
-The What's New window, the Quest Browser and History get the same new look in coming updates.
+local WIDTH, HEIGHT = 600, 560
+local PAD_TOP, PAD_SIDE, PAD_BOTTOM = 20, 24, 24
+local HEAD_GAP, SECTION_GAP, CLOSING_GAP, CLOSING_PAD = 4, 16, 20, 14
+local FOOTER_H, BUTTON_GAP, BAR_ROOM = 56, 10, 10
 
-|cffEBB706Thank you|r
-Thanks to |cffffffffZox|r (French), |cffffffffMalevi4|r (Russian), |cfffffffflabrie75|r (Korean), |cffffffffBNS333|r (Traditional Chinese), |cffffffffKeriaovo|r (Simplified Chinese) and |cffffffffStonetwist|r (German) for keeping Everything Quests translated, and to everyone who sends reports and suggestions.
-
-|cffEBB706Want to see this again?|r Type |cffffffff/eqs whatsnew|r anytime to reopen this summary.
-]]
-
-local YELLOW     = ns.Util.color.buttonYellow
-local HEADER_RED = ns.Util.color.brandRed
-local MUTED      = ns.Util.color.muted
+local function global()
+    return ns.db and ns.db.global
+end
 
 local function currentMode()
-    local m = ns.db and ns.db.global and ns.db.global.whatsNewMode
-    return m or "popup"
+    local g = global()
+    return (g and g.whatsNewMode) or "popup"
 end
 
 local function alreadySeen()
-    return ns.db and ns.db.global and ns.db.global.whatsNewSeen == FEATURE_POPUP_VERSION
+    local g = global()
+    return g and g.whatsNewSeen == FEATURE_POPUP_VERSION
 end
 
 local function markSeen()
-    if ns.db and ns.db.global then
-        ns.db.global.whatsNewSeen = FEATURE_POPUP_VERSION
-    end
+    local g = global()
+    if g then g.whatsNewSeen = FEATURE_POPUP_VERSION end
 end
 
 local function alreadyAnnounced()
-    return ns.db and ns.db.global and ns.db.global.whatsNewAnnounced == FEATURE_POPUP_VERSION
+    local g = global()
+    return g and g.whatsNewAnnounced == FEATURE_POPUP_VERSION
 end
 
 local function markAnnounced()
-    if ns.db and ns.db.global then
-        ns.db.global.whatsNewAnnounced = FEATURE_POPUP_VERSION
-    end
+    local g = global()
+    if g then g.whatsNewAnnounced = FEATURE_POPUP_VERSION end
 end
 
 local function announceChat()
@@ -68,154 +65,112 @@ if type(hooksecurefunc) == "function" and type(_G.SetItemRef) == "function" then
     end)
 end
 
-function WN:Build()
-    if self.frame then return self.frame end
+local function colorCode(ctx, name)
+    local r, g, b = ctx:Color(name)
+    return ("|cff%02x%02x%02x"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5),
+                                       math.floor(b * 255 + 0.5))
+end
 
-    local f = CreateFrame("Frame", "EQWhatsNewFrame", UIParent, "BackdropTemplate")
-    f:SetSize(560, 480)
-    f:SetPoint("CENTER")
-    -- Above the Options window's DIALOG strata so the popup is not hidden behind it
-    f:SetFrameStrata("FULLSCREEN_DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop",  f.StopMovingOrSizing)
-    f:SetClampedToScreen(true)
-    f:Hide()
-
-    f:SetBackdrop({
-        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 14,
-        insets   = { left = 4, right = 4, top = 4, bottom = 4 },
-    })
-    f:SetBackdropColor(0.02, 0.02, 0.02, 0.97)
-    f:SetBackdropBorderColor(HEADER_RED[1], HEADER_RED[2], HEADER_RED[3], 1)
-
-    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.title:SetPoint("TOPLEFT", 16, -14)
-    f.title:SetText(POPUP_TITLE)
-    f.title:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-
-    -- The bottom of the window is three stacked rows, and the scroll region has to clear all of
-    -- them. Derived from the row heights rather than written as one more independent number,
-    -- because that is what let the checkbox drift on top of the last line of text.
-    local BUTTON_ROW_Y  = 12
-    local BUTTON_H      = 28
-    local CHECK_H       = 22
-    local ROW_GAP       = 6
-    local CHECK_ROW_Y   = BUTTON_ROW_Y + BUTTON_H + ROW_GAP
-    local SCROLL_BOTTOM = CHECK_ROW_Y + CHECK_H + ROW_GAP
-
-    local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT",     14, -44)
-    scroll:SetPoint("BOTTOMRIGHT", -34, SCROLL_BOTTOM)
-
-    local body = CreateFrame("Frame", nil, scroll)
-    body:SetSize(scroll:GetWidth(), 1)
-    scroll:SetScrollChild(body)
-
-    f.body = body:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    f.body:SetPoint("TOPLEFT",  body, "TOPLEFT",  0, 0)
-    f.body:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, 0)
-    f.body:SetJustifyH("LEFT")
-    f.body:SetJustifyV("TOP")
-    f.body:SetSpacing(3)
-    f.body:SetText(POPUP_BODY)
-    body:SetHeight(f.body:GetStringHeight() + 12)
-
-    local function dismiss()
-        markSeen()
-        f:Hide()
+local function buildNotes(ctx, content)
+    local notes = ctx:CreateTextBlock(content)
+    notes:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -PAD_TOP)
+    notes:SetPoint("TOPRIGHT", content, "TOPRIGHT", -PAD_SIDE, -PAD_TOP)
+    for i, s in ipairs(POPUP_SECTIONS) do
+        notes:AddLine(s[1], "title", { gap = (i > 1) and SECTION_GAP or nil })
+        notes:AddLine(s[2], "label", { gap = HEAD_GAP })
     end
 
-    f.openBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
-    f.openBtn:SetSize(180, BUTTON_H)
-    f.openBtn:SetPoint("BOTTOMLEFT", 16, BUTTON_ROW_Y)
-    local openBg = f.openBtn:CreateTexture(nil, "BACKGROUND")
-    openBg:SetAllPoints()
-    openBg:SetColorTexture(0.10, 0.10, 0.10, 0.95)
-    f.openBtn.text = f.openBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.openBtn.text:SetPoint("CENTER")
-    f.openBtn.text:SetText(L["Open Options"])
-    f.openBtn.text:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-    f.openBtn:SetScript("OnClick", function()
-        dismiss()
-        local O = ns:GetSubsystem("Options")
-        if O and O.Show then O:Show() end
-    end)
+    local closing = CreateFrame("Frame", nil, content)
+    closing:SetPoint("TOPLEFT", notes, "BOTTOMLEFT", 0, -CLOSING_GAP)
+    closing:SetPoint("TOPRIGHT", notes, "BOTTOMRIGHT", 0, -CLOSING_GAP)
+    closing:SetHeight(1)
+    ctx:Paint(closing, nil, "divider", "T")
+    local lines = ctx:CreateTextBlock(closing)
+    lines:SetPoint("TOPLEFT", closing, "TOPLEFT", 0, -CLOSING_PAD)
+    lines:SetPoint("TOPRIGHT", closing, "TOPRIGHT", 0, -CLOSING_PAD)
+    local bright = colorCode(ctx, "text")
+    lines:AddLine(L["Translated by %s. Thanks to them and to everyone who sends reports and suggestions."]:format(
+        bright .. table.concat(TRANSLATORS, ", ") .. "|r"), "hint")
+    lines:AddLine(L["Type %s anytime to see this again."]:format(bright .. "/eqs whatsnew|r"), "hint")
+    return notes, lines
+end
 
-    f.gotBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
-    f.gotBtn:SetSize(120, BUTTON_H)
-    f.gotBtn:SetPoint("BOTTOMRIGHT", -16, BUTTON_ROW_Y)
-    local gotBg = f.gotBtn:CreateTexture(nil, "BACKGROUND")
-    gotBg:SetAllPoints()
-    gotBg:SetColorTexture(HEADER_RED[1], HEADER_RED[2], HEADER_RED[3], 0.95)
-    f.gotBtn.text = f.gotBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.gotBtn.text:SetPoint("CENTER")
-    f.gotBtn.text:SetText(L["Got it"])
-    f.gotBtn.text:SetTextColor(1, 1, 1)
-    f.gotBtn:SetScript("OnClick", dismiss)
+function WN:Build()
+    if self.frame then return self.frame end
+    local Options = ns:GetSubsystem("Options")
+    local ctx = Options.ui
 
-    f.discordBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
-    f.discordBtn:SetHeight(BUTTON_H)
-    f.discordBtn:SetPoint("BOTTOM", 0, BUTTON_ROW_Y)
-    local dBg = f.discordBtn:CreateTexture(nil, "BACKGROUND")
-    dBg:SetAllPoints()
-    dBg:SetColorTexture(0.10, 0.10, 0.10, 0.95)
-    f.discordBtn.icon = f.discordBtn:CreateTexture(nil, "OVERLAY")
-    f.discordBtn.icon:SetSize(16, 16)
-    f.discordBtn.icon:SetPoint("LEFT", 10, 0)
-    f.discordBtn.icon:SetTexture("Interface\\AddOns\\EverythingQuests\\Media\\Textures\\discord.tga")
-    f.discordBtn.text = f.discordBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.discordBtn.text:SetPoint("LEFT", f.discordBtn.icon, "RIGHT", 6, 0)
-    f.discordBtn.text:SetText(L["Join our Discord!"])
-    f.discordBtn.text:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-    f.discordBtn:SetWidth(10 + 16 + 6 + f.discordBtn.text:GetStringWidth() + 12)
-    f.discordBtn:SetScript("OnClick", function() ns:ShowDiscord() end)
+    local f = ctx:CreateWindow({ name = "EQWhatsNewFrame", title = L["What's New"], width = WIDTH, height = HEIGHT })
+    f:SetSection("Everything Quests " .. FEATURE_POPUP_VERSION)
+    f:AddHeaderButton("icon-discord", L["Join our Discord"], L["Click to copy the invite link."],
+        function() ns:ShowDiscord() end)
+    -- Closing it any way at all, Escape included, counts as having seen it.
+    f:HookScript("OnHide", markSeen)
 
-    f.close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    f.close:SetPoint("TOPRIGHT", -4, -4)
-    f.close:SetScript("OnClick", dismiss)
+    local area = ctx:CreateScrollArea(f.body, {})
+    area:SetPoint("TOPLEFT", f.body, "TOPLEFT")
+    area:SetPoint("BOTTOMRIGHT", f.body, "BOTTOMRIGHT", 0, FOOTER_H)
+    local notes, lines = buildNotes(ctx, area.content)
 
-    f.dontShow = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
-    f.dontShow:SetSize(CHECK_H, CHECK_H)
-    f.dontShow:SetPoint("BOTTOMLEFT", 14, CHECK_ROW_Y)
-    f.dontShow.text = f.dontShow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.dontShow.text:SetPoint("LEFT", f.dontShow, "RIGHT", 2, 0)
-    f.dontShow.text:SetText(L["Don't show these again"])
-    f.dontShow.text:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    f.dontShow:SetScript("OnShow", function(self2)
-        local m = currentMode()
-        -- Remember the non-none mode so unchecking restores it instead of resetting a chat-link user to popup
-        if m ~= "none" then self2._prevMode = m end
-        self2:SetChecked(m == "none")
+    local footer = CreateFrame("Frame", nil, f.body)
+    footer:SetPoint("BOTTOMLEFT")
+    footer:SetPoint("BOTTOMRIGHT")
+    footer:SetHeight(FOOTER_H)
+    footer._controls = {}
+    ctx:Paint(footer, "chrome", "divider", "T")
+
+    f.dontShow = ctx:CreateCheckbox(footer, L["Don't show these again"],
+        function() return currentMode() == "none" end,
+        function(on)
+            local g = global()
+            if not g then return end
+            -- Unticking puts back the mode in use before, kept across sessions, so a chat link user is not reset to the popup
+            if on then
+                if currentMode() ~= "none" then g.whatsNewModeBeforeOff = currentMode() end
+                g.whatsNewMode = "none"
+            else
+                local before = g.whatsNewModeBeforeOff
+                g.whatsNewMode = (before and before ~= "none") and before or "popup"
+            end
+        end,
+        L["Stops What's New notices entirely. You can turn them back on in /eqs > General."])
+    f.dontShow:SetPoint("LEFT", footer, "LEFT", PAD_SIDE, 0)
+
+    f.gotIt = ctx:CreateButton(footer, L["Got it"], nil, function() f:Hide() end, nil, "primary")
+    f.gotIt:SetPoint("RIGHT", footer, "RIGHT", -PAD_SIDE, 0)
+    f.openOptions = ctx:CreateButton(footer, L["Open Options"], nil, function()
+        f:Hide()
+        Options:Show()
     end)
-    f.dontShow:SetScript("OnClick", function(self2)
-        if not (ns.db and ns.db.global) then return end
-        if self2:GetChecked() then
-            ns.db.global.whatsNewMode = "none"
-        else
-            ns.db.global.whatsNewMode =
-                (self2._prevMode and self2._prevMode ~= "none" and self2._prevMode) or "popup"
-        end
+    f.openOptions:SetPoint("RIGHT", f.gotIt, "LEFT", -BUTTON_GAP, 0)
+
+    -- Text measured while hidden can be short of the text as drawn, so it is measured again once shown.
+    local function layout()
+        local h = PAD_TOP + notes:Measure() + CLOSING_GAP + CLOSING_PAD + lines:Measure() + PAD_BOTTOM
+        -- The scroll frame's own width, which leaves room for the bars, so the notes never scroll sideways
+        local w = area.scroll:GetWidth() or 0
+        if w <= 0 then w = WIDTH - BAR_ROOM end
+        area:SetContentSize(w, h)
+        f.gotIt:Fit()
+        f.openOptions:Fit()
+    end
+    layout()
+    f:HookScript("OnShow", function()
+        f.dontShow:Refresh()
+        C_Timer.After(0, layout)
     end)
-    f.dontShow:SetScript("OnEnter", function(self2)
-        GameTooltip:SetOwner(self2, "ANCHOR_RIGHT")
-        -- SetText arg 5 is alpha, not wrap - pass 1 or the line can render invisible
-        GameTooltip:SetText(L["Stops What's New notices entirely. You can turn them back on in /eqs > General."], 1, 1, 1, 1, true)
-        GameTooltip:Show()
-    end)
-    f.dontShow:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     self.frame = f
     return f
 end
 
 function WN:Show()
+    local Options = ns:GetSubsystem("Options")
+    if not (Options and Options.ui) then return end
     self:Build()
     self.frame:Show()
+    -- Above the options window, which the About tab and /eqs open it over.
+    self.frame:Raise()
 end
 
 function WN:PrintChatLink()

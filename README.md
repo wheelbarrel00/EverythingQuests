@@ -25,7 +25,7 @@ Everything Quests replaces Blizzard's quest tracking and builds on the rest of i
 2. **Nameplate Quest Icons** — a quest icon plus the remaining count or percent on objective mobs in the 3D world
 3. Interactive **World Quest pins** on the world map and zone maps, plus a docked World Quests panel (retail)
 4. A standalone **Chain Guide** window for browsing quest chains: Midnight's on retail, and on WoW Forever every chain your character can take
-5. An account-wide **Quest History** log with six views and a backfill of past completions (retail)
+5. An account-wide **Quest History** log with three pages and a backfill of past completions (retail)
 6. Branded **Quest POI** overlays on zone maps, and on Classic, objective spawn markers on both the world map and the minimap
 7. A **Quest Browser** on Classic, for looking up almost any quest in the game before you accept it, plus **shareable quest links** in chat on every flavor
 8. **Quest progress on game tooltips** — a bag item names the quest that wants it, how many are still missing, and which group members still need it too
@@ -138,6 +138,7 @@ Replaces Blizzard's world quest icons with custom pins on both the world map and
 A standalone window for browsing quest chains, in the same style as the options window since v2.1.0. On retail it shows hand-authored quest chains plus live campaign data straight from Blizzard's `C_CampaignInfo`, and since v1.55.0 WoW Forever builds chains of its own (see below). Items marked (retail) are retail only.
 
 - **Layout** — a zone picker at the top left and that zone's chains listed below it, with the chain you pick on the right as quest cards. Each card marks a quest you can pick up, have in your log or have done, and NEXT marks your next step. The search field under the zone picker jumps to the quest it finds and highlights it
+- **Lines between quests** — right-angle lines. Where quests that follow different quests meet in one row, each set gets a lane of its own and a lane breaks where another line crosses it, so a line no longer seems to join quests that are not linked (since v2.2.0). Hovering a card lights up its own lines
 - **Browser navigation** — Back / Forward buttons with full history
 - **Hand-authored overlays** (retail) — Prerequisite branching overrides Blizzard's API chains where the API is incomplete. Branching is authored only, never inferred from quest-type APIs
 - **Cross-character completion** (retail) — Tracks completion of every chain across every character on your account
@@ -159,19 +160,16 @@ Currently covers the Midnight expansion: **Eversong Woods**, **Zul'Aman**, **Har
 - **Track, Continue and search** — track a chain to see its quests on the world map, use Continue for a TomTom arrow to your next step, and search by quest name or ID
 
 ### Quest History
-An account-wide log of every quest turn-in across every character. Open with `/eqs history` or the History tab in Options. Retail only.
+An account-wide log of every quest turn-in across every character. Open with `/eqs history` or the History tab in Options. Retail only. In the same style as the options window since v2.2.0: a page list in the side panel, a window that resizes and maximizes and remembers its size, and Escape to close it.
 
-- **Six views**:
-  - **Quests** — searchable, filterable list (by character, date range, or quest type). Right-click any row to jump to that quest's chain in the Chain Guide
-  - **This Session** — a live recap of the current play session: quests, XP, gold, time played, quests per hour, level-ups
-  - **Streak** — current and best daily turn-in streaks across the whole account
-  - **Chain Timeline** — every chain you've made progress in with per-quest dates; click to expand; green checkmark on fully-completed chains
-  - **Activity** — 13-week heatmap of daily turn-ins
-  - **Stats** — gold and XP earned per character plus biggest single rewards, a total of quests abandoned and the average time a quest spends in your log, with a **Trends** toggle that charts quests, XP and gold over time, daily or weekly, account-wide or per character
+- **Three pages**:
+  - **Quests** — a searchable list in two-line rows (character, zone and how long you held the quest), filtered by character, date range or quest type and sorted by date, name or type. Right-click any row to open the Chain Guide on that quest
+  - **Chain Timeline** — every chain you've made progress in, with per-quest dates; click a chain to expand it; a check on a fully completed chain
+  - **Stats** — five cards on one page: **Streak** (current and best daily turn-in streaks across the account), **Activity** (a 13-week heatmap of daily turn-ins), **Totals** (gold and XP per character, the biggest single rewards, quests abandoned and the average time a quest spends in your log), **Trends** (quests, XP or gold charted daily or weekly, account-wide or per character, each change against the period before signed rather than colored) and **This Session** (quests, XP, gold, time played, quests per hour and level-ups). It refreshes while it is showing as you turn in quests and earn gold
 - **How long you held each quest** — a quest accepted and later turned in shows its held time on its row, and the row tooltip names when you accepted it. Quests you were already carrying when this shipped have no accept time to measure from, so they show nothing rather than a guess. The average prints the number of quests behind it, because it covers only quests accepted since the feature shipped and would otherwise read as a lifetime figure beside lifetime totals. With recording switched off both figures show a dash rather than a zero
 - **One-time backfill** — `Populate from past completions` walks the game's record of completed quests and adds them to history as `(before tracking)` entries
 - **Async title fill** — Backfilled entries that show as `Quest #12345` are filled in over a minute or two via server lookups (10/0.3s burst rate, post-drain sweep, `Re-scan names` button)
-- **Export** — Copy the currently visible view to your clipboard as plain text
+- **Export** — the page you are on as plain text in a window to copy from, the whole Stats page included
 - **Compact storage** — Saved-variables use short field names (`q,t,n,c,z,k,xp,m`) to keep the file small at 5000+ entries
 - **Backups** — History is snapshotted on logout so an empty or missing log can be restored automatically
 
@@ -199,6 +197,8 @@ Classic only (Classic Era, Burning Crusade Classic and WoW Forever). A search-an
 - **The reason it is unavailable** comes from `AvailableQuests:Explain`, the *same* gate that decides which gold markers are drawn. There is deliberately one implementation — a second copy would let the window and the map disagree while both looked right
 - **Clickable throughout** — a location opens the world map there and sets a TomTom waypoint; a prerequisite or follow-up navigates to that quest. References the data cannot describe render as plain text rather than a dead link
 - **Who to talk to** — the Starts and Turn in rows name the giver and the finisher. A row is merged per map while a map pin is merged per coordinate, so a row covering several different people names all of them rather than picking one
+- **The window** — in the same style as the options window since v2.2.0, the quest list in the side panel and the quest you pick in cards on the right. It resizes and maximizes, remembers its size and closes with Escape. In the list, quests you can pick up now (by the same rules and filters as the map's gold markers) and quests in your log stand out, the others are dimmed, and quests you have done carry a check, and the title bar names your zone while "This zone only" is ticked
+- **Get Directions** — opens the map and points you at the quest: for one in your log where its arrow points, and otherwise where it starts or is handed in, on your own map when it can be
 - **Entry points** — `/eqs quests [text]`, the button under `/eqs` > General, or right-clicking a gold available-quest marker
 - **Coverage is not total.** It reads the `names`/`gates` tables (3,794 Era / 5,652 TBC) while the coordinate tables cover more, so 357 Era and 508 TBC quests EQ pins on the map are not in the browser. WoW Forever's tables are the Era set plus 319 Forever quests, from AllTheThings and from playing Forever, with a similar gap
 - `/eqsprobe questbrowser` reports the data, a live query, the player's zone, one full decoded record, and whether the browser and the map pins agree
@@ -357,7 +357,7 @@ HereBeDragons is listed by the three Classic TOCs only. HBD-Pins calls `WorldMap
 
 | Metric | Value |
 |---|---|
-| Interface version | 120100, 120007, 120005 (Midnight 12.1), 20506 (Burning Crusade Classic 2.5), 16001 (WoW Forever 1.60) and 11509 (Classic Era 1.15) |
+| Interface version | 120100, 120105, 120007 (Midnight 12.1 and 12.1.5), 20506 (Burning Crusade Classic 2.5), 16001 (WoW Forever 1.60) and 11509 (Classic Era 1.15) |
 | SavedVariables | `EverythingQuestsDB` (account), `EverythingQuestsCharDB` (character), `EverythingQuestsChainCache` (account), `EverythingQuestsHistory` (account), `EverythingQuestsHistoryBackups` (account) |
 | API compliance | No protected actions and no taint. Auto-accept, auto-turn-in and joining group quests are opt-in and use insecure-only APIs (`C_GossipInfo`, `AcceptQuest`, `CompleteQuest`, `GetQuestReward`, `ConfirmAcceptQuest`); Alt pauses them. Chat announcements stay off until you choose a channel, and party quest progress travels as hidden addon messages |
 

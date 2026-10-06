@@ -13,6 +13,10 @@ local PAD_Y         = 16
 local FAN_PAD       = 8
 local FAN_LINE_EDGE = 24
 local LINE_PX       = 2
+local LANE          = 6
+local CROSS_GAP     = 5
+local LANE_OFFSETS  = { 0, -LANE, LANE, -2 * LANE, 2 * LANE }
+local PAIR          = 65536
 local ICON_PX       = 16
 local CARD_PAD      = 10
 local TEXT_LEFT     = 34
@@ -43,6 +47,10 @@ local _slotLoserOf   = {}
 local _slotWinner    = {}
 local _titleRequested = {}
 local _fanL, _fanT, _fanR, _fanB = {}, {}, {}, {}
+local _segs, _segN = {}, 0
+local _laneOff, _laneGroup = {}, {}
+local _cuts = {}
+local _linePx = LINE_PX
 
 local function slotRank(s)
     if s == "complete" or s == "turnin" or s == "active" then return 4 end
@@ -196,7 +204,7 @@ local function releaseNodes()
         local b = CV.activeNodes[i]
         b:Hide()
         b:ClearAllPoints()
-        b._ref, b._chain, b._reason, b._status, b._navKind = nil, nil, nil, nil, nil
+        b._ref, b._chain, b._reason, b._status, b._navKind, b._index = nil, nil, nil, nil, nil, nil
         b.statusIcon:SetTexture(nil)
         b.statusIcon:SetTexCoord(0, 1, 0, 1)
         b.statusIcon:SetVertexColor(1, 1, 1, 1)
@@ -210,11 +218,10 @@ local function releaseNodes()
 end
 
 local function acquireBar(ctx, canvas)
-    local t = tremove(CV.barPool)
-    if not t then
-        t = canvas:CreateTexture(nil, "BACKGROUND")
-        t:SetColorTexture(ctx:Color("borderStrong"))
-    end
+    local t = tremove(CV.barPool) or canvas:CreateTexture(nil, "BACKGROUND")
+    -- A bar lit under the mouse can be handed back by a render the mouse never left
+    t:SetColorTexture(ctx:Color("borderStrong"))
+    t:SetDrawLayer("BACKGROUND", 0)
     t:Show()
     CV.activeBars[#CV.activeBars + 1] = t
     return t
@@ -225,6 +232,7 @@ local function releaseBars()
         local t = CV.activeBars[i]
         t:Hide()
         t:ClearAllPoints()
+        t._s, t._d = nil, nil
         CV.barPool[#CV.barPool + 1] = t
         CV.activeBars[i] = nil
     end
@@ -253,35 +261,193 @@ local function releaseFans()
     end
 end
 
--- One straight run of a connector, in canvas units growing down
-local function run(ctx, canvas, x1, y1, x2, y2)
+-- One straight run of a connector, in canvas units growing down, owned by the link from card s to card d
+local function run(ctx, canvas, x1, y1, x2, y2, s, d)
     local bar = acquireBar(ctx, canvas)
-    local half = LINE_PX / 2
+    local half = _linePx / 2
     if x1 == x2 then
         bar:SetPoint("TOPLEFT", canvas, "TOPLEFT", x1 - half, -math.min(y1, y2))
-        bar:SetSize(LINE_PX, math.max(LINE_PX, math.abs(y2 - y1)))
+        bar:SetSize(_linePx, math.max(_linePx, math.abs(y2 - y1)))
     else
         bar:SetPoint("TOPLEFT", canvas, "TOPLEFT", math.min(x1, x2) - half, -(y1 - half))
-        bar:SetSize(math.abs(x2 - x1) + LINE_PX, LINE_PX)
+        bar:SetSize(math.abs(x2 - x1) + _linePx, _linePx)
     end
+    bar._s, bar._d = s, d
 end
 
--- Down, across in the gap above the child's row, and down again, so a split or a merge shares one run
-local function elbow(ctx, canvas, x1, y1, x2, y2)
-    local mid = y2 - GAP / 2
-    run(ctx, canvas, x1, y1, x1, mid)
-    if x1 ~= x2 then run(ctx, canvas, x1, mid, x2, mid) end
-    run(ctx, canvas, x2, mid, x2, y2)
+local function addSeg(x1, y1, x2, y2, s, d, role)
+    _segN = _segN + 1
+    local sg = _segs[_segN]
+    if not sg then sg = {} _segs[_segN] = sg end
+    sg.x1, sg.y1, sg.x2, sg.y2, sg.s, sg.d, sg.role = x1, y1, x2, y2, s, d, role
+end
+
+-- Down from the source, across in the gap above the child's row, and down into the child, so a split or a
+-- merge shares one run. A lane moves the run up or down in that gap.
+local function elbow(x1, y1, x2, y2, s, d, off)
+    local mid = y2 - GAP / 2 + (off or 0)
+    addSeg(x1, y1, x1, mid, s, d, "s")
+    if x1 ~= x2 then addSeg(x1, mid, x2, mid, s, d, "h") end
+    addSeg(x2, mid, x2, y2, s, d, "d")
 end
 
 -- Two cards side by side in one row, as a curated retail chain can place them, are joined straight across
-local function link(ctx, canvas, sx, sy, dx, dy)
+local function link(sx, sy, dx, dy, s, d)
     if sy ~= dy then
-        elbow(ctx, canvas, sx + CELL_W / 2, sy + CELL_H, dx + CELL_W / 2, dy)
+        elbow(sx + CELL_W / 2, sy + CELL_H, dx + CELL_W / 2, dy, s, d, _laneOff[s * PAIR + d])
         return
     end
     local y = sy + CELL_H / 2
-    if sx < dx then run(ctx, canvas, sx + CELL_W, y, dx, y) else run(ctx, canvas, dx + CELL_W, y, sx, y) end
+    if sx < dx then addSeg(sx + CELL_W, y, dx, y, s, d, "h") else addSeg(dx + CELL_W, y, sx, y, s, d, "h") end
+end
+
+local function byLoHi(a, b)
+    if a.lo ~= b.lo then return a.lo < b.lo end
+    return a.hi < b.hi
+end
+
+local function byLane(a, b)
+    if a.lo ~= b.lo then return a.lo < b.lo end
+    if a.hi ~= b.hi then return a.hi > b.hi end
+    return a.dsts[1] < b.dsts[1]
+end
+
+-- A run that reads as one line but joins a source to a child it does not lead to
+local function misleads(list, i, j)
+    local srcs, dsts, have = {}, {}, {}
+    for k = i, j do
+        local l = list[k]
+        srcs[l.s], dsts[l.d], have[l.s * PAIR + l.d] = true, true, true
+    end
+    for s in pairs(srcs) do
+        for d in pairs(dsts) do
+            if not have[s * PAIR + d] then return true end
+        end
+    end
+    return false
+end
+
+-- Each set of children with the same sources gets its own lane, and sets whose spans meet take different ones
+local function giveLanes(list, i, j, cols)
+    local srcsOf, order = {}, {}
+    for k = i, j do
+        local l = list[k]
+        local t = srcsOf[l.d]
+        if not t then t = {} srcsOf[l.d] = t order[#order + 1] = l.d end
+        t[#t + 1] = l.s
+    end
+    table.sort(order)
+    local groups, byKey = {}, {}
+    for _, d in ipairs(order) do
+        local srcs = srcsOf[d]
+        table.sort(srcs)
+        local key = table.concat(srcs, ",")
+        local g = byKey[key]
+        if not g then
+            g = { srcs = srcs, dsts = {}, src = {}, dst = {} }
+            for _, s in ipairs(srcs) do g.src[s] = true end
+            byKey[key] = g
+            groups[#groups + 1] = g
+        end
+        g.dsts[#g.dsts + 1] = d
+        g.dst[d] = true
+    end
+    for _, g in ipairs(groups) do
+        local lo, hi = math.huge, -math.huge
+        for _, s in ipairs(g.srcs) do lo, hi = math.min(lo, cols[s]), math.max(hi, cols[s]) end
+        for _, d in ipairs(g.dsts) do lo, hi = math.min(lo, cols[d]), math.max(hi, cols[d]) end
+        g.lo, g.hi = lo, hi
+    end
+    table.sort(groups, byLane)
+    local placed = {}
+    for _, g in ipairs(groups) do
+        local lane, clash = 1, true
+        while clash do
+            clash = false
+            for _, p in ipairs(placed) do
+                if p.lane == lane and not (p.hi < g.lo or g.hi < p.lo) then clash = true break end
+            end
+            if clash then lane = lane + 1 end
+        end
+        g.lane = lane
+        placed[#placed + 1] = g
+        local off = LANE_OFFSETS[math.min(lane, #LANE_OFFSETS)]
+        for _, s in ipairs(g.srcs) do
+            for _, d in ipairs(g.dsts) do
+                _laneOff[s * PAIR + d], _laneGroup[s * PAIR + d] = off, g
+            end
+        end
+    end
+end
+
+-- Links into one row whose runs overlap or touch read as one line, so only a row where that line misleads
+-- gets lanes, and every other row draws its runs where it always has
+local function assignLanes(links, cols)
+    wipe(_laneOff)
+    wipe(_laneGroup)
+    local byRow = {}
+    for _, l in ipairs(links) do
+        local list = byRow[l.row]
+        if not list then list = {} byRow[l.row] = list end
+        list[#list + 1] = l
+    end
+    for _, list in pairs(byRow) do
+        table.sort(list, byLoHi)
+        local i = 1
+        while i <= #list do
+            local j, hi = i, list[i].hi
+            while j < #list and list[j + 1].lo <= hi do
+                j = j + 1
+                if list[j].hi > hi then hi = list[j].hi end
+            end
+            if misleads(list, i, j) then giveLanes(list, i, j, cols) end
+            i = j + 1
+        end
+    end
+end
+
+local function joins(v, g)
+    return (v.role == "s" and g.src[v.s]) or (v.role == "d" and g.dst[v.d]) or false
+end
+
+-- A lane breaks where a line that does not join it crosses, so the two never read as touching
+local function drawSegs(ctx, canvas)
+    for k = 1, _segN do
+        local sg = _segs[k]
+        local g = sg.role == "h" and sg.y1 == sg.y2 and sg.d and _laneGroup[sg.s * PAIR + sg.d]
+        if g then
+            local lo, hi, y = math.min(sg.x1, sg.x2), math.max(sg.x1, sg.x2), sg.y1
+            wipe(_cuts)
+            for m = 1, _segN do
+                local v = _segs[m]
+                if v.x1 == v.x2 and v.y1 ~= v.y2 and not joins(v, g) then
+                    local vlo, vhi = math.min(v.y1, v.y2), math.max(v.y1, v.y2)
+                    if v.x1 > lo and v.x1 < hi and vlo < y and vhi > y then _cuts[#_cuts + 1] = v.x1 end
+                end
+            end
+            table.sort(_cuts)
+            local x = lo
+            for _, c in ipairs(_cuts) do
+                if c - CROSS_GAP > x then run(ctx, canvas, x, y, c - CROSS_GAP, y, sg.s, sg.d) end
+                x = math.max(x, c + CROSS_GAP)
+            end
+            if hi > x then run(ctx, canvas, x, y, hi, y, sg.s, sg.d) end
+        else
+            run(ctx, canvas, sg.x1, sg.y1, sg.x2, sg.y2, sg.s, sg.d)
+        end
+    end
+end
+
+-- The lines into and out of the card under the mouse take the accent, drawn over the rest. A fan's
+-- quests share their one line, the one into the panel from its hub
+function CV:LightLinks(index, hub)
+    local ctx = ui()
+    if not ctx then return end
+    for _, bar in ipairs(self.activeBars) do
+        local hot = index ~= nil and (bar._s == index or bar._d == index or (hub ~= nil and bar._s == hub and bar._d == nil))
+        bar:SetColorTexture(ctx:Color(hot and "accentHi" or "borderStrong"))
+        bar:SetDrawLayer("BACKGROUND", hot and 1 or 0)
+    end
 end
 
 local function statusForQuestItem(item, Characters)
@@ -472,6 +638,7 @@ end
 function nodeOnEnter(self)
     local area = areaOf(self)
     if area and area:IsPanGesture() then return end
+    CV:LightLinks(self._index, self._fan)
     if self._navKind == "chain" then
         buildChainNavTooltip(self._ref)
     elseif self._chain and self._chain._generated and classicSource() then
@@ -482,6 +649,7 @@ function nodeOnEnter(self)
 end
 
 function nodeOnLeave()
+    CV:LightLinks(nil)
     cardTip():Hide()
 end
 
@@ -547,7 +715,7 @@ local function computeLayout(items)
     for i = 1, n do getDepth(i) end
 
     local rowCursor = {}
-    local maxCol, maxRow = 0, 0
+    local minCol, maxCol, maxRow = 0, 0, 0
     for i = 1, n do
         local it = items[i]
         local col = it.x or depth[i] or 0
@@ -557,8 +725,14 @@ local function computeLayout(items)
             rowCursor[col] = row + 1
         end
         cols[i], rows[i] = col, row
+        if col < minCol then minCol = col end
         if col > maxCol then maxCol = col end
         if row > maxRow then maxRow = row end
+    end
+    -- A curated layout can start left of the first column (Zul'Aman's 90483 sits at -0.5)
+    if minCol < 0 then
+        for i = 1, n do cols[i] = cols[i] - minCol end
+        maxCol = maxCol - minCol
     end
     return cols, rows, maxCol, maxRow
 end
@@ -663,7 +837,8 @@ function CV:Render(pane, chain, highlightQuestID, again)
     -- A chain narrower than the view is centered in it
     local viewW = area.scroll and area.scroll:GetWidth() or 0
     local left = PAD_X + insetX
-    if viewW > contentW + PAD_X * 2 then left = (viewW - contentW) / 2 + insetX end
+    -- Whole units, as an uncentered chain's are
+    if viewW > contentW + PAD_X * 2 then left = math.floor((viewW - contentW) / 2) + insetX end
     local top = PAD_Y + insetX
     local function cellX(col) return left + col * COL_PITCH end
     local function cellY(row) return top + row * ROW_PITCH end
@@ -832,6 +1007,8 @@ function CV:Render(pane, chain, highlightQuestID, again)
             node.statusIcon:Hide()
         end
 
+        node._index   = i
+        node._fan     = items[i].fan
         node._ref     = resolved
         node._status  = statusKey
         node._reason  = _reasons[i]
@@ -863,6 +1040,10 @@ function CV:Render(pane, chain, highlightQuestID, again)
             end
         end
     end
+    -- Whole screen pixels, so every line draws the same width wherever it falls
+    _linePx = (PixelUtil and PixelUtil.GetNearestPixelSize and canvas.GetEffectiveScale)
+              and PixelUtil.GetNearestPixelSize(LINE_PX, canvas:GetEffectiveScale(), LINE_PX) or LINE_PX
+    _segN = 0
     -- One panel and one line for a wrapped fan, since a line to each of its quests would run through the rows above
     for hub in pairs(_fanL) do
         local fx, fy = cellX(_fanL[hub]) - FAN_PAD, cellY(_fanT[hub]) - FAN_PAD
@@ -873,18 +1054,36 @@ function CV:Render(pane, chain, highlightQuestID, again)
         panel:SetSize(fw, fh)
         local hx = cellX(cols[hub]) + CELL_W / 2
         local lx = math.min(math.max(hx, fx + FAN_LINE_EDGE), fx + fw - FAN_LINE_EDGE)
-        elbow(ctx, canvas, hx, cellY(rows[hub]) + CELL_H, lx, fy)
+        elbow(hx, cellY(rows[hub]) + CELL_H, lx, fy, hub, nil)
     end
 
+    local links = {}
+    for i = 1, #items do
+        local it = items[i]
+        if it.connections and nodes[i] and not (it.fan and _fanL[it.fan]) then
+            for _, src in ipairs(it.connections) do
+                if nodes[src] and rows[src] ~= rows[i] then
+                    links[#links + 1] = { s = src, d = i, row = rows[i],
+                                          lo = math.min(cols[src], cols[i]), hi = math.max(cols[src], cols[i]) }
+                end
+            end
+        end
+    end
+    assignLanes(links, cols)
     for i = 1, #items do
         local it = items[i]
         if it.connections and nodes[i] and not (it.fan and _fanL[it.fan]) then
             for _, src in ipairs(it.connections) do
                 if nodes[src] then
-                    link(ctx, canvas, cellX(cols[src]), cellY(rows[src]), cellX(cols[i]), cellY(rows[i]))
+                    link(cellX(cols[src]), cellY(rows[src]), cellX(cols[i]), cellY(rows[i]), src, i)
                 end
             end
         end
+    end
+    drawSegs(ctx, canvas)
+    -- A render under the mouse sends no OnEnter, so the card with the mouse is entered again, lines and tooltip
+    for i = 1, #items do
+        if nodes[i] and nodes[i]:IsMouseMotionFocus() then nodeOnEnter(nodes[i]) break end
     end
 
     -- At least the view's size, since the wheel and the drag live on the content

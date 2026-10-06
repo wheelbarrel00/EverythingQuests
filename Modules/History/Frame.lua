@@ -3,27 +3,25 @@ local L = ns.L
 
 local HF = ns:RegisterSubsystem("HistoryFrame", {})
 
-local TITLE_BAR_H = 22
-local TAB_BAR_H   = 28
-local TOOLBAR_H   = 30
-local ROW_H       = 36
+-- Narrower than 920 the filter bar and the Trends controls run past the body (measured on Barlow)
+local DEFAULT_W, DEFAULT_H, MIN_W, MIN_H, SIDEBAR_W = 1000, 660, 920, 480, 196
+local SIDE_PAD, SIDE_BOTTOM, SIDE_BUTTON_GAP = 8, 12, 8
+local PAD_TOP, PAD_SIDE, PAD_BOTTOM = 20, 24, 28
+local BAR_TOP, BAR_BOTTOM, BAR_ROW_GAP, FIELD_H, FIELD_GAP, CHECK_GAP = 14, 12, 8, 30, 10, 16
+local SEARCH_W, CHAR_W, DATE_W, TYPE_W, SORT_W, DIR_SIZE = 280, 180, 140, 150, 110, 30
+local ROW_H, SUB_H, SUB_INDENT, ROW_ICON, ROW_GAP, INTRO_PAD = 44, 28, 64, 16, 12, 16
+local GROUP_GAP, LABEL_GAP, CARD_PAD, TILE_GAP, LINE_GAP = 22, 8, 14, 14, 4
+local CELL, CELL_GAP, HEATMAP_DAYS, HEATMAP_ROWS, SWATCH = 16, 3, 91, 7, 14
+local CHART_H, BAR_SPACING, MAX_BARS = 160, 3, 30
+local MAX_ROWS = 500
+local HINT_GAP = 4
+local BAR_ROOM = 10
+local SEP = "  \226\128\162  "
+local DASH = "\226\128\148"
 
-local HEATMAP_DAYS = 91
-local HEATMAP_ROWS = 7
-local HEATMAP_COLS = 13
-local CELL_SIZE    = 16
-local CELL_GAP     = 3
-
-local YELLOW      = ns.Util.color.buttonYellow
-local HEADER_RED  = ns.Util.color.brandRed
-local MUTED       = ns.Util.color.muted
-local DIM         = ns.Util.color.dim
-
-local FONT_FILE = "Fonts\\ARIALN.TTF"
-local function thin(fs)
-    if not (fs and fs.GetFont and fs.SetFont) then return end
-    local _, sz, fl = fs:GetFont()
-    fs:SetFont(FONT_FILE, sz or 12, fl or "")
+local function windowCfg()
+    local DB = ns:GetSubsystem("DB")
+    return DB and DB.db and DB.db.profile and DB.db.profile.historyWindow
 end
 
 local function fmtTime(t)
@@ -31,468 +29,73 @@ local function fmtTime(t)
     return date("%Y-%m-%d %H:%M", t)
 end
 
-HF._rowPool   = {}
-HF._rowActive = {}
-
-local findChainForQuest
-
-local function rowOnMouseUp(self, button)
-    local kind = self._kind
-    if kind == "history" then
-        if button ~= "RightButton" then return end
-        local chainID = findChainForQuest(self._questID)
-        if chainID then
-            local CG = ns:GetSubsystem("ChainGuide")
-            if CG then
-                if CG.Open          then CG:Open()                end
-                if CG.NavigateChain then CG:NavigateChain(chainID) end
-            end
-        else
-            print((L["|cffEBB706EQ History|r: |cffffffff%s|r isn't part of any chain in the Chain Guide."]):format(
-                self._fullName or ("Quest #" .. tostring(self._questID))))
-        end
-    elseif kind == "timeline" then
-        if button == "RightButton" then
-            local CG = ns:GetSubsystem("ChainGuide")
-            if CG then
-                if CG.Open          then CG:Open()              end
-                if CG.NavigateChain then CG:NavigateChain(self._chainID) end
-            end
-            return
-        end
-        HF._timelineOpen[self._chainID] = not HF._timelineOpen[self._chainID]
-        HF:_renderTimeline()
-    end
+local function fmtMoney(copper)
+    copper = copper or 0
+    if GetCoinTextureString then return GetCoinTextureString(copper) end
+    local g = math.floor(copper / 10000)
+    local s = math.floor((copper % 10000) / 100)
+    local c = copper % 100
+    return (L["%dg %ds %dc"]):format(g, s, c)
 end
 
-local function rowOnEnter(self)
-    local kind = self._kind
-    if kind == "history" then
-        GameTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT")
-        GameTooltip:SetText(self._fullName or ("Quest #" .. tostring(self._questID)), 1, 1, 1, 1, true)
-        if self._held and self._held > 0 and self._accepted then
-            GameTooltip:AddLine((L["Accepted %1$s, held %2$s"]):format(
-                fmtTime(self._accepted),
-                ns.Util.FmtDurationLong(self._held)), YELLOW[1], YELLOW[2], YELLOW[3])
-        end
-        GameTooltip:AddLine(L["Right-click to open in the Chain Guide"], 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    elseif kind == "timeline" then
-        GameTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT")
-        GameTooltip:SetText(self._chainName or L["Chain"], 1, 0.82, 0)
-        GameTooltip:AddLine(L["Click to expand"], 0.7, 0.7, 0.7)
-        GameTooltip:AddLine(L["Right-click to open in the Chain Guide"], 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end
+local function fmtBigNumber(n)
+    if not n then return "0" end
+    if BreakUpLargeNumbers then return BreakUpLargeNumbers(n) end
+    return tostring(n)
 end
 
-local function rowOnLeave() GameTooltip:Hide() end
-
-local function buildRow(parent)
-    local r = CreateFrame("Frame", nil, parent)
-    r:SetHeight(ROW_H)
-    local hl = r:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.05)
-
-    r.title = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    r.title:SetHeight(15)
-    r.title:SetPoint("TOPLEFT",  6, -5)
-    r.title:SetPoint("TOPRIGHT", -160, -5)
-    r.title:SetJustifyH("LEFT")
-    r.title:SetWordWrap(false)
-
-    r.meta = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    r.meta:SetHeight(11)
-    r.meta:SetPoint("TOPLEFT",  r.title, "BOTTOMLEFT",  0, -2)
-    r.meta:SetPoint("TOPRIGHT", r.title, "BOTTOMRIGHT", 0, -2)
-    r.meta:SetJustifyH("LEFT")
-    r.meta:SetWordWrap(false)
-
-    r.right = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.right:SetPoint("RIGHT", -8, 0)
-    r.right:SetJustifyH("RIGHT")
-    r.right:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-
-    thin(r.title); thin(r.meta); thin(r.right)
-
-    r:SetScript("OnMouseUp", rowOnMouseUp)
-    r:SetScript("OnEnter",   rowOnEnter)
-    r:SetScript("OnLeave",   rowOnLeave)
-    return r
+local function formatMetric(key, v)
+    v = v or 0
+    if key == "gold" then return fmtMoney(v) end
+    if key == "xp"   then return (L["%s XP"]):format(fmtBigNumber(v)) end
+    return fmtBigNumber(v) .. (v == 1 and " quest" or " quests")
 end
 
-local function acquireRow(parent)
-    return ns.Util.AcquirePooled(HF._rowPool, HF._rowActive, parent, buildRow)
+-- A sign, not a color: the library has no green, and its red means danger
+local function fmtDelta(key, d)
+    if d == 0 then return "no change" end
+    -- On the number, since some languages put their word for XP first
+    local sign = d > 0 and "+" or "-"
+    if key == "gold" then return sign .. fmtMoney(math.abs(d)) end
+    local mag = sign .. fmtBigNumber(math.abs(d))
+    if key == "xp" then return (L["%s XP"]):format(mag) end
+    return mag
 end
 
-local function releaseAllRows()
-    for i = #HF._rowActive, 1, -1 do
-        local r = HF._rowActive[i]
-        r:Hide()
-        r:ClearAllPoints()
-        r.title:SetText("")
-        r.meta:SetText("")
-        r.right:SetText("")
-        r.right:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-        r:EnableMouse(false)
-        r._kind = nil
-        r._questID, r._fullName = nil, nil
-        r._held, r._accepted = nil, nil
-        r._chainID, r._chainName = nil, nil
-        HF._rowPool[#HF._rowPool + 1] = r
-        HF._rowActive[i] = nil
-    end
+local function ui()
+    return HF._ctx
 end
 
-function HF:Build()
-    if self.frame then return end
+HF._pools, HF._active = {}, {}
 
-    local f = CreateFrame("Frame", "EQHistoryFrame", UIParent, "BackdropTemplate")
-    f:SetSize(700, 460)
-    f:SetPoint("CENTER")
-    -- One strata above the Options frame so History pops over it when opened from the History tab
-    f:SetFrameStrata("FULLSCREEN_DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop",  f.StopMovingOrSizing)
-    f:SetClampedToScreen(true)
-    f:Hide()
-
-    f:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    f:SetBackdropColor(unpack(ns.Util.color.optionsBg))
-    f:SetBackdropBorderColor(HEADER_RED[1], HEADER_RED[2], HEADER_RED[3], 1)
-
-    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.title:SetPoint("TOPLEFT", 12, -10)
-    f.title:SetText(L["Quest History"])
-    f.title:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-    thin(f.title)
-
-    f.close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    f.close:SetPoint("TOPRIGHT", -4, -4)
-    f.close:SetScript("OnClick", function() f:Hide() end)
-
-    local function makeTitleButton(label, width, onClick)
-        local b = CreateFrame("Button", nil, f, "BackdropTemplate")
-        b:SetSize(width, 20)
-        local bg = b:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetColorTexture(0.10, 0.10, 0.10, 0.95)
-        b.text = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        b.text:SetPoint("CENTER")
-        b.text:SetText(label)
-        b.text:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-        thin(b.text)
-        b:SetScript("OnClick", onClick)
-        return b
-    end
-
-    f.export = makeTitleButton(L["Export"], 70, function() HF:_openExportPopup() end)
-    f.export:SetPoint("RIGHT", f.close, "LEFT", -2, 0)
-
-    f.rescan = makeTitleButton(L["Re-scan names"], 110, function()
-        local R = ns:GetSubsystem("History")
-        if not R then return end
-        local queued = R:RequestMissingTitles() or 0
-        if queued > 0 then
-            print((L["|cffEBB706EQ History:|r requested %d quest name%s from the server. Names will fill in over the next minute or two."]):format(
-                queued, queued == 1 and "" or "s"))
-        else
-            print(L["|cffEBB706EQ History:|r nothing left to look up — every entry that can be resolved already is."])
-        end
-    end)
-    f.rescan:SetPoint("RIGHT", f.export, "LEFT", -4, 0)
-    f.rescan:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:SetText(L["Re-scan for quest names"], 1, 0.82, 0, 1, true)
-        GameTooltip:AddLine(L["Asks the server for the name of any \"Quest #12345\" entries. They'll fill in over the next minute or two as responses arrive."], 0.7, 0.7, 0.7, true)
-        GameTooltip:Show()
-    end)
-    f.rescan:SetScript("OnLeave", GameTooltip_Hide)
-
-    local tabRow = CreateFrame("Frame", nil, f)
-    tabRow:SetPoint("TOPLEFT",  10, -(TITLE_BAR_H + 14))
-    tabRow:SetPoint("TOPRIGHT", -10, -(TITLE_BAR_H + 14))
-    tabRow:SetHeight(TAB_BAR_H)
-    f._tabRow = tabRow
-
-    self._tabs = {}
-    local function makeTab(id, label)
-        local b = CreateFrame("Button", nil, tabRow)
-        b:SetSize(110, TAB_BAR_H - 4)
-        b.bg = b:CreateTexture(nil, "BACKGROUND")
-        b.bg:SetAllPoints()
-        b.bg:SetColorTexture(0, 0, 0, 0.5)
-        b.hl = b:CreateTexture(nil, "HIGHLIGHT")
-        b.hl:SetAllPoints()
-        b.hl:SetColorTexture(1, 1, 1, 0.08)
-        b.text = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        b.text:SetPoint("CENTER")
-        b.text:SetText(label)
-        thin(b.text)
-        b:SetScript("OnClick", function() HF:SwitchTab(id) end)
-        b._id = id
-        return b
-    end
-    self._tabs.quests   = makeTab("quests",   L["Quests"])
-    self._tabs.streak   = makeTab("streak",   L["Streak"])
-    self._tabs.timeline = makeTab("timeline", L["Chain Timeline"])
-    self._tabs.activity = makeTab("activity", L["Activity"])
-    self._tabs.totals   = makeTab("totals",   L["Stats"])
-    self._tabs.session  = makeTab("session",  L["This Session"])
-    self._tabs.quests:SetPoint("LEFT", tabRow, "LEFT", 0, 0)
-    self._tabs.streak:SetPoint("LEFT", self._tabs.quests, "RIGHT", 4, 0)
-    self._tabs.timeline:SetPoint("LEFT", self._tabs.streak, "RIGHT", 4, 0)
-    self._tabs.activity:SetPoint("LEFT", self._tabs.timeline, "RIGHT", 4, 0)
-    self._tabs.totals:SetPoint("LEFT", self._tabs.activity, "RIGHT", 4, 0)
-    self._tabs.session:SetPoint("LEFT", self._tabs.totals, "RIGHT", 4, 0)
-
-    local content = CreateFrame("Frame", nil, f)
-    content:SetPoint("TOPLEFT",     10, -(TITLE_BAR_H + 14 + TAB_BAR_H + 4))
-    content:SetPoint("BOTTOMRIGHT", -10, 10)
-    f._content = content
-
-    self.frame = f
-    self:_buildPanes(content)
-    self:SwitchTab("quests")
-end
-
-function HF:_buildPanes(content)
-    self._panes = {
-        quests   = self:_buildQuestsPane(content),
-        streak   = self:_buildStreakPane(content),
-        timeline = self:_buildTimelinePane(content),
-        activity = self:_buildHeatmapPane(content),
-        totals   = self:_buildTotalsPane(content),
-        session  = self:_buildSessionPane(content),
-    }
-end
-
-function HF:SwitchTab(id)
-    if not self._panes then return end
-    for k, pane in pairs(self._panes) do
-        if k == id then pane:Show() else pane:Hide() end
-    end
-    for k, b in pairs(self._tabs) do
-        if k == id then
-            b.bg:SetColorTexture(HEADER_RED[1], HEADER_RED[2], HEADER_RED[3], 0.85)
-            b.text:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-        else
-            b.bg:SetColorTexture(0, 0, 0, 0.5)
-            b.text:SetTextColor(0.85, 0.85, 0.85)
+local function release(page)
+    local active = HF._active[page]
+    if not active then return end
+    for kind, list in pairs(active) do
+        local pool = HF._pools[page .. kind]
+        for i = #list, 1, -1 do
+            local w = list[i]
+            w:Hide()
+            w:ClearAllPoints()
+            pool[#pool + 1] = w
+            list[i] = nil
         end
     end
-    self._activeTab = id
-    self:Render()
 end
 
-function HF:_buildQuestsPane(parent)
-    local pane = CreateFrame("Frame", nil, parent)
-    pane:SetAllPoints()
-    pane:Hide()
-
-    local Options = ns:GetSubsystem("Options")
-
-    local row1 = CreateFrame("Frame", nil, pane)
-    row1:SetPoint("TOPLEFT", 0, 0)
-    row1:SetPoint("TOPRIGHT", 0, 0)
-    row1:SetHeight(TOOLBAR_H)
-
-    local search = CreateFrame("EditBox", nil, row1, "SearchBoxTemplate")
-    search:SetSize(220, 20)
-    search:SetPoint("LEFT", row1, "LEFT", 6, 0)
-    search:SetAutoFocus(false)
-    search:SetScript("OnTextChanged", function(eb, userInput)
-        if SearchBoxTemplate_OnTextChanged then SearchBoxTemplate_OnTextChanged(eb) end
-        if not userInput then return end
-        local Events = ns:GetSubsystem("Events")
-        if Events and Events.Debounce then
-            Events:Debounce("eq.history.search", 0.2, function() HF:Render() end)
-        else
-            HF:Render()
-        end
-    end)
-    pane._search = search
-
-    local charLabel = row1:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    charLabel:SetPoint("LEFT", search, "RIGHT", 14, 0)
-    charLabel:SetText(L["Character:"])
-    thin(charLabel)
-
-    local charDD
-    if Options and Options.CreateDropdown then
-        local function listFn()
-            local R = ns:GetSubsystem("History")
-            local out = { { value = "all", label = L["All characters"] } }
-            if R then
-                local chars = R:GetCharacters()
-                for i = 1, #chars do
-                    out[#out + 1] = { value = chars[i], label = chars[i] }
-                end
-            end
-            return out
-        end
-        local function curFn() return HF._charFilter or "all" end
-        local function setFn(v) HF._charFilter = v; HF:Render() end
-        charDD = Options:CreateDropdown(row1, nil, listFn, curFn, setFn)
-        charDD:SetPoint("LEFT", charLabel, "RIGHT", 4, 0)
-        charDD:SetWidth(180)
-    end
-    pane._charDD = charDD
-
-    pane._count = row1:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    pane._count:SetPoint("RIGHT", row1, "RIGHT", -6, 0)
-    pane._count:SetText("")
-    thin(pane._count)
-
-    local row2 = CreateFrame("Frame", nil, pane)
-    row2:SetPoint("TOPLEFT",  row1, "BOTTOMLEFT",  0, -2)
-    row2:SetPoint("TOPRIGHT", row1, "BOTTOMRIGHT", 0, -2)
-    row2:SetHeight(TOOLBAR_H)
-
-    local dateLabel = row2:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    dateLabel:SetPoint("LEFT", row2, "LEFT", 6, 0)
-    dateLabel:SetText(L["Date:"])
-    thin(dateLabel)
-
-    local DATE_OPTIONS = {
-        { value = "all",   label = L["All time"] },
-        { value = "today", label = L["Today"] },
-        { value = "7d",    label = L["Past 7 days"] },
-        { value = "30d",   label = L["Past 30 days"] },
-    }
-    local dateDD
-    if Options and Options.CreateDropdown then
-        local function listFn() return DATE_OPTIONS end
-        local function curFn()  return HF._dateFilter or "all" end
-        local function setFn(v) HF._dateFilter = v; HF:Render() end
-        dateDD = Options:CreateDropdown(row2, nil, listFn, curFn, setFn)
-        dateDD:SetPoint("LEFT", dateLabel, "RIGHT", 4, 0)
-        dateDD:SetWidth(130)
-    end
-    pane._dateDD = dateDD
-
-    local typeLabel = row2:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    typeLabel:SetPoint("LEFT", dateDD or dateLabel, "RIGHT", 14, 0)
-    typeLabel:SetText(L["Type:"])
-    thin(typeLabel)
-
-    local CLASS_OPTIONS = {
-        { value = "all",        label = L["All types"]   },
-        { value = "campaign",   label = L["Campaign"]    },
-        { value = "questline",  label = L["Questline"]   },
-        { value = "calling",    label = L["Calling"]     },
-        { value = "recurring",  label = L["Recurring"]   },
-        { value = "worldquest", label = L["World Quest"] },
-        { value = "other",      label = L["Other"]       },
-    }
-    local classDD
-    if Options and Options.CreateDropdown then
-        local function listFn() return CLASS_OPTIONS end
-        local function curFn()  return HF._classFilter or "all" end
-        local function setFn(v) HF._classFilter = v; HF:Render() end
-        classDD = Options:CreateDropdown(row2, nil, listFn, curFn, setFn)
-        classDD:SetPoint("LEFT", typeLabel, "RIGHT", 4, 0)
-        classDD:SetWidth(150)
-    end
-    pane._classDD = classDD
-
-    local sortLabel = row2:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    sortLabel:SetPoint("LEFT", classDD or typeLabel, "RIGHT", 14, 0)
-    sortLabel:SetText(L["Sort:"])
-    thin(sortLabel)
-
-    local SORT_OPTIONS = {
-        { value = "date", label = L["Date"] },
-        { value = "name", label = L["Name"] },
-        { value = "type", label = L["Type"] },
-    }
-    local sortDD
-    if Options and Options.CreateDropdown then
-        local function listFn() return SORT_OPTIONS end
-        local function curFn()  return HF._sortBy or "date" end
-        local function setFn(v) HF._sortBy = v; HF:Render() end
-        sortDD = Options:CreateDropdown(row2, nil, listFn, curFn, setFn)
-        sortDD:SetPoint("LEFT", sortLabel, "RIGHT", 4, 0)
-        sortDD:SetWidth(90)
-    end
-    pane._sortDD = sortDD
-
-    local dirBtn = CreateFrame("Button", nil, row2)
-    dirBtn:SetSize(22, 20)
-    dirBtn:SetPoint("LEFT", sortDD or sortLabel, "RIGHT", 2, 0)
-    local dirHL = dirBtn:CreateTexture(nil, "HIGHLIGHT")
-    dirHL:SetAllPoints()
-    dirHL:SetColorTexture(1, 1, 1, 0.10)
-    local arrow = dirBtn:CreateTexture(nil, "ARTWORK")
-    arrow:SetSize(16, 16)
-    arrow:SetPoint("CENTER")
-    arrow:SetTexture("Interface\\Buttons\\UI-SortArrow")
-    local function syncArrow()
-        if (HF._sortDir or "desc") == "asc" then
-            arrow:SetTexCoord(0, 1, 0, 1)
-        else
-            arrow:SetTexCoord(0, 1, 1, 0)
-        end
-    end
-    syncArrow()
-    dirBtn:SetScript("OnClick", function()
-        HF._sortDir = ((HF._sortDir or "desc") == "desc") and "asc" or "desc"
-        syncArrow()
-        HF:Render()
-    end)
-    dirBtn:SetScript("OnEnter", function(btn)
-        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
-        GameTooltip:SetText(L["Sort direction"], 1, 1, 1)
-        GameTooltip:AddLine(L["Click to flip ascending / descending."], 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    dirBtn:SetScript("OnLeave", GameTooltip_Hide)
-    pane._dirBtn = dirBtn
-
-    if Options and Options.CreateCheckbox then
-        local function get() return HF._hideBackfilled and true or false end
-        local function set(v) HF._hideBackfilled = v and true or false; HF:Render() end
-        local hideCB = Options:CreateCheckbox(row2,
-            L["Hide undated  |cffaaaaaa(backfilled)|r"],
-            get, set)
-        hideCB:ClearAllPoints()
-        hideCB.label:ClearAllPoints()
-        hideCB.label:SetPoint("RIGHT", row2, "RIGHT", -6, 1)
-        hideCB:SetPoint("RIGHT", hideCB.label, "LEFT", -4, -1)
-        pane._hideCB = hideCB
-    end
-
-    local listTop = TOOLBAR_H * 2 + 4
-    local scroll = CreateFrame("ScrollFrame", nil, pane, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT",     0, -listTop)
-    scroll:SetPoint("BOTTOMRIGHT", -22, 0)
-    pane._scroll = scroll
-
-    local canvas = CreateFrame("Frame", nil, scroll)
-    canvas:SetSize(1, 1)
-    scroll:SetScrollChild(canvas)
-    pane._canvas = canvas
-
-    pane._empty = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._empty:SetPoint("CENTER")
-    pane._empty:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    pane._empty:SetText(L["(no matching quests)"])
-    pane._empty:Hide()
-    thin(pane._empty)
-
-    return pane
+local function acquire(page, kind, make)
+    local key = page .. kind
+    HF._pools[key] = HF._pools[key] or {}
+    HF._active[page] = HF._active[page] or {}
+    HF._active[page][kind] = HF._active[page][kind] or {}
+    local w = table.remove(HF._pools[key]) or make()
+    w:Show()
+    local list = HF._active[page][kind]
+    list[#list + 1] = w
+    return w
 end
 
--- Assigns the forward-declared upvalue - do NOT re-local this function
-function findChainForQuest(questID)
+local function findChainForQuest(questID)
     local Database = ns:GetSubsystem("ChainGuideDatabase")
     local QLS      = ns:GetSubsystem("ChainGuideQuestLineSource")
     local CS       = ns:GetSubsystem("ChainGuideCampaignSource")
@@ -513,8 +116,11 @@ function findChainForQuest(questID)
         if items then
             for i = 1, #items do
                 local it = items[i]
-                if it and it.type == "quest" and it.id == questID then
-                    return chainID
+                if it and it.type == "quest" then
+                    if it.id == questID then return chainID end
+                    for _, v in ipairs(it.variations or {}) do
+                        if v.id == questID then return chainID end
+                    end
                 end
             end
         end
@@ -522,18 +128,288 @@ function findChainForQuest(questID)
     return nil
 end
 
-function HF:_renderQuests()
-    local pane = self._panes.quests
+local function openChain(chainID, questID)
+    local CG = ns:GetSubsystem("ChainGuide")
+    if not CG then return end
+    if CG.Open          then CG:Open()                         end
+    if CG.NavigateChain then CG:NavigateChain(chainID, questID) end
+end
+
+local function setResizeHintSeen(f)
+    local cfg = windowCfg()
+    if cfg then cfg.resizeHintSeen = true end
+    if f.resizeHint then f.resizeHint:Hide() end
+end
+
+local function rowButton(ctx, parent, height)
+    local r = CreateFrame("Button", nil, parent)
+    r:SetHeight(height)
+    r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    local hl = r:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(ctx:Color("hover"))
+    ctx:Paint(r, nil, "divider", "B")
+    r:SetScript("OnLeave", function() ctx:HideTooltip() end)
+    return r
+end
+
+local function dropdownOptions(list)
+    local out = {}
+    for _, o in ipairs(list) do out[#out + 1] = { value = o[1], label = o[2] } end
+    return out
+end
+
+local DATE_OPTIONS = {
+    { "all", L["All time"] }, { "today", L["Today"] }, { "7d", L["Past 7 days"] }, { "30d", L["Past 30 days"] },
+}
+local TYPE_OPTIONS = {
+    { "all", L["All types"] }, { "campaign", L["Campaign"] }, { "questline", L["Questline"] },
+    { "calling", L["Calling"] }, { "recurring", L["Recurring"] }, { "worldquest", L["World Quest"] }, { "other", L["Other"] },
+}
+local SORT_OPTIONS = { { "date", L["Date"] }, { "name", L["Name"] }, { "type", L["Type"] } }
+
+local function characterOptions()
     local R = ns:GetSubsystem("History")
-    releaseAllRows()
-    if not R then return end
+    local out = { { value = "all", label = L["All characters"] } }
+    if R then
+        for _, c in ipairs(R:GetCharacters()) do out[#out + 1] = { value = c, label = c } end
+    end
+    return out
+end
 
-    local searchText = pane._search and pane._search:GetText() or ""
-    -- SearchBoxTemplate stores its placeholder as the text when unfocused.
-    if searchText == SEARCH then searchText = "" end
+local function syncSortArrow(b)
+    local up = (HF._sortDir or "desc") == "asc"
+    for _, t in ipairs({ b:GetNormalTexture(), b:GetDisabledTexture() }) do
+        if up then t:SetTexCoord(0, 1, 1, 0) else t:SetTexCoord(0, 1, 0, 1) end
+    end
+end
 
-    local entries = R:Query({
-        search         = searchText,
+local function debounced(key, fn)
+    local Events = ns:GetSubsystem("Events")
+    if Events and Events.Debounce then Events:Debounce(key, 0.2, fn) else fn() end
+end
+
+local function buildQuestsPage(ctx, page)
+    local bar = CreateFrame("Frame", nil, page)
+    bar:SetPoint("TOPLEFT")
+    bar:SetPoint("TOPRIGHT")
+    bar:SetHeight(BAR_TOP + FIELD_H + BAR_ROW_GAP + FIELD_H + BAR_BOTTOM)
+    bar._controls = {}
+    ctx:Paint(bar, nil, "divider", "B")
+    page.bar = bar
+
+    page.search = ctx:CreateSearchField(bar, L["Find quest"], function() HF:Render() end)
+    page.search:SetPoint("TOPLEFT", bar, "TOPLEFT", PAD_SIDE, -BAR_TOP)
+    page.search:SetWidth(SEARCH_W)
+    page.search.box:HookScript("OnTextChanged", function(_, userInput)
+        if userInput then debounced("eq.history.search", function() HF:Render() end) end
+    end)
+
+    page.hideUndated = ctx:CreateCheckbox(bar, L["Hide undated  |cffaaaaaa(backfilled)|r"],
+        function() return HF._hideBackfilled == true end,
+        function(v) HF._hideBackfilled = v and true or nil; HF:Render() end)
+    page.hideUndated:SetPoint("LEFT", page.search, "RIGHT", CHECK_GAP, 0)
+
+    page.count = ctx:CreateText(bar, "", "hint")
+    page.count:SetPoint("RIGHT", bar, "TOPRIGHT", -PAD_SIDE, -(BAR_TOP + FIELD_H / 2))
+
+    local function dd(options, width, getter, setter, anchor)
+        local d = ctx:CreateDropdown(bar, nil, options, getter, setter)
+        d:SetWidth(width)
+        if anchor then d:SetPoint("LEFT", anchor, "RIGHT", FIELD_GAP, 0)
+        else d:SetPoint("TOPLEFT", page.search, "BOTTOMLEFT", 0, -BAR_ROW_GAP) end
+        return d
+    end
+    page.char = dd(characterOptions, CHAR_W, function() return HF._charFilter or "all" end,
+        function(v) HF._charFilter = v; HF:Render() end)
+    page.date = dd(function() return dropdownOptions(DATE_OPTIONS) end, DATE_W,
+        function() return HF._dateFilter or "all" end, function(v) HF._dateFilter = v; HF:Render() end, page.char)
+    page.type = dd(function() return dropdownOptions(TYPE_OPTIONS) end, TYPE_W,
+        function() return HF._classFilter or "all" end, function(v) HF._classFilter = v; HF:Render() end, page.date)
+    page.sortLabel = ctx:CreateText(bar, L["Sort:"], "label")
+    page.sortLabel:SetPoint("LEFT", page.type, "RIGHT", CHECK_GAP, 0)
+    page.sort = ctx:CreateDropdown(bar, nil, function() return dropdownOptions(SORT_OPTIONS) end,
+        function() return HF._sortBy or "date" end, function(v) HF._sortBy = v; HF:Render() end)
+    page.sort:SetWidth(SORT_W)
+    page.sort:SetPoint("LEFT", page.sortLabel, "RIGHT", FIELD_GAP, 0)
+    page.dir = ctx:CreateIconButton(bar, "chevron-down", DIR_SIZE)
+    page.dir:SetPoint("LEFT", page.sort, "RIGHT", LINE_GAP, 0)
+    ctx:AttachTooltip(page.dir, L["Sort direction"], L["Click to flip ascending / descending."])
+    page.dir:SetScript("OnClick", function(b)
+        HF._sortDir = ((HF._sortDir or "desc") == "desc") and "asc" or "desc"
+        syncSortArrow(b)
+        HF:Render()
+    end)
+    syncSortArrow(page.dir)
+
+    page.area = ctx:CreateScrollArea(page, {})
+    page.area:SetPoint("TOPLEFT", bar, "BOTTOMLEFT")
+    page.area:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT")
+    page.empty = ctx:CreateEmptyState(page.area, L["(no matching quests)"])
+    page.empty:SetPoint("TOP", page.area, "CENTER", 0, 8)
+end
+
+local function buildIntroPage(ctx, page, intro)
+    page.intro = ctx:CreateText(page, intro, "hint")
+    page.intro:SetPoint("TOPLEFT", page, "TOPLEFT", PAD_SIDE, -INTRO_PAD)
+    page.intro:SetPoint("TOPRIGHT", page, "TOPRIGHT", -PAD_SIDE, -INTRO_PAD)
+    page.intro:SetWordWrap(true)
+    page.head = CreateFrame("Frame", nil, page)
+    page.head:SetPoint("TOPLEFT")
+    page.head:SetPoint("TOPRIGHT")
+    page.head:SetHeight(INTRO_PAD * 2 + 15)
+    ctx:Paint(page.head, nil, "divider", "B")
+    page.area = ctx:CreateScrollArea(page, {})
+    page.area:SetPoint("TOPLEFT", page.head, "BOTTOMLEFT")
+    page.area:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT")
+end
+
+function HF:Build()
+    if self.frame then return end
+    local Options = ns:GetSubsystem("Options")
+    local ctx = Options.ui
+    self._ctx = ctx
+
+    local f = ctx:CreateWindow({
+        name = "EQHistoryFrame", title = L["Quest History"],
+        width = DEFAULT_W, height = DEFAULT_H, minWidth = MIN_W, minHeight = MIN_H,
+        sidebarWidth = SIDEBAR_W, gripTip = L["Drag to resize"],
+        getSize = function()
+            local cfg = windowCfg()
+            if cfg then return cfg.width, cfg.height end
+        end,
+        setSize = function(w, h)
+            local cfg = windowCfg()
+            if cfg then cfg.width, cfg.height = w, h end
+        end,
+        getMaximized = function()
+            local cfg = windowCfg()
+            return cfg and cfg.maximized or false
+        end,
+        setMaximized = function(on)
+            local cfg = windowCfg()
+            if cfg then cfg.maximized = on or nil end
+        end,
+        onResize = function(win)
+            setResizeHintSeen(win)
+            self:Render()
+        end,
+    })
+    self.frame = f
+
+    f.resizeHint = ctx:CreateText(f.grip, L["Drag to resize"], "hint")
+    f.resizeHint:SetPoint("RIGHT", f.grip, "LEFT", -HINT_GAP, 0)
+    local cfg = windowCfg()
+    if cfg and cfg.resizeHintSeen then f.resizeHint:Hide() end
+
+    self._pages = {
+        { id = "quests",   title = L["Quests"],         icon = ctx:Texture("icon-history") },
+        { id = "timeline", title = L["Chain Timeline"], icon = ctx:Texture("icon-chain") },
+        { id = "stats",    title = L["Stats"],          icon = ctx:Texture("icon-stats") },
+    }
+    f.nav = ctx:CreateNav(f.sidebar, self._pages, function(id) self:SwitchTab(id) end)
+
+    local width = SIDEBAR_W - SIDE_PAD * 2
+    f.export = ctx:CreateButton(f.sidebar, L["Export"], width, function() self:_openExportPopup() end)
+    f.export:SetPoint("BOTTOMLEFT", f.sidebar, "BOTTOMLEFT", SIDE_PAD, SIDE_BOTTOM)
+    f.rescan = ctx:CreateButton(f.sidebar, L["Re-scan names"], width, function()
+        local R = ns:GetSubsystem("History")
+        if not R then return end
+        local queued = R:RequestMissingTitles() or 0
+        if queued > 0 then
+            print((L["|cffEBB706EQ History:|r requested %d quest name%s from the server. Names will fill in over the next minute or two."]):format(
+                queued, queued == 1 and "" or "s"))
+        else
+            print(L["|cffEBB706EQ History:|r nothing left to look up — every entry that can be resolved already is."])
+        end
+    end)
+    f.rescan:SetPoint("BOTTOMLEFT", f.export, "TOPLEFT", 0, SIDE_BUTTON_GAP)
+    ctx:AttachTooltip(f.rescan, L["Re-scan for quest names"],
+        L["Asks the server for the name of any \"Quest #12345\" entries. They'll fill in over the next minute or two as responses arrive."])
+
+    self._views = {}
+    for _, p in ipairs(self._pages) do
+        local view = CreateFrame("Frame", nil, f.body)
+        view:SetAllPoints(f.body)
+        view:Hide()
+        self._views[p.id] = view
+    end
+    buildQuestsPage(ctx, self._views.quests)
+    buildIntroPage(ctx, self._views.timeline,
+        L["Chains where you have at least one completed quest. Click a chain to expand and see per-quest completion dates."])
+    self._views.timeline.empty = ctx:CreateEmptyState(self._views.timeline.area, L["(no chain quests recorded yet)"])
+    self._views.timeline.empty:SetPoint("TOP", self._views.timeline.area, "CENTER", 0, 8)
+    local stats = self._views.stats
+    stats.area = ctx:CreateScrollArea(stats, {})
+    stats.area:SetAllPoints(stats)
+    stats.area.content._controls = {}
+
+    self._timelineOpen = self._timelineOpen or {}
+    self._trendGran, self._trendMetric, self._trendCharFilter = "daily", "gold", "all"
+    self:SwitchTab("quests")
+end
+
+function HF:SwitchTab(id)
+    if not self._views then return end
+    for key, view in pairs(self._views) do view:SetShown(key == id) end
+    self.frame.nav:Select(id)
+    for _, p in ipairs(self._pages) do
+        if p.id == id then self.frame:SetSection(p.title) end
+    end
+    self._activeTab = id
+    self:Render()
+end
+
+function HF:IsShowing(page)
+    return self.frame ~= nil and self.frame:IsShown() and self._activeTab == page
+end
+
+local function areaWidth(area)
+    local w = area.scroll:GetWidth() or 0
+    if w <= 0 then w = (HF.frame.body:GetWidth() or 0) - BAR_ROOM end
+    if w <= 0 then w = DEFAULT_W - SIDEBAR_W - BAR_ROOM end
+    return w
+end
+
+local function questRow(ctx, content)
+    local r = rowButton(ctx, content, ROW_H)
+    r.t1 = ctx:CreateText(r, "", "label")
+    r.t1:SetPoint("TOPLEFT", r, "TOPLEFT", PAD_SIDE, -6)
+    r.t1:SetWordWrap(false)
+    r.t2 = ctx:CreateText(r, "", "hint")
+    r.t2:SetPoint("TOPLEFT", r.t1, "BOTTOMLEFT", 0, -2)
+    r.t2:SetWordWrap(false)
+    r.right = ctx:CreateText(r, "", "hint")
+    r.right:SetPoint("RIGHT", r, "RIGHT", -PAD_SIDE, 0)
+    r.t1:SetPoint("RIGHT", r.right, "LEFT", -ROW_GAP, 0)
+    r.t2:SetPoint("RIGHT", r.right, "LEFT", -ROW_GAP, 0)
+    r:SetScript("OnEnter", function(self)
+        local lines = {}
+        if self._held and self._held > 0 and self._accepted then
+            lines[#lines + 1] = (L["Accepted %1$s, held %2$s"]):format(fmtTime(self._accepted), ns.Util.FmtDurationLong(self._held))
+        end
+        lines[#lines + 1] = L["Right-click to open in the Chain Guide"]
+        ctx:ShowTooltip(self, self._fullName or ("Quest #" .. tostring(self._questID)), table.concat(lines, "\n"))
+    end)
+    r:SetScript("OnClick", function(self, button)
+        if button ~= "RightButton" then return end
+        local chainID = findChainForQuest(self._questID)
+        if chainID then
+            openChain(chainID, self._questID)
+        else
+            print((L["|cffEBB706EQ History|r: |cffffffff%s|r isn't part of any chain in the Chain Guide."]):format(
+                self._fullName or ("Quest #" .. tostring(self._questID))))
+        end
+    end)
+    return r
+end
+
+local function queryEntries()
+    local R = ns:GetSubsystem("History")
+    if not R then return {} end
+    local page = HF._views.quests
+    return R:Query({
+        search         = page.search:GetText(),
         char           = HF._charFilter,
         dateRange      = HF._dateFilter,
         classification = HF._classFilter,
@@ -541,155 +417,50 @@ function HF:_renderQuests()
         sortBy         = HF._sortBy or "date",
         sortDir        = HF._sortDir or "desc",
     })
+end
 
+function HF:_renderQuests()
+    local ctx = ui()
+    local page = self._views.quests
+    release("quests")
+    local entries = queryEntries()
     local n = #entries
-    if pane._count then pane._count:SetText((L["%d entries"]):format(n)) end
-
-    if n == 0 then
-        pane._empty:Show()
-        pane._canvas:SetSize(1, 1)
-        return
-    end
-    pane._empty:Hide()
-
-    local MAX = 500
-    local shown = math.min(n, MAX)
-    local canvasW = pane._scroll:GetWidth() or 600
-    pane._canvas:SetSize(canvasW, shown * (ROW_H + 2))
-
+    page.count:SetText((L["%d entries"]):format(n))
+    page.empty:SetShown(n == 0)
+    local content = page.area.content
+    local width = areaWidth(page.area)
+    local shown = math.min(n, MAX_ROWS)
     for i = 1, shown do
         local e = entries[i]
-        local row = acquireRow(pane._canvas)
-        row:SetPoint("TOPLEFT",  pane._canvas, "TOPLEFT",  0, -((i - 1) * (ROW_H + 2)))
-        row:SetPoint("TOPRIGHT", pane._canvas, "TOPRIGHT", 0, -((i - 1) * (ROW_H + 2)))
-
-        row.title:SetText(e.n or ("Quest #" .. tostring(e.q)))
-        if e.t and e.t == 0 then
-            row.title:SetTextColor(DIM[1], DIM[2], DIM[3])
-        else
-            row.title:SetTextColor(1, 1, 1)
-        end
-
+        local r = acquire("quests", "row", function() return questRow(ctx, content) end)
+        r:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((i - 1) * ROW_H))
+        r:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, -((i - 1) * ROW_H))
+        r.t1:SetText(e.n or ("Quest #" .. tostring(e.q)))
+        r.t1:SetTextColor(ctx:Color((e.t and e.t > 0) and "text" or "muted"))
         local meta = e.c or ""
-        if e.z and e.z ~= "" then meta = meta .. "  •  " .. e.z end
-        if e.d and e.d > 0 then
-            meta = meta .. "  •  " .. (L["held for %s"]):format(ns.Util.FmtDurationLong(e.d))
-        end
-        row.meta:SetText(meta)
-        row.right:SetText(fmtTime(e.t))
-
-        row:EnableMouse(true)
-        row._kind     = "history"
-        row._questID  = e.q
-        row._fullName = e.n
-        row._held     = e.d
-        row._accepted = (e.t and e.t > 0 and e.d) and (e.t - e.d) or nil
+        if e.z and e.z ~= "" then meta = meta .. SEP .. e.z end
+        if e.d and e.d > 0 then meta = meta .. SEP .. (L["held for %s"]):format(ns.Util.FmtDurationLong(e.d)) end
+        r.t2:SetText(meta)
+        r.right:SetText(fmtTime(e.t))
+        r._questID, r._fullName, r._held = e.q, e.n, e.d
+        r._accepted = (e.t and e.t > 0 and e.d) and (e.t - e.d) or nil
     end
-
-    if n > MAX then
+    if n > MAX_ROWS then
         local which = L["first"]
-        if (HF._sortBy or "date") == "date" then
-            which = (HF._sortDir == "asc") and L["oldest"] or L["newest"]
+        if (self._sortBy or "date") == "date" then
+            which = (self._sortDir == "asc") and L["oldest"] or L["newest"]
         end
-        pane._count:SetText((L["%d entries (showing %s %d)"]):format(n, which, MAX))
+        page.count:SetText((L["%d entries (showing %s %d)"]):format(n, which, MAX_ROWS))
     end
+    page.area:SetContentSize(width, math.max(1, shown * ROW_H))
 end
 
-function HF:_buildStreakPane(parent)
-    local pane = CreateFrame("Frame", nil, parent)
-    pane:SetAllPoints()
-    pane:Hide()
-
-    local function bigStat(yOffset)
-        local label = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        label:SetPoint("TOPLEFT", 30, yOffset)
-        label:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-        thin(label)
-
-        local value = pane:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        value:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
-        value:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-        thin(value)
-        return label, value
-    end
-
-    pane._currentLabel, pane._currentValue = bigStat(-20)
-    pane._currentLabel:SetText(L["Current daily streak"])
-
-    pane._bestLabel, pane._bestValue = bigStat(-80)
-    pane._bestLabel:SetText(L["Best daily streak"])
-
-    pane._totalLabel, pane._totalValue = bigStat(-140)
-    pane._totalLabel:SetText(L["Total quests recorded with a date"])
-
-    pane._note = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._note:SetPoint("TOPLEFT", 30, -210)
-    pane._note:SetPoint("TOPRIGHT", -30, -210)
-    pane._note:SetJustifyH("LEFT")
-    pane._note:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    pane._note:SetText(
-        L["Streak counts consecutive days (local time) with at least one quest turn-in across any character on the account. Today or yesterday keeps the streak alive - you don't lose it until a whole day passes with no activity."])
-    thin(pane._note)
-
-    return pane
-end
-
-function HF:_renderStreak()
-    local pane = self._panes.streak
-    local R = ns:GetSubsystem("History")
-    if not R then return end
-    local s = R:Streak()
-    pane._currentValue:SetText((L["%d days"]):format(s.current))
-    pane._bestValue:SetText((L["%d days"]):format(s.best))
-    pane._totalValue:SetText(("%d"):format(s.total))
-end
-
-function HF:_buildTimelinePane(parent)
-    local pane = CreateFrame("Frame", nil, parent)
-    pane:SetAllPoints()
-    pane:Hide()
-
-    pane._intro = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._intro:SetPoint("TOPLEFT", 6, -4)
-    pane._intro:SetPoint("TOPRIGHT", -22, -4)
-    pane._intro:SetJustifyH("LEFT")
-    pane._intro:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    pane._intro:SetText(
-        L["Chains where you have at least one completed quest. Click a chain to expand and see per-quest completion dates."])
-    thin(pane._intro)
-
-    local scroll = CreateFrame("ScrollFrame", nil, pane, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT",     0, -28)
-    scroll:SetPoint("BOTTOMRIGHT", -22, 0)
-    pane._scroll = scroll
-    local canvas = CreateFrame("Frame", nil, scroll)
-    canvas:SetSize(1, 1)
-    scroll:SetScrollChild(canvas)
-    pane._canvas = canvas
-
-    pane._empty = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._empty:SetPoint("CENTER")
-    pane._empty:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    pane._empty:SetText(L["(no chain quests recorded yet)"])
-    pane._empty:Hide()
-    thin(pane._empty)
-
-    HF._timelineOpen = HF._timelineOpen or {}
-    return pane
-end
-
-local MARKER_COLLAPSED = "|TInterface\\Buttons\\UI-PlusButton-Up:14:14|t "
-local MARKER_EXPANDED  = "|TInterface\\Buttons\\UI-MinusButton-Up:14:14|t "
-local MARKER_COMPLETE  = "|A:common-icon-checkmark:14:14|a "
-
-function HF:_renderTimeline()
-    local pane = self._panes.timeline
+local function timelineChains()
     local R         = ns:GetSubsystem("History")
     local Database  = ns:GetSubsystem("ChainGuideDatabase")
     local QLS       = ns:GetSubsystem("ChainGuideQuestLineSource")
     local CS        = ns:GetSubsystem("ChainGuideCampaignSource")
-    releaseAllRows()
-    if not (R and Database) then return end
+    if not (R and Database) then return {}, {} end
 
     if Database.categories then
         for catID in pairs(Database.categories) do
@@ -702,7 +473,6 @@ function HF:_renderTimeline()
     end
 
     local completion = R:CompletionMap()
-
     local sorted = {}
     for chainID, chain in pairs(Database.chains) do
         local items = chain.items
@@ -713,7 +483,7 @@ function HF:_renderTimeline()
                 if it and it.type == "quest" then
                     questTotal = questTotal + 1
                     local t = completion[it.id]
-                    if t and t ~= nil then
+                    if t then
                         doneN = doneN + 1
                         if t > latest then latest = t end
                     end
@@ -724,649 +494,436 @@ function HF:_renderTimeline()
             end
         end
     end
-
-    if #sorted == 0 then
-        pane._empty:Show()
-        pane._canvas:SetSize(1, 1)
-        return
-    end
-    pane._empty:Hide()
-
     table.sort(sorted, function(a, b)
         if a.latest ~= b.latest then return a.latest > b.latest end
         return (a.chain.name or "") < (b.chain.name or "")
     end)
+    return sorted, completion
+end
 
-    local canvasW = pane._scroll:GetWidth() or 600
+local function chainRow(ctx, content)
+    local r = rowButton(ctx, content, ROW_H)
+    r.chev = r:CreateTexture(nil, "ARTWORK")
+    r.chev:SetSize(ROW_ICON, ROW_ICON)
+    r.chev:SetPoint("LEFT", r, "LEFT", PAD_SIDE, 0)
+    r.chev:SetVertexColor(ctx:Color("navText"))
+    r.t1 = ctx:CreateText(r, "", "label")
+    r.t1:SetPoint("TOPLEFT", r.chev, "TOPRIGHT", ROW_GAP, 8)
+    r.t1:SetTextColor(ctx:Color("text"))
+    r.t1:SetWordWrap(false)
+    r.t2 = ctx:CreateText(r, "", "hint")
+    r.t2:SetPoint("TOPLEFT", r.t1, "BOTTOMLEFT", 0, -2)
+    r.right = ctx:CreateText(r, "", "hint")
+    r.right:SetPoint("RIGHT", r, "RIGHT", -PAD_SIDE, 0)
+    r.check = r:CreateTexture(nil, "ARTWORK")
+    r.check:SetSize(ROW_ICON, ROW_ICON)
+    r.check:SetTexture(ctx:Texture("check"))
+    r.check:SetVertexColor(ctx:Color("accentHi"))
+    r.check:SetPoint("RIGHT", r.right, "LEFT", -ROW_GAP, 0)
+    r.t1:SetPoint("RIGHT", r.check, "LEFT", -ROW_GAP, 0)
+    r:SetScript("OnEnter", function(self)
+        ctx:ShowTooltip(self, self._chainName or L["Chain"], L["Click to expand"] .. "\n" .. L["Right-click to open in the Chain Guide"])
+    end)
+    r:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then
+            openChain(self._chainID)
+            return
+        end
+        HF._timelineOpen[self._chainID] = not HF._timelineOpen[self._chainID]
+        HF:_renderTimeline()
+    end)
+    return r
+end
+
+local function subRow(ctx, content)
+    local r = CreateFrame("Frame", nil, content)
+    r:SetHeight(SUB_H)
+    ctx:Paint(r, nil, "divider", "B")
+    r.t1 = ctx:CreateText(r, "", "label")
+    r.t1:SetPoint("LEFT", r, "LEFT", SUB_INDENT, 0)
+    r.t1:SetWordWrap(false)
+    r.right = ctx:CreateText(r, "", "hint")
+    r.right:SetPoint("RIGHT", r, "RIGHT", -PAD_SIDE, 0)
+    r.t1:SetPoint("RIGHT", r.right, "LEFT", -ROW_GAP, 0)
+    return r
+end
+
+function HF:_renderTimeline()
+    local ctx = ui()
+    local page = self._views.timeline
+    release("timeline")
+    local sorted, completion = timelineChains()
+    page.empty:SetShown(#sorted == 0)
+    local content = page.area.content
     local y = 0
-    for i = 1, #sorted do
-        local rec = sorted[i]
-        local chain = rec.chain
-        local row = acquireRow(pane._canvas)
-        row:SetPoint("TOPLEFT",  pane._canvas, "TOPLEFT",  0, -y)
-        row:SetPoint("TOPRIGHT", pane._canvas, "TOPRIGHT", 0, -y)
-        local marker  = HF._timelineOpen[rec.id] and MARKER_EXPANDED or MARKER_COLLAPSED
-        local check   = (rec.doneN >= rec.total) and MARKER_COMPLETE or ""
-        row.title:SetText(marker .. check .. (chain.name or ("Chain #" .. tostring(rec.id))))
-        row.title:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-        row.meta:SetText((L["%d of %d quests recorded"]):format(rec.doneN, rec.total))
-        row.right:SetText(fmtTime(rec.latest))
-        row:EnableMouse(true)
-        row._kind      = "timeline"
-        row._chainID   = rec.id
-        row._chainName = chain.name
-        y = y + ROW_H + 2
-
-        if HF._timelineOpen[rec.id] then
-            for j = 1, #chain.items do
-                local it = chain.items[j]
+    for _, rec in ipairs(sorted) do
+        local open = self._timelineOpen[rec.id]
+        local r = acquire("timeline", "chain", function() return chainRow(ctx, content) end)
+        r:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+        r:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, -y)
+        r.chev:SetTexture(ctx:Texture(open and "chevron-down" or "chevron-right"))
+        r.t1:SetText(rec.chain.name or ("Chain #" .. tostring(rec.id)))
+        r.t2:SetText((L["%d of %d quests recorded"]):format(rec.doneN, rec.total))
+        r.right:SetText(fmtTime(rec.latest))
+        r.check:SetShown(rec.doneN >= rec.total)
+        r._chainID, r._chainName = rec.id, rec.chain.name
+        y = y + ROW_H
+        if open then
+            for _, it in ipairs(rec.chain.items) do
                 if it and it.type == "quest" then
-                    local sub = acquireRow(pane._canvas)
-                    sub._kind = "sub"
-                    sub:EnableMouse(false)
-                    sub:SetPoint("TOPLEFT",  pane._canvas, "TOPLEFT",  24, -y)
-                    sub:SetPoint("TOPRIGHT", pane._canvas, "TOPRIGHT", 0, -y)
+                    local sub = acquire("timeline", "sub", function() return subRow(ctx, content) end)
+                    sub:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+                    sub:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, -y)
                     local t = completion[it.id]
-                    local title = ns.Util.QuestTitle(it.id) or it.name or ("Quest #" .. tostring(it.id))
-                    sub.title:SetText(title)
-                    sub.meta:SetText("ID " .. tostring(it.id))
-                    if t and t ~= nil then
-                        sub.title:SetTextColor(1, 1, 1)
-                        sub.right:SetText(fmtTime(t))
-                    else
-                        sub.title:SetTextColor(DIM[1], DIM[2], DIM[3])
-                        sub.right:SetText("—")
-                        sub.right:SetTextColor(DIM[1], DIM[2], DIM[3])
-                    end
-                    y = y + ROW_H + 2
+                    sub.t1:SetText(ns.Util.QuestTitle(it.id) or it.name or ("Quest #" .. tostring(it.id)))
+                    sub.t1:SetTextColor(ctx:Color(t and "label" or "muted"))
+                    sub.right:SetText(t and fmtTime(t) or DASH)
+                    y = y + SUB_H
                 end
             end
         end
     end
-    pane._canvas:SetSize(canvasW, math.max(y, 1))
+    page.area:SetContentSize(areaWidth(page.area), math.max(1, y))
 end
 
-function HF:_buildHeatmapPane(parent)
-    local pane = CreateFrame("Frame", nil, parent)
-    pane:SetAllPoints()
-    pane:Hide()
-
-    pane._intro = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._intro:SetPoint("TOPLEFT",  30, -12)
-    pane._intro:SetPoint("TOPRIGHT", -30, -12)
-    pane._intro:SetJustifyH("LEFT")
-    pane._intro:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    pane._intro:SetText((L["Quest turn-ins per day over the last %d days. Brighter = busier. Hover a cell for the date and count. The bottom-right cell is today."]):format(HEATMAP_DAYS - 1))
-    thin(pane._intro)
-
-    local gridW = HEATMAP_COLS * (CELL_SIZE + CELL_GAP) - CELL_GAP
-    local gridH = HEATMAP_ROWS * (CELL_SIZE + CELL_GAP) - CELL_GAP
-    pane._grid = CreateFrame("Frame", nil, pane)
-    pane._grid:SetSize(gridW, gridH)
-    pane._grid:SetPoint("TOP", 0, -56)
-
-    pane._cells = {}
-    for i = 1, HEATMAP_DAYS do
-        local cell = CreateFrame("Frame", nil, pane._grid)
-        cell:SetSize(CELL_SIZE, CELL_SIZE)
-        cell:EnableMouse(true)
-        local col = math.floor((i - 1) / HEATMAP_ROWS)
-        local row = (i - 1) % HEATMAP_ROWS
-        cell:SetPoint("TOPLEFT", col * (CELL_SIZE + CELL_GAP), -(row * (CELL_SIZE + CELL_GAP)))
-
-        cell.bg = cell:CreateTexture(nil, "ARTWORK")
-        cell.bg:SetAllPoints()
-        cell.bg:SetColorTexture(0.15, 0.15, 0.15, 1)
-
-        cell:SetScript("OnEnter", function(cf)
-            if not cf._day then return end
-            GameTooltip:SetOwner(cf, "ANCHOR_CURSOR_RIGHT")
-            GameTooltip:SetText(date("!%A, %Y-%m-%d", cf._day * 86400), 1, 1, 1)
-            local c = cf._count or 0
-            GameTooltip:AddLine((L["%d quest%s turned in"]):format(c, c == 1 and "" or "s"),
-                YELLOW[1], YELLOW[2], YELLOW[3])
-            GameTooltip:Show()
-        end)
-        cell:SetScript("OnLeave", GameTooltip_Hide)
-        pane._cells[i] = cell
-    end
-
-    local legend = CreateFrame("Frame", nil, pane)
-    legend:SetSize(180, CELL_SIZE)
-    legend:SetPoint("TOP", pane._grid, "BOTTOM", 0, -18)
-
-    local lessLabel = legend:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    lessLabel:SetText(L["Less"])
-    lessLabel:SetPoint("LEFT")
-    thin(lessLabel)
-
-    local swatches = {}
-    for i = 1, 5 do
-        local sw = legend:CreateTexture(nil, "ARTWORK")
-        sw:SetSize(CELL_SIZE - 2, CELL_SIZE - 2)
-        local prev = (i == 1) and lessLabel or swatches[i - 1]
-        sw:SetPoint("LEFT", prev, "RIGHT", 4, 0)
-        local intensity = (i - 1) / 4
-        sw:SetColorTexture(
-            0.15 + (YELLOW[1] - 0.15) * intensity,
-            0.15 + (YELLOW[2] - 0.15) * intensity,
-            0.15 + (YELLOW[3] - 0.15) * intensity,
-            1)
-        swatches[i] = sw
-    end
-    local moreLabel = legend:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    moreLabel:SetText(L["More"])
-    moreLabel:SetPoint("LEFT", swatches[5], "RIGHT", 4, 0)
-    thin(moreLabel)
-
-    pane._totalValue = pane:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    pane._totalValue:SetPoint("TOP", legend, "BOTTOM", 0, -28)
-    pane._totalValue:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-    thin(pane._totalValue)
-
-    pane._totalLabel = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._totalLabel:SetPoint("TOP", pane._totalValue, "BOTTOM", 0, -2)
-    pane._totalLabel:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    pane._totalLabel:SetText((L["total turn-ins in the last %d days"]):format(HEATMAP_DAYS - 1))
-    thin(pane._totalLabel)
-
-    pane._busiestValue = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._busiestValue:SetPoint("TOP", pane._totalLabel, "BOTTOM", 0, -12)
-    pane._busiestValue:SetTextColor(0.85, 0.85, 0.85)
-    thin(pane._busiestValue)
-
-    return pane
+local function mix(ctx, from, to, t)
+    local fr, fg, fb = ctx:Color(from)
+    local tr, tg, tb = ctx:Color(to)
+    return fr + (tr - fr) * t, fg + (tg - fg) * t, fb + (tb - fb) * t
 end
 
-function HF:_renderHeatmap()
-    local pane = self._panes.activity
+-- Five steps from an empty cell to the accent, the color a progress bar fills with
+local function heatColor(ctx, step)
+    if step <= 0 then return ctx:Color("track") end
+    return mix(ctx, "track", "accent", 0.25 + step * 0.1875)
+end
+
+local _y, _cardW
+
+-- Each card owns its pieces, pooled by kind, so after the first render nothing new is made
+local function cardPiece(card, kind, make)
+    local pool = card._pool[kind]
+    if not pool then pool = {} card._pool[kind] = pool end
+    local n = (card._used[kind] or 0) + 1
+    card._used[kind] = n
+    local w = pool[n]
+    if not w then w = make() pool[n] = w end
+    w:Show()
+    return w
+end
+
+local function resetCard(card)
+    for _, pool in pairs(card._pool) do
+        for i = 1, #pool do
+            pool[i]:Hide()
+            pool[i]:ClearAllPoints()
+        end
+    end
+    card._used = {}
+end
+
+local function statsGroup(ctx, content, key, title, build)
+    local stats = HF._views.stats
+    stats.cards = stats.cards or {}
+    local slot = stats.cards[key]
+    if not slot then
+        slot = { label = ctx:CreateText(content, "", "groupLabel"), card = CreateFrame("Frame", nil, content) }
+        ctx:Paint(slot.card, "surface", "surfaceBorder")
+        slot.card._controls, slot.card._pool, slot.card._used = {}, {}, {}
+        stats.cards[key] = slot
+    end
+    _y = _y + ((_y > PAD_TOP) and GROUP_GAP or 0)
+    slot.label:ClearAllPoints()
+    slot.label:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)
+    slot.label:SetText(title)
+    _y = _y + (slot.label:GetStringHeight() or 12) + LABEL_GAP
+    local card = slot.card
+    resetCard(card)
+    card:ClearAllPoints()
+    card:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)
+    card:SetPoint("TOPRIGHT", content, "TOPRIGHT", -PAD_SIDE, -_y)
+    local h = build(card) + CARD_PAD
+    card:SetHeight(h)
+    _y = _y + h
+end
+
+-- Each style's own color, set on every use, so a pooled string a row recolored never keeps it
+local function colorOf(style)
+    if style == "hint" or style == "groupLabel" then return "muted" end
+    if style == "label" then return "label" end
+    return "text"
+end
+
+local function text(ctx, card, style, str, x, y, width)
+    local fs = cardPiece(card, "text_" .. style, function() return ctx:CreateText(card, "", style) end)
+    fs:SetPoint("TOPLEFT", card, "TOPLEFT", x, -y)
+    if width then fs:SetWidth(width) fs:SetWordWrap(true) else fs:SetWordWrap(false) end
+    fs:SetText(str)
+    fs:SetTextColor(ctx:Color(colorOf(style)))
+    return fs
+end
+
+-- A row of figures: each a muted label over its number, the tiles parted by a divider
+local function tiles(ctx, card, list, y, perRow)
+    perRow = perRow or 3
+    local w = (_cardW - CARD_PAD * 2) / perRow
+    local rowH = 0
+    for i, t in ipairs(list) do
+        local col = (i - 1) % perRow
+        local row = math.floor((i - 1) / perRow)
+        local x = CARD_PAD + col * w + (col > 0 and TILE_GAP or 0)
+        local ty = y + row * (rowH + TILE_GAP)
+        local label = text(ctx, card, "hint", t[1], x, ty, w - TILE_GAP * 2)
+        local value = text(ctx, card, "figure", t[2], x, ty + (label:GetStringHeight() or 12) + LINE_GAP)
+        local h = (label:GetStringHeight() or 12) + LINE_GAP + (value:GetStringHeight() or 22)
+        if t[3] then
+            local delta = text(ctx, card, "label", t[3], x, ty + h + LINE_GAP)
+            h = h + LINE_GAP + (delta:GetStringHeight() or 13)
+        end
+        if col > 0 then
+            local div = cardPiece(card, "vdiv", function()
+                local d = card:CreateTexture(nil, "BORDER")
+                d:SetColorTexture(ctx:Color("divider"))
+                d:SetWidth(1)
+                return d
+            end)
+            div:SetPoint("TOPLEFT", card, "TOPLEFT", CARD_PAD + col * w, -ty)
+            div:SetHeight(h)
+        end
+        rowH = math.max(rowH, h)
+    end
+    local rows = math.ceil(#list / perRow)
+    return y + rows * rowH + (rows - 1) * TILE_GAP
+end
+
+local function streakCard(ctx, card)
     local R = ns:GetSubsystem("History")
-    if not (pane and R and R.DayCounts) then return end
+    local s = R and R:Streak() or { current = 0, best = 0, total = 0 }
+    local y = tiles(ctx, card, {
+        { L["Current daily streak"], (L["%d days"]):format(s.current) },
+        { L["Best daily streak"], (L["%d days"]):format(s.best) },
+        { L["Total quests recorded with a date"], fmtBigNumber(s.total) },
+    }, CARD_PAD)
+    local note = text(ctx, card, "hint",
+        L["Streak counts consecutive days (local time) with at least one quest turn-in across any character on the account. Today or yesterday keeps the streak alive - you don't lose it until a whole day passes with no activity."],
+        CARD_PAD, y + TILE_GAP, _cardW - CARD_PAD * 2)
+    return y + TILE_GAP + (note:GetStringHeight() or 15)
+end
 
-    local counts, today = R:DayCounts(HEATMAP_DAYS)
+local function cellTip(self)
+    if not self._day then return end
+    local c = self._count or 0
+    ui():ShowTooltip(self, date("!%A, %Y-%m-%d", self._day * 86400), (L["%d quest%s turned in"]):format(c, c == 1 and "" or "s"))
+end
+
+local function activityCard(ctx, card)
+    local R = ns:GetSubsystem("History")
+    local intro = text(ctx, card, "hint",
+        (L["Quest turn-ins per day over the last %d days. Brighter = busier. Hover a cell for the date and count. The bottom-right cell is today."]):format(HEATMAP_DAYS - 1),
+        CARD_PAD, CARD_PAD, _cardW - CARD_PAD * 2)
+    local y = CARD_PAD + (intro:GetStringHeight() or 15) + TILE_GAP
+    local counts, today = {}, 0
+    if R and R.DayCounts then counts, today = R:DayCounts(HEATMAP_DAYS) end
     local maxCount, total, busiestDay, busiestCount = 0, 0, nil, 0
     for d, c in pairs(counts) do
         total = total + c
         if c > maxCount then maxCount = c end
-        if c > busiestCount then busiestCount = c; busiestDay = d end
+        if c > busiestCount then busiestCount, busiestDay = c, d end
     end
-
     for i = 1, HEATMAP_DAYS do
-        local cell = pane._cells[i]
+        local cell = cardPiece(card, "cell", function()
+            local c = CreateFrame("Frame", nil, card)
+            c:SetSize(CELL, CELL)
+            c.fill = c:CreateTexture(nil, "ARTWORK")
+            c.fill:SetAllPoints()
+            c:EnableMouse(true)
+            c:SetScript("OnEnter", cellTip)
+            c:SetScript("OnLeave", function() ui():HideTooltip() end)
+            return c
+        end)
+        local col = math.floor((i - 1) / HEATMAP_ROWS)
+        local row = (i - 1) % HEATMAP_ROWS
+        cell:SetPoint("TOPLEFT", card, "TOPLEFT", CARD_PAD + col * (CELL + CELL_GAP), -(y + row * (CELL + CELL_GAP)))
         local day = today - (HEATMAP_DAYS - i)
         local count = counts[day] or 0
-        cell._day   = day
-        cell._count = count
-
-        local intensity
-        if count == 0 then
-            intensity = 0
-        else
-            intensity = math.max(0.25, math.min(1.0, count / math.max(maxCount, 1)))
-        end
-        cell.bg:SetColorTexture(
-            0.15 + (YELLOW[1] - 0.15) * intensity,
-            0.15 + (YELLOW[2] - 0.15) * intensity,
-            0.15 + (YELLOW[3] - 0.15) * intensity,
-            1)
+        cell._day, cell._count = day, count
+        local step = 0
+        if count > 0 then step = math.max(1, math.min(4, math.ceil(count / math.max(maxCount, 1) * 4))) end
+        cell.fill:SetColorTexture(heatColor(ctx, step))
     end
-
-    pane._totalValue:SetText(tostring(total))
+    y = y + HEATMAP_ROWS * (CELL + CELL_GAP) - CELL_GAP + TILE_GAP
+    local less = text(ctx, card, "hint", L["Less"], CARD_PAD, y)
+    local x = CARD_PAD + (less:GetStringWidth() or 24) + LINE_GAP
+    for step = 0, 4 do
+        local sw = cardPiece(card, "swatch", function() return card:CreateTexture(nil, "ARTWORK") end)
+        sw:SetSize(SWATCH, SWATCH)
+        sw:SetPoint("TOPLEFT", card, "TOPLEFT", x, -y)
+        sw:SetColorTexture(heatColor(ctx, step))
+        x = x + SWATCH + LINE_GAP
+    end
+    text(ctx, card, "hint", L["More"], x, y)
+    y = y + SWATCH + TILE_GAP
+    local fig = text(ctx, card, "figure", fmtBigNumber(total), CARD_PAD, y)
+    local figH = fig:GetStringHeight() or 22
+    text(ctx, card, "hint", (L["total turn-ins in the last %d days"]):format(HEATMAP_DAYS - 1), CARD_PAD, y + figH + LINE_GAP)
+    y = y + figH + LINE_GAP + 15
     if busiestDay and busiestCount > 0 then
-        pane._busiestValue:SetText(
-            (L["Busiest day: %s (%d quests)"]):format(date("!%Y-%m-%d", busiestDay * 86400), busiestCount))
-    else
-        pane._busiestValue:SetText(" ")
+        local b = text(ctx, card, "label", (L["Busiest day: %s (%d quests)"]):format(date("!%Y-%m-%d", busiestDay * 86400), busiestCount), CARD_PAD, y + LINE_GAP)
+        y = y + LINE_GAP + (b:GetStringHeight() or 13)
     end
+    return y
 end
 
-local function fmtMoney(copper)
-    copper = copper or 0
-    if GetCoinTextureString then return GetCoinTextureString(copper) end
-    local g = math.floor(copper / 10000)
-    local s = math.floor((copper % 10000) / 100)
-    local c = copper % 100
-    return (L["%dg %ds %dc"]):format(g, s, c)
-end
-
-local function fmtBigNumber(n)
-    if not n then return "0" end
-    if BreakUpLargeNumbers then return BreakUpLargeNumbers(n) end
-    return tostring(n)
-end
-
-local STATS_MAX_BARS = 30
-local CARD_W, CARD_H, CARD_GAP = 210, 70, 12
-local BAR_GAP = 3
-
-local function formatMetric(key, v)
-    v = v or 0
-    if key == "gold" then return fmtMoney(v) end
-    if key == "xp"   then return fmtBigNumber(v) .. " XP" end
-    return fmtBigNumber(v) .. (v == 1 and " quest" or " quests")
-end
-
-local function fmtDelta(key, d)
-    if d == 0 then return "|cff888888no change|r" end
-    local mag = (key == "gold") and fmtMoney(math.abs(d)) or fmtBigNumber(math.abs(d))
-    if key == "xp" then mag = mag .. " XP" end
-    if d > 0 then return "|cff55dd55+" .. mag .. "|r" end
-    return "|cffdd5555-" .. mag .. "|r"
-end
-
-local function makeToggleButton(parent, label, w)
-    local b = CreateFrame("Button", nil, parent)
-    b:SetSize(w, 22)
-    b.bg = b:CreateTexture(nil, "BACKGROUND")
-    b.bg:SetAllPoints()
-    b.hl = b:CreateTexture(nil, "HIGHLIGHT")
-    b.hl:SetAllPoints()
-    b.hl:SetColorTexture(1, 1, 1, 0.08)
-    b.text = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    b.text:SetPoint("CENTER")
-    b.text:SetText(label)
-    thin(b.text)
-    function b:SetActive(on)
-        if on then
-            self.bg:SetColorTexture(HEADER_RED[1], HEADER_RED[2], HEADER_RED[3], 0.85)
-            self.text:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-        else
-            self.bg:SetColorTexture(0, 0, 0, 0.5)
-            self.text:SetTextColor(0.85, 0.85, 0.85)
+local function keyValueRows(ctx, card, rows, y)
+    for i, r in ipairs(rows) do
+        local left = text(ctx, card, "label", r[1], CARD_PAD, y + 7)
+        left:SetTextColor(ctx:Color("text"))
+        local right = cardPiece(card, "right", function() return ctx:CreateText(card, "", "hint") end)
+        right:SetPoint("RIGHT", card, "TOPRIGHT", -CARD_PAD, -(y + 14))
+        right:SetText(r[2])
+        if i > 1 then
+            local div = cardPiece(card, "hdiv", function()
+                local d = card:CreateTexture(nil, "BORDER")
+                d:SetColorTexture(ctx:Color("divider"))
+                d:SetHeight(1)
+                return d
+            end)
+            div:SetPoint("TOPLEFT", card, "TOPLEFT", CARD_PAD, -y)
+            div:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CARD_PAD, -y)
         end
+        y = y + 28
     end
-    b:SetActive(false)
-    return b
+    return y
 end
 
-local function makeCard(parent)
-    local c = CreateFrame("Frame", nil, parent)
-    c:SetSize(CARD_W, CARD_H)
-    local bg = c:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0, 0, 0, 0.4)
-    c.label = c:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    c.label:SetPoint("TOPLEFT", 8, -6)
-    thin(c.label)
-    c.value = c:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    c.value:SetPoint("TOPLEFT", 8, -22)
-    c.value:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-    thin(c.value)
-    c.delta = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    c.delta:SetPoint("BOTTOMLEFT", 8, 6)
-    thin(c.delta)
-    return c
+local function byCount(a, b)
+    if a.rec.count ~= b.rec.count then return a.rec.count > b.rec.count end
+    return a.key < b.key
 end
 
-local function barOnEnter(self)
-    if not self._rangeText then return end
-    GameTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT")
-    GameTooltip:SetText(self._rangeText, 1, 1, 1)
-    GameTooltip:AddLine(self._valueText or "", YELLOW[1], YELLOW[2], YELLOW[3])
-    GameTooltip:Show()
-end
-
-function HF:_buildTotalsPane(parent)
-    local pane = CreateFrame("Frame", nil, parent)
-    pane:SetAllPoints()
-    pane:Hide()
-
-    pane._segTotals = makeToggleButton(pane, L["Totals"], 80)
-    pane._segTotals:SetPoint("TOPLEFT", 12, -8)
-    pane._segTrends = makeToggleButton(pane, L["Trends"], 80)
-    pane._segTrends:SetPoint("LEFT", pane._segTotals, "RIGHT", 4, 0)
-    pane._segTotals:SetScript("OnClick", function() HF:_switchStatsView("totals") end)
-    pane._segTrends:SetScript("OnClick", function() HF:_switchStatsView("trends") end)
-
-    local tvw = CreateFrame("Frame", nil, pane)
-    tvw:SetPoint("TOPLEFT",     0, -34)
-    tvw:SetPoint("BOTTOMRIGHT", 0, 0)
-    pane._totalsView = tvw
-
-    pane._intro = tvw:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._intro:SetPoint("TOPLEFT",  30, -4)
-    pane._intro:SetPoint("TOPRIGHT", -30, -4)
-    pane._intro:SetJustifyH("LEFT")
-    pane._intro:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    pane._intro:SetText(L["Account-wide quest rewards. Totals count only quests turned in while reward tracking was on; older entries didn't capture XP or gold."])
-    thin(pane._intro)
-
-    local function pairBlock(yOffset, labelText, big, xOffset)
-        local label = tvw:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        label:SetPoint("TOPLEFT", xOffset or 30, yOffset)
-        label:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-        label:SetText(labelText)
-        thin(label)
-
-        local value = tvw:CreateFontString(nil, "OVERLAY",
-            big and "GameFontNormalLarge" or "GameFontHighlight")
-        value:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
-        value:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-        thin(value)
-
-        -- A second column has a hard right edge. Truncating beats wrapping, which would drop a
-        -- long translated label onto the block below it.
-        if xOffset then
-            label:SetPoint("TOPRIGHT", -30, yOffset)
-            label:SetJustifyH("LEFT")
-            label:SetWordWrap(false)
-            value:SetPoint("TOPRIGHT", label, "BOTTOMRIGHT", 0, -2)
-            value:SetJustifyH("LEFT")
-            value:SetWordWrap(false)
-        end
-        return value
-    end
-
-    pane._totalQuests = pairBlock(-30,  L["Total quests with reward data"], true)
-    pane._totalGold   = pairBlock(-78,  L["Total gold earned"],             true)
-    pane._totalXP     = pairBlock(-126, L["Total XP earned"],               true)
-
-    pane._abandoned = pairBlock(-30, L["Total quests abandoned"], true, 380)
-    pane._avgHeld   = pairBlock(-78, L["Average time"],           true, 380)
-
-    local h2 = tvw:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    h2:SetPoint("TOPLEFT", 30, -180)
-    h2:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-    h2:SetText(L["By character"])
-    thin(h2)
-    pane._charHeader = h2
-
-    pane._charRows = {}
-
-    pane._topXP = tvw:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    pane._topXP:SetPoint("BOTTOMLEFT",  30,   8)
-    pane._topXP:SetPoint("BOTTOMRIGHT", -30,  8)
-    pane._topXP:SetJustifyH("LEFT")
-    pane._topXP:SetTextColor(1, 1, 1)
-    thin(pane._topXP)
-
-    pane._topGold = tvw:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    pane._topGold:SetPoint("BOTTOMLEFT",  pane._topXP, "TOPLEFT",  0, 4)
-    pane._topGold:SetPoint("BOTTOMRIGHT", pane._topXP, "TOPRIGHT", 0, 4)
-    pane._topGold:SetJustifyH("LEFT")
-    pane._topGold:SetTextColor(1, 1, 1)
-    thin(pane._topGold)
-
-    local h3 = tvw:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    h3:SetPoint("BOTTOMLEFT", pane._topGold, "TOPLEFT", 0, 6)
-    h3:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-    h3:SetText(L["Top single-quest rewards"])
-    thin(h3)
-    pane._topHeader = h3
-
-    pane._trendsView = self:_buildTrendsView(pane)
-
-    self._statsView      = "totals"
-    self._trendGran      = "daily"
-    self._trendMetric    = "gold"
-    self._trendCharFilter = "all"
-    pane._segTotals:SetActive(true)
-    pane._trendsView:Hide()
-
-    return pane
-end
-
-local function ensureCharRow(pane, idx)
-    local r = pane._charRows[idx]
-    if r then return r end
-    local host = pane._totalsView or pane
-    r = host:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    r:SetTextColor(0.92, 0.92, 0.92)
-    r:SetJustifyH("LEFT")
-    r:SetPoint("TOPLEFT",  host, "TOPLEFT",  40, -200 - (idx - 1) * 14)
-    r:SetPoint("TOPRIGHT", host, "TOPRIGHT", -30, -200 - (idx - 1) * 14)
-    thin(r)
-    pane._charRows[idx] = r
-    return r
-end
-
-function HF:_renderTotals()
-    local pane = self._panes.totals
+local function totalsCard(ctx, card)
     local R = ns:GetSubsystem("History")
-    if not (pane and R and R.Totals) then return end
+    if not (R and R.Totals) then return CARD_PAD end
     local t = R:Totals()
-
-    pane._totalQuests:SetText(fmtBigNumber(t.totalCount))
-    pane._totalGold:SetText(fmtMoney(t.totalMoney))
-    pane._totalXP:SetText(fmtBigNumber(t.totalXP) .. " XP")
-
+    local abandoned, avg = DASH, DASH
     -- A zero here would read as "you abandoned none" when recording was simply switched off
-    if t.recording == false then
-        pane._abandoned:SetText("\226\128\148")
-        pane._avgHeld:SetText("\226\128\148")
-    else
-        pane._abandoned:SetText(fmtBigNumber(t.abandoned or 0))
+    if t.recording ~= false then
+        abandoned = fmtBigNumber(t.abandoned or 0)
         if t.avgHeld and (t.heldCount or 0) > 0 then
             -- The count is shown because the average covers only quests accepted since this
             -- shipped, which is a far smaller set than the totals beside it
-            pane._avgHeld:SetText((L["%1$s   |cffaaaaaa(%2$d quests)|r"]):format(
-                ns.Util.FmtDurationLong(t.avgHeld), t.heldCount))
-        else
-            pane._avgHeld:SetText("\226\128\148")
+            avg = (L["%1$s   |cffaaaaaa(%2$d quests)|r"]):format(ns.Util.FmtDurationLong(t.avgHeld), t.heldCount)
         end
     end
-
+    local y = tiles(ctx, card, {
+        { L["Total quests with reward data"], fmtBigNumber(t.totalCount) },
+        { L["Total gold earned"], fmtMoney(t.totalMoney) },
+        { L["Total XP earned"], (L["%s XP"]):format(fmtBigNumber(t.totalXP)) },
+        { L["Total quests abandoned"], abandoned },
+        { L["Average time"], avg },
+    }, CARD_PAD)
     local chars = {}
-    for k, v in pairs(t.byChar) do
-        chars[#chars + 1] = { key = k, rec = v }
+    for k, v in pairs(t.byChar) do chars[#chars + 1] = { key = k, rec = v } end
+    table.sort(chars, byCount)
+    y = y + TILE_GAP * 2
+    text(ctx, card, "groupLabel", L["By character"], CARD_PAD, y)
+    y = y + 14 + LABEL_GAP
+    local rows = {}
+    for _, c in ipairs(chars) do
+        rows[#rows + 1] = { c.key, (L["%d quests"]):format(c.rec.count) .. SEP .. fmtMoney(c.rec.money) .. SEP
+            .. (L["%s XP"]):format(fmtBigNumber(c.rec.xp)) }
     end
-    table.sort(chars, function(a, b) return a.rec.count > b.rec.count end)
-
-    local MAX_VISIBLE = 8
-    local shown = math.min(#chars, MAX_VISIBLE)
-    for i = 1, shown do
-        local row = ensureCharRow(pane, i)
-        local c = chars[i]
-        row:SetText((L["%s  \194\183  %s quests  \194\183  %s  \194\183  %s XP"]):format(
-            c.key,
-            fmtBigNumber(c.rec.count),
-            fmtMoney(c.rec.money),
-            fmtBigNumber(c.rec.xp)))
-        row:Show()
-    end
-    for i = shown + 1, #pane._charRows do
-        pane._charRows[i]:Hide()
-    end
-
-    if t.topGold then
-        pane._topGold:SetText((L["Biggest gold:  |cffffffff%s|r  \194\183  %s"]):format(
-            t.topGold.n or ("Quest #" .. tostring(t.topGold.q)),
-            fmtMoney(t.topGold.m)))
-    else
-        pane._topGold:SetText(L["Biggest gold:  (none yet)"])
-    end
-    if t.topXP then
-        pane._topXP:SetText((L["Biggest XP:    |cffffffff%s|r  \194\183  %s XP"]):format(
-            t.topXP.n or ("Quest #" .. tostring(t.topXP.q)),
-            fmtBigNumber(t.topXP.xp)))
-    else
-        pane._topXP:SetText(L["Biggest XP:    (none yet)"])
-    end
+    y = keyValueRows(ctx, card, rows, y)
+    local top = {}
+    if t.topGold then top[#top + 1] = { t.topGold.n or ("Quest #" .. tostring(t.topGold.q)), fmtMoney(t.topGold.m) } end
+    if t.topXP then top[#top + 1] = { t.topXP.n or ("Quest #" .. tostring(t.topXP.q)), (L["%s XP"]):format(fmtBigNumber(t.topXP.xp)) } end
+    if #top == 0 then return y end
+    y = y + TILE_GAP
+    text(ctx, card, "groupLabel", L["Top single-quest rewards"], CARD_PAD, y)
+    y = y + 14 + LABEL_GAP
+    return keyValueRows(ctx, card, top, y)
 end
 
-function HF:_buildTrendsView(pane)
-    local Options = ns:GetSubsystem("Options")
-    local tv = CreateFrame("Frame", nil, pane)
-    tv:SetPoint("TOPLEFT",     0, -34)
-    tv:SetPoint("BOTTOMRIGHT", 0, 0)
-    tv:Hide()
+local function barTip(self)
+    if not self._rangeText then return end
+    ui():ShowTooltip(self, self._rangeText, self._valueText)
+end
 
-    tv._granDaily  = makeToggleButton(tv, L["Daily"], 60)
-    tv._granDaily:SetPoint("TOPLEFT", 12, -4)
-    tv._granWeekly = makeToggleButton(tv, L["Weekly"], 60)
-    tv._granWeekly:SetPoint("LEFT", tv._granDaily, "RIGHT", 4, 0)
-    tv._granDaily:SetScript("OnClick",  function() HF:_switchTrendGran("daily")  end)
-    tv._granWeekly:SetScript("OnClick", function() HF:_switchTrendGran("weekly") end)
-
-    local charLabel = tv:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    charLabel:SetPoint("LEFT", tv._granWeekly, "RIGHT", 16, 0)
-    charLabel:SetText(L["Show:"])
-    thin(charLabel)
-    if Options and Options.CreateDropdown then
-        local function listFn()
-            local R = ns:GetSubsystem("History")
-            local out = { { value = "all", label = L["All characters"] } }
-            if R then
-                local chars = R:GetCharacters()
-                for i = 1, #chars do
-                    out[#out + 1] = { value = chars[i], label = chars[i] }
-                end
-            end
-            return out
+local function trendsCard(ctx, card)
+    local R = ns:GetSubsystem("History")
+    if not (R and R.Trends) then return CARD_PAD end
+    local stats = HF._views.stats
+    -- Built once, on this card, which is made once too
+    if not stats.gran then
+        stats.gran = ctx:CreateRadioGroup(card, nil, { { value = "daily", label = L["Daily"] }, { value = "weekly", label = L["Weekly"] } },
+            function() return HF._trendGran end, function(v) HF._trendGran = v; HF:_renderStats() end, 9999)
+        stats.showLabel = ctx:CreateText(card, L["Show:"], "label")
+        stats.charDD = ctx:CreateDropdown(card, nil, characterOptions, function() return HF._trendCharFilter or "all" end,
+            function(v) HF._trendCharFilter = v; HF:_renderStats() end)
+        stats.charDD:SetWidth(CHAR_W)
+        stats.metric = ctx:CreateRadioGroup(card, nil, { { value = "count", label = L["Quests"] }, { value = "xp", label = L["XP"] },
+            { value = "gold", label = L["Gold"] } }, function() return HF._trendMetric end, function(v) HF._trendMetric = v; HF:_renderStats() end, 9999)
+        stats.chart = CreateFrame("Frame", nil, card)
+        stats.chart:SetHeight(CHART_H)
+        ctx:Paint(stats.chart, nil, "track", "B")
+        stats.bars = {}
+        for i = 1, MAX_BARS do
+            local b = CreateFrame("Frame", nil, stats.chart)
+            b.fill = b:CreateTexture(nil, "ARTWORK")
+            b.fill:SetAllPoints()
+            b:EnableMouse(true)
+            b:SetScript("OnEnter", barTip)
+            b:SetScript("OnLeave", function() ui():HideTooltip() end)
+            stats.bars[i] = b
         end
-        local function curFn() return HF._trendCharFilter or "all" end
-        local function setFn(v) HF._trendCharFilter = v; HF:_renderTrends() end
-        tv._charDD = Options:CreateDropdown(tv, nil, listFn, curFn, setFn)
-        tv._charDD:SetPoint("LEFT", charLabel, "RIGHT", 4, 0)
-        tv._charDD:SetWidth(170)
+        stats.axisL = ctx:CreateText(card, "", "hint")
+        stats.axisR = ctx:CreateText(card, "", "hint")
     end
-
-    tv._mGold  = makeToggleButton(tv, L["Gold"], 64)
-    tv._mGold:SetPoint("TOPRIGHT", -12, -4)
-    tv._mXP    = makeToggleButton(tv, L["XP"], 64)
-    tv._mXP:SetPoint("RIGHT", tv._mGold, "LEFT", -4, 0)
-    tv._mCount = makeToggleButton(tv, L["Quests"], 64)
-    tv._mCount:SetPoint("RIGHT", tv._mXP, "LEFT", -4, 0)
-    tv._mGold:SetScript("OnClick",  function() HF:_switchTrendMetric("gold")  end)
-    tv._mXP:SetScript("OnClick",    function() HF:_switchTrendMetric("xp")    end)
-    tv._mCount:SetScript("OnClick", function() HF:_switchTrendMetric("count") end)
-
-    tv._cards = {}
-    for i = 1, 3 do
-        local card = makeCard(tv)
-        if i == 1 then
-            card:SetPoint("TOPLEFT", 12, -34)
-        else
-            card:SetPoint("LEFT", tv._cards[i - 1], "RIGHT", CARD_GAP, 0)
-        end
-        tv._cards[i] = card
+    for _, w in ipairs({ stats.gran, stats.showLabel, stats.charDD, stats.metric, stats.chart, stats.axisL, stats.axisR }) do
+        w:ClearAllPoints()
     end
+    stats.gran:SetPoint("TOPLEFT", card, "TOPLEFT", CARD_PAD, -CARD_PAD)
+    stats.gran:Refresh()
+    stats.showLabel:SetPoint("LEFT", stats.gran, "LEFT", 200, 0)
+    stats.charDD:SetPoint("LEFT", stats.showLabel, "RIGHT", FIELD_GAP, 0)
+    stats.metric:SetPoint("LEFT", stats.charDD, "RIGHT", CHECK_GAP, 0)
+    stats.metric:Refresh()
+    if stats.charDD.Refresh then stats.charDD:Refresh() end
 
-    local chart = CreateFrame("Frame", nil, tv)
-    chart:SetPoint("TOPLEFT",     12, -(34 + CARD_H + 14))
-    chart:SetPoint("BOTTOMRIGHT", -12, 46)
-    local cbg = chart:CreateTexture(nil, "BACKGROUND")
-    cbg:SetAllPoints()
-    cbg:SetColorTexture(1, 1, 1, 0.03)
-    tv._chart = chart
-
-    tv._bars = {}
-    for i = 1, STATS_MAX_BARS do
-        local bar = CreateFrame("Frame", nil, chart)
-        bar:EnableMouse(true)
-        bar.fill = bar:CreateTexture(nil, "ARTWORK")
-        bar.fill:SetAllPoints()
-        bar:SetScript("OnEnter", barOnEnter)
-        bar:SetScript("OnLeave", GameTooltip_Hide)
-        bar:Hide()
-        tv._bars[i] = bar
-    end
-
-    tv._axisL = tv:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    tv._axisL:SetPoint("TOPLEFT", chart, "BOTTOMLEFT", 0, -2)
-    thin(tv._axisL)
-    tv._axisR = tv:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    tv._axisR:SetPoint("TOPRIGHT", chart, "BOTTOMRIGHT", 0, -2)
-    tv._axisR:SetJustifyH("RIGHT")
-    thin(tv._axisR)
-
-    tv._caveat = tv:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    tv._caveat:SetPoint("BOTTOMLEFT",  12, 8)
-    tv._caveat:SetPoint("BOTTOMRIGHT", -12, 8)
-    tv._caveat:SetJustifyH("LEFT")
-    tv._caveat:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    tv._caveat:SetText(L["Gold is all income (loot, vendor, rewards) tracked forward from when this version was installed \226\128\148 past periods may read 0. XP and quest counts come from quest turn-ins."])
-    thin(tv._caveat)
-
-    return tv
-end
-
-function HF:_switchStatsView(view)
-    local pane = self._panes and self._panes.totals
-    if not pane then return end
-    self._statsView = view
-    if view == "trends" then
-        pane._totalsView:Hide()
-        pane._trendsView:Show()
-    else
-        pane._trendsView:Hide()
-        pane._totalsView:Show()
-    end
-    pane._segTotals:SetActive(view == "totals")
-    pane._segTrends:SetActive(view == "trends")
-    self:_renderStats()
-end
-
-function HF:_switchTrendGran(gran)
-    self._trendGran = gran
-    self:_renderTrends()
-end
-
-function HF:_switchTrendMetric(metric)
-    self._trendMetric = metric
-    self:_renderTrends()
-end
-
-function HF:_renderStats()
-    if self._statsView == "trends" then
-        self:_renderTrends()
-    else
-        self:_renderTotals()
-    end
-end
-
-function HF:_renderTrends()
-    local pane = self._panes and self._panes.totals
-    local tv   = pane and pane._trendsView
-    local R    = ns:GetSubsystem("History")
-    if not (tv and R and R.Trends) then return end
-
-    local gran   = self._trendGran   or "daily"
-    local metric = self._trendMetric or "gold"
-    local data   = R:Trends(gran, self._trendCharFilter)
+    local gran, metric = HF._trendGran or "daily", HF._trendMetric or "gold"
+    local data = R:Trends(gran, HF._trendCharFilter)
     local periods = data.periods
     local n = #periods
-    if n == 0 then return end
-
-    local cur  = periods[n]
+    local y = CARD_PAD + FIELD_H + TILE_GAP
+    if n == 0 then return y end
+    local cur = periods[n]
     local prev = periods[n - 1] or { xp = 0, gold = 0, count = 0 }
     local curLabel  = (gran == "weekly") and L["This week"] or L["Today"]
     local prevLabel = (gran == "weekly") and L["last week"] or L["yesterday"]
-    local CARD_DEFS = {
-        { key = "count", name = L["Quests"] },
-        { key = "xp",    name = L["XP"] },
-        { key = "gold",  name = L["Gold"] },
-    }
-    for i = 1, 3 do
-        local d    = CARD_DEFS[i]
-        local card = tv._cards[i]
-        card.label:SetText((L["%s \226\128\148 %s"]):format(d.name, curLabel))
-        card.value:SetText(formatMetric(d.key, cur[d.key] or 0))
-        local delta = (cur[d.key] or 0) - (prev[d.key] or 0)
-        card.delta:SetText((L["%s vs %s"]):format(fmtDelta(d.key, delta), prevLabel))
+    local list = {}
+    for _, d in ipairs({ { "count", L["Quests"] }, { "xp", L["XP"] }, { "gold", L["Gold"] } }) do
+        local key = d[1]
+        list[#list + 1] = { (L["%s \226\128\148 %s"]):format(d[2], curLabel), formatMetric(key, cur[key] or 0),
+            (L["%s vs %s"]):format(fmtDelta(key, (cur[key] or 0) - (prev[key] or 0)), prevLabel) }
     end
-
-    local maxV = (metric == "xp" and data.maxXP)
-              or (metric == "gold" and data.maxGold)
-              or data.maxCount
-    local chart = tv._chart
-    local cw = chart:GetWidth()
-    local ch = chart:GetHeight()
-    if not cw or cw <= 1 then cw = (tv:GetWidth() or 660) - 24 end
-    if not ch or ch <= 1 then ch = 180 end
-    local barW = (cw - (n - 1) * BAR_GAP) / n
-
-    for i = 1, STATS_MAX_BARS do
-        local bar = tv._bars[i]
+    y = tiles(ctx, card, list, y)
+    y = y + TILE_GAP
+    stats.chart:SetPoint("TOPLEFT", card, "TOPLEFT", CARD_PAD, -y)
+    stats.chart:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CARD_PAD, -y)
+    local maxV = (metric == "xp" and data.maxXP) or (metric == "gold" and data.maxGold) or data.maxCount
+    local cw = _cardW - CARD_PAD * 2
+    local barW = (cw - (n - 1) * BAR_SPACING) / n
+    for i = 1, MAX_BARS do
+        local bar = stats.bars[i]
         if i <= n then
             local p = periods[i]
             local v = (metric == "xp" and p.xp) or (metric == "gold" and p.gold) or p.count
-            local h = 0
-            if maxV > 0 and v > 0 then h = math.max(2, (v / maxV) * (ch - 4)) end
+            local h = 1
+            if maxV > 0 and v > 0 then h = math.max(2, (v / maxV) * (CHART_H - 4)) end
             bar:ClearAllPoints()
-            bar:SetPoint("BOTTOMLEFT", chart, "BOTTOMLEFT", (i - 1) * (barW + BAR_GAP), 0)
-            bar:SetSize(math.max(barW, 1), math.max(h, 1))
-            bar.fill:SetColorTexture(YELLOW[1], YELLOW[2], YELLOW[3], v > 0 and 0.9 or 0.12)
+            bar:SetPoint("BOTTOMLEFT", stats.chart, "BOTTOMLEFT", (i - 1) * (barW + BAR_SPACING), 0)
+            bar:SetSize(math.max(barW, 1), h)
+            bar.fill:SetColorTexture(ctx:Color(v > 0 and "accent" or "track"))
             local rng = p.label
             -- Plain hyphen, not an en dash - the Korean game font has no glyph for U+2013 and draws a box
             if gran == "weekly" then rng = rng .. " - " .. date("!%b %d", p.day1 * 86400) end
@@ -1377,87 +934,69 @@ function HF:_renderTrends()
             bar:Hide()
         end
     end
-
-    tv._axisL:SetText(periods[1].label)
-    tv._axisR:SetText(periods[n].label)
-
-    tv._granDaily:SetActive(gran == "daily")
-    tv._granWeekly:SetActive(gran == "weekly")
-    tv._mCount:SetActive(metric == "count")
-    tv._mXP:SetActive(metric == "xp")
-    tv._mGold:SetActive(metric == "gold")
+    y = y + CHART_H + LINE_GAP
+    stats.axisL:SetPoint("TOPLEFT", card, "TOPLEFT", CARD_PAD, -y)
+    stats.axisL:SetText(periods[1].label)
+    stats.axisR:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CARD_PAD, -y)
+    stats.axisR:SetText(periods[n].label)
+    y = y + 15 + TILE_GAP
+    local caveat = text(ctx, card, "hint",
+        L["Gold is all income (loot, vendor, rewards) tracked forward from when this version was installed \226\128\148 past periods may read 0. XP and quest counts come from quest turn-ins."],
+        CARD_PAD, y, cw)
+    return y + (caveat:GetStringHeight() or 15)
 end
 
-function HF:_buildSessionPane(parent)
-    local pane = CreateFrame("Frame", nil, parent)
-    pane:SetAllPoints()
-    pane:Hide()
-
-    pane._intro = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pane._intro:SetPoint("TOPLEFT",  30, -12)
-    pane._intro:SetPoint("TOPRIGHT", -30, -12)
-    pane._intro:SetJustifyH("LEFT")
-    pane._intro:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-    pane._intro:SetText(L["Your quest activity this play session. A session starts when you log in and continues across /reload; it resets the next time you log in fresh."])
-    thin(pane._intro)
-
-    local function pairBlock(yOffset, labelText)
-        local label = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        label:SetPoint("TOPLEFT", 30, yOffset)
-        label:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-        label:SetText(labelText)
-        thin(label)
-        local value = pane:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        value:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
-        value:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-        thin(value)
-        return value
-    end
-
-    pane._played = pairBlock(-46,  L["Played this session"])
-    pane._quests = pairBlock(-100, L["Quests completed"])
-    pane._xp     = pairBlock(-154, L["Quest XP earned"])
-    pane._gold   = pairBlock(-208, L["Quest gold earned"])
-    pane._levels = pairBlock(-262, L["Level-ups"])
-    pane._abandoned = pairBlock(-316, L["Quests abandoned"])
-
-    return pane
-end
-
-function HF:_renderSession()
-    local pane = self._panes.session
+local function sessionCard(ctx, card)
     local Sess = ns:GetSubsystem("Session")
-    if not (pane and Sess and Sess.Summary) then return end
+    if not (Sess and Sess.Summary) then return CARD_PAD end
     local sm = Sess:Summary()
-
-    pane._played:SetText(ns.Util.FmtDuration(sm.played))
-
+    local intro = text(ctx, card, "hint",
+        L["Your quest activity this play session. A session starts when you log in and continues across /reload; it resets the next time you log in fresh."],
+        CARD_PAD, CARD_PAD, _cardW - CARD_PAD * 2)
     local rate = sm.perHour and (L["   |cffaaaaaa(%.1f / hour)|r"]):format(sm.perHour) or ""
-    pane._quests:SetText(fmtBigNumber(sm.quests) .. rate)
+    local levels = "0"
+    if sm.levelUps > 0 then levels = (L["%d   |cffaaaaaa(%d to %d)|r"]):format(sm.levelUps, sm.startLevel, sm.curLevel) end
+    return tiles(ctx, card, {
+        { L["Played this session"], ns.Util.FmtDuration(sm.played) },
+        { L["Quests completed"], fmtBigNumber(sm.quests) .. rate },
+        { L["Quest XP earned"], (L["%s XP"]):format(fmtBigNumber(sm.xp)) },
+        { L["Quest gold earned"], fmtMoney(sm.gold) },
+        { L["Level-ups"], levels },
+        { L["Quests abandoned"], sm.recording == false and DASH or fmtBigNumber(sm.abandoned or 0) },
+    }, CARD_PAD + (intro:GetStringHeight() or 15) + TILE_GAP)
+end
 
-    pane._xp:SetText(fmtBigNumber(sm.xp) .. " XP")
-    pane._gold:SetText(fmtMoney(sm.gold))
+function HF:_renderStats()
+    local ctx = ui()
+    local stats = self._views.stats
+    local content = stats.area.content
+    local width = areaWidth(stats.area)
+    _cardW = width - PAD_SIDE * 2
+    _y = PAD_TOP
+    statsGroup(ctx, content, "streak", L["Streak"], function(card) return streakCard(ctx, card) end)
+    statsGroup(ctx, content, "activity", L["Activity"], function(card) return activityCard(ctx, card) end)
+    statsGroup(ctx, content, "totals", L["Totals"], function(card) return totalsCard(ctx, card) end)
+    statsGroup(ctx, content, "trends", L["Trends"], function(card) return trendsCard(ctx, card) end)
+    statsGroup(ctx, content, "session", L["This Session"], function(card) return sessionCard(ctx, card) end)
+    stats.area:SetContentSize(width, _y + PAD_BOTTOM)
+end
 
-    if sm.levelUps > 0 then
-        pane._levels:SetText((L["%d   |cffaaaaaa(%d to %d)|r"]):format(
-            sm.levelUps, sm.startLevel, sm.curLevel))
+-- Gold can come in many times a second in a dungeon, so live refreshes are folded into one each half second
+function HF:RenderSoon()
+    local Events = ns:GetSubsystem("Events")
+    if Events and Events.Debounce then
+        Events:Debounce("eq.history.live", 0.5, function() HF:Render() end)
     else
-        pane._levels:SetText("0")
+        self:Render()
     end
-
-    pane._abandoned:SetText(sm.recording == false and "\226\128\148"
-                            or fmtBigNumber(sm.abandoned or 0))
 end
 
 function HF:Render()
     if not self.frame or not self.frame:IsShown() then return end
     local t = self._activeTab
     if t == "quests"   then self:_renderQuests() end
-    if t == "streak"   then self:_renderStreak() end
     if t == "timeline" then self:_renderTimeline() end
-    if t == "activity" then self:_renderHeatmap() end
-    if t == "totals"   then self:_renderStats()  end
-    if t == "session"  then self:_renderSession() end
+    if t == "stats"    then self:_renderStats() end
 end
 
 function HF:Toggle()
@@ -1466,8 +1005,11 @@ function HF:Toggle()
 end
 
 function HF:Open()
+    if not ns:GetSubsystem("Options") then return end
     self:Build()
     self.frame:Show()
+    -- Above the options window, which the History tab opens it from
+    self.frame:Raise()
     local R = ns:GetSubsystem("History")
     if R and R.RequestMissingTitles then R:RequestMissingTitles() end
     self:Render()
@@ -1484,20 +1026,8 @@ local function fmtMoneyText(copper)
 end
 
 function HF:_exportQuests()
-    local R = ns:GetSubsystem("History")
-    if not R then return "(history unavailable)" end
-    local pane = self._panes.quests
-    local searchText = pane._search and pane._search:GetText() or ""
-    if searchText == SEARCH then searchText = "" end
-    local entries = R:Query({
-        search         = searchText,
-        char           = HF._charFilter,
-        dateRange      = HF._dateFilter,
-        classification = HF._classFilter,
-        hideBackfilled = HF._hideBackfilled,
-        sortBy         = HF._sortBy or "date",
-        sortDir        = HF._sortDir or "desc",
-    })
+    if not ns:GetSubsystem("History") then return "(history unavailable)" end
+    local entries = queryEntries()
     local lines = { ("# Quest History — %d entries"):format(#entries) }
     lines[#lines + 1] = "# date | character | quest | type | zone | held"
     for i = 1, #entries do
@@ -1510,39 +1040,9 @@ function HF:_exportQuests()
     return table.concat(lines, "\n")
 end
 
-function HF:_exportStreak()
-    local R = ns:GetSubsystem("History")
-    if not R then return "(history unavailable)" end
-    local s = R:Streak()
-    return ("Quest History — Streak\n\nCurrent daily streak: %d days\nBest daily streak: %d days\nTotal dated entries: %d"):format(
-        s.current, s.best, s.total)
-end
-
 function HF:_exportTimeline()
-    local R        = ns:GetSubsystem("History")
-    local Database = ns:GetSubsystem("ChainGuideDatabase")
-    if not (R and Database) then return "(history or chain guide unavailable)" end
-    local completion = R:CompletionMap()
-    local sorted = {}
-    for chainID, chain in pairs(Database.chains) do
-        if chain.items and #chain.items > 0 then
-            local doneN, latest, questTotal = 0, 0, 0
-            for i = 1, #chain.items do
-                local it = chain.items[i]
-                if it and it.type == "quest" then
-                    questTotal = questTotal + 1
-                    if completion[it.id] then
-                        doneN = doneN + 1
-                        if completion[it.id] > latest then latest = completion[it.id] end
-                    end
-                end
-            end
-            if doneN > 0 then
-                sorted[#sorted + 1] = { id = chainID, chain = chain, doneN = doneN, latest = latest, total = questTotal }
-            end
-        end
-    end
-    table.sort(sorted, function(a, b) return a.latest > b.latest end)
+    local sorted, completion = timelineChains()
+    if not ns:GetSubsystem("ChainGuideDatabase") then return "(history or chain guide unavailable)" end
     local lines = { "# Chain Timeline — chains with at least one recorded completion" }
     for _, rec in ipairs(sorted) do
         lines[#lines + 1] = ("## %s — %d of %d quests"):format(
@@ -1552,7 +1052,7 @@ function HF:_exportTimeline()
             if it and it.type == "quest" then
                 local t = completion[it.id]
                 local title = ns.Util.QuestTitle(it.id) or it.name or ("Quest #" .. tostring(it.id))
-                local when = t and ((t > 0 and date("%Y-%m-%d", t)) or L["(before tracking)"]) or "—"
+                local when = t and ((t > 0 and date("%Y-%m-%d", t)) or L["(before tracking)"]) or DASH
                 lines[#lines + 1] = ("  - %s [%s]"):format(title, when)
             end
         end
@@ -1560,41 +1060,33 @@ function HF:_exportTimeline()
     return table.concat(lines, "\n")
 end
 
-function HF:_exportActivity()
-    local R = ns:GetSubsystem("History")
-    if not (R and R.DayCounts) then return "(history unavailable)" end
-    local counts, today = R:DayCounts(HEATMAP_DAYS)
-    local lines = { ("# Activity — last %d days"):format(HEATMAP_DAYS) }
-    lines[#lines + 1] = "# date | turn-ins"
-    for i = HEATMAP_DAYS, 1, -1 do
-        local day = today - (i - 1)
-        lines[#lines + 1] = ("%s | %d"):format(date("!%Y-%m-%d", day * 86400), counts[day] or 0)
-    end
-    return table.concat(lines, "\n")
-end
-
-function HF:_exportTotals()
+function HF:_exportStats()
     local R = ns:GetSubsystem("History")
     if not (R and R.Totals) then return "(history unavailable)" end
+    local s = R:Streak()
     local t = R:Totals()
     local lines = {
-        "Quest History — Totals",
+        "Quest History — Stats",
+        "",
+        ("Current daily streak: %d days"):format(s.current),
+        ("Best daily streak: %d days"):format(s.best),
+        ("Total dated entries: %d"):format(s.total),
         "",
         ("Total quests with reward data: %d"):format(t.totalCount),
         ("Total gold earned: %s"):format(fmtMoneyText(t.totalMoney)),
         ("Total XP earned: %d"):format(t.totalXP),
-        ("Total quests abandoned: %d"):format(t.abandoned or 0),
-        ("Average time: %s (over %d quests)"):format(
-            t.avgHeld and ns.Util.FmtDurationLong(t.avgHeld) or "n/a", t.heldCount or 0),
+        ("Total quests abandoned: %s"):format(t.recording == false and "not recorded" or tostring(t.abandoned or 0)),
+        (t.recording ~= false and t.avgHeld)
+            and ("Average time: %s (over %d quests)"):format(ns.Util.FmtDurationLong(t.avgHeld), t.heldCount or 0)
+            or "Average time: n/a",
         "",
         "By character:",
     }
     local chars = {}
     for k, v in pairs(t.byChar) do chars[#chars + 1] = { key = k, rec = v } end
-    table.sort(chars, function(a, b) return a.rec.count > b.rec.count end)
+    table.sort(chars, byCount)
     for _, c in ipairs(chars) do
-        lines[#lines + 1] = ("  %s — %d quests, %s, %d XP"):format(
-            c.key, c.rec.count, fmtMoneyText(c.rec.money), c.rec.xp)
+        lines[#lines + 1] = ("  %s — %d quests, %s, %d XP"):format(c.key, c.rec.count, fmtMoneyText(c.rec.money), c.rec.xp)
     end
     if t.topGold then
         lines[#lines + 1] = ""
@@ -1602,130 +1094,77 @@ function HF:_exportTotals()
             t.topGold.n or ("Quest #" .. tostring(t.topGold.q)), fmtMoneyText(t.topGold.m))
     end
     if t.topXP then
+        if not t.topGold then lines[#lines + 1] = "" end
         lines[#lines + 1] = ("Biggest single XP reward: %s (%d XP)"):format(
             t.topXP.n or ("Quest #" .. tostring(t.topXP.q)), t.topXP.xp)
     end
-    return table.concat(lines, "\n")
-end
-
-function HF:_exportTrends()
-    local R = ns:GetSubsystem("History")
-    if not (R and R.Trends) then return "(history unavailable)" end
-    local gran  = self._trendGran or "daily"
-    local scope = self._trendCharFilter
-    local data  = R:Trends(gran, scope)
-    local scopeLabel = (not scope or scope == "all" or scope == "") and "all characters" or scope
-    local lines = {
-        ("Quest History — Trends (%s, %s)"):format(gran == "weekly" and "weekly" or "daily", scopeLabel),
-        "",
-        "# period | quests | xp | gold",
-    }
-    for i = 1, #data.periods do
-        local p = data.periods[i]
-        local period = (gran == "weekly")
-            and (date("!%Y-%m-%d", p.day0 * 86400) .. " - " .. date("!%Y-%m-%d", p.day1 * 86400))
-            or  date("!%Y-%m-%d", p.day0 * 86400)
-        lines[#lines + 1] = ("%s | %d | %d | %s"):format(
-            period, p.count, p.xp, fmtMoneyText(p.gold))
+    if R.DayCounts then
+        local counts, today = R:DayCounts(HEATMAP_DAYS)
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = ("# Activity — last %d days"):format(HEATMAP_DAYS)
+        lines[#lines + 1] = "# date | turn-ins"
+        for i = HEATMAP_DAYS, 1, -1 do
+            local day = today - (i - 1)
+            lines[#lines + 1] = ("%s | %d"):format(date("!%Y-%m-%d", day * 86400), counts[day] or 0)
+        end
     end
-    return table.concat(lines, "\n")
-end
-
-function HF:_exportSession()
+    if R.Trends then
+        local gran, scope = self._trendGran or "daily", self._trendCharFilter
+        local data = R:Trends(gran, scope)
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = ("# Trends (%s, %s)"):format(gran,
+            (not scope or scope == "all" or scope == "") and "all characters" or scope)
+        lines[#lines + 1] = "# period | quests | xp | gold"
+        for _, p in ipairs(data.periods) do
+            local period = (gran == "weekly")
+                and (date("!%Y-%m-%d", p.day0 * 86400) .. " - " .. date("!%Y-%m-%d", p.day1 * 86400))
+                or date("!%Y-%m-%d", p.day0 * 86400)
+            lines[#lines + 1] = ("%s | %d | %d | %s"):format(period, p.count, p.xp, fmtMoneyText(p.gold))
+        end
+    end
     local Sess = ns:GetSubsystem("Session")
-    if not (Sess and Sess.Summary) then return "(session unavailable)" end
-    local sm = Sess:Summary()
-    local lines = {
-        "Everything Quests - This Session",
-        "",
-        ("Played: %s"):format(ns.Util.FmtDuration(sm.played)),
-        ("Quests completed: %d%s"):format(sm.quests,
-            sm.perHour and ((" (%.1f/hour)"):format(sm.perHour)) or ""),
-        ("Quest XP earned: %d"):format(sm.xp),
-        ("Quest gold earned: %s"):format(fmtMoneyText(sm.gold)),
-        ("Quests abandoned: %d"):format(sm.abandoned or 0),
-    }
-    if sm.levelUps > 0 then
-        lines[#lines + 1] = ("Level-ups: %d (%d to %d)"):format(
-            sm.levelUps, sm.startLevel, sm.curLevel)
+    if Sess and Sess.Summary then
+        local sm = Sess:Summary()
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = ("Played this session: %s"):format(ns.Util.FmtDuration(sm.played))
+        lines[#lines + 1] = ("Quests completed: %d%s"):format(sm.quests,
+            sm.perHour and ((" (%.1f/hour)"):format(sm.perHour)) or "")
+        lines[#lines + 1] = ("Quest XP earned: %d"):format(sm.xp)
+        lines[#lines + 1] = ("Quest gold earned: %s"):format(fmtMoneyText(sm.gold))
+        lines[#lines + 1] = ("Quests abandoned: %s"):format(sm.recording == false and "not recorded" or tostring(sm.abandoned or 0))
+        if sm.levelUps > 0 then
+            lines[#lines + 1] = ("Level-ups: %d (%d to %d)"):format(sm.levelUps, sm.startLevel, sm.curLevel)
+        end
     end
     return table.concat(lines, "\n")
 end
 
 function HF:_exportForTab(tabId)
     if tabId == "quests"   then return self:_exportQuests()   end
-    if tabId == "streak"   then return self:_exportStreak()   end
     if tabId == "timeline" then return self:_exportTimeline() end
-    if tabId == "activity" then return self:_exportActivity() end
-    if tabId == "totals"   then
-        if self._statsView == "trends" then return self:_exportTrends() end
-        return self:_exportTotals()
-    end
-    if tabId == "session"  then return self:_exportSession()  end
+    if tabId == "stats"    then return self:_exportStats()    end
     return "(nothing to export)"
 end
 
 function HF:_buildExportPopup()
     if self._exportPopup then return self._exportPopup end
-
-    local p = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-    p:SetSize(540, 380)
-    p:SetPoint("CENTER")
-    p:SetFrameStrata("FULLSCREEN_DIALOG")
-    p:SetMovable(true)
-    p:EnableMouse(true)
-    p:RegisterForDrag("LeftButton")
-    p:SetScript("OnDragStart", p.StartMoving)
-    p:SetScript("OnDragStop",  p.StopMovingOrSizing)
-    p:SetClampedToScreen(true)
-    p:Hide()
-    p:SetBackdrop({
-        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 14,
-        insets   = { left = 4, right = 4, top = 4, bottom = 4 },
-    })
-    p:SetBackdropColor(0.02, 0.02, 0.02, 0.97)
-    p:SetBackdropBorderColor(HEADER_RED[1], HEADER_RED[2], HEADER_RED[3], 1)
-
-    p.title = p:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    p.title:SetPoint("TOPLEFT", 12, -10)
-    p.title:SetText(L["Export"])
-    p.title:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-    thin(p.title)
-
-    p.hint = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    p.hint:SetPoint("TOPLEFT", 12, -32)
-    p.hint:SetText(L["Press Ctrl+A to select all, then Ctrl+C to copy."])
-    thin(p.hint)
-
-    p.close = CreateFrame("Button", nil, p, "UIPanelCloseButton")
-    p.close:SetPoint("TOPRIGHT", -4, -4)
-    p.close:SetScript("OnClick", function() p:Hide() end)
-
-    local scroll = CreateFrame("ScrollFrame", nil, p, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 12, -52)
-    scroll:SetPoint("BOTTOMRIGHT", -32, 12)
-    p._scroll = scroll
-
-    local edit = CreateFrame("EditBox", nil, scroll)
-    edit:SetMultiLine(true)
-    edit:SetAutoFocus(false)
-    edit:SetFontObject("ChatFontNormal")
-    edit:SetWidth(scroll:GetWidth())
-    edit:SetScript("OnEscapePressed", function() p:Hide() end)
-    scroll:SetScrollChild(edit)
-    p._edit = edit
-
+    local ctx = ui()
+    local p = ctx:CreateWindow({ name = "EQHistoryExportFrame", title = L["Export"], width = 540, height = 380 })
+    p.hint = ctx:CreateText(p.body, L["Press Ctrl+A to select all, then Ctrl+C to copy."], "hint")
+    p.hint:SetPoint("TOPLEFT", p.body, "TOPLEFT", PAD_SIDE, -INTRO_PAD)
+    p.field = ctx:CreateMultilineField(p.body, { readOnly = true })
+    p.field:SetPoint("TOPLEFT", p.hint, "BOTTOMLEFT", 0, -LABEL_GAP)
+    p.field:SetPoint("BOTTOMRIGHT", p.body, "BOTTOMRIGHT", -PAD_SIDE, PAD_SIDE)
+    -- The field holds the keyboard after SelectAll, so its Escape closes the window, as the old one did
+    p.field.box:HookScript("OnEscapePressed", function() p:Hide() end)
     self._exportPopup = p
     return p
 end
 
 function HF:_openExportPopup()
     local p = self:_buildExportPopup()
-    local text = self:_exportForTab(self._activeTab) or ""
-    p._edit:SetText(text)
-    p._edit:HighlightText()
-    p._edit:SetFocus()
+    p.field:SetText(self:_exportForTab(self._activeTab) or "")
     p:Show()
+    p:Raise()
+    p.field:SelectAll()
 end

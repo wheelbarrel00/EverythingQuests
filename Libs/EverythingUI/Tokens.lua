@@ -75,6 +75,7 @@ lib.tokens = {
         groupLabel = { size = 12, weight = "SemiBold", color = "muted" },
         hint       = { size = 12, weight = "Regular",  color = "muted" },
         segment    = { size = 12, weight = "SemiBold", color = "navText" },
+        figure     = { size = 22, weight = "SemiBold", color = "text" },
     },
 
     spacing = {

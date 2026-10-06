@@ -467,17 +467,32 @@ function QB:Record(questID)
     return r
 end
 
--- Where an arrow should point for this quest. A finished one wants its finisher, and anything
--- else wants a place it can be picked up, which is the whole point of browsing an unaccepted one.
+local function nearest(places)
+    if not (places and places[1]) then return nil end
+    local f = C_Map and C_Map.GetBestMapForUnit
+    local ok, here = false, nil
+    if f then ok, here = pcall(f, "player") end
+    if ok and here then
+        for _, p in ipairs(places) do
+            if p.mapID == here then return p end
+        end
+    end
+    return places[1]
+end
+
+-- Where the arrow points for a quest in the log that has a point, else a start or its turn-in, on your map first
 function QB:Waypoint(record)
     if not record then return nil end
     if record.inLog then
         local Arrow = ns:GetSubsystem("QuestArrow")
-        if Arrow and Arrow.PointAtQuest then return "quest" end
+        if Arrow and Arrow.PointFor then
+            local m, x, y = Arrow:PointFor(record.id)
+            if m then return "quest", m, x, y end
+        end
     end
-    local first = record.starts and record.starts[1]
+    local first = nearest(record.starts)
     if first then return "start", first.mapID, first.x, first.y end
-    local turn = record.turnIn and record.turnIn[1]
+    local turn = nearest(record.turnIn)
     if turn then return "turnin", turn.mapID, turn.x, turn.y end
     return nil
 end

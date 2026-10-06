@@ -131,7 +131,11 @@ local function generalCard(self, content, stack)
             end,
             function(value)
                 local DB = ns:GetSubsystem("DB")
-                if DB then DB.db.global.whatsNewMode = value end
+                if DB then
+                    DB.db.global.whatsNewMode = value
+                    -- The mode the What's New window's own checkbox puts back
+                    if value ~= "none" then DB.db.global.whatsNewModeBeforeOff = value end
+                end
             end,
             nil, nil, L["After an update"],
             L["How Everything Quests tells you about new features: a Popup window, a quiet clickable Chat link in your chat frame, or None. New features always ship off until you turn them on."]))
@@ -382,6 +386,7 @@ Options:RegisterTab({
                         if g then
                             g.optionsWindowScale = DB.defaults.global.optionsWindowScale
                             g.whatsNewMode       = DB.defaults.global.whatsNewMode
+                            g.whatsNewModeBeforeOff = nil
                         end
                         if DB.char and DB.char.minimap then
                             DB.char.minimap.hide = DB.defaults.char.minimap.hide

@@ -18,6 +18,8 @@ local MIN_THUMB = 24
 -- Tooltip titles stay gold (decision 8). Every other piece of text in the panel is themed.
 local TOOLTIP_TITLE = { 0.92, 0.72, 0.02 }
 local TIP_GAP = 4
+local NAV_ICON = 16
+local NAV_ICON_GAP = 10
 
 function kit.Pixel(frame)
     local scale = frame:GetEffectiveScale()
@@ -235,11 +237,48 @@ function kit.Icon(ctx, parent, name, size, color)
     return t
 end
 
+-- One page in a sidebar's list: the settings window's tabs and a main window's pages draw alike. A
+-- title that outruns the item breaks onto a second line, which its 36 px fits (frFR, 2026-10-05).
+function kit.NavItem(ctx, parent, width, title, icon)
+    local sp = lib.tokens.spacing
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(width, sp.navItemHeight)
+    b.active = kit.Fill(ctx, b, "accentSoft")
+    b.active:Hide()
+    kit.Highlight(ctx, b)
+    b.label = kit.Text(ctx, b, "nav")
+    if icon then
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetSize(NAV_ICON, NAV_ICON)
+        b.icon:SetPoint("LEFT", sp.navItemPadding, 0)
+        b.icon:SetTexture(icon)
+        b.label:SetPoint("LEFT", b.icon, "RIGHT", NAV_ICON_GAP, 0)
+    else
+        b.label:SetPoint("LEFT", sp.navItemPadding, 0)
+    end
+    b.label:SetPoint("RIGHT", -sp.navItemPadding, 0)
+    kit.TwoLines(b.label)
+    b.label:SetText(title)
+    return b
+end
+
+function kit.PaintNav(ctx, b, active)
+    b.active:SetShown(active)
+    kit.Style(ctx, b.label, active and "navActive" or "nav")
+    if b.icon then b.icon:SetVertexColor(ctx:Color(active and "accentHi" or "navText")) end
+end
+
+-- Wraps at its width onto two lines at most
+function kit.TwoLines(fs)
+    fs:SetWordWrap(true)
+    if fs.SetMaxLines then fs:SetMaxLines(2) end
+end
+
 -- Widths read off a string while a tab is built have come out short of the text as drawn (the
 -- Tracker tab, 2026-10-02: a button's text and a slider's label ran past their room), and a tab can be
 -- built at login, before its window is scaled or shown. So whatever a frame sizes from a string is
--- sized again here, once the tab is on screen: each card's label column, each fitted button and
--- each formatted slider readout.
+-- sized again here, once the tab is on screen: each card's label column, each fitted button, each
+-- formatted slider readout, each color picker's width and each column of pickers lined up together.
 function kit.Refit(frame)
     for _, card in ipairs(frame._euiCards or {}) do card:Layout() end
     for _, b in ipairs(frame._euiFit or {}) do b:Fit() end
@@ -256,12 +295,29 @@ end
 -- and Escape just falls through to the default UI.
 function kit.CloseOnEscape(frame)
     frame:EnableKeyboard(false)
-    frame:HookScript("OnShow", function(f)
-        if InCombatLockdown() then return end
-        f:EnableKeyboard(true)
-        f:SetPropagateKeyboardInput(true)
+    local function arm()
+        frame:EnableKeyboard(true)
+        frame:SetPropagateKeyboardInput(true)
+    end
+    -- Its own frame, since a menu sets the window's OnEvent
+    local wait = CreateFrame("Frame")
+    wait:SetScript("OnEvent", function(w)
+        w:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        arm()
     end)
-    frame:HookScript("OnHide", function(f) f:EnableKeyboard(false) end)
+    frame._euiEscapeWait = wait
+    frame:HookScript("OnShow", function()
+        -- Deferred rather than dropped, as a dialog's is, or a window shown in combat never took Escape
+        if InCombatLockdown() then
+            wait:RegisterEvent("PLAYER_REGEN_ENABLED")
+            return
+        end
+        arm()
+    end)
+    frame:HookScript("OnHide", function(f)
+        f:EnableKeyboard(false)
+        wait:UnregisterEvent("PLAYER_REGEN_ENABLED")
+    end)
     frame:SetScript("OnKeyDown", function(f, key)
         if InCombatLockdown() then return end
         if key == "ESCAPE" then
@@ -295,7 +351,8 @@ function kit.Scroll(ctx, parent)
     bar:SetScript("OnValueChanged", function(_, v) sf:SetVerticalScroll(v) end)
 
     sf:SetScript("OnScrollRangeChanged", function(self, _, yrange)
-        yrange = math.max(0, yrange or 0)
+        -- Floored as Blizzard's own scroll frames floor it, so a fraction of a unit is no range at all.
+        yrange = math.floor(math.max(0, yrange or 0))
         bar:SetMinMaxValues(0, yrange)
         bar:SetShown(yrange > 0)
         local view, length = self:GetHeight() or 0, bar:GetHeight() or 0

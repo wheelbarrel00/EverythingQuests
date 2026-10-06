@@ -213,7 +213,12 @@ local function showList(ctx, anchor, opts, onPick, decorate, current, previewFon
     -- SetPoints old here and has not resolved yet.
     p.content:SetSize(math.max(1, (anchor:GetWidth() or 0) - (scrolls and (BAR_ROOM + 1) or 2)),
                       math.max(1, #opts * rowH))
+    -- Over its window even when that window sits above the world map, so a click on it still closes the list
+    local high = p.owner and p.owner.GetFrameStrata and p.owner:GetFrameStrata() == "FULLSCREEN_DIALOG"
+    p.closer:SetFrameStrata(high and "FULLSCREEN_DIALOG" or "FULLSCREEN")
     p:Show()
+    p.closer:Raise()
+    p:Raise()
 
     -- One popup is shared by every dropdown and nothing else resets the offset, so a
     -- short list opened after a long one would inherit the long one's scroll position.

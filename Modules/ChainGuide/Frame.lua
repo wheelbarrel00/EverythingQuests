@@ -24,10 +24,33 @@ local function guideCfg()
     return DB and DB.db and DB.db.profile and DB.db.profile.chainGuide
 end
 
+-- The hint sits where the sideways scroll bar ends, so the bar stops short of it while it shows
+local function fitScrollBar(f)
+    local area = f.body and f.body._cvArea
+    local bar = area and area.hbar
+    if not (bar and f.resizeHint) then return end
+    if not f._barEnd then
+        for i = 1, bar:GetNumPoints() do
+            local p, rel, rp, x, y = bar:GetPoint(i)
+            if p == "BOTTOMRIGHT" then f._barEnd = { rel, rp, x, y } end
+        end
+        if not f._barEnd then return end
+    end
+    local e = f._barEnd
+    local room = 0
+    if f.resizeHint:IsShown() and f.grip then
+        -- From the window's edge to a gap left of the hint, less what the bar already leaves
+        local _, _, _, gx = f.grip:GetPoint(1)
+        room = (f.grip:GetWidth() or 0) - (gx or 0) + HINT_GAP + (f.resizeHint:GetStringWidth() or 0) + HINT_GAP + e[3]
+    end
+    bar:SetPoint("BOTTOMRIGHT", e[1], e[2], e[3] - math.max(0, room), e[4])
+end
+
 local function hideResizeHint(f)
     local cfg = guideCfg()
     if cfg then cfg.resizeHintSeen = true end
     if f.resizeHint then f.resizeHint:Hide() end
+    fitScrollBar(f)
 end
 
 local function sortedCategories(self)
@@ -109,7 +132,7 @@ local function iconButton(ctx, parent, icon, title, body, onClick)
 end
 
 local function placeListLabel(f)
-    local above = f.searchNote:IsShown() and f.searchNote or f.search
+    local above = (f.searchNote:IsShown() and f.searchNote) or (f.searchNoteData:IsShown() and f.searchNoteData) or f.search
     f.listLabel:ClearAllPoints()
     f.listLabel:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -LABEL_GAP)
     f.list:ClearAllPoints()
@@ -173,10 +196,18 @@ function CG:Build()
     f.search:SetPoint("TOPRIGHT", f.zonePicker, "BOTTOMRIGHT", 0, -FIELD_GAP)
 
     f.searchNote = ctx:CreateText(side, "", "hint")
-    f.searchNote:SetPoint("TOPLEFT", f.search, "BOTTOMLEFT", 0, -NOTE_GAP)
-    f.searchNote:SetPoint("TOPRIGHT", f.search, "BOTTOMRIGHT", 0, -NOTE_GAP)
-    f.searchNote:SetWordWrap(true)
-    f.searchNote:Hide()
+    -- What was typed can be in any alphabet, which the client's font object draws and the library's face may not
+    f.searchNoteData = side:CreateFontString(nil, "OVERLAY")
+    f.searchNoteData:SetFontObject(GameFontHighlight)
+    f.searchNoteData:SetShadowOffset(0, 0)
+    f.searchNoteData:SetTextColor(ctx:Color("muted"))
+    f.searchNoteData:SetJustifyH("LEFT")
+    for _, note in ipairs({ f.searchNote, f.searchNoteData }) do
+        note:SetPoint("TOPLEFT", f.search, "BOTTOMLEFT", 0, -NOTE_GAP)
+        note:SetPoint("TOPRIGHT", f.search, "BOTTOMRIGHT", 0, -NOTE_GAP)
+        note:SetWordWrap(true)
+        note:Hide()
+    end
 
     f.listLabel = ctx:CreateHeading(side, L["Chains"])
     f.list = ctx:CreateList(side, function(id) self:NavigateChain(id) end)
@@ -201,6 +232,7 @@ function CG:Build()
     for _, b in ipairs({ f.hideListBtn, f.showListBtn, f.backBtn, f.fwdBtn }) do
         b:SetFrameLevel(body._cvHead:GetFrameLevel() + 1)
     end
+    fitScrollBar(f)
 
     self:SetRailCollapsed(cfg and cfg.railCollapsed or false)
     local home = self:HomeCategory()
@@ -254,6 +286,8 @@ function CG:Open()
         self.frame:Show()
         self:RenderCurrent()
     end
+    -- Above History, which opens it from a row's right-click
+    self.frame:Raise()
 end
 
 function CG:SetRailCollapsed(collapsed)
@@ -332,11 +366,16 @@ local function classicSource()
     return ns:GetSubsystem("ChainGuideClassicSource")
 end
 
-function CG:SetSearchNote(text)
+function CG:SetSearchNote(text, typed)
     local f = self.frame
     if not f then return end
-    f.searchNote:SetText(text or "")
-    f.searchNote:SetShown(text ~= nil)
+    local Options = ns:GetSubsystem("Options")
+    local ctx = Options and Options.ui
+    local data = typed ~= nil and ctx ~= nil and ctx:NeedsClientFont(typed)
+    f.searchNote:SetText(data and "" or (text or ""))
+    f.searchNote:SetShown(text ~= nil and not data)
+    f.searchNoteData:SetText(data and text or "")
+    f.searchNoteData:SetShown(text ~= nil and data)
     placeListLabel(f)
 end
 
@@ -358,7 +397,7 @@ function CG:RunSearch(text)
 end
 
 function CG:SearchMissed(text)
-    self:SetSearchNote((L["No chain quest matches \"%s\"."]):format(text))
+    self:SetSearchNote((L["No chain quest matches \"%s\"."]):format(text), text)
 end
 
 local function searchLive(self, gen)

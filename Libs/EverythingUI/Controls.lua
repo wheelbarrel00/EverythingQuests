@@ -35,8 +35,10 @@ function Context:Spacing(name)
 end
 
 function Context:AttachTooltip(frame, title, body)
+    title = title and stripEscapes(title) or nil
+    if title == "" then title = nil end
+    if body == "" then body = nil end
     if not frame or (not title and not body) then return end
-    title = (title and title ~= "") and stripEscapes(title) or nil
 
     if frame.GetObjectType and frame:GetObjectType() == "FontString" then
         local overlay = CreateFrame("Frame", nil, frame:GetParent())
@@ -60,6 +62,20 @@ function Context:AttachTooltip(frame, title, body)
         t:HookScript("OnEnter", function() kit.ShowTip(getTip, anchor, title, body) end)
         t:HookScript("OnLeave", function() getTip():Hide() end)
     end
+end
+
+-- For a pooled frame whose text changes between uses, where AttachTooltip's hooks would pile up
+function Context:ShowTooltip(owner, title, body)
+    title = title and stripEscapes(title) or nil
+    if title == "" then title = nil end
+    if body == "" then body = nil end
+    if not owner or (not title and not body) then return end
+    kit.ShowTip(self.opts.tooltip, owner, title, body)
+end
+
+function Context:HideTooltip()
+    local tip = self.opts.tooltip()
+    if tip then tip:Hide() end
 end
 
 local BUTTON_STYLES = { secondary = true, primary = true, ghost = true, danger = true }
@@ -543,22 +559,57 @@ end
 -- swatches but leaves the labels ragged.
 function Context:AlignPickerColumn(...)
     local pickers = { ... }
-    local widest = 0
-    for _, p in ipairs(pickers) do
-        local w = p.label:GetStringWidth() or 0
-        if w > widest then widest = w end
+    local entry = {}
+    local function align()
+        -- Room for the widest Clear, which sits between the labels and the swatches
+        local mine, widest, clearRoom = {}, 0, 0
+        for _, p in ipairs(pickers) do
+            if p._euiColumnAligner == entry then
+                mine[#mine + 1] = p
+                local w = p.label:GetStringWidth() or 0
+                if w > widest then widest = w end
+                if p.clear then
+                    local c = p.clear:GetWidth() + (p._euiClearGap or 0)
+                    if c > clearRoom then clearRoom = c end
+                end
+            end
+        end
+        local x = widest + PICKER_GAP + clearRoom
+        for _, p in ipairs(mine) do
+            p.label:ClearAllPoints()
+            p.label:SetPoint("LEFT", p, "LEFT", 0, 0)
+            p.button:ClearAllPoints()
+            p.button:SetPoint("TOP",  p, "TOP", 0, -1)
+            p.button:SetPoint("LEFT", p, "LEFT", x, 0)
+            -- A translated label can outrun the width the holder is built at, which would leave the
+            -- swatch hanging past the holder's right edge.
+            local need = x + p.button:GetWidth()
+            if need > p:GetWidth() then p:SetWidth(need) end
+        end
+        return #mine > 0
     end
+    entry.Fit = align
+    -- Lined up again, a picker leaves its old column, so two aligners never fight over its swatches
+    for _, p in ipairs(pickers) do p._euiColumnAligner = entry end
+    align()
+    -- Listed after each picker's own Fit, which sets the holder back to its own width, so kit.Refit
+    -- lines the column up again from the labels as they measure on screen.
+    local seen = {}
     for _, p in ipairs(pickers) do
-        p.label:ClearAllPoints()
-        p.label:SetPoint("LEFT", p, "LEFT", 0, 0)
-        p.button:ClearAllPoints()
-        p.button:SetPoint("TOP",  p, "TOP", 0, -1)
-        p.button:SetPoint("LEFT", p, "LEFT", widest + PICKER_GAP, 0)
-        -- A translated label can outrun the width the holder is built at, which would leave the
-        -- swatch hanging past the holder's right edge.
-        local need = widest + PICKER_GAP + p.button:GetWidth()
-        if need > p:GetWidth() then p:SetWidth(need) end
+        local content = p:GetParent()
+        if content and not seen[content] then
+            seen[content] = true
+            local fits = content._euiFit or {}
+            content._euiFit = fits
+            -- On every parent its pickers sit on, and an aligner left with no picker goes
+            for i = #fits, 1, -1 do
+                local f = fits[i]
+                if f._euiPickerColumn and f ~= entry and not f.Fit() then table.remove(fits, i) end
+            end
+            fits[#fits + 1] = entry
+        end
     end
+    entry._euiPickerColumn = true
 end
 
 -- One label column for every labelled control in a group: the token's width, or the widest

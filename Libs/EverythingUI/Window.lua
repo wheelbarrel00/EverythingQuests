@@ -14,6 +14,7 @@ local ACCENT_SQUARE = 10
 local CLOSE_SIZE = 32
 local SCROLLBAR_INSET = 9
 local SCROLLBAR_BOTTOM = 8
+local TWO_LINE_BUTTON = 44
 
 local TAB_FIELDS = {
     id = "string", title = "string", order = "number", build = "function",
@@ -41,10 +42,7 @@ function Context:RegisterTab(def)
 end
 
 local function paintNav(ctx, t, active)
-    local b = t._nav
-    b.active:SetShown(active)
-    kit.Style(ctx, b.label, active and "navActive" or "nav")
-    if b.icon then b.icon:SetVertexColor(ctx:Color(active and "accentHi" or "navText")) end
+    kit.PaintNav(ctx, t._nav, active)
 end
 
 local function buildHeader(ctx, f)
@@ -92,29 +90,12 @@ local function buildSidebar(ctx, f, sidebar)
     local width = sp.sidebarWidth - SIDEBAR_PADDING * 2
     local prev
     for _, t in ipairs(ctx._tabs or {}) do
-        local b = CreateFrame("Button", nil, sidebar)
-        b:SetSize(width, sp.navItemHeight)
+        local b = kit.NavItem(ctx, sidebar, width, t.title, t.icon)
         if prev then
             b:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -sp.navItemGap)
         else
             b:SetPoint("TOPLEFT", SIDEBAR_PADDING, -SIDEBAR_TOP)
         end
-        b.active = kit.Fill(ctx, b, "accentSoft")
-        b.active:Hide()
-        kit.Highlight(ctx, b)
-        b.label = kit.Text(ctx, b, "nav")
-        if t.icon then
-            b.icon = b:CreateTexture(nil, "ARTWORK")
-            b.icon:SetSize(ICON_SIZE, ICON_SIZE)
-            b.icon:SetPoint("LEFT", sp.navItemPadding, 0)
-            b.icon:SetTexture(t.icon)
-            b.label:SetPoint("LEFT", b.icon, "RIGHT", ICON_GAP, 0)
-        else
-            b.label:SetPoint("LEFT", sp.navItemPadding, 0)
-        end
-        b.label:SetPoint("RIGHT", -sp.navItemPadding, 0)
-        b.label:SetWordWrap(false)
-        b.label:SetText(t.title)
         local id = t.id
         b:SetScript("OnClick", function() ctx:SelectTab(id) end)
         t._nav = b
@@ -132,7 +113,18 @@ local function buildSidebar(ctx, f, sidebar)
         d.text:ClearAllPoints()
         d.text:SetPoint("LEFT", icon, "RIGHT", ICON_GAP, 0)
         d.text:SetPoint("RIGHT", -sp.navItemPadding, 0)
-        d.text:SetWordWrap(false)
+        d.text:SetJustifyH("LEFT")
+        kit.TwoLines(d.text)
+        -- A label too long for one line (de, fr and ru, 2026-10-05) takes a second, and the button
+        -- grows for it upward from its bottom anchor. Measured again on screen, like a fitted button.
+        function d.Fit()
+            local wrapped = (d.text:GetStringHeight() or 0) > lib.tokens.typography.value.size * 1.5
+            d:SetHeight(wrapped and TWO_LINE_BUTTON or sp.buttonHeight)
+        end
+        d.Fit()
+        local fits = sidebar._euiFit or {}
+        sidebar._euiFit = fits
+        fits[#fits + 1] = d
         ctx:AttachTooltip(d, labels.discordTipTitle, labels.discordTip)
         f.discord = d
     end
@@ -185,6 +177,7 @@ function Context:BuildSettings(name)
     f:SetSize(sp.windowWidth, sp.windowHeight)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
+    -- Not toplevel, or a click on it would cover Blizzard's color picker, which shares its strata
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
@@ -257,11 +250,21 @@ function Context:BuildSettings(name)
 end
 
 -- Run once the tab is on screen: its content is sized again and measured (MeasureContent), and so
--- is its footer, a frame later.
+-- are its footer and the sidebar, a frame later.
 local function settle(ctx, t)
     ctx:MeasureContent(t._content)
     local footer = t._footer
-    if footer then C_Timer.After(0, function() kit.Refit(footer) end) end
+    local sidebar = ctx._window and ctx._window.sidebar
+    C_Timer.After(0, function()
+        if footer then kit.Refit(footer) end
+        if sidebar then kit.Refit(sidebar) end
+    end)
+end
+
+local function refreshControls(t)
+    for _, c in ipairs(t._content._controls or {}) do
+        if c.Refresh then c:Refresh() end
+    end
 end
 
 function Context:SelectTab(id)
@@ -281,9 +284,7 @@ function Context:SelectTab(id)
                 t._footerBuilt = true
             end
             if t.refresh then t.refresh(self, t._content) end
-            for _, c in ipairs(t._content._controls or {}) do
-                if c.Refresh then c:Refresh() end
-            end
+            refreshControls(t)
             if t._preview then
                 if not t._previewBuilt then
                     t.preview(self, t._preview)
@@ -319,13 +320,17 @@ function Context:ApplyWindowScale()
     -- broken state would survive closing the window.
     local sp = lib.tokens.spacing
     local uw, uh = UIParent:GetWidth(), UIParent:GetHeight()
+    local wasCapped = false
     if uw and uh and uw > 0 and uh > 0 then
         local capped = math.min(s, uw / sp.windowWidth, uh / sp.windowHeight)
         -- Written back, or the slider goes on reporting a number the window never had: at a
         -- 768-unit UIParent every step from about 1.07 up rendered identically while the
         -- readout still said 1.40. The ceiling moves with the player's UI Scale.
         local set = self.opts.setWindowScale
-        if capped < s and set then set(capped) end
+        if capped < s and set then
+            set(capped)
+            wasCapped = true
+        end
         s = capped
     end
 
@@ -343,7 +348,11 @@ function Context:ApplyWindowScale()
     -- A scale changed from inside the open window leaves the tab on screen sized at the old one.
     if f:IsShown() then
         for _, t in ipairs(self._tabs or {}) do
-            if t.id == self._current and t._built then settle(self, t) end
+            if t.id == self._current and t._built then
+                -- The scale slider on screen still reads the number that was capped until it is read again.
+                if wasCapped then refreshControls(t) end
+                settle(self, t)
+            end
         end
     end
 end
@@ -356,5 +365,7 @@ function Context:ToggleSettings()
         self:ApplyWindowScale()
         self:SelectTab(self._current)
         f:Show()
+        -- Over a main window, which is toplevel and may have come forward since
+        f:Raise()
     end
 end

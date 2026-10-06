@@ -251,17 +251,30 @@ function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasA
 
     -- Only clearable pickers get the button, so an unset swatch stays distinguishable
     -- from a deliberately black one.
-    local width = (text:GetStringWidth() or 0) + CLEAR_GAP + sp.swatchWidth
     if onClear then
         clear = self:CreateButton(holder, clearLabel, nil, function()
             onClear()
             paint()
         end, nil, "ghost")
         clear:SetPoint("RIGHT", swatch, "LEFT", -CLEAR_GAP, 0)
-        -- Room for Clear is kept while it is hidden, so the label does not move when it shows.
-        width = width + clear:GetWidth() + CLEAR_GAP
     end
-    holder:SetWidth(width)
+    -- Sized again by kit.Refit on screen, like a fitted button: sized only at build, a picker at a
+    -- checkbox row's end ran its label under its swatch (2026-10-04).
+    local function fit()
+        local width = (text:GetStringWidth() or 0) + CLEAR_GAP + sp.swatchWidth
+        if clear then
+            -- Clear is listed on this holder, which no tab's Refit reaches.
+            clear:Fit()
+            -- Room for Clear is kept while it is hidden, so the label does not move when it shows.
+            width = width + clear:GetWidth() + CLEAR_GAP
+        end
+        holder:SetWidth(width)
+    end
+    fit()
+    holder.Fit = fit
+    local fits = content._euiFit or {}
+    content._euiFit = fits
+    fits[#fits + 1] = holder
     paint()
 
     swatch:SetScript("OnClick", function()
@@ -287,6 +300,7 @@ function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasA
 
     holder.button  = swatch
     holder.clear   = clear
+    holder._euiClearGap = CLEAR_GAP
     holder.paint   = paint
     holder.Refresh = paint
     if tooltip then self:AttachTooltip(holder, label, tooltip) end

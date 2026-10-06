@@ -634,9 +634,8 @@ function R:RecordMoney()
     end
 
     local HF = ns:GetSubsystem("HistoryFrame")
-    if HF and HF.frame and HF.frame:IsShown()
-       and HF._activeTab == "totals" and HF._statsView == "trends" then
-        HF:Render()
+    if HF and HF.IsShowing and HF:IsShowing("stats") then
+        HF:RenderSoon()
     end
 end
 

@@ -5,27 +5,35 @@ local L = ns.L
 -- in QuestBrowserData, so this file only lays out what that returns.
 local QB = ns:RegisterSubsystem("QuestBrowser", {})
 
-local TITLE_BAR_H = 26
-local TOOLBAR_H   = 26
-local LIST_W      = 268
-local ROW_H       = 26
-local LINE_H      = 15
-local MAX_ROWS    = 300
+local DEFAULT_W, DEFAULT_H = 1000, 660
+local MIN_W, MIN_H = 760, 480
+local SIDEBAR_W = 300
+local SIDE_PAD, FIELD_GAP, CHECK_GAP, COUNT_GAP, LIST_GAP = 12, 8, 12, 10, 8
+local PAD_TOP, PAD_SIDE, PAD_BOTTOM = 20, 24, 28
+local META_GAP, STATUS_GAP, TAG_GAP, TAG_SPACING, STATUS_ICON = 4, 12, 10, 6, 16
+local GROUP_GAP, LABEL_GAP = 22, 8
+local ROW_H, ROW_PAD, TEXT_PAD, ROW_ICON, ROW_ICON_GAP = 28, 14, 6, 16, 8
+local BUTTON_GAP = 16
+local HINT_GAP = 4
+local BAR_ROOM = 10
+local MAX_ROWS = 300
+local SEP = "  \226\128\162  "
 
-local YELLOW = ns.Util.color.buttonYellow
-local RED    = ns.Util.color.brandRed
-local MUTED  = ns.Util.color.muted
-local DIM    = ns.Util.color.dim
-
-local FONT_FILE = "Fonts\\ARIALN.TTF"
-local function thin(fs)
-    if not (fs and fs.GetFont and fs.SetFont) then return end
-    local _, sz, fl = fs:GetFont()
-    fs:SetFont(FONT_FILE, sz or 12, fl or "")
-end
+local GOSSIP_AVAILABLE = "Interface\\GossipFrame\\AvailableQuestIcon"
+local DONE_ICONS = { { name = "check", color = "muted" } }
+local GOSSIP_ACTIVE    = "Interface\\GossipFrame\\ActiveQuestIcon"
 
 local function data()
     return ns:GetSubsystem("QuestBrowserData")
+end
+
+local function avail()
+    return ns:GetSubsystem("AvailableQuests")
+end
+
+local function browserCfg()
+    local DB = ns:GetSubsystem("DB")
+    return DB and DB.db and DB.db.profile and DB.db.profile.questBrowser
 end
 
 -- The gate returns its refusal as a stable English key. Mapping it here with a literal L key per
@@ -62,44 +70,48 @@ end
 function QB:ReasonText(reason) return reasonText(reason) end
 function QB:SourceText(kind) return sourceText(kind) end
 
-QB._rowPool,  QB._rowActive  = {}, {}
-QB._linePool, QB._lineActive = {}, {}
-
-local function listRowClick(self)
-    if not self._questID then return end
-    local QLink = ns:GetSubsystem("QuestLink")
-    if QLink and QLink:WantsShare() and QLink:Share(self._questID) then return end
-    QB:Select(self._questID)
+local function scopeOptions()
+    return {
+        { value = "all",       label = L["All quests"] },
+        { value = "available", label = L["Available to you"] },
+        { value = "log",       label = L["In your quest log"] },
+        { value = "completed", label = L["Completed"] },
+    }
 end
 
-local function buildListRow(parent)
-    local r = CreateFrame("Button", nil, parent)
-    r:SetHeight(ROW_H)
-    r.hl = r:CreateTexture(nil, "HIGHLIGHT")
-    r.hl:SetAllPoints()
-    r.hl:SetColorTexture(1, 1, 1, 0.06)
-    r.sel = r:CreateTexture(nil, "BACKGROUND")
-    r.sel:SetAllPoints()
-    r.sel:SetColorTexture(RED[1], RED[2], RED[3], 0.45)
-    r.sel:Hide()
+-- Rows are pooled per kind, since each kind's tooltip is attached once, when the row is made
+QB._pools, QB._active = {}, {}
 
-    r.level = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.level:SetPoint("LEFT", 6, 0)
-    r.level:SetWidth(28)
-    r.level:SetJustifyH("RIGHT")
-
-    r.title = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.title:SetPoint("LEFT", r.level, "RIGHT", 6, 0)
-    r.title:SetPoint("RIGHT", -6, 0)
-    r.title:SetJustifyH("LEFT")
-    r.title:SetWordWrap(false)
-
-    thin(r.level); thin(r.title)
-    r:SetScript("OnClick", listRowClick)
-    return r
+local function release()
+    for kind, list in pairs(QB._active) do
+        local pool = QB._pools[kind]
+        for i = #list, 1, -1 do
+            local w = list[i]
+            w:Hide()
+            w:ClearAllPoints()
+            pool[#pool + 1] = w
+            list[i] = nil
+        end
+    end
 end
 
-local function detailLineClick(self)
+local function acquire(kind, make)
+    QB._pools[kind] = QB._pools[kind] or {}
+    QB._active[kind] = QB._active[kind] or {}
+    local w = table.remove(QB._pools[kind]) or make()
+    w:Show()
+    local active = QB._active[kind]
+    active[#active + 1] = w
+    return w
+end
+
+local ROW_TIPS = {
+    place = function() return L["Click to open the map here and set a waypoint"] end,
+    quest = function() return L["Click to open this quest"] end,
+    chain = function() return L["Find this quest in EQ's Chain Guide"] end,
+}
+
+local function rowClick(self)
     if self._questID then
         local QLink = ns:GetSubsystem("QuestLink")
         if QLink and QLink:WantsShare() and QLink:Share(self._questID) then return end
@@ -109,7 +121,7 @@ local function detailLineClick(self)
     elseif self._chainID then
         local CG = ns:GetSubsystem("ChainGuide")
         if CG then
-            -- The browser's strata sits above the guide's, so it would open out of sight behind this window
+            -- Hidden first, so the guide does not open behind this window
             if QB.frame then QB.frame:Hide() end
             CG:Open()
             CG:NavigateChain(self._chainID, self._chainQuest)
@@ -117,109 +129,85 @@ local function detailLineClick(self)
     end
 end
 
-local function detailLineEnter(self)
-    if not (self._questID or self._mapID or self._chainID) then return end
-    GameTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT")
-    if self._questID then
-        GameTooltip:SetText(L["Click to open this quest"], 1, 0.82, 0)
-    elseif self._chainID then
-        GameTooltip:SetText(L["Find this quest in EQ's Chain Guide"], 1, 0.82, 0)
-    else
-        GameTooltip:SetText(L["Click to open the map here and set a waypoint"], 1, 0.82, 0)
+local function makeRow(ctx, content, kind)
+    local r = CreateFrame("Button", nil, content)
+    r:SetHeight(ROW_H)
+    if kind ~= "text" then
+        local hl = r:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetColorTexture(ctx:Color("hover"))
+        r:SetScript("OnClick", rowClick)
     end
-    GameTooltip:Show()
+    local _, edges = ctx:Paint(r, nil, "divider", "T")
+    r.div = edges[1]
+    r.icon = r:CreateTexture(nil, "ARTWORK")
+    r.icon:SetSize(ROW_ICON, ROW_ICON)
+    r.icon:SetPoint("LEFT", r, "LEFT", ROW_PAD, 0)
+    r.text = ctx:CreateText(r, "", "label")
+    r.value = ctx:CreateText(r, "", "hint")
+    r.value:SetPoint("RIGHT", r, "RIGHT", -ROW_PAD, 0)
+    r.value:SetWordWrap(false)
+    if ROW_TIPS[kind] then ctx:AttachTooltip(r, ROW_TIPS[kind]()) end
+    return r
 end
 
-local function detailLineLeave() GameTooltip:Hide() end
-
-local function buildDetailLine(parent)
-    local d = CreateFrame("Button", nil, parent)
-    d:SetHeight(LINE_H)
-    d.hl = d:CreateTexture(nil, "HIGHLIGHT")
-    d.hl:SetAllPoints()
-    d.hl:SetColorTexture(1, 1, 1, 0.05)
-    d.text = d:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    d.text:SetPoint("LEFT", 0, 0)
-    d.text:SetPoint("RIGHT", 0, 0)
-    d.text:SetJustifyH("LEFT")
-    thin(d.text)
-    d:SetScript("OnClick", detailLineClick)
-    d:SetScript("OnEnter", detailLineEnter)
-    d:SetScript("OnLeave", detailLineLeave)
-    return d
+local function makeCard(ctx, content)
+    local c = CreateFrame("Frame", nil, content)
+    ctx:Paint(c, "surface", "surfaceBorder")
+    return c
 end
 
-local function releaseRows()
-    for i = #QB._rowActive, 1, -1 do
-        local r = QB._rowActive[i]
-        r:Hide()
-        r:ClearAllPoints()
-        r.sel:Hide()
-        r._questID = nil
-        QB._rowPool[#QB._rowPool + 1] = r
-        QB._rowActive[i] = nil
-    end
-end
-
-local function releaseLines()
-    for i = #QB._lineActive, 1, -1 do
-        local d = QB._lineActive[i]
-        d:Hide()
-        d:ClearAllPoints()
-        d.hl:SetAlpha(1)
-        d:EnableMouse(false)
-        d.text:SetWordWrap(false)
-        -- A pooled line keeps whatever font and height its last use gave it, so the title's large
-        -- font would come back on an ordinary row further down the next quest.
-        d.text:SetFontObject("GameFontHighlightSmall")
-        thin(d.text)
-        d:SetHeight(LINE_H)
-        d._questID, d._mapID, d._px, d._py, d._title = nil, nil, nil, nil, nil
-        d._chainID, d._chainQuest = nil, nil
-        QB._linePool[#QB._linePool + 1] = d
-        QB._lineActive[i] = nil
-    end
+local function setResizeHintSeen(f)
+    local cfg = browserCfg()
+    if cfg then cfg.resizeHintSeen = true end
+    if f.resizeHint then f.resizeHint:Hide() end
 end
 
 function QB:Build()
     if self.frame then return end
+    local Options = ns:GetSubsystem("Options")
+    local ctx = Options.ui
+    self._ctx = ctx
 
-    local f = CreateFrame("Frame", "EQQuestBrowserFrame", UIParent, "BackdropTemplate")
-    f:SetSize(760, 480)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("FULLSCREEN_DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop",  f.StopMovingOrSizing)
-    f:SetClampedToScreen(true)
-    f:Hide()
-
-    f:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
+    local f = ctx:CreateWindow({
+        name = "EQQuestBrowserFrame", title = L["Quest Browser"],
+        width = DEFAULT_W, height = DEFAULT_H, minWidth = MIN_W, minHeight = MIN_H,
+        sidebarWidth = SIDEBAR_W, gripTip = L["Drag to resize"],
+        getSize = function()
+            local cfg = browserCfg()
+            if cfg then return cfg.width, cfg.height end
+        end,
+        setSize = function(w, h)
+            local cfg = browserCfg()
+            if cfg then cfg.width, cfg.height = w, h end
+        end,
+        getMaximized = function()
+            local cfg = browserCfg()
+            return cfg and cfg.maximized or false
+        end,
+        setMaximized = function(on)
+            local cfg = browserCfg()
+            if cfg then cfg.maximized = on or nil end
+        end,
+        onResize = function(win)
+            setResizeHintSeen(win)
+            self:RenderDetails()
+        end,
     })
-    f:SetBackdropColor(unpack(ns.Util.color.optionsBg))
-    f:SetBackdropBorderColor(RED[1], RED[2], RED[3], 1)
+    self.frame = f
 
-    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.title:SetPoint("TOPLEFT", 12, -10)
-    f.title:SetText(L["Quest Browser"])
-    f.title:SetTextColor(YELLOW[1], YELLOW[2], YELLOW[3])
-    thin(f.title)
+    f.resizeHint = ctx:CreateText(f.grip, L["Drag to resize"], "hint")
+    f.resizeHint:SetPoint("RIGHT", f.grip, "LEFT", -HINT_GAP, 0)
+    local cfg = browserCfg()
+    if cfg and cfg.resizeHintSeen then f.resizeHint:Hide() end
 
-    f.close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    f.close:SetPoint("TOPRIGHT", -4, -4)
-    f.close:SetScript("OnClick", function() f:Hide() end)
-
-    local search = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-    search:SetSize(LIST_W - 26, 20)
-    search:SetPoint("TOPLEFT", 18, -(TITLE_BAR_H + 12))
-    search:SetAutoFocus(false)
-    search:SetScript("OnEscapePressed", function(eb) eb:ClearFocus() end)
-    search:SetScript("OnTextChanged", function(_, userInput)
+    local side = f.sidebar
+    f._search = ctx:CreateSearchField(side, L["Find quest"], function() self:RenderList() end,
+        L["Find quest"], L["Type part of a quest's name or its ID. Put the name in quotes to match the whole title."])
+    f._search:SetPoint("TOPLEFT", side, "TOPLEFT", SIDE_PAD, -SIDE_PAD)
+    f._search:SetPoint("TOPRIGHT", side, "TOPRIGHT", -SIDE_PAD, -SIDE_PAD)
+    -- The library field answers only Enter, and this one filters as you type, an empty field included
+    f._search.box:HookScript("OnTextChanged", function(_, userInput)
         if not userInput then return end
         local Events = ns:GetSubsystem("Events")
         if Events and Events.Debounce then
@@ -228,103 +216,75 @@ function QB:Build()
             QB:RenderList()
         end
     end)
-    f._search = search
 
-    local scopeRow = CreateFrame("Frame", nil, f)
-    scopeRow:SetPoint("TOPLEFT", search, "BOTTOMLEFT", -6, -6)
-    scopeRow:SetSize(LIST_W, TOOLBAR_H)
+    f._scopeDD = ctx:CreateDropdown(side, nil, scopeOptions,
+        function() return QB._scope or "all" end,
+        function(v) QB._scope = v; QB:RenderList() end)
+    f._scopeDD:SetPoint("TOPLEFT", f._search, "BOTTOMLEFT", 0, -FIELD_GAP)
+    f._scopeDD:SetPoint("TOPRIGHT", f._search, "BOTTOMRIGHT", 0, -FIELD_GAP)
 
-    local Options = ns:GetSubsystem("Options")
-    if Options and Options.CreateDropdown then
-        local function listFn()
-            return {
-                { value = "all",       label = L["All quests"] },
-                { value = "available", label = L["Available to you"] },
-                { value = "log",       label = L["In your quest log"] },
-                { value = "completed", label = L["Completed"] },
-            }
-        end
-        local dd = Options:CreateDropdown(scopeRow, nil, listFn,
-            function() return QB._scope or "all" end,
-            function(v) QB._scope = v; QB:RenderList() end)
-        dd:SetPoint("LEFT", scopeRow, "LEFT", 0, 0)
-        dd:SetWidth(LIST_W - 10)
-        f._scopeDD = dd
-    end
+    f._zoneCB = ctx:CreateCheckbox(side, L["This zone only"],
+        function() return QB._zoneOnly == true end,
+        function(v) QB._zoneOnly = v; QB:RenderList() end,
+        L["Only list quests that can be picked up on the map you are standing in."])
+    f._zoneCB:SetPoint("TOPLEFT", f._scopeDD, "BOTTOMLEFT", 0, -CHECK_GAP)
 
-    local zoneRow = CreateFrame("Frame", nil, f)
-    zoneRow:SetPoint("TOPLEFT", scopeRow, "BOTTOMLEFT", 0, -2)
-    zoneRow:SetSize(LIST_W, TOOLBAR_H)
-    if Options and Options.CreateCheckbox then
-        local cb = Options:CreateCheckbox(zoneRow, L["This zone only"],
-            function() return QB._zoneOnly == true end,
-            function(v) QB._zoneOnly = v; QB:RenderList() end,
-            L["Only list quests that can be picked up on the map you are standing in."])
-        cb:SetPoint("LEFT", zoneRow, "LEFT", 4, 0)
-        f._zoneCB = cb
-    end
+    f._count = ctx:CreateText(side, "", "hint")
+    f._count:SetPoint("TOPLEFT", f._zoneCB, "BOTTOMLEFT", 0, -COUNT_GAP)
+    f._count:SetPoint("RIGHT", side, "RIGHT", -SIDE_PAD, 0)
 
-    f._count = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    f._count:SetPoint("TOPLEFT", zoneRow, "BOTTOMLEFT", 6, -2)
-    f._count:SetJustifyH("LEFT")
-    thin(f._count)
+    f._list = ctx:CreateList(side, function(id)
+        local QLink = ns:GetSubsystem("QuestLink")
+        if QLink and QLink:WantsShare() and QLink:Share(id) then return end
+        QB:Select(id)
+    end)
+    f._list:SetPoint("TOPLEFT", f._count, "BOTTOMLEFT", -SIDE_PAD, -LIST_GAP)
+    f._list:SetPoint("BOTTOMRIGHT", side, "BOTTOMRIGHT", 0, 0)
 
-    local listTop = TITLE_BAR_H + 12 + 20 + 6 + TOOLBAR_H + 2 + TOOLBAR_H + 16
-    local listScroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    listScroll:SetPoint("TOPLEFT", 12, -listTop)
-    -- Anchored top and bottom rather than sized, so the height is not a copy of the frame's own
-    listScroll:SetPoint("BOTTOMLEFT", 12, 12)
-    listScroll:SetWidth(LIST_W - 22)
-    f._listScroll = listScroll
+    local area = ctx:CreateScrollArea(f.body, {})
+    area:SetAllPoints(f.body)
+    f._area = area
+    local content = area.content
+    content._controls = {}
+    f._content = content
 
-    local listCanvas = CreateFrame("Frame", nil, listScroll)
-    listCanvas:SetSize(1, 1)
-    listScroll:SetScrollChild(listCanvas)
-    f._listCanvas = listCanvas
-
-    local divider = f:CreateTexture(nil, "ARTWORK")
-    divider:SetColorTexture(1, 1, 1, 0.12)
-    divider:SetWidth(1)
-    divider:SetPoint("TOPLEFT", 12 + LIST_W, -(TITLE_BAR_H + 8))
-    divider:SetPoint("BOTTOMLEFT", 12 + LIST_W, 12)
-
-    local detailScroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    detailScroll:SetPoint("TOPLEFT", 12 + LIST_W + 14, -(TITLE_BAR_H + 12))
-    detailScroll:SetPoint("BOTTOMRIGHT", -30, 12)
-    f._detailScroll = detailScroll
-
-    local detailCanvas = CreateFrame("Frame", nil, detailScroll)
-    detailCanvas:SetSize(1, 1)
-    detailScroll:SetScrollChild(detailCanvas)
-    f._detailCanvas = detailCanvas
-
-    self.frame = f
+    f._title = ctx:CreateText(content, "", "title")
+    f._title:SetWordWrap(true)
+    f._meta = ctx:CreateText(content, "", "hint")
+    f._statusIcon = content:CreateTexture(nil, "ARTWORK")
+    f._statusIcon:SetSize(STATUS_ICON, STATUS_ICON)
+    f._status = ctx:CreateText(content, "", "label")
+    f._status:SetWordWrap(true)
+    f._directions = ctx:CreateButton(content, L["Get Directions"], nil, function() QB:GetDirections() end)
+    f._empty = ctx:CreateEmptyState(f.body, L["Pick a quest on the left."])
+    f._empty:SetPoint("TOP", f.body, "CENTER", 0, 8)
 end
 
-local function acquireRow(parent)
-    return ns.Util.AcquirePooled(QB._rowPool, QB._rowActive, parent, buildListRow)
+local function zoneName(mapID)
+    local D = data()
+    return D and D:ZoneName(mapID) or nil
 end
 
-local function acquireLine(parent)
-    return ns.Util.AcquirePooled(QB._linePool, QB._lineActive, parent, buildDetailLine)
+local function playerMap()
+    if not (C_Map and C_Map.GetBestMapForUnit) then return nil end
+    local ok, id = pcall(C_Map.GetBestMapForUnit, "player")
+    return ok and id or nil
 end
+
+local _listRows = {}
 
 function QB:RenderList()
     local f = self.frame
     if not f then return end
-    releaseRows()
-
     local D = data()
     if not (D and D:Loaded()) then
         f._count:SetText(L["No quest data on this version of the game."])
+        f._list:SetRows({})
         return
     end
 
-    local mapID
-    if self._zoneOnly and C_Map and C_Map.GetBestMapForUnit then
-        local ok, id = pcall(C_Map.GetBestMapForUnit, "player")
-        if ok then mapID = id end
-    end
+    local mapID = self._zoneOnly and playerMap() or nil
+    f:SetSection(mapID and zoneName(mapID) or nil)
 
     local rows, matched = D:Query({
         text  = f._search:GetText(),
@@ -332,7 +292,6 @@ function QB:RenderList()
         mapID = mapID,
         limit = MAX_ROWS,
     })
-
     local shown = #rows
     if matched > shown then
         f._count:SetText((L["%d quests (showing the first %d)"]):format(matched, shown))
@@ -340,147 +299,194 @@ function QB:RenderList()
         f._count:SetText((L["%d quests"]):format(matched))
     end
 
-    f._listCanvas:SetSize(f._listScroll:GetWidth() or LIST_W, math.max(1, shown * ROW_H))
+    -- Quests you can neither take now nor have in your log are dimmed, and done ones carry a check
+    local A = avail()
+    for i = #_listRows, shown + 1, -1 do _listRows[i] = nil end
     for i = 1, shown do
-        local row = rows[i]
-        local r = acquireRow(f._listCanvas)
-        r:SetPoint("TOPLEFT",  f._listCanvas, "TOPLEFT",  0, -((i - 1) * ROW_H))
-        r:SetPoint("TOPRIGHT", f._listCanvas, "TOPRIGHT", 0, -((i - 1) * ROW_H))
-        r.level:SetText(row.level > 0 and tostring(row.level) or "-")
-        r.level:SetTextColor(MUTED[1], MUTED[2], MUTED[3])
-        r.title:SetText(row.name)
-        r._questID = row.id
-        if row.id == self._selected then
-            r.sel:Show()
-            r.title:SetTextColor(1, 1, 1)
-        else
-            r.sel:Hide()
-            r.title:SetTextColor(0.85, 0.85, 0.85)
-        end
+        local q = rows[i]
+        local available = A and A:Explain(q.id) == true
+        local inLog = A and A:InLog(q.id)
+        local done = A and A:IsCompleted(q.id)
+        local row = _listRows[i] or {}
+        _listRows[i] = row
+        row.key, row.text = q.id, q.name or ("Quest #" .. tostring(q.id))
+        row.value = q.level > 0 and tostring(q.level) or "-"
+        row.selected = (q.id == self._selected)
+        row.muted = not (available or inLog)
+        row.icons = done and DONE_ICONS or nil
     end
+    f._list:SetRows(_listRows)
 end
 
-local _cursorY = 0
+local _y, _width = 0, 0
 
-local function line(parent, text, opts)
-    opts = opts or {}
-    local d = acquireLine(parent)
-    d:SetPoint("TOPLEFT",  parent, "TOPLEFT",  opts.indent or 0, -_cursorY)
-    d:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -_cursorY)
-    if opts.font then
-        d.text:SetFontObject(opts.font)
-        thin(d.text)
-    end
-    d.text:SetText(text or "")
-    local c = opts.color
-    if c then d.text:SetTextColor(c[1], c[2], c[3]) else d.text:SetTextColor(1, 1, 1) end
-    if opts.wrap then
-        d.text:SetWordWrap(true)
-        -- Measured after the font and the text are both set, and only ever on a canvas that has
-        -- already been given its width - a zero width canvas reports one line for everything.
-        d:SetHeight(math.max(LINE_H, d.text:GetStringHeight() + 2))
-    end
-    if opts.questID or opts.mapID or opts.chainID then
-        d:EnableMouse(true)
-        d._questID = opts.questID
-        d._mapID, d._px, d._py, d._title = opts.mapID, opts.x, opts.y, opts.title
-        d._chainID, d._chainQuest = opts.chainID, opts.chainQuest
-    else
-        d.hl:SetAlpha(0)
-    end
-    _cursorY = _cursorY + d:GetHeight() + 1
-    return d
+-- The scroll frame's own width, which leaves room for the bars, so the content never scrolls sideways
+local function contentWidth(f)
+    local w = f._area.scroll:GetWidth() or 0
+    if w <= 0 then w = (f.body:GetWidth() or 0) - BAR_ROOM end
+    if w <= 0 then w = DEFAULT_W - SIDEBAR_W - BAR_ROOM end
+    return w
 end
 
-local function gap(px) _cursorY = _cursorY + (px or 6) end
-
-local function header(parent, text)
-    gap(8)
-    line(parent, text, { color = YELLOW })
+local function placeRow(ctx, card, kind, prevRow, y)
+    local r = acquire("row_" .. kind, function() return makeRow(ctx, QB.frame._content, kind) end)
+    r:SetFrameLevel(card:GetFrameLevel() + 1)
+    r:SetPoint("TOPLEFT", card, "TOPLEFT", 0, -y)
+    r:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, -y)
+    r.div:SetShown(prevRow ~= nil)
+    r._questID, r._mapID, r._px, r._py, r._title, r._chainID, r._chainQuest = nil, nil, nil, nil, nil, nil, nil
+    r.icon:Hide()
+    r.text:ClearAllPoints()
+    r.text:SetPoint("LEFT", r, "LEFT", ROW_PAD, 0)
+    r.text:SetPoint("RIGHT", r.value, "LEFT", -ROW_ICON_GAP, 0)
+    r.text:SetWordWrap(false)
+    r.text:SetTextColor(ctx:Color("text"))
+    r.value:SetText("")
+    r:SetHeight(ROW_H)
+    return r
 end
 
-local function places(parent, list, title, questTitle)
-    if not list then return end
-    header(parent, title)
-    local D = data()
-    for i = 1, #list do
-        local p = list[i]
-        local zone = D:ZoneName(p.mapID) or ("map " .. tostring(p.mapID))
-        local text = ("%s  (%.1f, %.1f)"):format(zone, p.x * 100, p.y * 100)
-        -- The giver's name leads, because it is what the reader is looking for once the section
-        -- header has already said Starts or Turn in. Joined with the separator this line already
-        -- uses rather than a new phrase, so naming a quest giver costs no manifest key and no
-        -- translation. A quest started by an item has no name and reads exactly as it did.
-        if p.name then text = p.name .. "  -  " .. text end
-        -- Its own key rather than the pin tooltip's "and %d more", which counts QUESTS. One
-        -- English phrase covering two meanings is one manifest key, and translators only see one.
-        if p.points and p.points > 1 then
-            text = text .. "  -  " .. (L["%d locations"]):format(p.points)
-        end
-        -- Only when nobody is named. "Farmer Furlbrow" already says a character offers it, and
-        -- the sentence is what carries the meaning for an item start, which names nobody.
-        local kindLine = (not p.name) and p.kind and sourceText(p.kind)
-        if kindLine then text = text .. "  -  " .. kindLine end
-        line(parent, text, {
-            indent = 10, color = MUTED,
-            mapID = p.mapID, x = p.x, y = p.y, title = questTitle,
-        })
-    end
+local function withIcon(ctx, r, file, color)
+    r.icon:SetTexture(file)
+    if color then r.icon:SetVertexColor(ctx:Color(color)) else r.icon:SetVertexColor(1, 1, 1, 1) end
+    r.icon:Show()
+    r.text:SetPoint("LEFT", r.icon, "RIGHT", ROW_ICON_GAP, 0)
 end
 
-local function refs(parent, list, title)
-    if not (list and #list > 0) then return end
-    header(parent, title)
-    for i = 1, #list do
-        local q = list[i]
-        local mark = q.done and "|cff44ff44+|r" or "|cffff5050-|r"
-        -- Only a quest the data can describe gets a link. Clicking one it cannot would clear
-        -- the pane to the empty state, which reads as the window losing your place.
-        line(parent, ("%s  %s"):format(mark, q.name), {
-            indent = 10, color = MUTED, questID = q.known and q.id or nil,
-        })
+local function group(ctx, title, build)
+    local content = QB.frame._content
+    _y = _y + GROUP_GAP
+    local label = acquire("label", function() return ctx:CreateText(content, "", "groupLabel") end)
+    label:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)
+    label:SetText(title)
+    _y = _y + (label:GetStringHeight() or 12) + LABEL_GAP
+    local card = acquire("card", function() return makeCard(ctx, content) end)
+    card:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)
+    card:SetPoint("TOPRIGHT", content, "TOPRIGHT", -PAD_SIDE, -_y)
+    local h = build(card)
+    card:SetHeight(math.max(1, h))
+    _y = _y + h
+end
+
+local function textRows(ctx, card, lines)
+    local y, prev = 0, nil
+    local w = _width - PAD_SIDE * 2 - ROW_PAD * 2
+    for _, text in ipairs(lines) do
+        local r = placeRow(ctx, card, "text", prev, y)
+        r.text:ClearAllPoints()
+        r.text:SetPoint("TOPLEFT", r, "TOPLEFT", ROW_PAD, -TEXT_PAD)
+        r.text:SetWidth(w)
+        r.text:SetWordWrap(true)
+        r.text:SetTextColor(ctx:Color("label"))
+        r.text:SetText(text)
+        local h = math.max(ROW_H, (r.text:GetStringHeight() or 13) + TEXT_PAD * 2)
+        r:SetHeight(h)
+        y, prev = y + h, r
     end
+    return y
+end
+
+local function placeRows(ctx, card, list, questTitle)
+    local y, prev = 0, nil
+    for _, p in ipairs(list) do
+        local r = placeRow(ctx, card, "place", prev, y)
+        local label = p.name or (p.kind and sourceText(p.kind)) or zoneName(p.mapID) or ("map " .. tostring(p.mapID))
+        if not p.name then r.text:SetTextColor(ctx:Color("label")) end
+        r.text:SetText(label)
+        local value = ("%s  %.1f, %.1f"):format(zoneName(p.mapID) or ("map " .. tostring(p.mapID)), p.x * 100, p.y * 100)
+        if p.points and p.points > 1 then value = value .. SEP .. (L["%d locations"]):format(p.points) end
+        r.value:SetText(value)
+        r._mapID, r._px, r._py, r._title = p.mapID, p.x, p.y, questTitle
+        y, prev = y + ROW_H, r
+    end
+    return y
+end
+
+local function refRows(ctx, card, list)
+    local y, prev = 0, nil
+    for _, q in ipairs(list) do
+        -- Only a quest the data can describe gets a link, since one it cannot would clear the pane
+        local r = placeRow(ctx, card, q.known ~= false and "quest" or "text", prev, y)
+        if q.done then withIcon(ctx, r, ctx:Texture("check"), "muted") end
+        r.text:SetText(q.name or ("Quest #" .. tostring(q.id)))
+        if q.known ~= false then r._questID = q.id else r.text:SetTextColor(ctx:Color("muted")) end
+        y, prev = y + ROW_H, r
+    end
+    return y
+end
+
+local function statusOf(record)
+    if record.failed then return L["Failed, so you can take it again."], GOSSIP_AVAILABLE end
+    if record.available then return L["You can pick this up now."], GOSSIP_AVAILABLE end
+    local text = record.reason and reasonText(record.reason) or L["Not available to you right now."]
+    if record.completed then return text, "check" end
+    if record.inLog then return text, GOSSIP_ACTIVE end
+    return text, nil
 end
 
 function QB:RenderDetails()
     local f = self.frame
     if not f then return end
-    releaseLines()
-    _cursorY = 0
-
-    local canvas = f._detailCanvas
-    -- Width first and height last. Every wrapped line measures itself against this canvas, so a
-    -- canvas still one pixel wide reports a single line for a paragraph and the rows overlap.
-    local width = f._detailScroll:GetWidth() or 400
-    canvas:SetSize(width, 1)
+    local ctx = self._ctx
+    release()
+    local content = f._content
+    _width = contentWidth(f)
+    _y = PAD_TOP
 
     local D = data()
     local record = self._selected and D and D:Record(self._selected)
+    local parts = { f._title, f._meta, f._statusIcon, f._status, f._directions }
     if not record then
-        line(canvas, L["Pick a quest on the left."], { color = DIM })
-        canvas:SetHeight(math.max(1, _cursorY))
+        for _, p in ipairs(parts) do p:Hide() end
+        f._empty:Show()
+        f._area:SetContentSize(_width, 1)
         return
     end
+    for _, p in ipairs(parts) do p:Show() end
+    f._empty:Hide()
     self._record = record
 
-    line(canvas, record.name, { color = YELLOW, wrap = true, font = "GameFontNormalLarge" })
+    local kind = D:Waypoint(record)
+    f._directions:SetShown(kind ~= nil)
+    if f._directions.Fit then f._directions:Fit() end
+    f._directions:ClearAllPoints()
+    f._directions:SetPoint("TOPRIGHT", content, "TOPRIGHT", -PAD_SIDE, -PAD_TOP)
+    local textW = _width - PAD_SIDE * 2 - (kind and (f._directions:GetWidth() + BUTTON_GAP) or 0)
 
-    local bits = { ("|cff888888#%d|r"):format(record.id) }
+    f._title:ClearAllPoints()
+    f._title:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)
+    f._title:SetWidth(textW)
+    f._title:SetText(record.name)
+    _y = _y + (f._title:GetStringHeight() or 15)
+
+    local bits = { "#" .. record.id }
     if record.level then bits[#bits + 1] = (L["Level %d"]):format(record.level) end
     if record.reqLevel then bits[#bits + 1] = (L["Requires level %d"]):format(record.reqLevel) end
-    line(canvas, table.concat(bits, "   "), { color = MUTED })
+    _y = _y + META_GAP
+    f._meta:ClearAllPoints()
+    f._meta:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)
+    f._meta:SetText(table.concat(bits, SEP))
+    _y = _y + (f._meta:GetStringHeight() or 12)
 
-    local status, color
-    if record.available then
-        status, color = L["You can pick this up now."], { 0.3, 1, 0.3 }
-    elseif record.reason then
-        status, color = reasonText(record.reason), { 1, 0.6, 0.3 }
-        if not status then status = L["Not available to you right now."] end
+    local status, icon = statusOf(record)
+    _y = _y + STATUS_GAP
+    local textLeft = PAD_SIDE
+    if icon then
+        f._statusIcon:SetTexture(icon == "check" and ctx:Texture("check") or icon)
+        if icon == "check" then f._statusIcon:SetVertexColor(ctx:Color("muted")) else f._statusIcon:SetVertexColor(1, 1, 1, 1) end
+        f._statusIcon:ClearAllPoints()
+        f._statusIcon:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)
+        f._statusIcon:Show()
+        textLeft = PAD_SIDE + STATUS_ICON + ROW_ICON_GAP
     else
-        status, color = L["Not available to you right now."], { 1, 0.6, 0.3 }
+        f._statusIcon:Hide()
     end
-    if record.failed then status = L["Failed, so you can take it again."] end
-    line(canvas, status, { color = color, wrap = true })
+    f._status:ClearAllPoints()
+    f._status:SetPoint("TOPLEFT", content, "TOPLEFT", textLeft, -_y)
+    f._status:SetWidth(textW - (textLeft - PAD_SIDE))
+    f._status:SetTextColor(ctx:Color(record.available and "text" or "label"))
+    f._status:SetText(status)
+    _y = _y + math.max(STATUS_ICON, f._status:GetStringHeight() or 13)
 
     local tags = {}
     if record.isInstance   then tags[#tags + 1] = L["Dungeon or raid"] end
@@ -489,7 +495,16 @@ function QB:RenderDetails()
     if record.isClassQuest then tags[#tags + 1] = L["Class quest"] end
     if record.isProfession then tags[#tags + 1] = L["Profession"] end
     if #tags > 0 then
-        line(canvas, table.concat(tags, ", "), { color = { 0.6, 0.8, 1 } })
+        _y = _y + TAG_GAP
+        local prev
+        for _, text in ipairs(tags) do
+            local t = acquire("tag", function() return ctx:CreateTag(content, "", "outline") end)
+            t:SetText(text)
+            if prev then t:SetPoint("LEFT", prev, "RIGHT", TAG_SPACING, 0)
+            else t:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y) end
+            prev = t
+        end
+        _y = _y + prev:GetHeight()
     end
 
     local reqs = {}
@@ -508,46 +523,51 @@ function QB:RenderDetails()
         local who = record.maxRep.name or (L["faction %d"]):format(record.maxRep.faction)
         reqs[#reqs + 1] = (L["Only below %s with %s"]):format(record.maxRep.standing or tostring(record.maxRep.value), who)
     end
-    if #reqs > 0 then
-        header(canvas, L["Requirements"])
-        for i = 1, #reqs do line(canvas, reqs[i], { indent = 10, color = MUTED, wrap = true }) end
-    end
+    if #reqs > 0 then group(ctx, L["Requirements"], function(card) return textRows(ctx, card, reqs) end) end
 
-    places(canvas, record.starts,     L["Starts"],     record.name)
-    places(canvas, record.objectives, L["Objectives"], record.name)
-    places(canvas, record.turnIn,     L["Turn in"],    record.name)
+    if record.starts then group(ctx, L["Starts"], function(card) return placeRows(ctx, card, record.starts, record.name) end) end
+    if record.objectives then group(ctx, L["Objectives"], function(card) return placeRows(ctx, card, record.objectives, record.name) end) end
+    if record.turnIn then group(ctx, L["Turn in"], function(card) return placeRows(ctx, card, record.turnIn, record.name) end) end
 
-    if record.pre then
-        refs(canvas, record.pre, record.preMode == "all" and L["Finish all of these first"] or L["Finish one of these first"])
+    if record.pre and #record.pre > 0 then
+        group(ctx, record.preMode == "all" and L["Finish all of these first"] or L["Finish one of these first"],
+            function(card) return refRows(ctx, card, record.pre) end)
     end
-    if record.parent then refs(canvas, { record.parent }, L["Part of"]) end
-    if record.chain  then refs(canvas, { record.chain },  L["Leads to"]) end
-    refs(canvas, record.excl, L["Instead of"])
+    local AD = avail() and avail().Data and avail():Data()
+    local function known(ref)
+        return { id = ref.id, name = ref.name, done = ref.done, known = AD ~= nil and AD.gates[ref.id] ~= nil }
+    end
+    if record.parent then group(ctx, L["Part of"], function(card) return refRows(ctx, card, { known(record.parent) }) end) end
+    if record.chain then group(ctx, L["Leads to"], function(card) return refRows(ctx, card, { known(record.chain) }) end) end
+    if record.excl and #record.excl > 0 then group(ctx, L["Instead of"], function(card) return refRows(ctx, card, record.excl) end) end
 
     local CS = ns:GetSubsystem("ChainGuideClassicSource")
     local chainID = CS and CS:ChainForQuest(record.id)
     local Database = chainID and ns:GetSubsystem("ChainGuideDatabase")
     local chain = Database and Database.chains[chainID]
     if chain then
-        header(canvas, L["Chain"])
-        line(canvas, chain.name, { indent = 10, color = MUTED, chainID = chainID, chainQuest = record.id })
+        group(ctx, L["Chain"], function(card)
+            local r = placeRow(ctx, card, "chain", nil, 0)
+            withIcon(ctx, r, ctx:Texture("icon-chain"), "accentHi")
+            r.text:SetText(chain.name)
+            r._chainID, r._chainQuest = chainID, record.id
+            return ROW_H
+        end)
     end
 
-    canvas:SetHeight(math.max(1, _cursorY + 8))
+    f._area:SetContentSize(_width, _y + PAD_BOTTOM)
 end
 
 function QB:Select(questID)
     self._selected = questID
     self:RenderList()
     self:RenderDetails()
-    if self.frame then self.frame._detailScroll:SetVerticalScroll(0) end
+    if self.frame then self.frame._area:ScrollTo(0, 0) end
 end
 
 -- Both effects on one click, because a browser row is asking "where is this" and the answer is
 -- worth having on the map and on the arrow at the same time.
-function QB:GoTo(mapID, x, y, title)
-    local Arrow = ns:GetSubsystem("QuestArrow")
-    if Arrow and Arrow.Set then Arrow:Set(mapID, x, y, title) end
+local function showMap(mapID)
     local wm = _G.WorldMapFrame
     if wm and wm.SetMapID then
         if not wm:IsShown() and _G.ToggleWorldMap then _G.ToggleWorldMap() end
@@ -555,10 +575,44 @@ function QB:GoTo(mapID, x, y, title)
     end
 end
 
+function QB:GoTo(mapID, x, y, title)
+    local Arrow = ns:GetSubsystem("QuestArrow")
+    if Arrow and Arrow.Set then Arrow:Set(mapID, x, y, title) end
+    -- Held until combat ends, as the Chain Guide's is: Forever's map pins call the protected SetPassThroughButtons as they appear
+    if InCombatLockdown() then
+        local Events = ns:GetSubsystem("Events")
+        if Events and Events.RunWhenOutOfCombat then
+            Events:RunWhenOutOfCombat("eq.questbrowser.map", function() showMap(mapID) end)
+        end
+        return
+    end
+    showMap(mapID)
+end
+
+-- Where you pick the quest up, or its turn-in, or a quest in your log's own next step
+function QB:GetDirections()
+    local D = data()
+    local record = self._record
+    if not (D and record) then return end
+    local kind, mapID, x, y = D:Waypoint(record)
+    if kind then self:GoTo(mapID, x, y, record.name) end
+end
+
+-- Over the world map, which Era and TBC draw at FULLSCREEN when it is large, and otherwise beside the other windows
+local function placeStrata(f)
+    local wm = _G.WorldMapFrame
+    local over = wm and wm:IsShown() and wm.GetFrameStrata
+                 and (wm:GetFrameStrata() == "FULLSCREEN" or wm:GetFrameStrata() == "FULLSCREEN_DIALOG")
+    f:SetFrameStrata(over and "FULLSCREEN_DIALOG" or "DIALOG")
+end
+
 function QB:Open(questID)
     if not self:Available() then return end
     self:Build()
+    placeStrata(self.frame)
     self.frame:Show()
+    -- Above the Chain Guide, which opens it from a card's right-click
+    self.frame:Raise()
     if questID then
         self:Select(questID)
     else
@@ -580,7 +634,7 @@ end
 -- the entry points hide themselves rather than opening an empty frame.
 function QB:Available()
     local D = data()
-    return (D and D:Loaded()) == true
+    return (D and D:Loaded()) == true and ns:GetSubsystem("Options") ~= nil
 end
 
 function QB:Search(text)

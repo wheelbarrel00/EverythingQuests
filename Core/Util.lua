@@ -3,16 +3,8 @@ local _, ns = ...
 local Util = ns:RegisterSubsystem("Util", {})
 
 Util.color = {
-    optionsBg     = { 0.00,  0.00,  0.00,  0.95 },
-    tabActive     = { 0.635, 0.000, 0.039, 1.00 },
-    tabInactive   = { 0.10,  0.10,  0.10,  0.85 },
-    tabText       = { 1.00,  1.00,  1.00,  1.00 },
-    brandRed      = { 0.635, 0.000, 0.039, 1.00 },
     headerRed     = { 0.635, 0.000, 0.039, 1.00 },
     buttonYellow  = { 0.92,  0.72,  0.02,  1.00 },
-    statYellow    = { 0.92,  0.72,  0.02,  1.00 },
-    muted         = { 0.70,  0.70,  0.70,  1.00 },
-    dim           = { 0.50,  0.50,  0.50,  1.00 },
 }
 
 -- The client ships its own localized one-letter time abbreviations, so these need no locale key

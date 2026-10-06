@@ -18,6 +18,9 @@ local BAR_ROOM = 12
 local TAG_HEIGHT = 16
 local TAG_PAD = 6
 local EMPTY_INSET = 40
+local NAV_PAD = 8
+local NAV_TOP = 12
+local MULTI_PAD = 8
 
 local function trim(s)
     return (s or ""):match("^%s*(.-)%s*$")
@@ -242,7 +245,7 @@ function Context:CreateList(parent, onClick)
         if view <= 0 then return false end
         -- Updated first, as Blizzard's ItemTextFrame does before it reads the range of a child it resized.
         if sf.UpdateScrollChildRect then sf:UpdateScrollChildRect() end
-        local max = math.max(0, sf:GetVerticalScrollRange() or 0)
+        local max = math.floor(math.max(0, sf:GetVerticalScrollRange() or 0))
         bar:SetMinMaxValues(0, max)
         local rowH = sp.listRowHeight
         local top, bottom = (index - 1) * rowH, index * rowH
@@ -342,4 +345,140 @@ function Context:CreateEmptyState(parent, text)
     fs:SetWordWrap(true)
     fs:SetText(text or "")
     return fs
+end
+
+local NAV_FIELDS = { id = "string", title = "string", icon = "string" }
+
+-- A main window's pages in its sidebar, drawn as the settings window's tabs are
+function Context:CreateNav(parent, pages, onSelect)
+    if type(pages) ~= "table" or #pages == 0 then error("EverythingUI: CreateNav needs a list of pages", 2) end
+    if onSelect ~= nil and type(onSelect) ~= "function" then error("EverythingUI: CreateNav's onSelect must be a function", 2) end
+    local ids = {}
+    for i, p in ipairs(pages) do
+        if type(p) ~= "table" or type(p.id) ~= "string" or type(p.title) ~= "string" then
+            error(("EverythingUI: CreateNav page %d needs an id and a title"):format(i), 2)
+        end
+        if ids[p.id] then error(("EverythingUI: CreateNav page %d repeats the id %s"):format(i, p.id), 2) end
+        ids[p.id] = true
+        for key, v in pairs(p) do
+            if NAV_FIELDS[key] ~= type(v) then
+                error(("EverythingUI: CreateNav page %d has a bad or unknown field %s"):format(i, tostring(key)), 2)
+            end
+        end
+    end
+    local sp = lib.tokens.spacing
+    local ctx = self
+    local nav = CreateFrame("Frame", nil, parent)
+    nav:SetPoint("TOPLEFT", NAV_PAD, -NAV_TOP)
+    nav:SetPoint("TOPRIGHT", -NAV_PAD, -NAV_TOP)
+    nav:SetHeight(#pages * sp.navItemHeight + (#pages - 1) * sp.navItemGap)
+    nav.items = {}
+    local width = math.max(1, (parent:GetWidth() or 0) - NAV_PAD * 2)
+    local prev
+    for _, p in ipairs(pages) do
+        local b = kit.NavItem(ctx, nav, width, p.title, p.icon)
+        if prev then
+            b:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -sp.navItemGap)
+            b:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, -sp.navItemGap)
+        else
+            b:SetPoint("TOPLEFT")
+            b:SetPoint("TOPRIGHT")
+        end
+        local id = p.id
+        b:SetScript("OnClick", function()
+            nav:Select(id)
+            if onSelect then onSelect(id) end
+        end)
+        kit.PaintNav(ctx, b, false)
+        nav.items[id] = b
+        prev = b
+    end
+    function nav.Select(_, id)
+        if not nav.items[id] then error(("EverythingUI: CreateNav has no page %s"):format(tostring(id)), 2) end
+        for key, b in pairs(nav.items) do kit.PaintNav(ctx, b, key == id) end
+        nav._selected = id
+    end
+    function nav.GetSelected() return nav._selected end
+    return nav
+end
+
+local MULTI_FIELDS = { readOnly = "boolean" }
+
+-- In the client's font object (decision 14), since what it holds can be in any alphabet
+function Context:CreateMultilineField(parent, opts)
+    if opts ~= nil and type(opts) ~= "table" then error("EverythingUI: CreateMultilineField's opts must be a table", 2) end
+    opts = opts or {}
+    for key, v in pairs(opts) do
+        if MULTI_FIELDS[key] ~= type(v) then
+            error(("EverythingUI: CreateMultilineField got a bad or unknown field %s"):format(tostring(key)), 2)
+        end
+    end
+    local ctx = self
+    local holder = CreateFrame("Frame", nil, parent)
+    holder._euiFill = true
+    kit.Fill(self, holder, "input")
+    local edges = kit.Edge(self, holder, "inputBorder")
+    local sf, _, bar = kit.Scroll(self, holder)
+    sf:SetPoint("TOPLEFT", MULTI_PAD, -MULTI_PAD)
+    sf:SetPoint("BOTTOMRIGHT", -(MULTI_PAD + BAR_ROOM), MULTI_PAD)
+    bar:SetPoint("TOPRIGHT", -SCROLLBAR_INSET, -MULTI_PAD)
+    bar:SetPoint("BOTTOMRIGHT", -SCROLLBAR_INSET, MULTI_PAD)
+
+    local box = CreateFrame("EditBox", nil, sf)
+    box:SetMultiLine(true)
+    box:SetAutoFocus(false)
+    box:SetFontObject(GameFontHighlight)
+    box:SetTextInsets(0, 0, 0, 0)
+    box:SetWidth(1)
+    sf:SetScrollChild(box)
+    -- The box takes the scroll frame's width, so its lines wrap there rather than running past the edge.
+    sf:SetScript("OnSizeChanged", function(_, w) box:SetWidth(math.max(1, w or 0)) end)
+
+    local stored = ""
+    local function paint()
+        for _, line in ipairs(edges) do line:SetColorTexture(ctx:Color(box:HasFocus() and "borderStrong" or "inputBorder")) end
+    end
+    box:SetScript("OnEditFocusGained", paint)
+    box:SetScript("OnEditFocusLost", paint)
+    box:SetScript("OnEscapePressed", function(b) b:ClearFocus() end)
+    box:SetScript("OnTextChanged", function(b, userInput)
+        if opts.readOnly and userInput and b:GetText() ~= stored then
+            b:SetText(stored)
+            b:SetCursorPosition(0)
+            b:HighlightText()
+        end
+    end)
+    -- Keeps the cursor in view as it moves through the text, as Blizzard's scrolling edit boxes do.
+    box:SetScript("OnCursorChanged", function(_, _, y, _, h)
+        -- The range is read afresh, or a new last line clamps to the old one
+        if sf.UpdateScrollChildRect then sf:UpdateScrollChildRect() end
+        bar:SetMinMaxValues(0, math.floor(math.max(0, sf:GetVerticalScrollRange() or 0)))
+        local top, view, v = -(y or 0), sf:GetHeight() or 0, sf:GetVerticalScroll() or 0
+        if top < v then
+            bar:SetValue(top)
+        elseif top + (h or 0) > v + view then
+            bar:SetValue(top + (h or 0) - view)
+        end
+    end)
+    holder:EnableMouse(true)
+    holder:SetScript("OnMouseDown", function() box:SetFocus() end)
+
+    holder.box, holder.scroll, holder.bar = box, sf, bar
+    function holder.SetText(_, s)
+        stored = s or ""
+        -- Sized now, since text laid out at the build width of 1 wraps a letter to a line
+        local w = sf:GetWidth() or 0
+        if w > 0 then box:SetWidth(w) end
+        box:SetText(stored)
+        box:SetCursorPosition(0)
+        bar:SetValue(0)
+    end
+    function holder.GetText() return box:GetText() end
+    -- Focus first, since taking the keyboard drops a selection made before it.
+    function holder.SelectAll()
+        box:SetFocus()
+        box:HighlightText()
+    end
+    paint()
+    return holder
 end

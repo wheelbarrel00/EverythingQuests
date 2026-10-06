@@ -83,6 +83,14 @@ DB.defaults = {
             showUnroutedChains = false,
             showMapPins = true,
         },
+        questBrowser = {
+            width = 1000,
+            height = 660,
+        },
+        historyWindow = {
+            width = 1000,
+            height = 660,
+        },
         appearance = {
             optionsAlpha = 0.95,
         },
