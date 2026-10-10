@@ -12,11 +12,15 @@ local TAB_ICONS = {
     general = "icon-general", map = "icon-map", worldQuests = "icon-globe",
     chainGuide = "icon-chain", history = "icon-history", about = "icon-about",
 }
+-- EQ's own art, drawn by tools/gen_tabicons.py, for a tab the library has no icon for
+local EQ_TAB_ICONS = {
+    questBrowser = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\icon-browser",
+}
 
 local ui = EUI:NewContext({
     id      = "EQ",
     title   = "Everything Quests",
-    version = ns.VERSION or "2.2.0",
+    version = ns.VERSION or "2.3.0",
     accent  = EUI.tokens.accents.EQ.accent,
     L       = L,
     tooltip = ns.Util.PinTooltip,
@@ -47,7 +51,15 @@ local ui = EUI:NewContext({
 Options.ui = ui
 
 local function iconFor(id)
-    return TAB_ICONS[id] and ui:Texture(TAB_ICONS[id])
+    return EQ_TAB_ICONS[id] or (TAB_ICONS[id] and ui:Texture(TAB_ICONS[id]))
+end
+
+-- The one way in for the slash command, the key binding and the tab, which says so where it cannot open
+function Options:QuestBrowser()
+    local QB = ns:GetSubsystem("QuestBrowser")
+    if QB and QB.Available and QB:Available() then return QB end
+    print(L["|cffEBB706EQ|r: the Quest Browser needs the Classic quest data, which this version of the game does not load."])
+    return nil
 end
 
 -- Tab files load after this one and register themselves, so the nav lists only what the TOC loaded
@@ -154,26 +166,32 @@ function Options:OnEnable()
     self:RegisterBlizzardCategory()
 end
 
+local function unavailable()
+    print(L["|cffEBB706EQ|r: that command is not available on this version of the game."])
+end
+
+-- Bindings.xml calls this
+function Options:Unavailable()
+    unavailable()
+end
+
 local function eqSlashHandler(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "chain" then
-        local CG = ns:GetSubsystem("ChainGuide"); if CG then CG:Toggle() end
+        local CG = ns:GetSubsystem("ChainGuide")
+        if CG then CG:Toggle() else unavailable() end
         return
     elseif msg == "history" then
         local HF = ns:GetSubsystem("HistoryFrame")
-        if HF and HF.Toggle then HF:Toggle() end
+        if HF and HF.Toggle then HF:Toggle() else unavailable() end
         return
     elseif msg == "quests" or msg:match("^quests%s") then
-        local QB = ns:GetSubsystem("QuestBrowser")
-        if not (QB and QB.Available and QB:Available()) then
-            print(L["|cffEBB706EQ|r: the quest browser needs the Classic quest data, which this version of the game does not load."])
-            return
-        end
-        QB:Search(msg:match("^quests%s+(.+)$"))
+        local QB = Options:QuestBrowser()
+        if QB then QB:Search(msg:match("^quests%s+(.+)$")) end
         return
     elseif msg == "session" then
         local Sess = ns:GetSubsystem("Session")
-        if Sess and Sess.Print then Sess:Print() end
+        if Sess and Sess.Print then Sess:Print() else unavailable() end
         return
     elseif msg == "whatsnew chat" then
         local WN = ns:GetSubsystem("WhatsNew")
@@ -193,9 +211,10 @@ local function eqSlashHandler(msg)
     elseif msg:match("^discover") then
         local hint = msg:match("^discover%s+(.+)$")
         local QLS = ns:GetSubsystem("ChainGuideQuestLineSource")
-        if QLS and QLS.PrintCurrentZone then QLS:PrintCurrentZone(hint) end
+        if QLS and QLS.PrintCurrentZone then QLS:PrintCurrentZone(hint) else unavailable() end
         return
     elseif msg == "wqdebug" then
+        if not ns:GetSubsystem("WQWorldMap") then unavailable() return end
         Options:DumpWorldQuestSources()
         return
     elseif msg == "scenario" then
@@ -253,6 +272,7 @@ local function eqSlashHandler(msg)
         end
         return
     elseif msg == "chaindump" then
+        if not ns:GetSubsystem("ChainGuideDatabase") then unavailable() return end
         local DBm = ns:GetSubsystem("ChainGuideDatabase")
         local H   = ns:GetSubsystem("ChainGuideHistory")
         local state   = H and H.Current and H:Current()
@@ -283,6 +303,7 @@ local function eqSlashHandler(msg)
         end
         return
     elseif msg == "campdump" then
+        if not ns:GetSubsystem("ChainGuideCampaignSource") then unavailable() return end
         local DBm = ns:GetSubsystem("ChainGuideDatabase")
         if not (C_CampaignInfo and C_CampaignInfo.GetChapterIDs
                 and C_QuestLine and C_QuestLine.GetQuestLineQuests) then
@@ -319,6 +340,7 @@ local function eqSlashHandler(msg)
         end
         return
     elseif msg:match("^campfind") then
+        if not ns:GetSubsystem("ChainGuideCampaignSource") then unavailable() return end
         local filter = msg:match("^campfind%s+(.+)$")
         if not (C_CampaignInfo and C_CampaignInfo.GetCampaignInfo) then
             print("|cffEBB706EQ CampFind|r: campaign API unavailable on this build.")
@@ -387,6 +409,7 @@ local function eqSlashHandler(msg)
         end
         return
     elseif msg:match("^zonedump") then
+        if not ns:GetSubsystem("ChainGuideQuestLineSource") then unavailable() return end
         local hint = msg:match("^zonedump%s+(.+)$")
         local DBm  = ns:GetSubsystem("ChainGuideDatabase")
         if not (hint and DBm and ns.QUESTLINE_ROUTING
@@ -430,7 +453,7 @@ local function eqSlashHandler(msg)
     elseif msg:match("^profile") then
         local rest = msg:match("^profile%s*(.*)$") or ""
         local Profiler = ns:GetSubsystem("Profiler")
-        if not Profiler then return end
+        if not Profiler then unavailable() return end
         if rest == "" or rest == "show" then
             Profiler:Show()
         elseif rest == "reset" then

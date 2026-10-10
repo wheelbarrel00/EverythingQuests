@@ -241,7 +241,7 @@ function QB:Build()
     f._list:SetPoint("TOPLEFT", f._count, "BOTTOMLEFT", -SIDE_PAD, -LIST_GAP)
     f._list:SetPoint("BOTTOMRIGHT", side, "BOTTOMRIGHT", 0, 0)
 
-    local area = ctx:CreateScrollArea(f.body, {})
+    local area = ctx:CreateScrollArea(f.body, { clearGrip = true })
     area:SetAllPoints(f.body)
     f._area = area
     local content = area.content

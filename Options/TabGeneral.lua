@@ -200,20 +200,6 @@ local function partyCard(self, content, stack, deps)
     end
 end
 
-local function browserCard(self, content, stack)
-    local QB = ns:GetSubsystem("QuestBrowser")
-    if not (QB and QB.Available and QB:Available()) then return end
-    local card = stack(self:CreateGroup(content, L["Quest Browser"]))
-
-    local open = self:CreateButton(content, L["Open Quest Browser"], nil, function()
-        local B = ns:GetSubsystem("QuestBrowser")
-        if B then B:Open() end
-    end)
-    self:AttachTooltip(open, L["Quest Browser"],
-        L["Look up almost any quest in the game, including ones you have never picked up. Shows the level and race and class requirements, where it starts and turns in, what has to be finished first, and why you cannot take it yet. Also on /eqs quests, or right-click a gold quest marker on the map."])
-    card:Add(open)
-end
-
 local function trackerCard(self, content, stack)
     local Bridge = ns:GetSubsystem("TrackerBridge")
     if not Bridge then return end
@@ -409,7 +395,6 @@ Options:RegisterTab({
         generalCard(self, content, stack)
         announceCard(self, content, stack)
         partyCard(self, content, stack, deps)
-        browserCard(self, content, stack)
         trackerCard(self, content, stack)
         profilesCard(self, content, stack)
         deps.sync()

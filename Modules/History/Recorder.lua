@@ -112,17 +112,16 @@ end
 function R:OnInitialize()
     self.sv = ensureSV()
     self.backups = ensureBackupSV()
-    -- Core/Init.lua xpcalls this and enables the subsystem regardless, so anything the event
-    -- handlers touch has to exist before the first line that can raise
+    -- Core/Init.lua enables this subsystem even if this raises, so what the event handlers touch comes first
+    self._completion, self._mine = {}, {}
     self._giveUp = {}
     self._turnedIn = {}
 
     self._loadNotice = self:_guardOnLoad()
 
-    self._completion = {}
     local entries = self.sv.entries
     for i = 1, #entries do
-        self:_updateCompletion(entries[i].q, entries[i].t or 0)
+        self:_updateCompletion(entries[i].q, entries[i].t or 0, entries[i].c)
     end
 end
 
@@ -131,16 +130,37 @@ local function resolveTitle(qid)
 end
 R._resolveTitle = resolveTitle
 
-function R:_updateCompletion(qid, t)
-    if not qid then return end
-    local cur = self._completion[qid]
+-- The Classic quest data's English names, shown but never stored, so the game's own title replaces one once it has it
+local function shippedNames()
+    local A = ns:GetSubsystem("AvailableQuests")
+    local D = A and A.Data and A:Data()
+    return D and D.names
+end
+
+function R:NameOf(entry)
+    if not entry then return nil end
+    if entry.n and entry.n ~= "" then return entry.n end
+    local names = shippedNames()
+    return names and entry.q and names[entry.q] or nil
+end
+
+local function keepLatest(map, qid, t)
+    local cur = map[qid]
     if not cur or (t > 0 and t > cur) or (cur == 0 and t > 0) then
-        self._completion[qid] = t
+        map[qid] = t
     end
 end
 
-function R:GetCompletionTime(questID)
-    return self._completion and self._completion[questID]
+function R:_updateCompletion(qid, t, c)
+    if not qid then return end
+    keepLatest(self._completion, qid, t)
+    if c == charKey() then keepLatest(self._mine, qid, t) end
+end
+
+function R:GetCompletionTime(questID, thisCharacter)
+    local map = self._completion
+    if thisCharacter then map = self._mine end
+    return map and map[questID]
 end
 
 function R:OnEnable()
@@ -168,8 +188,11 @@ function R:OnEnable()
         self:RecordMoney()
     end)
     Events:On("QUEST_DATA_LOAD_RESULT", function(_, questID, success)
+        local asked = questID ~= nil and questID == self._inFlight
+        if asked then self._inFlight = nil end
         if success then
             self:_fillTitle(questID)
+            if asked and not resolveTitle(questID) then self._giveUp[questID] = true end
         elseif questID then
             self._giveUp[questID] = true
         end
@@ -226,11 +249,11 @@ local function applySnapshot(self, snap)
     self.sv.abandoned      = copyCharLedger(snap.abandoned)
     self.sv.levels         = copyCharLedger(snap.levels)
     self.sv.abandonCount   = copySet(snap.abandonCount)
-    self._completion = {}
+    self._completion, self._mine = {}, {}
     self._pendingTitles = nil
     local entries = self.sv.entries
     for i = 1, #entries do
-        self:_updateCompletion(entries[i].q, entries[i].t or 0)
+        self:_updateCompletion(entries[i].q, entries[i].t or 0, entries[i].c)
     end
     return #entries
 end
@@ -369,20 +392,18 @@ local _titleQueue = {}
 local _titleTimer
 
 function R:RequestMissingTitles()
-    -- The sweep runs first even where the round trip cannot, being the only path that
-    -- re-resolves titles on rows already written. On Classic it rests entirely on
-    -- QuestUtils_GetQuestName - measured PRESENT on Era, though whether it returns a name
-    -- there is still open - because the rung below it in Util.QuestTitle is curated Midnight
-    -- data that no Classic TOC lists.
+    -- The sweep sends no request, so it runs even where none can be sent
     self:SweepTitles()
     if not ns.Has.QuestDataRequest then return 0 end
     wipe(_titleQueue)
     local seen = {}
+    local names = shippedNames()
     local entries = self.sv.entries
     for i = 1, #entries do
         local e = entries[i]
         if e.q and (not e.n or e.n == "")
-           and not seen[e.q] and not self._giveUp[e.q] then
+           and not seen[e.q] and not self._giveUp[e.q]
+           and e.q ~= self._inFlight and not (names and names[e.q]) then
             seen[e.q] = true
             _titleQueue[#_titleQueue + 1] = e.q
         end
@@ -392,8 +413,44 @@ function R:RequestMissingTitles()
     return n
 end
 
+-- WoW Forever's server was only ever measured answering one request at a time, a second apart
+local SLOW_GAP, SLOW_TIMEOUT = 1, 10
+
+function R:_pumpSlow()
+    if self._slowTimer then return end
+    local function step()
+        self._slowTimer = nil
+        local now = GetTime()
+        if self._inFlight and now - (self._inFlightAt or 0) < SLOW_TIMEOUT then
+            self._slowTimer = C_Timer.NewTimer(SLOW_GAP, step)
+            return
+        end
+        if self._inFlight then
+            self._giveUp[self._inFlight] = true
+            self._inFlight = nil
+        end
+        if InCombatLockdown and InCombatLockdown() then
+            self._slowTimer = C_Timer.NewTimer(SLOW_GAP, step)
+            return
+        end
+        local qid = tremove(_titleQueue)
+        while qid and (self._giveUp[qid] or not ensurePendingTitles(self)[qid] or resolveTitle(qid)) do
+            qid = tremove(_titleQueue)
+        end
+        if not qid then
+            C_Timer.After(3, function() self:SweepTitles() end)
+            return
+        end
+        self._inFlight, self._inFlightAt = qid, now
+        C_QuestLog.RequestLoadQuestByID(qid)
+        self._slowTimer = C_Timer.NewTimer(SLOW_GAP, step)
+    end
+    step()
+end
+
 function R:_pumpTitles()
     if not ns.Has.QuestDataRequest then return end
+    if ns.HAS_CLASSIC_SPAWNS then return self:_pumpSlow() end
     local BATCH = 10
     local fired = 0
     while #_titleQueue > 0 and fired < BATCH do
@@ -590,9 +647,7 @@ function R:Record(questID, xpReward, moneyReward)
         c = charKey(),
         z = (GetZoneText and GetZoneText()) or nil,
         k = (C_QuestInfoSystem and C_QuestInfoSystem.GetQuestClassification
-             and C_QuestInfoSystem.GetQuestClassification(questID))
-            or (C_QuestLog and C_QuestLog.GetQuestClassification
-                and C_QuestLog.GetQuestClassification(questID)) or nil,
+             and C_QuestInfoSystem.GetQuestClassification(questID)) or nil,
     }
     if xpReward    and xpReward    > 0 then entry.xp = xpReward    end
     if moneyReward and moneyReward > 0 then entry.m  = moneyReward end
@@ -603,7 +658,7 @@ function R:Record(questID, xpReward, moneyReward)
     local entries = self.sv.entries
     entries[#entries + 1] = entry
     self._pendingTitles = nil
-    self:_updateCompletion(entry.q, entry.t)
+    self:_updateCompletion(entry.q, entry.t, entry.c)
     self:_enforceRetention()
 end
 
@@ -702,7 +757,7 @@ function R:Backfill()
                 n = resolveTitle(qid),
                 c = key,
             }
-            self:_updateCompletion(qid, 0)
+            self:_updateCompletion(qid, 0, key)
             added = added + 1
             room = room - 1
         end
@@ -721,6 +776,7 @@ function R:Wipe()
     self.sv.entries        = {}
     self.sv.charBackfilled = {}
     self._completion       = {}
+    self._mine             = {}
     self._pendingTitles    = nil
     self.sv.goldDaily      = {}
     self.sv.accepted       = {}
@@ -763,13 +819,76 @@ local function bucketOf(k)
     return (k and CLASS_BUCKET[k]) or "other"
 end
 
+local CLASSIC_KIND = { dungeon = 1, event = 2, class = 4, profession = 8, repeatable = 16 }
+local CLASSIC_ORDER = { "dungeon", "event", "class", "profession", "repeatable" }
+local CAT_INSTANCE, CAT_REPEATABLE, CAT_CLASS, CAT_PROFESSION = 1, 2, 8, 16
+
+local function hasBit(mask, bit)
+    return mask ~= nil and math.floor(mask / bit) % 2 == 1
+end
+
+local function classicTypes()
+    return ns.CLASSIC_QUEST_CATEGORY ~= nil
+end
+
+-- The Quest Browser's tag rules (QuestBrowser/Data.lua), so a quest carries the same types in both windows
+local _classicKinds = {}
+local function classicKinds(q)
+    local kinds = _classicKinds[q]
+    if kinds then return kinds end
+    local cats = ns.CLASSIC_QUEST_CATEGORY[q]
+    local hol = ns.CLASSIC_QUEST_HOLIDAY
+    local A = ns:GetSubsystem("AvailableQuests")
+    kinds = 0
+    if hasBit(cats, CAT_INSTANCE) then kinds = kinds + CLASSIC_KIND.dungeon end
+    if hol and hol.event and hol.event[q] then kinds = kinds + CLASSIC_KIND.event end
+    if hasBit(cats, CAT_CLASS) then kinds = kinds + CLASSIC_KIND.class end
+    if hasBit(cats, CAT_PROFESSION) then kinds = kinds + CLASSIC_KIND.profession end
+    if hasBit(cats, CAT_REPEATABLE) or (A and A.IsRepeatable and A:IsRepeatable(q)) then
+        kinds = kinds + CLASSIC_KIND.repeatable
+    end
+    _classicKinds[q] = kinds
+    return kinds
+end
+
+local function typeOf(e)
+    if not classicTypes() then return bucketOf(e.k) end
+    local kinds = e.q and classicKinds(e.q) or 0
+    for _, key in ipairs(CLASSIC_ORDER) do
+        if hasBit(kinds, CLASSIC_KIND[key]) then return key end
+    end
+    return "other"
+end
+
+local function isType(e, want)
+    if not classicTypes() then return bucketOf(e.k) == want end
+    local kinds = e.q and classicKinds(e.q) or 0
+    if want == "other" then return kinds == 0 end
+    return CLASSIC_KIND[want] ~= nil and hasBit(kinds, CLASSIC_KIND[want])
+end
+
+function R:UsesClassicTypes()
+    return classicTypes()
+end
+
+function R:TypeOf(entry)
+    return typeOf(entry)
+end
+
 local SORT_BUCKET_ORDER = {
     campaign = 1, questline = 2, calling = 3,
     recurring = 4, worldquest = 5, other = 6,
+    dungeon = 1, event = 2, class = 3, profession = 4, repeatable = 5,
 }
 function R:Query(filter)
     local entries = self.sv.entries
     local out = {}
+    local names = shippedNames()
+    local function nameOf(e)
+        local n = e.n
+        if (not n or n == "") and names and e.q then n = names[e.q] end
+        return n
+    end
 
     local search = filter and filter.search
     if search and search ~= "" then search = search:lower() else search = nil end
@@ -798,7 +917,7 @@ function R:Query(filter)
         local ok = true
         if wantChar and e.c ~= wantChar then ok = false end
         if ok and search then
-            local n = e.n
+            local n = nameOf(e)
             if not (n and n:lower():find(search, 1, true)) then ok = false end
         end
         if ok and hideBackfilled and (not e.t or e.t == 0) then ok = false end
@@ -806,7 +925,7 @@ function R:Query(filter)
             if not e.t or e.t < minTime then ok = false end
         end
         if ok and wantClass then
-            if bucketOf(e.k) ~= wantClass then ok = false end
+            if not isType(e, wantClass) then ok = false end
         end
         if ok then out[#out + 1] = e end
     end
@@ -814,17 +933,20 @@ function R:Query(filter)
     local asc    = filter and filter.sortDir == "asc"
     local sortBy = filter and filter.sortBy or "date"
     if sortBy == "name" then
+        local lowered = {}
+        for i = 1, #out do lowered[out[i]] = (nameOf(out[i]) or ""):lower() end
         table.sort(out, function(a, b)
-            local na, nb = (a.n or ""):lower(), (b.n or ""):lower()
+            local na, nb = lowered[a], lowered[b]
             if na ~= nb then
                 if asc then return na < nb else return na > nb end
             end
             return (a.q or 0) < (b.q or 0)
         end)
     elseif sortBy == "type" then
+        local rank = {}
+        for i = 1, #out do rank[out[i]] = SORT_BUCKET_ORDER[typeOf(out[i])] or 99 end
         table.sort(out, function(a, b)
-            local ba = SORT_BUCKET_ORDER[bucketOf(a.k)] or 99
-            local bb = SORT_BUCKET_ORDER[bucketOf(b.k)] or 99
+            local ba, bb = rank[a], rank[b]
             if ba ~= bb then
                 if asc then return ba < bb else return ba > bb end
             end
@@ -908,7 +1030,7 @@ end
 
 function R:Totals()
     local entries = self.sv.entries
-    local totalCount, totalXP, totalMoney = 0, 0, 0
+    local totalCount, rewardCount, totalXP, totalMoney = 0, 0, 0, 0
     local totalHeld, heldCount = 0, 0
     local byChar = {}
     local topGold, topXP
@@ -916,6 +1038,7 @@ function R:Totals()
     for i = 1, #entries do
         local e = entries[i]
         totalCount = totalCount + 1
+        if (e.xp and e.xp > 0) or (e.m and e.m > 0) then rewardCount = rewardCount + 1 end
 
         if e.d and e.d > 0 then
             totalHeld = totalHeld + e.d
@@ -946,6 +1069,7 @@ function R:Totals()
 
     return {
         totalCount = totalCount,
+        rewardCount = rewardCount,
         totalXP    = totalXP,
         totalMoney = totalMoney,
         byChar     = byChar,

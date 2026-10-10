@@ -1,10 +1,16 @@
 <Bindings>
-    <Binding name="EVERYTHINGQUESTS_TOGGLE_OPTIONS" header="EVERYTHINGQUESTS" category="EVERYTHINGQUESTS">
+    <Binding name="EVERYTHINGQUESTS_TOGGLE_OPTIONS" category="BINDING_HEADER_EVERYTHINGQUESTS">
         local O = EverythingQuests and EverythingQuests:GetSubsystem("Options")
         if O then O:Toggle() end
     </Binding>
-    <Binding name="EVERYTHINGQUESTS_TOGGLE_CHAINGUIDE">
+    <Binding name="EVERYTHINGQUESTS_TOGGLE_CHAINGUIDE" category="BINDING_HEADER_EVERYTHINGQUESTS">
         local C = EverythingQuests and EverythingQuests:GetSubsystem("ChainGuide")
-        if C then C:Toggle() end
+        local O = EverythingQuests and EverythingQuests:GetSubsystem("Options")
+        if C then C:Toggle() elseif O then O:Unavailable() end
+    </Binding>
+    <Binding name="EVERYTHINGQUESTS_TOGGLE_QUESTBROWSER" category="BINDING_HEADER_EVERYTHINGQUESTS">
+        local O = EverythingQuests and EverythingQuests:GetSubsystem("Options")
+        local Q = O and O:QuestBrowser()
+        if Q then Q:Toggle() end
     </Binding>
 </Bindings>

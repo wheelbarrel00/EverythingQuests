@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Unified replacement for the Blizzard quest experience - world map overlays, nameplate quest icons, quest history, and a Midnight chain guide. The objective tracker installs alongside it as EQ Objective Tracker.
 ## Author: Wheelbarrel00
-## Version: 2.2.0
+## Version: 2.3.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -29,7 +29,6 @@ Libs\LibMapPinHandler\LibMapPinHandler.lua
 # Core (defines RegisterSubsystem - must load before any module)
 Core\Init.lua
 
-# ns.Has and ns.Compat are read at file scope by consumers, so this loads before all of them
 Core\Compat.lua
 
 # Locales (define ns.L before any consumer - enUS first to create the table)
@@ -167,6 +166,7 @@ Modules\History\Session.lua
 # there is nothing here for it to add and no data for it to read.
 # check-toc: flavor-only Modules/QuestBrowser/Data.lua
 # check-toc: flavor-only Modules/QuestBrowser/Frame.lua
+# check-toc: flavor-only Options/TabQuestBrowser.lua
 
 # Builds the Chain Guide from the same tables, as Classic quests belong to no client quest line.
 # check-toc: flavor-only Modules/ChainGuide/ClassicSource.lua

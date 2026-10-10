@@ -567,6 +567,14 @@ local function attMismatch(qid, what, detail)
     attIssues[#attIssues + 1] = ("-- ATT KNOWN ANSWER MISMATCH: quest %d %s: %s"):format(qid, what, detail)
 end
 
+local function startersText(npcs, objs, items)
+    local parts = {}
+    if npcs and #npcs > 0 then parts[#parts + 1] = "npc " .. table.concat(npcs, " ") end
+    if objs and #objs > 0 then parts[#parts + 1] = "obj " .. table.concat(objs, " ") end
+    if items and #items > 0 then parts[#parts + 1] = "item " .. table.concat(items, " ") end
+    return #parts > 0 and table.concat(parts, " ") or "none"
+end
+
 -- ATT only fills empty fields, except that an agreeing race mask or prerequisite takes ATT's more detailed form and a disputed prerequisite is dropped.
 local function mergeATT(qid, row, a, lines)
     local filled = false
@@ -583,7 +591,7 @@ local function mergeATT(qid, row, a, lines)
         if agree then
             attStats.confirmed = attStats.confirmed + 1
         elseif #a.givers + #a.objects > 0 then
-            attMismatch(qid, "giver", ("ATT %s, collected %s"):format(table.concat(a.givers, " "), table.concat(sb[1] or {}, " ")))
+            attMismatch(qid, "giver", ("ATT %s, collected %s"):format(startersText(a.givers, a.objects), startersText(sb[1], sb[2], sb[3])))
         end
     elseif #a.givers + #a.objects > 0 then
         row[Q_STARTEDBY] = { #a.givers > 0 and a.givers or nil, #a.objects > 0 and a.objects or nil }

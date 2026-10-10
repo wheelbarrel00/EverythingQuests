@@ -65,9 +65,6 @@ L["Share quest progress with your group"] = true
 L["Your group sees how far along you are on each quest, and you see the same for them. This travels as hidden addon messages, so nothing is ever posted to anyone's chat. Switching it off stops both halves."] = true
 L["Read other quest addons as well"] = true
 L["Also reads the progress other quest addons share, so you see group members running them as well as the people running EQ. EQ asks their users for their quest logs when either of you joins the group. Your own progress is never sent on their channel."] = true
-L["Quest Browser"] = true
-L["Open Quest Browser"] = true
-L["Look up almost any quest in the game, including ones you have never picked up. Shows the level and race and class requirements, where it starts and turns in, what has to be finished first, and why you cannot take it yet. Also on /eqs quests, or right-click a gold quest marker on the map."] = true
 L["Tracker"] = true
 L["Use Blizzard's quest tracker"] = true
 L["Switch to Blizzard's quest tracker? The interface will reload."] = true
@@ -195,10 +192,11 @@ L["Everything Quests saves a rolling backup of your history when you log out, an
 L["Join our Discord!"] = true
 L["Join our Discord"] = true
 L["Click to copy the invite link."] = true
+L["|cffEBB706EQ|r: the Quest Browser needs the Classic quest data, which this version of the game does not load."] = true
 L["Version %s"] = true
 L["Everything Quests opens its full options in a dedicated window. Click the button below, or type |cffEBB706/eqs|r in chat."] = true
 L["Open Everything Quests Options"] = true
-L["|cffEBB706EQ|r: the quest browser needs the Classic quest data, which this version of the game does not load."] = true
+L["|cffEBB706EQ|r: that command is not available on this version of the game."] = true
 L["|cffEBB706Everything Quests|r: couldn't open Options \226\128\148 %s"] = true
 
 -- ─── Core/Init.lua ───
@@ -231,6 +229,8 @@ L["%1$s for %2$s"] = true
 L["Campaign Map"] = true
 
 -- ─── Modules/ChainGuide/ChainView.lua ───
+L["Completed: "] = true
+L["Completed (before tracking)"] = true
 L["Completed"] = true
 L["In your quest log"] = true
 L["Skipped"] = true
@@ -238,8 +238,6 @@ L["A later quest in this chain has already passed this one."] = true
 L["May be worth going back to pick up."] = true
 L["Not started"] = true
 L["Level %d"] = true
-L["Completed: "] = true
-L["Completed (before tracking)"] = true
 L["Shift-click to link in chat"] = true
 L["You can pick this up now."] = true
 L["Requires level %d"] = true
@@ -302,6 +300,11 @@ L["Questline"] = true
 L["Calling"] = true
 L["Recurring"] = true
 L["World Quest"] = true
+L["Dungeon or raid"] = true
+L["World event"] = true
+L["Class quest"] = true
+L["Profession"] = true
+L["Repeatable"] = true
 L["Date"] = true
 L["Name"] = true
 L["Type"] = true
@@ -419,6 +422,7 @@ L["All quests"] = true
 L["Available to you"] = true
 L["Click to open the map here and set a waypoint"] = true
 L["Click to open this quest"] = true
+L["Quest Browser"] = true
 L["Type part of a quest's name or its ID. Put the name in quotes to match the whole title."] = true
 L["This zone only"] = true
 L["Only list quests that can be picked up on the map you are standing in."] = true
@@ -429,11 +433,6 @@ L["%d quests (showing the first %d)"] = true
 L["%d locations"] = true
 L["Failed, so you can take it again."] = true
 L["Not available to you right now."] = true
-L["Dungeon or raid"] = true
-L["Repeatable"] = true
-L["World event"] = true
-L["Class quest"] = true
-L["Profession"] = true
 L["Races: %s"] = true
 L["Classes: %s"] = true
 L["Requires a profession at rank %d"] = true
@@ -504,7 +503,7 @@ L[" for the many hours spent translating Everything Quests into Simplified Chine
 L[" for the many hours spent translating Everything Quests into Traditional Chinese."] = true
 L[" for the many hours spent translating Everything Quests into German."] = true
 L["Better questing across the whole game: markers for your quests on the world map, world quests with reward and faction filters, a guide to Midnight's quest chains, a history of every quest you turn in, and quest progress on nameplates."] = true
-L["Better questing for WoW Forever: objective markers on the world map and minimap, every quest giver with something for you, a guide to the quest chains, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."] = true
+L["Better questing for WoW Forever: objective markers on the world map and minimap, every quest giver with something for you, a guide to the quest chains, a history of every quest you turn in, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."] = true
 L["Better questing for Classic: objective markers on the world map and minimap, every quest giver with something for you, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."] = true
 L["Its objective tracker is EQ Objective Tracker, a separate addon that installs with it."] = true
 L["by Wheelbarrel00"] = true
@@ -583,6 +582,10 @@ L["X offset"] = true
 L["Nudges the icon and count together left or right from the Position above, so you can slide them right up against the health bar."] = true
 L["Y offset"] = true
 L["Nudges the icon and count together up or down from the Position above (positive moves them up)."] = true
+
+-- ─── Options/TabQuestBrowser.lua ───
+L["Open Quest Browser"] = true
+L["Look up almost any quest in the game, including ones you have never picked up. Shows the level and race and class requirements, where it starts and turns in, what has to be finished first, and why you cannot take it yet. Also on /eqs quests, or right-click a gold quest marker on the map."] = true
 
 -- Convert the `true` sentinels to their key (the self-keyed English default).
 for k, v in pairs(L) do if v == true then L[k] = k end end

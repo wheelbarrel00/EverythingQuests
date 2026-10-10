@@ -24,7 +24,7 @@ local OTHER_ADDONS = {
     { name = "EQ Objective Tracker",
       cf   = "https://www.curseforge.com/wow/addons/eq-objective-tracker",
       gh   = "https://github.com/wheelbarrel00/EQObjectiveTracker" },
-    { name = "Everything Delves",
+    { name = "Everything Delves", retail = true,
       cf   = "https://www.curseforge.com/wow/addons/everything-delves",
       gh   = "https://github.com/wheelbarrel00/EverythingDelves" },
     { name = "Cooldown Master",
@@ -59,7 +59,7 @@ local function description()
     if ns:GetSubsystem("ChainGuideQuestLineSource") then
         lead = L["Better questing across the whole game: markers for your quests on the world map, world quests with reward and faction filters, a guide to Midnight's quest chains, a history of every quest you turn in, and quest progress on nameplates."]
     elseif ns:GetSubsystem("ChainGuide") then
-        lead = L["Better questing for WoW Forever: objective markers on the world map and minimap, every quest giver with something for you, a guide to the quest chains, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."]
+        lead = L["Better questing for WoW Forever: objective markers on the world map and minimap, every quest giver with something for you, a guide to the quest chains, a history of every quest you turn in, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."]
     else
         lead = L["Better questing for Classic: objective markers on the world map and minimap, every quest giver with something for you, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."]
     end
@@ -137,14 +137,16 @@ end
 local function addonsCard(self, content, stack)
     local card = stack(self:CreateGroup(content, L["More Add-ons by Wheelbarrel00"]))
     for _, a in ipairs(OTHER_ADDONS) do
-        local row = self:CreateTextRow(content, a.name, "")
-        row.label:SetTextColor(self:Color("text"))
-        card:Add(row)
-        -- On the row's text column, which the card moves past its widest name in any client font
-        local cf = self:CreateButton(content, L["CurseForge"], nil, function() ns:ShowURL(a.cf) end, nil, "ghost")
-        cf:SetPoint("LEFT", row.text, "LEFT", 0, 0)
-        local gh = self:CreateButton(content, L["GitHub"], nil, function() ns:ShowURL(a.gh) end, nil, "ghost")
-        gh:SetPoint("LEFT", cf, "RIGHT", self:Spacing("buttonGap"), 0)
+        if ns.Util.ForThisClient(a) then
+            local row = self:CreateTextRow(content, a.name, "")
+            row.label:SetTextColor(self:Color("text"))
+            card:Add(row)
+            -- On the row's text column, which the card moves past its widest name in any client font
+            local cf = self:CreateButton(content, L["CurseForge"], nil, function() ns:ShowURL(a.cf) end, nil, "ghost")
+            cf:SetPoint("LEFT", row.text, "LEFT", 0, 0)
+            local gh = self:CreateButton(content, L["GitHub"], nil, function() ns:ShowURL(a.gh) end, nil, "ghost")
+            gh:SetPoint("LEFT", cf, "RIGHT", self:Spacing("buttonGap"), 0)
+        end
     end
 end
 
@@ -169,15 +171,30 @@ local function changelogCard(self, content, stack)
     -- A raise here leaves the library's SelectTab with every tab hidden, so a version-less entry is skipped
     for _, entry in ipairs(ns.Changelog or {}) do
         if entry.version then
-            local block = self:CreateTextBlock(content)
-            block:AddLine(entry.version .. "   " .. muted .. (entry.date or "") .. "|r", "value")
+            local shown, hidden = {}, false
             for _, sec in ipairs(entry.sections or {}) do
-                block:AddLine(sec.head or "", "groupLabel", { gap = 10 })
+                local items = {}
                 for _, item in ipairs(sec.items or {}) do
-                    block:AddLine(item, "label", { bullet = "-" })
+                    local text = type(item) == "table" and item[1] or item
+                    if type(text) == "string" and ns.Util.ForThisClient(item) then
+                        items[#items + 1] = text
+                    else
+                        hidden = true
+                    end
                 end
+                if #items > 0 or #(sec.items or {}) == 0 then shown[#shown + 1] = { head = sec.head, items = items } end
             end
-            card:Add(block, { fitHeight = true })
+            if #shown > 0 or not hidden then
+                local block = self:CreateTextBlock(content)
+                block:AddLine(entry.version .. "   " .. muted .. (entry.date or "") .. "|r", "value")
+                for _, sec in ipairs(shown) do
+                    block:AddLine(sec.head or "", "groupLabel", { gap = 10 })
+                    for _, text in ipairs(sec.items) do
+                        block:AddLine(text, "label", { bullet = "-" })
+                    end
+                end
+                card:Add(block, { fitHeight = true })
+            end
         end
     end
     card:Add(self:CreateButton(content, L["Older versions are on CurseForge"], nil,

@@ -466,6 +466,18 @@ local function cardTip()
     return ns.Util.PinTooltip()
 end
 
+-- This character's own date, as the status line above it is this character's
+local function addCompletionLine(tip, questID)
+    local R = ns:GetSubsystem("History")
+    local t = R and R.GetCompletionTime and R:GetCompletionTime(questID, true)
+    if not t then return end
+    if t > 0 then
+        tip:AddLine(L["Completed: "] .. date("%Y-%m-%d %H:%M", t), 0.55, 0.85, 0.55)
+    else
+        tip:AddLine(L["Completed (before tracking)"], 0.55, 0.85, 0.55)
+    end
+end
+
 local function buildQuestTooltip(item, statusKey)
     local tip = cardTip()
     local title = ns.Util.QuestTitle(item.id) or item.name or ("Quest #" .. tostring(item.id))
@@ -517,17 +529,7 @@ local function buildQuestTooltip(item, statusKey)
         end
     end
 
-    local R = ns:GetSubsystem("History")
-    if R and R.GetCompletionTime then
-        local t = R:GetCompletionTime(item.id)
-        if t then
-            if t > 0 then
-                tip:AddLine(L["Completed: "] .. date("%Y-%m-%d %H:%M", t), 0.55, 0.85, 0.55)
-            else
-                tip:AddLine(L["Completed (before tracking)"], 0.55, 0.85, 0.55)
-            end
-        end
-    end
+    addCompletionLine(tip, item.id)
 
     local QR = ns:GetSubsystem("QuestRewards")
     if QR then
@@ -593,6 +595,8 @@ local function buildClassicTooltip(item, statusKey, reason)
     if req and req > 1 then
         tip:AddLine((L["Requires level %d"]):format(req), 0.8, 0.8, 0.8)
     end
+
+    addCompletionLine(tip, item.id)
 
     addPlace(L["Starts"], CS:StartPoint(item.id))
     addPlace(L["Turn in"], CS:FinishPoint(item.id))
@@ -1144,7 +1148,7 @@ function CV:_ensureUI(pane, ctx)
     pane._cvProgress = ctx:CreateProgressBar(head, PROGRESS_W)
     pane._cvProgress:SetPoint("LEFT", pane._cvMeta, "RIGHT", META_GAP, 0)
 
-    local area = ctx:CreateScrollArea(pane, { pan = true, wheelStep = ROW_PITCH })
+    local area = ctx:CreateScrollArea(pane, { pan = true, wheelStep = ROW_PITCH, clearGrip = true })
     area:SetPoint("TOPLEFT", head, "BOTTOMLEFT", 0, -1)
     area:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT")
     pane._cvArea = area

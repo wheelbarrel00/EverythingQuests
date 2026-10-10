@@ -2,14 +2,14 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. WoW Forever support is a work in progress.
 ## Author: Wheelbarrel00
-## Version: 2.2.0
+## Version: 2.3.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
 ## IconTexture: Interface\AddOns\EverythingQuests\Media\Textures\eq-logo-v3
 ## X-Curse-Project-ID: 1544648
 
-# WoW Forever runs 1.x content, so this lists the Classic Era file set, the Chain Guide and Forever's own data files.
+# WoW Forever runs 1.x content, so this lists the Classic Era file set, the Chain Guide, Quest History and Forever's own data files.
 
 # The Chain Guide is built from the quest tables, as Classic quests belong to no client quest line.
 # check-toc: omit Modules/ChainGuide/QuestLineSource.lua
@@ -36,10 +36,6 @@
 # check-toc: omit Modules/WorldQuests/Panel.lua
 # check-toc: omit Modules/WorldQuests/Tab.lua
 # check-toc: omit Options/TabWorldQuests.lua
-# check-toc: omit Modules/History/Recorder.lua
-# check-toc: omit Modules/History/Frame.lua
-# check-toc: omit Modules/History/Session.lua
-# check-toc: omit Options/TabHistory.lua
 # check-toc: omit Core/Media.lua
 # check-toc: omit Core/Profiler.lua
 # check-toc: omit Libs/LibSharedMedia-3.0/lib.xml
@@ -110,6 +106,10 @@ Modules\Nameplates\QuestIcons.lua
 Modules\Tooltips\QuestTooltips.lua
 Modules\MapCoords.lua
 
+Modules\History\Recorder.lua
+Modules\History\Frame.lua
+Modules\History\Session.lua
+
 # MapPin.xml names the mixin MapPin.lua defines.
 Modules\ChainGuide\Frame.lua
 Modules\ChainGuide\Database.lua
@@ -128,6 +128,8 @@ Options\Frame.lua
 Options\TabGeneral.lua
 Options\TabMap.lua
 Options\TabChainGuide.lua
+Options\TabQuestBrowser.lua
+Options\TabHistory.lua
 Options\TabAbout.lua
 
 # The Forever data set. Each file defines the same global as its _Classic twin.

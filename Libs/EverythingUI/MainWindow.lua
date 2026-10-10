@@ -353,7 +353,8 @@ local function cursor(frame)
 end
 
 -- A view that scrolls both ways with slim bars, the mouse wheel (Shift for sideways), and, with
--- opts.pan, a left-button drag anywhere on its content. A frame placed on the content can still
+-- opts.pan, a left-button drag anywhere on its content. opts.clearGrip is for an area placed in the
+-- bottom-right corner of a resizable window. A frame placed on the content can still
 -- start a drag when it passes its clicks through (SetPropagateMouseClicks), and its own click then
 -- asks IsPanGesture whether the press was a drag rather than a click.
 function Context:CreateScrollArea(parent, opts)
@@ -370,12 +371,14 @@ function Context:CreateScrollArea(parent, opts)
     content._area = area
     area.scroll, area.content = sf, content
 
+    -- In a window's corner the bars end short of its grip, or a press on their last pixels resizes the window
+    local corner = opts.clearGrip and (GRIP_SIZE + GRIP_INSET + SCROLLBAR_INSET) or (SCROLLBAR_WIDTH + SCROLLBAR_INSET * 2)
     local vbar, vthumb = newBar(ctx, area, "VERTICAL")
     vbar:SetPoint("TOPRIGHT", -SCROLLBAR_INSET, 0)
-    vbar:SetPoint("BOTTOMRIGHT", -SCROLLBAR_INSET, SCROLLBAR_WIDTH + SCROLLBAR_INSET * 2)
+    vbar:SetPoint("BOTTOMRIGHT", -SCROLLBAR_INSET, corner)
     local hbar, hthumb = newBar(ctx, area, "HORIZONTAL")
     hbar:SetPoint("BOTTOMLEFT", 0, SCROLLBAR_INSET)
-    hbar:SetPoint("BOTTOMRIGHT", -(SCROLLBAR_WIDTH + SCROLLBAR_INSET * 2), SCROLLBAR_INSET)
+    hbar:SetPoint("BOTTOMRIGHT", -corner, SCROLLBAR_INSET)
     area.vbar, area.hbar = vbar, hbar
 
     vbar:SetScript("OnValueChanged", function(_, v) sf:SetVerticalScroll(v) end)

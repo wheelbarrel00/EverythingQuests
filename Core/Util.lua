@@ -181,6 +181,15 @@ function Util.QuestTitle(questID, withNumberFallback)
     return nil
 end
 
+-- The classic and retail tags split on the Classic quest data, so WoW Forever counts as classic
+function Util.ForThisClient(t)
+    if type(t) ~= "table" then return true end
+    if t.sub and not ns:GetSubsystem(t.sub) then return false end
+    if t.classic and not ns.HAS_CLASSIC_SPAWNS then return false end
+    if t.retail and ns.HAS_CLASSIC_SPAWNS then return false end
+    return true
+end
+
 function Util.AcquirePooled(pool, active, parent, factory)
     local f = tremove(pool)
     if not f then f = factory(parent) end

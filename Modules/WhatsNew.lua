@@ -3,13 +3,14 @@ local L = ns.L
 
 local WN = ns:RegisterSubsystem("WhatsNew", {})
 
-local FEATURE_POPUP_VERSION = "2.2.0"
+local FEATURE_POPUP_VERSION = "2.3.0"
 
 -- In English, as the changelog is: each section a heading and its paragraph.
 local POPUP_SECTIONS = {
-    { "A new look for the Quest Browser and History", "On Classic the Quest Browser, and on retail History, now have the same style as the options window and the Chain Guide: a side panel on the left, the details in cards, and a window you can resize. The Quest Browser gains a Get Directions button, and History's Stats page gathers every chart and figure in one place." },
-    { "Chain Guide lines that no longer run together", "Quests with the same quests before them get a lane of their own, so a line no longer seems to join quests that are not linked, and hovering a quest lights up its lines." },
-    { "One look across the windows", "The options window, the Chain Guide, the Quest Browser, History and What's New now share one look, and on retail Everything Quests loads on patch 12.1.5 without the out-of-date warning." },
+    { "Quest History on WoW Forever", "Every turn-in across your characters, with the Quests, Chain Timeline and Stats pages, and each character's past quests added the first time it logs in. The Type filter uses the Quest Browser's groups, and hovering a quest in the Chain Guide shows the date this character finished it.", classic = true, sub = "HistoryFrame" },
+    { "A tab and a key for the Quest Browser", "The Quest Browser has its own tab in the options window, and a Toggle Quest Browser key you can set in the game's Key Bindings.", sub = "QuestBrowser" },
+    { "History and the Chain Guide", "Hovering a quest in the Chain Guide shows the date this character finished it, History's reward total counts only quests that earned XP or gold, and its name and Type sorts are quicker on a long history.", retail = true, sub = "HistoryFrame" },
+    { "Only what applies to your version", "What's New and the About tab's changelog now leave out what your version of the game does not have, a command or key your version lacks says so, and Everything Quests' keys sit together under one heading in Key Bindings. The scroll bars also stop short of the resize grip." },
 }
 
 local TRANSLATORS = { "Zox", "Malevi4", "labrie75", "BNS333", "Keriaovo", "Stonetwist" }
@@ -71,11 +72,22 @@ local function colorCode(ctx, name)
                                        math.floor(b * 255 + 0.5))
 end
 
+local function sectionsForThisClient()
+    local out = {}
+    for _, s in ipairs(POPUP_SECTIONS) do
+        if ns.Util.ForThisClient(s) then out[#out + 1] = s end
+    end
+    return out
+end
+
 local function buildNotes(ctx, content)
     local notes = ctx:CreateTextBlock(content)
     notes:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -PAD_TOP)
     notes:SetPoint("TOPRIGHT", content, "TOPRIGHT", -PAD_SIDE, -PAD_TOP)
-    for i, s in ipairs(POPUP_SECTIONS) do
+    -- Opened by hand on a client none of the sections are for, it shows the whole release rather than nothing
+    local sections = sectionsForThisClient()
+    if #sections == 0 then sections = POPUP_SECTIONS end
+    for i, s in ipairs(sections) do
         notes:AddLine(s[1], "title", { gap = (i > 1) and SECTION_GAP or nil })
         notes:AddLine(s[2], "label", { gap = HEAD_GAP })
     end
@@ -180,6 +192,12 @@ end
 function WN:OnEnable()
     local mode = currentMode()
     if mode == "none" then return end
+    -- A release with nothing for this client neither pops up nor posts its chat link here
+    if #sectionsForThisClient() == 0 then
+        markSeen()
+        markAnnounced()
+        return
+    end
     local isChat = (mode == "chat")
     if (isChat and alreadyAnnounced()) or (not isChat and alreadySeen()) then return end
     C_Timer.After(2, function()

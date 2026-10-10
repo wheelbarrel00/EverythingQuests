@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Classic Era support is limited and growing - see the What's New notice.
 ## Author: Wheelbarrel00
-## Version: 2.2.0
+## Version: 2.3.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -13,8 +13,8 @@
 # '# check-toc: omit'. The gate errors on a stale directive, so an omission cannot rot into a
 # silent hole.
 
-# Retail-only subsystems. C_QuestLine and C_CampaignInfo do not exist on Era, and the authored
-# chain data is Midnight content, so the Chain Guide has neither an API nor anything to show.
+# The Chain Guide waits for its own in-game test on this client. Its quest line and campaign sources
+# need C_QuestLine and C_CampaignInfo, absent here, and Data/QuestChains is Midnight content.
 # check-toc: omit Modules/ChainGuide/Frame.lua
 # check-toc: omit Modules/ChainGuide/Database.lua
 # check-toc: omit Modules/ChainGuide/QuestLineSource.lua
@@ -54,22 +54,18 @@
 # check-toc: omit Modules/WorldQuests/Tab.lua
 # check-toc: omit Options/TabWorldQuests.lua
 
-# Quest History ports with degradations rather than cleanly - GetTitleForQuestID and
-# RequestLoadQuestByID are both absent, so a backfilled row can never fill in its own name.
-# Held back until that reads acceptably rather than shipped half working.
+# Quest History waits for its own in-game test on this client.
 # check-toc: omit Modules/History/Recorder.lua
 # check-toc: omit Modules/History/Frame.lua
 # check-toc: omit Modules/History/Session.lua
 # check-toc: omit Options/TabHistory.lua
 
-# Reached only through nil-guarded GetSubsystem calls from Options/Frame.lua, so their absence
-# skips the font and status bar pickers instead of erroring. Those pickers belong to the tracker
-# and history options, neither of which is listed here.
+# Nothing listed here reads Core/Media.lua or LibSharedMedia, and Core/Profiler.lua serves only /eqs profile.
 # check-toc: omit Core/Media.lua
 # check-toc: omit Core/Profiler.lua
 # check-toc: omit Libs/LibSharedMedia-3.0/lib.xml
 
-# Reward tooltips for the world quest and history panels, neither of which is listed.
+# Reward tooltips for the World Quests tooltip and the Chain Guide, neither of which is listed.
 # check-toc: omit Core/QuestRewards.lua
 
 # Nothing listed here uses either one. Core/Events.lua is a plain frame and C_Timer.
@@ -104,7 +100,6 @@ Libs\HereBeDragons\HereBeDragons-Pins-2.0.lua
 
 Core\Init.lua
 
-# ns.Has and ns.Compat are read at file scope by Core/Cache.lua, so this loads before it
 Core\Compat.lua
 
 # enUS first - it creates ns.L and the fallback metatable the others layer onto.
@@ -192,6 +187,7 @@ Modules\MapCoords.lua
 Options\Frame.lua
 Options\TabGeneral.lua
 Options\TabMap.lua
+Options\TabQuestBrowser.lua
 Options\TabAbout.lua
 
 # The Era quest coordinate table. The TBC TOC lists its own Data\QuestCoords_TBC.lua instead,

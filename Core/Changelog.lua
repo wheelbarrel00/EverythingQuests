@@ -2,6 +2,29 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.3.0", date = "2026-10-09",
+        sections = {
+            { head = "New Features", items = {
+                { "Quest History on WoW Forever. Every turn-in across your characters, with the Quests, Chain Timeline and Stats pages from retail. The first time each character logs in, History adds the quests that character has already done, named from Everything Quests' own quest data, and any quest the data cannot name is asked of the server one at a time. The Type filter and sort use the Quest Browser's groups: dungeon or raid, world event, class, profession and repeatable. The Chain Timeline shows the Forever Chain Guide's chains you have made progress in, right-clicking a quest opens its chain, and hovering a quest in the Chain Guide shows the date this character finished it.", classic = true, sub = "HistoryFrame" },
+                { "A tab and a key for the Quest Browser. On Classic Era, Burning Crusade Classic and WoW Forever the options window has a Quest Browser tab in place of the button on the General tab, and the game's Key Bindings have a Toggle Quest Browser key you can set.", sub = "QuestBrowser" },
+                "Only what applies to your version. From this update on, What's New and the About tab's changelog leave out what your version of the game does not have, and the About tab lists Everything Delves only on retail, where it runs. A /eqs command or a key your version does not have now says so, where most did nothing before.",
+            } },
+            { head = "Improvements", items = {
+                { "Chain Guide dates for this character. Hovering a quest in the Chain Guide shows the date this character finished it, no longer the date another of your characters did.", retail = true },
+                { "Quicker name and Type sorts in History when your history is long.", retail = true, sub = "HistoryFrame" },
+            } },
+            { head = "Bug Fixes", items = {
+                "Key Bindings. Everything Quests' section is now headed Everything Quests instead of EVERYTHINGQUESTS, with Toggle Options, Toggle Chain Guide and Toggle Quest Browser together under it.",
+                "Scroll bars clear of the resize grip. In the Chain Guide, the Quest Browser and History, the scroll bars now end before the corner grip, so dragging from the end of a scroll bar scrolls instead of resizing the window.",
+                { "History's \"Total quests with reward data\" now counts only the quests that earned XP or gold.", retail = true, sub = "HistoryFrame" },
+                { "History's filter bar in German no longer runs past the window's edge at its smallest size.", retail = true, sub = "HistoryFrame" },
+            } },
+            { head = "Notes", items = {
+                "Translations. The new and reworded lines are in all six languages, and a French line in History's entry count was corrected.",
+            } },
+        },
+    },
+    {
         version = "2.2.0", date = "2026-10-06",
         sections = {
             { head = "New Features", items = {

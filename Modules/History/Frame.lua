@@ -3,12 +3,14 @@ local L = ns.L
 
 local HF = ns:RegisterSubsystem("HistoryFrame", {})
 
--- Narrower than 920 the filter bar and the Trends controls run past the body (measured on Barlow)
-local DEFAULT_W, DEFAULT_H, MIN_W, MIN_H, SIDEBAR_W = 1000, 660, 920, 480, 196
+-- German's filter row needs 986 to keep a gap before its longest entry count (measured on Barlow)
+local DEFAULT_W, DEFAULT_H, MIN_W, MIN_H, SIDEBAR_W = 1000, 660, 990, 480, 196
 local SIDE_PAD, SIDE_BOTTOM, SIDE_BUTTON_GAP = 8, 12, 8
 local PAD_TOP, PAD_SIDE, PAD_BOTTOM = 20, 24, 28
 local BAR_TOP, BAR_BOTTOM, BAR_ROW_GAP, FIELD_H, FIELD_GAP, CHECK_GAP = 14, 12, 8, 30, 10, 16
 local SEARCH_W, CHAR_W, DATE_W, TYPE_W, SORT_W, DIR_SIZE = 280, 180, 140, 150, 110, 30
+-- German's "Dungeon oder Schlachtzug" is 153 px in Barlow 13, and its sort row beside the wider menu needs 1019
+local CLASSIC_TYPE_W, CLASSIC_MIN_W = 200, 1020
 local ROW_H, SUB_H, SUB_INDENT, ROW_ICON, ROW_GAP, INTRO_PAD = 44, 28, 64, 16, 12, 16
 local GROUP_GAP, LABEL_GAP, CARD_PAD, TILE_GAP, LINE_GAP = 22, 8, 14, 14, 4
 local CELL, CELL_GAP, HEATMAP_DAYS, HEATMAP_ROWS, SWATCH = 16, 3, 91, 7, 14
@@ -96,6 +98,10 @@ local function acquire(page, kind, make)
 end
 
 local function findChainForQuest(questID)
+    -- WoW Forever's chains exist only once built, and ChainForQuest builds them first
+    local Classic = ns:GetSubsystem("ChainGuideClassicSource")
+    if Classic then return Classic:ChainForQuest(questID) end
+
     local Database = ns:GetSubsystem("ChainGuideDatabase")
     local QLS      = ns:GetSubsystem("ChainGuideQuestLineSource")
     local CS       = ns:GetSubsystem("ChainGuideCampaignSource")
@@ -166,7 +172,39 @@ local TYPE_OPTIONS = {
     { "all", L["All types"] }, { "campaign", L["Campaign"] }, { "questline", L["Questline"] },
     { "calling", L["Calling"] }, { "recurring", L["Recurring"] }, { "worldquest", L["World Quest"] }, { "other", L["Other"] },
 }
+-- The Quest Browser's own tag names, so both windows use the same words
+local CLASSIC_TYPE_OPTIONS = {
+    { "all", L["All types"] }, { "dungeon", L["Dungeon or raid"] }, { "event", L["World event"] },
+    { "class", L["Class quest"] }, { "profession", L["Profession"] }, { "repeatable", L["Repeatable"] }, { "other", L["Other"] },
+}
 local SORT_OPTIONS = { { "date", L["Date"] }, { "name", L["Name"] }, { "type", L["Type"] } }
+
+local function classicTypes()
+    local R = ns:GetSubsystem("History")
+    return R and R.UsesClassicTypes and R:UsesClassicTypes() or false
+end
+
+local function typeOptions()
+    return classicTypes() and CLASSIC_TYPE_OPTIONS or TYPE_OPTIONS
+end
+
+local function nameOf(e)
+    local R = ns:GetSubsystem("History")
+    return (R and R.NameOf and R:NameOf(e)) or e.n
+end
+
+local function exportType(e)
+    if not classicTypes() then return e.k or "?" end
+    local R = ns:GetSubsystem("History")
+    return R:TypeOf(e)
+end
+
+local function questTitle(questID)
+    local t = ns.Util.QuestTitle(questID)
+    if t then return t end
+    local R = ns:GetSubsystem("History")
+    return R and R.NameOf and R:NameOf({ q = questID }) or nil
+end
 
 local function characterOptions()
     local R = ns:GetSubsystem("History")
@@ -224,7 +262,7 @@ local function buildQuestsPage(ctx, page)
         function(v) HF._charFilter = v; HF:Render() end)
     page.date = dd(function() return dropdownOptions(DATE_OPTIONS) end, DATE_W,
         function() return HF._dateFilter or "all" end, function(v) HF._dateFilter = v; HF:Render() end, page.char)
-    page.type = dd(function() return dropdownOptions(TYPE_OPTIONS) end, TYPE_W,
+    page.type = dd(function() return dropdownOptions(typeOptions()) end, classicTypes() and CLASSIC_TYPE_W or TYPE_W,
         function() return HF._classFilter or "all" end, function(v) HF._classFilter = v; HF:Render() end, page.date)
     page.sortLabel = ctx:CreateText(bar, L["Sort:"], "label")
     page.sortLabel:SetPoint("LEFT", page.type, "RIGHT", CHECK_GAP, 0)
@@ -242,7 +280,7 @@ local function buildQuestsPage(ctx, page)
     end)
     syncSortArrow(page.dir)
 
-    page.area = ctx:CreateScrollArea(page, {})
+    page.area = ctx:CreateScrollArea(page, { clearGrip = true })
     page.area:SetPoint("TOPLEFT", bar, "BOTTOMLEFT")
     page.area:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT")
     page.empty = ctx:CreateEmptyState(page.area, L["(no matching quests)"])
@@ -259,7 +297,7 @@ local function buildIntroPage(ctx, page, intro)
     page.head:SetPoint("TOPRIGHT")
     page.head:SetHeight(INTRO_PAD * 2 + 15)
     ctx:Paint(page.head, nil, "divider", "B")
-    page.area = ctx:CreateScrollArea(page, {})
+    page.area = ctx:CreateScrollArea(page, { clearGrip = true })
     page.area:SetPoint("TOPLEFT", page.head, "BOTTOMLEFT")
     page.area:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT")
 end
@@ -272,7 +310,8 @@ function HF:Build()
 
     local f = ctx:CreateWindow({
         name = "EQHistoryFrame", title = L["Quest History"],
-        width = DEFAULT_W, height = DEFAULT_H, minWidth = MIN_W, minHeight = MIN_H,
+        width = DEFAULT_W, height = DEFAULT_H, minHeight = MIN_H,
+        minWidth = classicTypes() and CLASSIC_MIN_W or MIN_W,
         sidebarWidth = SIDEBAR_W, gripTip = L["Drag to resize"],
         getSize = function()
             local cfg = windowCfg()
@@ -340,7 +379,7 @@ function HF:Build()
     self._views.timeline.empty = ctx:CreateEmptyState(self._views.timeline.area, L["(no chain quests recorded yet)"])
     self._views.timeline.empty:SetPoint("TOP", self._views.timeline.area, "CENTER", 0, 8)
     local stats = self._views.stats
-    stats.area = ctx:CreateScrollArea(stats, {})
+    stats.area = ctx:CreateScrollArea(stats, { clearGrip = true })
     stats.area:SetAllPoints(stats)
     stats.area.content._controls = {}
 
@@ -435,14 +474,15 @@ function HF:_renderQuests()
         local r = acquire("quests", "row", function() return questRow(ctx, content) end)
         r:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((i - 1) * ROW_H))
         r:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, -((i - 1) * ROW_H))
-        r.t1:SetText(e.n or ("Quest #" .. tostring(e.q)))
+        local name = nameOf(e)
+        r.t1:SetText(name or ("Quest #" .. tostring(e.q)))
         r.t1:SetTextColor(ctx:Color((e.t and e.t > 0) and "text" or "muted"))
         local meta = e.c or ""
         if e.z and e.z ~= "" then meta = meta .. SEP .. e.z end
         if e.d and e.d > 0 then meta = meta .. SEP .. (L["held for %s"]):format(ns.Util.FmtDurationLong(e.d)) end
         r.t2:SetText(meta)
         r.right:SetText(fmtTime(e.t))
-        r._questID, r._fullName, r._held = e.q, e.n, e.d
+        r._questID, r._fullName, r._held = e.q, name, e.d
         r._accepted = (e.t and e.t > 0 and e.d) and (e.t - e.d) or nil
     end
     if n > MAX_ROWS then
@@ -462,6 +502,7 @@ local function timelineChains()
     local CS        = ns:GetSubsystem("ChainGuideCampaignSource")
     if not (R and Database) then return {}, {} end
 
+    if Database.EnsureGenerated then Database:EnsureGenerated() end
     if Database.categories then
         for catID in pairs(Database.categories) do
             if QLS and QLS.EnsureZoneChains    then QLS:EnsureZoneChains(catID)    end
@@ -575,7 +616,7 @@ function HF:_renderTimeline()
                     sub:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
                     sub:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, -y)
                     local t = completion[it.id]
-                    sub.t1:SetText(ns.Util.QuestTitle(it.id) or it.name or ("Quest #" .. tostring(it.id)))
+                    sub.t1:SetText(questTitle(it.id) or it.name or ("Quest #" .. tostring(it.id)))
                     sub.t1:SetTextColor(ctx:Color(t and "label" or "muted"))
                     sub.right:SetText(t and fmtTime(t) or DASH)
                     y = y + SUB_H
@@ -810,13 +851,12 @@ local function totalsCard(ctx, card)
     if t.recording ~= false then
         abandoned = fmtBigNumber(t.abandoned or 0)
         if t.avgHeld and (t.heldCount or 0) > 0 then
-            -- The count is shown because the average covers only quests accepted since this
-            -- shipped, which is a far smaller set than the totals beside it
+            -- The count is shown because the average covers only quests seen accepted, not every quest in the totals beside it
             avg = (L["%1$s   |cffaaaaaa(%2$d quests)|r"]):format(ns.Util.FmtDurationLong(t.avgHeld), t.heldCount)
         end
     end
     local y = tiles(ctx, card, {
-        { L["Total quests with reward data"], fmtBigNumber(t.totalCount) },
+        { L["Total quests with reward data"], fmtBigNumber(t.rewardCount) },
         { L["Total gold earned"], fmtMoney(t.totalMoney) },
         { L["Total XP earned"], (L["%s XP"]):format(fmtBigNumber(t.totalXP)) },
         { L["Total quests abandoned"], abandoned },
@@ -835,8 +875,8 @@ local function totalsCard(ctx, card)
     end
     y = keyValueRows(ctx, card, rows, y)
     local top = {}
-    if t.topGold then top[#top + 1] = { t.topGold.n or ("Quest #" .. tostring(t.topGold.q)), fmtMoney(t.topGold.m) } end
-    if t.topXP then top[#top + 1] = { t.topXP.n or ("Quest #" .. tostring(t.topXP.q)), (L["%s XP"]):format(fmtBigNumber(t.topXP.xp)) } end
+    if t.topGold then top[#top + 1] = { nameOf(t.topGold) or ("Quest #" .. tostring(t.topGold.q)), fmtMoney(t.topGold.m) } end
+    if t.topXP then top[#top + 1] = { nameOf(t.topXP) or ("Quest #" .. tostring(t.topXP.q)), (L["%s XP"]):format(fmtBigNumber(t.topXP.xp)) } end
     if #top == 0 then return y end
     y = y + TILE_GAP
     text(ctx, card, "groupLabel", L["Top single-quest rewards"], CARD_PAD, y)
@@ -1034,7 +1074,7 @@ function HF:_exportQuests()
         local e = entries[i]
         local d = (e.t and e.t > 0) and date("%Y-%m-%d %H:%M", e.t) or L["(before tracking)"]
         lines[#lines + 1] = ("%s | %s | %s | %s | %s | %s"):format(
-            d, e.c or "?", e.n or ("Quest #" .. tostring(e.q)), e.k or "?", e.z or "",
+            d, e.c or "?", nameOf(e) or ("Quest #" .. tostring(e.q)), exportType(e), e.z or "",
             (e.d and e.d > 0) and ns.Util.FmtDurationLong(e.d) or "")
     end
     return table.concat(lines, "\n")
@@ -1051,7 +1091,7 @@ function HF:_exportTimeline()
             local it = rec.chain.items[j]
             if it and it.type == "quest" then
                 local t = completion[it.id]
-                local title = ns.Util.QuestTitle(it.id) or it.name or ("Quest #" .. tostring(it.id))
+                local title = questTitle(it.id) or it.name or ("Quest #" .. tostring(it.id))
                 local when = t and ((t > 0 and date("%Y-%m-%d", t)) or L["(before tracking)"]) or DASH
                 lines[#lines + 1] = ("  - %s [%s]"):format(title, when)
             end
@@ -1072,7 +1112,7 @@ function HF:_exportStats()
         ("Best daily streak: %d days"):format(s.best),
         ("Total dated entries: %d"):format(s.total),
         "",
-        ("Total quests with reward data: %d"):format(t.totalCount),
+        ("Total quests with reward data: %d"):format(t.rewardCount),
         ("Total gold earned: %s"):format(fmtMoneyText(t.totalMoney)),
         ("Total XP earned: %d"):format(t.totalXP),
         ("Total quests abandoned: %s"):format(t.recording == false and "not recorded" or tostring(t.abandoned or 0)),
@@ -1091,12 +1131,12 @@ function HF:_exportStats()
     if t.topGold then
         lines[#lines + 1] = ""
         lines[#lines + 1] = ("Biggest single gold reward: %s (%s)"):format(
-            t.topGold.n or ("Quest #" .. tostring(t.topGold.q)), fmtMoneyText(t.topGold.m))
+            nameOf(t.topGold) or ("Quest #" .. tostring(t.topGold.q)), fmtMoneyText(t.topGold.m))
     end
     if t.topXP then
         if not t.topGold then lines[#lines + 1] = "" end
         lines[#lines + 1] = ("Biggest single XP reward: %s (%d XP)"):format(
-            t.topXP.n or ("Quest #" .. tostring(t.topXP.q)), t.topXP.xp)
+            nameOf(t.topXP) or ("Quest #" .. tostring(t.topXP.q)), t.topXP.xp)
     end
     if R.DayCounts then
         local counts, today = R:DayCounts(HEATMAP_DAYS)

@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 _G.EverythingQuests = ns
 ns.NAME = addonName
-ns.VERSION = "2.2.0"
+ns.VERSION = "2.3.0"
 
 ns.DISCORD_URL = "https://discord.gg/vm8K2WfQUE"
 
@@ -53,6 +53,7 @@ end
 _G.BINDING_HEADER_EVERYTHINGQUESTS              = "Everything Quests"
 _G.BINDING_NAME_EVERYTHINGQUESTS_TOGGLE_OPTIONS = "Toggle Options"
 _G.BINDING_NAME_EVERYTHINGQUESTS_TOGGLE_CHAINGUIDE = "Toggle Chain Guide"
+_G.BINDING_NAME_EVERYTHINGQUESTS_TOGGLE_QUESTBROWSER = "Toggle Quest Browser"
 
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("PLAYER_LOGIN")
