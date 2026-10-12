@@ -36,6 +36,8 @@ function Pin:OnAcquired(questID, x, y, status, inLog)
     local c = RING[status] or RING.pending
     if self.ring then
         self.ring:SetAtlas("worldquest-emissary-ring")
+        -- Desaturated, because a vertex color only multiplies and the gold ring art has almost no blue, so a blue tint shows green
+        self.ring:SetDesaturated(true)
         self.ring:SetVertexColor(c[1], c[2], c[3], 1)
     end
     if status == "complete" then

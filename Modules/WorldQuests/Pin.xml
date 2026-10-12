@@ -2,16 +2,25 @@
     <Button name="EQWorldQuestPinTemplate" mixin="EQWorldQuestPinMixin" hidden="true" virtual="true">
         <Size x="34" y="34"/>
         <Layers>
-            <Layer level="BACKGROUND">
-                <Texture parentKey="ring">
-                    <Anchors><Anchor point="CENTER"/></Anchors>
-                    <Size x="34" y="34"/>
-                </Texture>
-            </Layer>
             <Layer level="ARTWORK">
                 <Texture parentKey="icon">
                     <Anchors><Anchor point="CENTER"/></Anchors>
                     <Size x="22" y="22"/>
+                </Texture>
+                <MaskTexture parentKey="iconMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+                    <Anchors>
+                        <Anchor point="TOPLEFT" relativeKey="$parent.icon"/>
+                        <Anchor point="BOTTOMRIGHT" relativeKey="$parent.icon"/>
+                    </Anchors>
+                    <MaskedTextures>
+                        <MaskedTexture childKey="icon"/>
+                    </MaskedTextures>
+                </MaskTexture>
+            </Layer>
+            <Layer level="ARTWORK" textureSubLevel="1">
+                <Texture parentKey="ring">
+                    <Anchors><Anchor point="CENTER"/></Anchors>
+                    <Size x="34" y="34"/>
                 </Texture>
             </Layer>
             <Layer level="OVERLAY">

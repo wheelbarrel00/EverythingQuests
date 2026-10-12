@@ -2,6 +2,20 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.3.1", date = "2026-10-11",
+        sections = {
+            { head = "Improvements", items = {
+                "What's New catches you up. From this update on, if you skip an update or two, What's New shows each one you missed that brought something new for your version of the game, up to the last three, each under its version and date when there are several. Before, it showed only the newest. A fresh install no longer opens it, and the chat link option follows the same rule.",
+            } },
+            { head = "Bug Fixes", items = {
+                { "World quest pin icons. The reward icon on each world quest pin is now round and sits inside its colored ring, where the corners of a square icon used to cover it. Thanks to Lorade for the report.", retail = true },
+                { "World quest ring colors. Gear rings are now blue, reputation purple and pet battles cyan, as intended. Before, the gold ring art turned them green, orange and yellow-green.", retail = true },
+                { "World quest pin scale. The World Quests tab's pin scale slider now keeps world quest pins at the size you set. Before, the map put them back to the default size as soon as they appeared.", retail = true },
+                { "Chain Guide map pins. On the world map, the ring of a quest you are on is now blue and the ring of one that comes later gray, as intended. Before, the gold ring art made a quest you are on as green as a finished one, and one that comes later olive.", sub = "ChainGuideMapPins" },
+            } },
+        },
+    },
+    {
         version = "2.3.0", date = "2026-10-09",
         sections = {
             { head = "New Features", items = {

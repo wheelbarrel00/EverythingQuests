@@ -20,7 +20,6 @@ local Util = _ns.Util
 
 function Pin:OnLoad()
     self:UseFrameLevelType("PIN_FRAME_LEVEL_QUEST_PING")
-    self:SetScalingLimits(1, 0.6, 1.4)
     self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
     -- Outlined and shadowed, because bright map terrain swallows a plain label
@@ -45,12 +44,15 @@ function Pin:OnAcquired(questID, x, y, reward)
     self:SetPosition(x, y)
 
     local DB = _ns:GetSubsystem("DB")
-    if DB and DB.db.profile.worldQuests and DB.db.profile.worldQuests.pinScale then
-        local s = math.max(0.5, math.min(2.0, DB.db.profile.worldQuests.pinScale))
-        self:SetScale(s)
-    end
+    local wq = DB and DB.db.profile.worldQuests
+    local s = math.max(0.5, math.min(2.0, (wq and wq.pinScale) or 1))
+    -- The setting scales the limits, because ApplyCurrentScale overwrites any scale set here after every acquire and zoom
+    self:SetScalingLimits(1, 0.6 * s, 1.4 * s)
+    if self.ApplyCurrentScale then self:ApplyCurrentScale() end
 
     self.ring:SetAtlas("worldquest-emissary-ring")
+    -- Desaturated, because a vertex color only multiplies and the gold ring art has almost no blue, so a blue tint shows green
+    self.ring:SetDesaturated(true)
 
     local Rewards = _ns:GetSubsystem("WQRewards")
     if Rewards and Rewards.ApplyToTexture then

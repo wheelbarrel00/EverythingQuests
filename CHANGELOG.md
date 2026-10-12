@@ -5,6 +5,21 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2026-10-11
+
+World quest pins show their reward inside a ring of the right color and keep the size you set, and What's New catches you up on the updates you missed.
+
+### Improvements
+
+- **What's New catches you up.** From this update on, if you skip an update or two, What's New shows each one you missed that brought something new for your version of the game, up to the last three, each under its version and date when there are several. Before, it showed only the newest. A fresh install no longer opens it, and the chat link option follows the same rule.
+
+### Bug Fixes
+
+- **World quest pin icons.** The reward icon on each world quest pin is now round and sits inside its colored ring, where the corners of a square icon used to cover it. Thanks to Lorade for the report.
+- **World quest ring colors.** Gear rings are now blue, reputation purple and pet battles cyan, as intended. Before, the gold ring art turned them green, orange and yellow-green.
+- **World quest pin scale.** The World Quests tab's pin scale slider now keeps world quest pins at the size you set. Before, the map put them back to the default size as soon as they appeared.
+- **Chain Guide map pins.** On the world map, the ring of a quest you are on is now blue and the ring of one that comes later gray, as intended. Before, the gold ring art made a quest you are on as green as a finished one, and one that comes later olive.
+
 ## [2.3.0] - 2026-10-09
 
 Quest History comes to WoW Forever, the Quest Browser gets a tab and a key of its own, and What's New and the About tab's changelog now show only what applies to your version of the game.

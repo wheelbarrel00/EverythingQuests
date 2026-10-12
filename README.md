@@ -255,8 +255,8 @@ LibDataBroker-powered launcher compatible with Titan Panel, Arcana (formerly Cho
 | `/eqs history` | Toggle the Quest History window |
 | `/eqs about` | Open Options on the About tab |
 | `/eqs session` | Show a recap of your current play session (quests, XP, gold, time) |
-| `/eqs whatsnew` | Show the "What's New" summary for the latest update (also `/eqs changes`) |
-| `/eqs whatsnew chat` | Print the same summary to chat instead of the popup |
+| `/eqs whatsnew` | Show the "What's New" summary: the updates you have not read yet, or else the latest one (also `/eqs changes`) |
+| `/eqs whatsnew chat` | Print the What's New link in your chat window instead of opening the popup |
 | `/eqs discover [zone]` | Print quest-line discovery info for the current zone (optional hint) |
 | `/eqsprobe [section]` | Print what EQ found on the running client (also `/eqs flavorprobe`). Ships on every flavor |
 
@@ -396,7 +396,7 @@ EverythingQuests/
 │   ├── QuestLink.lua                 # Shareable quest links in chat
 │   ├── TrackerBridge.lua             # Puts EQ's icons and menu entry onto
 │   │                                 #   EQ Objective Tracker via its public API
-│   └── WhatsNew.lua                  # One-time popup for new releases
+│   └── WhatsNew.lua                  # What's New, for feature releases you have not read
 ├── Data/
 │   ├── QuestChains/                  # Hand-authored Midnight chain data
 │   ├── QuestCoords_*.lua             # Generated: questID -> single waypoint
