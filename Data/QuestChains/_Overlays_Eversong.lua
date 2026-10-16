@@ -17,7 +17,7 @@ ns.CHAINGUIDE_OVERLAYS = ns.CHAINGUIDE_OVERLAYS or {}
 
     ns.CHAINGUIDE_OVERLAYS[5804] = {
         layout = {
-            [94388] = { x = 0, y = 0  },
+            [94388] = { x = 0, y = 0, breadcrumb = true },
             [88978] = { x = 2, y = 0  },
             [88977] = { x = 1, y = 1  },
             [88979] = { x = 1, y = 2  },

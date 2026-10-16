@@ -54,7 +54,7 @@ read_globals = {
     "QuestMapFrame_OpenToQuestDetails", "QuestUtil", "ProfessionsUtil", "QuestUtils_GetQuestName",
     "QuestUtils_IsQuestWorldQuest", "QuestMapQuestOptions_OpenQuestDetails",
     "QuestMapFrame_UpdateQuestDetailsButtons", "QuestMapFrame_GetDetailQuestID",
-    "QuestMapFrame_GetFocusedQuestID",
+    "QuestMapFrame_GetFocusedQuestID", "MapUtil",
     "QuestLogPopupDetailFrame_Show", "QuestLogPopupDetailFrame_Update",
     "QuestLogPushQuest", "QuestPOIGetIconInfo",
     "GetNumAutoQuestPopUps", "GetAutoQuestPopUp", "RemoveAutoQuestPopUp",

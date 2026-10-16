@@ -132,7 +132,8 @@ function QLS:EnsureZoneChains(catID)
     if cat.campaignID then
         local CS = ns:GetSubsystem("ChainGuideCampaignSource")
         if CS then CS:EnsureCampaignChains(catID) end
-        self._discovered[catID] = true
+        -- An empty chapter list means the campaign data has not loaded yet, so a later call asks again
+        if not CS or CS._discovered[catID] then self._discovered[catID] = true end
         return
     end
 
@@ -140,6 +141,9 @@ function QLS:EnsureZoneChains(catID)
 
     local function registerChain(qlID, destCat, name)
         if self._registered[qlID] or skip[qlID] then return end
+        -- A campaign lists only its own chapters, and every questline routed to one is a chapter
+        local dest = Database.categories[destCat]
+        if dest and dest.campaignID then return end
         local CS = ns:GetSubsystem("ChainGuideCampaignSource")
         if CS and CS.IsChapterQuestline and CS:IsChapterQuestline(qlID) then
             return
@@ -193,8 +197,33 @@ local NON_CHAIN_QUESTS = {
     [92641] = true, [95276] = true,
 }
 
+local _nameRequested = {}
+
+-- A chain with no questline has no name in the game, so it takes the title of the quest it names once that loads
+local function nameFromQuest(chain)
+    local questID = chain.nameFromQuest
+    local title = ns.Util.QuestTitle(questID)
+    if title then
+        chain.name, chain.nameFromQuest = title, nil
+    elseif not _nameRequested[questID] and C_QuestLog and C_QuestLog.RequestLoadQuestByID then
+        _nameRequested[questID] = true
+        C_QuestLog.RequestLoadQuestByID(questID)
+    end
+end
+
+-- Asked at login so the title has usually loaded before the Chain Guide first lists the chain
+function QLS:OnEnable()
+    local Database = ns:GetSubsystem("ChainGuideDatabase")
+    if not Database then return end
+    for _, chain in pairs(Database.chains) do
+        if chain.nameFromQuest then nameFromQuest(chain) end
+    end
+end
+
 function QLS:EnsureChainItems(chain)
-    if not chain or self._populated[chain.id] then return end
+    if not chain then return end
+    if chain.nameFromQuest then nameFromQuest(chain) end
+    if self._populated[chain.id] then return end
     if not chain.questlineID then return end
     if chain.items and #chain.items > 0 then
         self._populated[chain.id] = true
@@ -204,27 +233,22 @@ function QLS:EnsureChainItems(chain)
 
     local quests = C_QuestLine.GetQuestLineQuests(chain.questlineID)
     if not quests or #quests == 0 then
-        local curated = ns.CHAINGUIDE_CURATED_ITEMS and ns.CHAINGUIDE_CURATED_ITEMS[chain.questlineID]
-        if curated and #curated > 0 then
-            quests = curated
-        else
-            local tries = self._retryCount[chain.id] or 0
-            if tries < RETRY_MAX and not self._retryScheduled[chain.id] then
-                self._retryScheduled[chain.id] = true
-                self._retryCount[chain.id] = tries + 1
-                local gen = self._gen
-                C_Timer.After(RETRY_BASE_DELAY * (tries + 1), function()
-                    if gen ~= self._gen then return end
-                    self._retryScheduled[chain.id] = nil
-                    self:EnsureChainItems(chain)
-                    local CG = ns:GetSubsystem("ChainGuide")
-                    if CG and CG.frame and CG.frame:IsShown() and CG.RenderCurrent then
-                        CG:RenderCurrent()
-                    end
-                end)
-            end
-            return
+        local tries = self._retryCount[chain.id] or 0
+        if tries < RETRY_MAX and not self._retryScheduled[chain.id] then
+            self._retryScheduled[chain.id] = true
+            self._retryCount[chain.id] = tries + 1
+            local gen = self._gen
+            C_Timer.After(RETRY_BASE_DELAY * (tries + 1), function()
+                if gen ~= self._gen then return end
+                self._retryScheduled[chain.id] = nil
+                self:EnsureChainItems(chain)
+                local CG = ns:GetSubsystem("ChainGuide")
+                if CG and CG.frame and CG.frame:IsShown() and CG.RenderCurrent then
+                    CG:RenderCurrent()
+                end
+            end)
         end
+        return
     end
 
     local items = {}

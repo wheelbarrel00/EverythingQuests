@@ -21,6 +21,8 @@ ns.QUESTLINE_ROUTING = {
     [5784] = { cat = ns.CAT.EVERSONG_WOODS, name = "The Drinking Debt" },
     [5804] = { cat = ns.CAT.EVERSONG_WOODS, name = "Theft Tracking" },
     [5958] = { cat = ns.CAT.EVERSONG_WOODS, name = "Daggerspine Landing" },
+    -- Also the last five steps of campaign 349's Sins of the Past, listed here so the Labyrinth's entrance zone shows it too
+    [6301] = { cat = ns.CAT.EVERSONG_WOODS, name = "Into the Labyrinth" },
     [5722] = { cat = ns.CAT.ZULAMAN, name = "Dis Was Our Land" },
     [5723] = { cat = ns.CAT.ZULAMAN, name = "Path of De Hashey" },
     [5938] = { cat = ns.CAT.ZULAMAN, name = "Where War Slumbers" },
@@ -91,7 +93,7 @@ ns.QUESTLINE_ROUTING = {
     [6276] = { cat = ns.CAT.COILED_ISLE, name = "Strange Friends in Odd Places" },
     [6277] = { cat = ns.CAT.COILED_ISLE, name = "Ancient Anthropology" },
     [6302] = { cat = ns.CAT.COILED_ISLE, name = "Living Legend" },
-    -- Campaign 324 chapters. EnsureZoneChains early-returns for a campaign category, so only /eqs zonedump reads these.
+    -- Campaign 324 chapters, so a chapter a zone's map reports is never listed under that zone
     [6050] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "Legacy of the Amani" },
     [6229] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "An Island of Fangs" },
     [6230] = { cat = ns.CAT.CURSE_OF_ULATEK, name = "Ghosts of the Past" },

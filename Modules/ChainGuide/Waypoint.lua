@@ -90,6 +90,30 @@ local function candidateMaps(chain)
     return _cand
 end
 
+local function questLineStart(questID, mapID)
+    if not (C_QuestLine and C_QuestLine.GetQuestLineInfo) then return nil end
+    local info = C_QuestLine.GetQuestLineInfo(questID, mapID)
+    if not (info and info.x and info.y and (info.x ~= 0 or info.y ~= 0)) then return nil end
+    -- Blizzard's own quest offers drop an answer that starts outside the asked map (QuestOfferDataProvider)
+    local start = info.startMapID
+    if start and start ~= mapID
+       and not (MapUtil and MapUtil.IsChildMapCached and MapUtil.IsChildMapCached(start, mapID)) then
+        return nil, nil, start
+    end
+    return info.x, info.y
+end
+
+-- Only Resolve follows an answer naming another start map, asking that map once
+local function questLineStartAnywhere(questID, mapID)
+    local x, y, other = questLineStart(questID, mapID)
+    if x then return mapID, x, y end
+    if other and other > 0 then
+        local ox, oy = questLineStart(questID, other)
+        if ox then return other, ox, oy end
+    end
+    return nil
+end
+
 function W:Resolve(questID, chain)
     if not questID then return nil end
 
@@ -108,13 +132,13 @@ function W:Resolve(questID, chain)
         return static.m, static.x, static.y
     end
 
-    if not CS and C_QuestLine and C_QuestLine.GetQuestLineInfo then
+    if not CS then
         local maps = candidateMaps(chain)
         for i = 1, #maps do
-            local info = C_QuestLine.GetQuestLineInfo(questID, maps[i])
-            if info and info.x and info.y and (info.x ~= 0 or info.y ~= 0) then
-                cacheSet(questID, maps[i], info.x, info.y)
-                return maps[i], info.x, info.y
+            local qm, qx, qy = questLineStartAnywhere(questID, maps[i])
+            if qm then
+                cacheSet(questID, qm, qx, qy)
+                return qm, qx, qy
             end
         end
     end
@@ -189,7 +213,7 @@ local function liveWaypoint(questID)
     return nil
 end
 
-function W:ResolveForPin(questID, chain)
+function W:ResolveForPin(questID, chain, viewMapID)
     if not questID then return nil end
     local onQuest = inLog(questID)
     if onQuest then
@@ -197,6 +221,11 @@ function W:ResolveForPin(questID, chain)
         if m and x and y then return m, x, y, true end
     end
     local m, x, y = self:Resolve(questID, chain)
+    -- A step not in the log takes its start point on the viewed map, where the stored answer may not lie
+    if viewMapID and m ~= viewMapID and not onQuest and not classicSource() then
+        local vx, vy = questLineStart(questID, viewMapID)
+        if vx then return viewMapID, vx, vy, false end
+    end
     if m and x and y then return m, x, y, onQuest end
     return nil
 end
@@ -251,12 +280,7 @@ local function stepCellKey(raw)
     return nil
 end
 
-local function nextActionableStep(chain)
-    if not chain then return nil end
-    if chain._generated then
-        local CS = classicSource()
-        if CS then return CS:NextStep(chain) end
-    end
+local function readSteps(chain)
     local Database   = ns:GetSubsystem("ChainGuideDatabase")
     local Characters = ns:GetSubsystem("ChainGuideCharacters")
     if not (Database and Characters) then return nil end
@@ -288,6 +312,27 @@ local function nextActionableStep(chain)
             end
         end
     end
+    return items, Database, Characters, char
+end
+
+local function nextActionableStep(chain)
+    if not chain then return nil end
+    if chain._generated then
+        local CS = classicSource()
+        if CS then return CS:NextStep(chain) end
+    end
+    local items, Database, Characters, char = readSteps(chain)
+    if not items then return nil end
+
+    -- A quest you are on comes first, as Forever's NextStep does, so a branch you took is the one followed
+    for i = 1, #items do
+        local raw = items[i]
+        if raw.type ~= "chain" and not raw.breadcrumb then
+            local key = stepCellKey(raw)
+            local onIt = key and _stepCellInLog[key]
+            if onIt and not _stepCellDone[key] then return onIt end
+        end
+    end
 
     for i = 1, #items do
         local raw = items[i]
@@ -303,6 +348,70 @@ local function nextActionableStep(chain)
         end
     end
     return nil
+end
+
+local NO_LINKS = {}
+
+-- A card sends you back only to a step its quest still needs through the chain's links
+local function stepItNeeds(chain, questID)
+    local items, Database, Characters, char = readSteps(chain)
+    if not items then return nil end
+    local function stepAt(i)
+        local raw = items[i]
+        if not raw or raw.type == "chain" or raw.breadcrumb then return nil end
+        local item = Database:GetVariation(raw, char)
+        if not (item and item.id) then return nil end
+        local key = stepCellKey(raw)
+        local finished = (key and _stepCellDone[key]) or Characters:IsQuestCompleted(item.id)
+        return (key and _stepCellInLog[key]) or item, finished
+    end
+    local function onQuest(i)
+        local key = items[i] and stepCellKey(items[i])
+        return key and _stepCellInLog[key] and not _stepCellDone[key]
+    end
+    -- Every linked cell must be done, as twins share one, and a step you are on counts as reached
+    local function open(i)
+        if onQuest(i) then return true end
+        for _, p in ipairs(items[i].connections or NO_LINKS) do
+            local step, finished = stepAt(p)
+            if step and not finished then return false end
+        end
+        return true
+    end
+    local start
+    for i = 1, #items do
+        local raw = items[i]
+        if raw.type ~= "chain" then
+            local item = Database:GetVariation(raw, char)
+            if raw.id == questID or (item and item.id == questID) then
+                start = i
+                break
+            end
+        end
+    end
+    if not start then return nil end
+    local need, stack = { [start] = true }, { start }
+    while #stack > 0 do
+        local i = table.remove(stack)
+        for _, p in ipairs(items[i].connections or NO_LINKS) do
+            if not need[p] then
+                local step, finished = stepAt(p)
+                if step and not finished then
+                    need[p] = true
+                    stack[#stack + 1] = p
+                end
+            end
+        end
+    end
+    local first
+    for i = 1, #items do
+        if need[i] and open(i) then
+            local step = stepAt(i)
+            if step and onQuest(i) then return step end
+            first = first or step
+        end
+    end
+    return first
 end
 
 function W:NextActionableStep(chain)
@@ -333,17 +442,24 @@ function W:GoTo(questID, chain)
     local title = titleOf(questID)
 
     local navID, navTitle = questID, title
-    if chain and not inLog(questID) then
-        local Characters = ns:GetSubsystem("ChainGuideCharacters")
+    local Characters = ns:GetSubsystem("ChainGuideCharacters")
+    if chain and not inLog(questID) and Characters and not Characters:IsQuestCompleted(questID) then
         local CS = chain._generated and classicSource()
+        if not CS then
+            local step = stepItNeeds(chain, questID)
+            if step and step.id ~= questID then
+                navID    = step.id
+                navTitle = titleOf(step.id) or navTitle
+                print(("|cffEBB706EQ|r: |cffffffff%s|r needs |cffffffff%s|r first, so directions are set there."):format(
+                    title, navTitle))
+            end
         -- A quest the game offers you right now is a step in its own right, wherever it sits in the chain
-        local offered = CS and CS:Status(questID) == "available"
-        if Characters and not offered and not Characters:IsQuestCompleted(questID) then
+        elseif CS:Status(questID) ~= "available" then
             local step = nextActionableStep(chain)
             if step and step.id and step.id ~= questID then
                 navID    = step.id
                 navTitle = titleOf(step.id) or navTitle
-                print(("|cffEBB706EQ|r: |cffffffff%s|r comes later in |cffffffff%s|r — directions set to your next step, |cffffffff%s|r."):format(
+                print(("|cffEBB706EQ|r: |cffffffff%s|r comes later in |cffffffff%s|r, so directions are set to your next step, |cffffffff%s|r."):format(
                     title, chain.name or "this chain", navTitle))
             end
         end

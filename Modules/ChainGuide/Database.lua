@@ -89,7 +89,12 @@ function DBmod:ApplyOverlay(chain)
                     local pidx = idIndex[prereqs[j]]
                     if pidx then conn[#conn + 1] = pidx end
                 end
-                if #conn > 0 then items[idx].connections = conn end
+                -- An empty list makes the quest a start of its own
+                if #prereqs == 0 then
+                    items[idx].connections = nil
+                elseif #conn > 0 then
+                    items[idx].connections = conn
+                end
             end
         end
     end
@@ -113,6 +118,40 @@ function DBmod:ApplyOverlay(chain)
     end
 
     chain._overlayApplied = true
+end
+
+local function chainHasQuest(chain, questID)
+    local items = chain.items
+    if not items then return false end
+    for i = 1, #items do
+        local it = items[i]
+        if it and it.type ~= "chain" then
+            if it.id == questID then return true end
+            local vars = it.variations
+            if vars then
+                for j = 1, #vars do
+                    if vars[j].id == questID then return true end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- A quest can sit in two chains (the Labyrinth's), so the pick is fixed: the followed chain, a campaign chapter, the lowest id
+function DBmod:PickChainForQuest(questID, followedID)
+    local best, bestChapter
+    for chainID, chain in pairs(self.chains) do
+        self:NormalizeChain(chain)
+        if chainHasQuest(chain, questID) then
+            if chainID == followedID then return chainID end
+            local chapter = chain._campaignSourced and true or false
+            if not best or (chapter and not bestChapter) or (chapter == bestChapter and chainID < best) then
+                best, bestChapter = chainID, chapter
+            end
+        end
+    end
+    return best
 end
 
 function DBmod:GetVariation(item, character)

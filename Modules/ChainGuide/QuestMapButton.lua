@@ -3,7 +3,7 @@ local L = ns.L
 local QMB = ns:RegisterSubsystem("ChainGuideQuestMapButton", {})
 
 local function findChainFor(questID)
-    -- WoW Forever builds its chains on first use, so the loop below can miss them until something has asked
+    -- WoW Forever builds its chains on first use, and ChainForQuest builds them first
     local Classic = ns:GetSubsystem("ChainGuideClassicSource")
     if Classic then return Classic:ChainForQuest(questID) end
 
@@ -25,27 +25,8 @@ local function findChainFor(questID)
         end
     end
 
-    for chainID, chain in pairs(Database.chains) do
-        Database:NormalizeChain(chain)
-        local items = chain.items
-        if items then
-            for i = 1, #items do
-                local it = items[i]
-                if it then
-                    if it.type == "quest" and it.id == questID then
-                        return chainID
-                    end
-                    local vars = it.variations
-                    if vars then
-                        for j = 1, #vars do
-                            if vars[j].id == questID then return chainID end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return nil
+    local CG = ns:GetSubsystem("ChainGuide")
+    return Database:PickChainForQuest(questID, CG and CG.GetTrackedChainID and CG:GetTrackedChainID())
 end
 
 local function currentDetailQuestID()

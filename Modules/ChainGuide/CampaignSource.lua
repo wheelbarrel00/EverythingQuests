@@ -21,28 +21,29 @@ function CS:Reset()
 end
 
 function CS:IsChapterQuestline(qlID)
-    if self._chapterSet == nil then
-        local set, gotAny, queried = false, false, 0
+    local set = self._chapterSet
+    if set == nil then
+        set = {}
+        local complete = true
         if C_CampaignInfo and C_CampaignInfo.GetChapterIDs then
             local Database = ns:GetSubsystem("ChainGuideDatabase")
             if Database then
-                set = {}
                 for _, cat in pairs(Database.categories) do
                     if cat.campaignID then
-                        queried = queried + 1
                         local ch = C_CampaignInfo.GetChapterIDs(cat.campaignID)
-                        if ch then
-                            gotAny = true
+                        if ch and #ch > 0 then
                             for _, id in ipairs(ch) do set[id] = true end
+                        else
+                            complete = false
                         end
                     end
                 end
             end
         end
-        -- All-nil means chapter data has not streamed yet - leave the cache nil so it retries rather than latching empty
-        if gotAny or queried == 0 then self._chapterSet = set end
+        -- A campaign with no chapters yet has not loaded, so the set is kept only once every campaign answers
+        if complete then self._chapterSet = set end
     end
-    return (self._chapterSet and self._chapterSet[qlID]) or false
+    return set[qlID] or false
 end
 
 function CS:EnsureCampaignChains(catID)

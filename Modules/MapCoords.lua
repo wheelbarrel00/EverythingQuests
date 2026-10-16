@@ -19,6 +19,62 @@ end
 local function mapWanted()    return cfg("showMapCoords", true) == true end
 local function minimapWanted() return cfg("showMinimapCoords", false) == true end
 
+-- An unknown CVar (Era, TBC) reads false, so a client without the game's readouts keeps all of EQ's
+local function cvarOn(cvar)
+    local C = _G["C_CVar"]
+    if not (C and C.GetCVarBool) then return false end
+    local ok, on = pcall(C.GetCVarBool, cvar)
+    return ok and on == true
+end
+
+local function gameMinimapFrame()
+    local cluster = _G["MinimapCluster"]
+    local box = cluster and cluster.MinimapContainer
+    return box and box.PlayerCoords
+end
+
+-- The world map keeps its coordinate panel only in its overlay list, found the way ElvUI finds it
+local _gameMapPanel
+local function gameMapPanel()
+    if _gameMapPanel then return _gameMapPanel end
+    local wmf = _G["WorldMapFrame"]
+    local list = wmf and wmf.overlayFrames
+    if type(list) ~= "table" then return nil end
+    for _, f in pairs(list) do
+        if type(f) == "table" and f.PlayerCoords and f.CursorCoords then
+            _gameMapPanel = f
+            return f
+        end
+    end
+    return nil
+end
+
+local GAME_MAP_CVAR = { mapPlayer = "worldMapShowPlayerCoords", mapCursor = "worldMapShowCursorCoords" }
+
+-- Interface addons hide or fade the game's frame and leave its CVar on, so the frame must be showing too
+local function frameShowing(f)
+    if f:IsVisible() and (f.GetEffectiveAlpha == nil or f:GetEffectiveAlpha() > 0) then return true end
+    return false
+end
+
+-- A frame that cannot be read counts as not showing, which leaves EQ's readout up
+local function frameState(f)
+    if f == nil then return "absent" end
+    local ok, on = pcall(frameShowing, f)
+    if not ok then return "unreadable" end
+    return on and "showing" or "hidden"
+end
+
+local function showing(f) return frameState(f) == "showing" end
+
+local function gameShows(key)
+    if key == "minimap" then
+        return showing(gameMinimapFrame()) and cvarOn("minimapShowPlayerCoords")
+    end
+    if not showing(gameMapPanel()) then return false end
+    return cvarOn(GAME_MAP_CVAR[key])
+end
+
 local function precision()
     local n = cfg("coordPrecision", 1)
     if type(n) ~= "number" then return 1 end
@@ -147,7 +203,8 @@ local function updateMap()
     local fmt = pairFormat()
     local parts
 
-    local cx, cy = cursorPositionOn(canvas)
+    local cx, cy
+    if not gameShows("mapCursor") then cx, cy = cursorPositionOn(canvas) end
     if cx then
         parts = L["Cursor"] .. " " .. fmt:format(cx * 100, cy * 100)
     end
@@ -156,7 +213,7 @@ local function updateMap()
     -- prints the player's own position against whatever map you scrolled to, which reads as the
     -- player being in a zone they are not in.
     local best = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
-    if mapID and best == mapID then
+    if mapID and best == mapID and not gameShows("mapPlayer") then
         local px, py = playerPositionOn(mapID)
         if px then
             local label = (_G["PLAYER"] or L["Player"]) .. " " .. fmt:format(px * 100, py * 100)
@@ -182,7 +239,7 @@ local function updateMinimap()
     local f = _minimapFrame
     if not f then return end
     local mm = _G["Minimap"]
-    if not (minimapWanted() and mm and mm:IsVisible()) then
+    if not (minimapWanted() and mm and mm:IsVisible() and not gameShows("minimap")) then
         f:Hide()
         M._lastMinimapText = nil
         return
@@ -236,6 +293,16 @@ function M:Refresh()
     wipe(FORMATS)
     updateMap()
     updateMinimap()
+end
+
+-- Read by /eqsprobe ui, raw beside the answer EQ acts on
+function M:GameReadouts()
+    return {
+        minimapCVar = cvarOn("minimapShowPlayerCoords"), minimapFrame = frameState(gameMinimapFrame()),
+        mapPlayerCVar = cvarOn("worldMapShowPlayerCoords"), mapCursorCVar = cvarOn("worldMapShowCursorCoords"),
+        mapPanel = frameState(gameMapPanel()),
+        minimap = gameShows("minimap"), mapPlayer = gameShows("mapPlayer"), mapCursor = gameShows("mapCursor"),
+    }
 end
 
 function M:OnEnable()

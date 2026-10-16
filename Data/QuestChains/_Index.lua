@@ -23,11 +23,13 @@ ns.CAT = {
     VOID_ACROPOLIS    = 1108,
     SUNSTRIDER_OMNIUM = 1109,
     COILED_ISLE       = 1110,
+    PROMISE_OF_TOMORROW = 1111,
 }
 
 DBmod:RegisterCategory(ns.CAT.CAMPAIGN,         { expansion = ns.EXP_MIDNIGHT, name = "Midnight Campaign", mapIDs = {}, campaignID = 270, order = 10 })
 DBmod:RegisterCategory(ns.CAT.WAR_LIGHT_SHADOW, { expansion = ns.EXP_MIDNIGHT, name = "The War of Light and Shadow", mapIDs = {}, campaignID = 284, order = 20 })
 DBmod:RegisterCategory(ns.CAT.CURSE_OF_ULATEK,  { expansion = ns.EXP_MIDNIGHT, name = "The Curse of Ula'tek", mapIDs = { 2424 }, campaignID = 324, order = 25 })
+DBmod:RegisterCategory(ns.CAT.PROMISE_OF_TOMORROW, { expansion = ns.EXP_MIDNIGHT, name = "The Promise of Tomorrow", mapIDs = {}, campaignID = 349, order = 26 })
 DBmod:RegisterCategory(ns.CAT.EVERSONG_WOODS,   { expansion = ns.EXP_MIDNIGHT, name = "Eversong Woods", mapIDs = { 2393 }, order = 30 })
 DBmod:RegisterCategory(ns.CAT.ZULAMAN,          { expansion = ns.EXP_MIDNIGHT, name = "Zul'Aman",       mapIDs = { 2437 }, order = 40 })
 DBmod:RegisterCategory(ns.CAT.HARANDAR,         { expansion = ns.EXP_MIDNIGHT, name = "Harandar",       mapIDs = { 2413 }, order = 50 })

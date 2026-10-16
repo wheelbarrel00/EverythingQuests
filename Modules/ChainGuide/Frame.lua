@@ -338,25 +338,10 @@ function CG:FindChainForQuest(questID)
     if QLS then
         for id in pairs(Database.categories) do QLS:EnsureZoneChains(id) end
     end
-    for _, chain in pairs(Database.chains) do
-        Database:NormalizeChain(chain)
-        if QLS then pcall(QLS.EnsureChainItems, QLS, chain) end
-        local items = chain.items
-        if items then
-            for i = 1, #items do
-                local it = items[i]
-                if it and it.type ~= "chain" then
-                    if it.id == questID then return chain.id end
-                    if it.variations then
-                        for v = 1, #it.variations do
-                            if it.variations[v].id == questID then return chain.id end
-                        end
-                    end
-                end
-            end
-        end
+    if QLS then
+        for _, chain in pairs(Database.chains) do pcall(QLS.EnsureChainItems, QLS, chain) end
     end
-    return nil
+    return Database:PickChainForQuest(questID, self:GetTrackedChainID())
 end
 
 local SEARCH_MAX_ATTEMPTS = 6
@@ -449,10 +434,13 @@ function CG:FindChainByName(needle)
 
     local QuestTitle = ns.Util.QuestTitle
     local reqLoad    = C_QuestLog and C_QuestLog.RequestLoadQuestByID
+    local followed   = self:GetTrackedChainID()
 
+    if QLS then
+        for _, chain in pairs(Database.chains) do pcall(QLS.EnsureChainItems, QLS, chain) end
+    end
     for _, chain in pairs(Database.chains) do
         Database:NormalizeChain(chain)
-        if QLS then pcall(QLS.EnsureChainItems, QLS, chain) end
         local items = chain.items
         if items then
             for i = 1, #items do
@@ -460,7 +448,9 @@ function CG:FindChainByName(needle)
                 if it and it.type ~= "chain" then
                     local title = it.id and QuestTitle(it.id)
                     if title then
-                        if title:lower():find(needle, 1, true) then return chain.id, it.id end
+                        if title:lower():find(needle, 1, true) then
+                            return Database:PickChainForQuest(it.id, followed) or chain.id, it.id
+                        end
                     elseif reqLoad and it.id then
                         reqLoad(it.id)
                     end
@@ -469,7 +459,9 @@ function CG:FindChainByName(needle)
                             local vid = it.variations[v].id
                             local vt  = vid and QuestTitle(vid)
                             if vt then
-                                if vt:lower():find(needle, 1, true) then return chain.id, vid end
+                                if vt:lower():find(needle, 1, true) then
+                                    return Database:PickChainForQuest(vid, followed) or chain.id, vid
+                                end
                             elseif reqLoad and vid then
                                 reqLoad(vid)
                             end
@@ -614,7 +606,11 @@ function CG:RenderChains(activeCatID, activeChainID)
         if QLS then QLS:EnsureZoneChains(activeCatID) end
         local chains = {}
         for id, c in pairs(Database.chains) do
-            if c.category == activeCatID then chains[#chains + 1] = { id = id, def = c } end
+            if c.category == activeCatID then
+                -- Before the sort, since a chain with no questline may only now take its name from a quest title
+                if QLS then QLS:EnsureChainItems(c) end
+                chains[#chains + 1] = { id = id, def = c }
+            end
         end
         table.sort(chains, function(a, b)
             local ao, bo = a.def._campaignOrder, b.def._campaignOrder
@@ -635,7 +631,6 @@ function CG:RenderChains(activeCatID, activeChainID)
         local selectedIndex
         for i = 1, #chains do
             local entry = chains[i]
-            if QLS then QLS:EnsureChainItems(entry.def) end
             local name = entry.def.name or ("Chain " .. entry.id)
             local complete, _, total = Characters:ChainProgress(entry.def)
             local done = total > 0 and complete >= total

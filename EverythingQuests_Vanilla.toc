@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. Classic Era support is limited and growing - see the What's New notice.
 ## Author: Wheelbarrel00
-## Version: 2.3.1
+## Version: 2.4.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -38,7 +38,7 @@
 # check-toc: omit Data/QuestChains/_Overlays_Harandar.lua
 # check-toc: omit Data/QuestChains/_Overlays_Voidstorm.lua
 # check-toc: omit Data/QuestChains/_Overlays_Revelations.lua
-# check-toc: omit Data/QuestChains/_Overlays_Val.lua
+# check-toc: omit Data/QuestChains/_Chains_Catalyst.lua
 
 # World quests do not exist in Classic content. The C_TaskQuest names are present on Era and
 # answer nothing, which is why the gate here is the TOC rather than a capability check.

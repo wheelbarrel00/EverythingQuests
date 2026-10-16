@@ -43,6 +43,20 @@ ns.CHAINGUIDE_OVERLAYS = ns.CHAINGUIDE_OVERLAYS or {}
         },
     }
 
+    -- The Labyrinth's five are their own questline (6301) and need nothing from this chapter, so they start beside it
+    ns.CHAINGUIDE_OVERLAYS[6221] = {
+        layout = {
+            [98831] = { x = 1, y = 0 },
+            [98832] = { x = 1, y = 1 },
+            [98833] = { x = 1, y = 2 },
+            [98834] = { x = 1, y = 3 },
+            [98836] = { x = 1, y = 4 },
+        },
+        connections = {
+            [98831] = {},
+        },
+    }
+
 ns.CURATED_QUEST_NAMES = ns.CURATED_QUEST_NAMES or {}
 local names = ns.CURATED_QUEST_NAMES
 names[92897] = "The Preparations Are Complete"

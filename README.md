@@ -53,7 +53,7 @@ Era and TBC were measured identical across every game API the addon reads, so on
 - **The Quest Browser** — look up almost any quest in the game, including ones never picked up, with its level, race and class requirements, start and turn-in locations, prerequisites, and the reason it is not available yet. Its own tab in `/eqs`, `/eqs quests`, a key you bind to it, or right-click a gold marker
 - **Shareable quest links** — shift-click a marker or a Quest Browser row with a chat box open and the quest goes into chat as readable text carrying its ID. Anyone else running Everything Quests sees a clickable link that opens their Quest Browser on that quest
 - **Quest progress on tooltips** — a bag item names the quest that wants it and what is still missing, and on Classic Era and TBC an enemy names the quest it counts toward, which the client there never does. Group members who still need the same objective are listed under your own
-- **Coordinates** on the world map and under the minimap, with a slider for how many decimals to show
+- **Coordinates** on the world map and under the minimap, with a slider for how many decimals to show. On retail and WoW Forever they leave out whatever the game's own coordinates already show
 - **Two more ways to quiet a busy map** on top of the filters above, both off by default: leave out markers for quests you have untracked, and fade markers sitting on top of your own position
 - **Quest announcements** and **party quest progress**, shown on quest markers and tooltips, which also reads the progress the established Classic quest addon shares. **Joining group quests automatically** is included too, but has not been checked in game yet
 - **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, the **focus arrow**, and the **`/eqs`** options window (General, Map, Quest Browser and About tabs)
@@ -144,12 +144,12 @@ A standalone window for browsing quest chains, in the same style as the options 
 - **Cross-character completion** (retail) — Tracks completion of every chain across every character on your account
 - **Completion-date tooltips** — Hover any quest in a chain to see when this character completed it, from Quest History
 - **Live campaign chapters** (retail) — Campaigns render from `C_CampaignInfo` chapter by chapter, so a new patch chapter appears without a data update
-- **Click-to-waypoint** — Click any quest in a chain to point you at it and open the world map there. Uses [TomTom](https://www.curseforge.com/wow/addons/tomtom)'s arrow when installed (recommended). Without TomTom, a quest already in your log is super-tracked, and otherwise the coordinates are printed in chat as the map opens. Blizzard's own map waypoint is deliberately never written, because it taints shared map state
+- **Click-to-waypoint** — Click any quest in a chain to point you at it, or at a step it needs first, and open the world map there. Uses [TomTom](https://www.curseforge.com/wow/addons/tomtom)'s arrow when installed (recommended). Without TomTom, a quest already in your log is super-tracked, and otherwise the coordinates are printed in chat as the map opens. Blizzard's own map waypoint is deliberately never written, because it taints shared map state
 - **Lazy-built** — The window is constructed on first toggle to keep load times minimal
 - **Resizable** — Drag the grip in the bottom right corner, or use the maximize button beside the close button to fill the screen and back. The window remembers which you chose, and at a large window scale it shrinks to fit your screen
 - **Chain button** — The quest log's details pane has a Chain button that opens the quest's chain
 
-Currently covers the Midnight expansion: **Eversong Woods**, **Zul'Aman**, **Harandar**, **Arator**, **Voidstorm**, **The Sunstrider Omnium**, **Void Acropolis** and **The Coiled Isle**, plus the live **Midnight Campaign**, **The War of Light and Shadow** and **The Curse of Ula'tek** storylines.
+Currently covers the Midnight expansion: **Eversong Woods**, **Zul'Aman**, **Harandar**, **Arator**, **Voidstorm**, **The Sunstrider Omnium**, **Void Acropolis** and **The Coiled Isle**, plus the live **Midnight Campaign**, **The War of Light and Shadow**, **The Curse of Ula'tek** and **The Promise of Tomorrow** storylines.
 
 **On WoW Forever** the game has no quest line data for Classic quests, so the Chain Guide builds its chains from Everything Quests' own quest data the first time you open it:
 

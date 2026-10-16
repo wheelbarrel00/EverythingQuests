@@ -5,6 +5,31 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-10-15
+
+The Chain Guide covers patch 12.1.5: the new campaign, The Promise of Tomorrow, the way into the Labyrinth of Kindo'jan, and the Catalyst's Voidcore and Venomstone quests. Everything Quests' coordinates also make way for the game's own.
+
+### New Features
+
+- **The Promise of Tomorrow in the Chain Guide.** Patch 12.1.5's campaign has its own place after The Curse of Ula'tek, with its chapters in order: What Slept Below, Sins of the Past and To the Faithful. The Chain Guide reads the chapters and their quests from the game, so a chapter added later appears on its own.
+- **Into the Labyrinth.** The five quests that take you into the Labyrinth of Kindo'jan are listed under Eversong Woods, where its entrance is. The game also lists them under Sins of the Past, so they show there too, beside the chapter's own first step, since they need nothing from the campaign. The quest log's Chain button, a search and History open the one you are following, or else Sins of the Past.
+- **The Catalyst's Voidcore and Venomstone quests.** The five quests from In the Catalyst's Shadow to Ascending with Venomstones are listed under Voidstorm as one chain named after the first, with A Nebulous Endeavour branching off after Umbral Blessings of the Catalyst. The game files these quests under no questline, so their order comes from the quests each one requires.
+
+### Improvements
+
+- **Chain Guide map pins.** Following a chain now pins each step that is not in your quest log wherever the game gives its starting point on the map you are looking at. Before, each such step was pinned on one map only: its stored point's, or the first the Chain Guide found it on, and it looked only on the map you stood on and the maps it lists for the chain's zone.
+- **The Chain Guide's next step.** When a quest from a chain is in your quest log, the Chain Guide now takes it as your next step in that chain, as WoW Forever's Chain Guide already did: Continue, the arrow set after you hand in a step, the map pin that reads Your next step, and where the chain opens all go to it. Before, they went to the first unfinished quest in the chain's order even then, which could be one you had passed over or one on a branch you were not doing. Clicking the card of a quest you have not picked up now sends you to a step before it only when the quest needs that step, following the lines between the cards, and otherwise gives the quest's own directions. Before, such a click went to the chain's first unfinished quest whenever one came earlier, even on a branch the quest does not need.
+- **Coordinates make way for the game's own.** On retail and WoW Forever, Everything Quests' coordinates under the minimap stay hidden while the game shows its own there, from its Player Minimap Coordinates option. The world map readout leaves out the mouse position while the game shows it, from Cursor Map Coordinates, and your position while the game shows that, from Player Map Coordinates. The game turns all three on by default, so unless you have changed them you now see only the game's readouts. If an interface addon hides or fades out the game's readouts, Everything Quests' show as before. To keep Everything Quests' instead, for example for two decimals, turn the game's off in its options under Map Coordinates.
+
+### Bug Fixes
+
+- **Campaigns missing from the Chain Guide.** If the game had not loaded its campaign data when the Chain Guide first looked for a campaign's chapters, they could stay missing from the Chain Guide. It now asks again each time it looks, until the game has them.
+- **Theft Tracking's first quest is optional.** In the Theft Tracking chain in Eversong Woods, the first quest only sends you on to the next two, so it now reads as optional and no longer counts toward the chain's progress. NEXT, Continue and a click on a later card no longer send you to it, and it is no longer pinned on the map.
+
+### Notes
+
+- **Translations.** The two new option tooltip lines are in all six languages.
+
 ## [2.3.1] - 2026-10-11
 
 World quest pins show their reward inside a ring of the right color and keep the size you set, and What's New catches you up on the updates you missed.

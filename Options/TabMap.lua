@@ -188,13 +188,23 @@ local function coordinatesCard(self, content, stack, w)
             end
     end
 
-    local mapGet, mapSet = coordSetting("showMapCoords", true)
-    card:Add(self:CreateCheckbox(content, L["Show coordinates on the world map"], mapGet, mapSet,
-        L["Puts a small readout in the bottom left of the world map with the position your mouse is pointing at, and your own position when you are looking at the zone you are standing in. Turn it off if another addon already shows coordinates there."]))
+    -- The game names its own options in these strings, and only a client that has them defines them
+    local gameCursor, gamePlayer = _G["SETTINGS_CURSOR_MAP_COORDS"], _G["SETTINGS_PLAYER_MAP_COORDS"]
+    local gameMinimap = _G["SETTINGS_MINIMAP_PLAYER_COORDS"]
 
+    local mapTip = L["Puts a small readout in the bottom left of the world map with the position your mouse is pointing at, and your own position when you are looking at the zone you are standing in. Turn it off if another addon already shows coordinates there."]
+    if type(gameCursor) == "string" and type(gamePlayer) == "string" then
+        mapTip = mapTip .. " " .. L["The readout leaves out the mouse position and your position while the game's own map coordinates show them, set by its \"%1$s\" and \"%2$s\" options."]:format(gameCursor, gamePlayer)
+    end
+    local mapGet, mapSet = coordSetting("showMapCoords", true)
+    card:Add(self:CreateCheckbox(content, L["Show coordinates on the world map"], mapGet, mapSet, mapTip))
+
+    local mmTip = L["Puts your own position just below the minimap so it is readable without opening the map. Off by default, because many interface addons already put something there."]
+    if type(gameMinimap) == "string" then
+        mmTip = mmTip .. " " .. L["The readout stays hidden while the game shows its own minimap coordinates, set by its \"%s\" option."]:format(gameMinimap)
+    end
     local mmGet, mmSet = coordSetting("showMinimapCoords", false)
-    card:Add(self:CreateCheckbox(content, L["Show coordinates under the minimap"], mmGet, mmSet,
-        L["Puts your own position just below the minimap so it is readable without opening the map. Off by default, because many interface addons already put something there."]))
+    card:Add(self:CreateCheckbox(content, L["Show coordinates under the minimap"], mmGet, mmSet, mmTip))
 
     local prec = self:CreateSlider(content, L["Coordinate decimals"], 0, 2, 1,
         function()

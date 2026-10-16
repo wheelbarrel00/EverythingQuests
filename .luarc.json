@@ -172,6 +172,7 @@
     "QuestMapFrame",
     "QuestMapFrame_GetDetailQuestID",
     "QuestMapFrame_GetFocusedQuestID",
+    "MapUtil",
     "QuestMapFrame_OpenToQuestDetails",
     "QuestMapFrame_UpdateQuestDetailsButtons",
     "QuestMapQuestOptions_OpenQuestDetails",

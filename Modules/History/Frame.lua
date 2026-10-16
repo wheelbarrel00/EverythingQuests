@@ -117,21 +117,8 @@ local function findChainForQuest(questID)
         for _, chain in pairs(Database.chains) do QLS:EnsureChainItems(chain) end
     end
 
-    for chainID, chain in pairs(Database.chains) do
-        local items = chain.items
-        if items then
-            for i = 1, #items do
-                local it = items[i]
-                if it and it.type == "quest" then
-                    if it.id == questID then return chainID end
-                    for _, v in ipairs(it.variations or {}) do
-                        if v.id == questID then return chainID end
-                    end
-                end
-            end
-        end
-    end
-    return nil
+    local CG = ns:GetSubsystem("ChainGuide")
+    return Database:PickChainForQuest(questID, CG and CG.GetTrackedChainID and CG:GetTrackedChainID())
 end
 
 local function openChain(chainID, questID)

@@ -2077,6 +2077,14 @@ function Probe:UI()
         line("  last rendered   map=%s  minimap=%s",
              MC._lastMapText and ("%q"):format(MC._lastMapText) or "nil",
              MC._lastMinimapText and ("%q"):format(MC._lastMinimapText) or "nil")
+        if MC.GameReadouts then
+            local g = MC:GameReadouts()
+            line("  game's minimap readout   CVar=%s  frame=%s  -> EQ leaves it out=%s",
+                 tostring(g.minimapCVar), tostring(g.minimapFrame), tostring(g.minimap))
+            line("  game's map readouts   player CVar=%s  cursor CVar=%s  panel=%s  -> EQ leaves out player=%s cursor=%s",
+                 tostring(g.mapPlayerCVar), tostring(g.mapCursorCVar), tostring(g.mapPanel),
+                 tostring(g.mapPlayer), tostring(g.mapCursor))
+        end
     else
         line("MapCoords: not loaded by this TOC")
     end
