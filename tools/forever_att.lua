@@ -82,6 +82,82 @@ local function normalize(id, t, ctx)
     return q
 end
 
+local DETAIL = {
+    { "reqLevel", label = "required level" }, { "faction", label = "faction" }, { "races", label = "races", set = true },
+    { "classes", label = "classes", set = true }, { "pre", "preCount", label = "prerequisites", set = true },
+    { "excl", label = "exclusive quests", set = true }, { "skill", label = "skill" }, { "minRep", label = "reputation floor" },
+    { "maxRep", label = "reputation ceiling" }, { "repeatable", label = "repeatable" }, { "breadcrumb", label = "breadcrumb" },
+}
+local AVAILABILITY = { { "unobtainable", "unobtainable" }, { "addedIn", "added patch" }, { "removedIn", "removed patch" },
+                       { "variants", "faction split" } }
+
+local function sameSet(a, b)
+    local inA, inB = {}, {}
+    for _, v in ipairs(a) do inA[v] = true end
+    for _, v in ipairs(b) do
+        if not inA[v] then return false end
+        inB[v] = true
+    end
+    for _, v in ipairs(a) do if not inB[v] then return false end end
+    return true
+end
+
+local function same(a, b, set)
+    if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+    if set then return sameSet(a, b) end
+    if #a ~= #b then return false end
+    for i = 1, #a do if a[i] ~= b[i] then return false end end
+    return true
+end
+
+local function join(q, d, note)
+    note.copies = note.copies + 1
+    local qHas, dHas = #q.givers + #q.objects > 0, #d.givers + #d.objects > 0
+    local sameGivers = sameSet(q.givers, d.givers) and sameSet(q.objects, d.objects)
+    -- Copies naming different givers may be different listings, so nothing of the later one is taken.
+    if qHas and dHas and not sameGivers then
+        note.conflicts[#note.conflicts + 1] = "givers"
+        return
+    end
+    local alt = {}
+    for _, f in ipairs(AVAILABILITY) do
+        alt[f[1]] = d[f[1]]
+        if not same(q[f[1]], d[f[1]]) then note.opened[#note.opened + 1] = f[2] end
+    end
+    q.alts = q.alts or {}
+    q.alts[#q.alts + 1] = alt
+    for _, group in ipairs(DETAIL) do
+        local has, gives, differs = false, false, false
+        for _, k in ipairs(group) do
+            if q[k] ~= nil then has = true end
+            if d[k] ~= nil then gives = true end
+            if not same(q[k], d[k], group.set) then differs = true end
+        end
+        if gives and not has then
+            for _, k in ipairs(group) do q[k] = d[k] end
+            note.filled[#note.filled + 1] = group.label
+        elseif gives and differs then
+            note.conflicts[#note.conflicts + 1] = group.label
+        end
+    end
+    -- A point belongs to the givers its copy names, so only a copy naming the same ones adds its points.
+    if dHas and not qHas then
+        q.givers, q.objects, q.points = d.givers, d.objects, d.points
+        note.filled[#note.filled + 1] = "givers"
+    end
+    if not sameGivers then return end
+    for _, p in ipairs(d.points) do
+        local known = false
+        for _, have in ipairs(q.points) do
+            if have[1] == p[1] and have[2] == p[2] and have[3] == p[3] then known = true end
+        end
+        if not known then
+            q.points[#q.points + 1] = p
+            note.points = note.points + 1
+        end
+    end
+end
+
 return function(dir)
     local handlers = {}
     local att = setmetatable({}, { __index = function(self, k)
@@ -113,7 +189,7 @@ return function(dir)
         fn(categories)
     end
 
-    local quests, duplicates = {}, 0
+    local quests, duplicates, notes = {}, 0, {}
     local function walk(node, ctx)
         if type(node) ~= "table" or node == inert then return end
         local kind = rawget(node, "kind")
@@ -127,8 +203,14 @@ return function(dir)
         if kind == "CreateMap" then ctx.map = node.id
         elseif kind == "CreateInstance" then ctx.inst = node.id end
         if kind == "CreateQuest" and type(node.id) == "number" then
-            if quests[node.id] then duplicates = duplicates + 1
-            else quests[node.id] = normalize(node.id, t, ctx) end
+            local q = normalize(node.id, t, ctx)
+            if quests[node.id] then
+                duplicates = duplicates + 1
+                notes[node.id] = notes[node.id] or { id = node.id, copies = 1, filled = {}, conflicts = {}, opened = {}, points = 0 }
+                join(quests[node.id], q, notes[node.id])
+            else
+                quests[node.id] = q
+            end
         end
         if type(t.g) == "table" then for _, child in ipairs(t.g) do walk(child, ctx) end end
         for _, child in ipairs(t) do walk(child, ctx) end
@@ -138,5 +220,8 @@ return function(dir)
     table.sort(names)
     for _, name in ipairs(names) do walk(categories[name], {}) end
 
-    return { quests = quests, files = #files, duplicates = duplicates }
+    local merged = {}
+    for _, note in pairs(notes) do merged[#merged + 1] = note end
+    table.sort(merged, function(a, b) return a.id < b.id end)
+    return { quests = quests, files = #files, duplicates = duplicates, merged = merged }
 end

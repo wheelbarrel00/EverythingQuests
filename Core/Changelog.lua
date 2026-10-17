@@ -2,6 +2,27 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.6.0", date = "2026-10-17",
+        sections = {
+            { head = "New Features", items = {
+                { "211 more WoW Forever quests. Everything Quests now knows 534 quests new to WoW Forever, up from 323. Most of them come from the WoW Forever quest data of the AllTheThings addon, which it publishes under the MIT License, and the rest were gathered by playing Forever. 530 of them have a marker where you pick them up and a Quest Browser entry, every one of them named, and 501 of those carry the level they need. Tirisfal Glades, the Wetlands, Mulgore, Durotar, Teldrassil, the Barrens, Silverpine Forest and Stormwind City gain the most, and quests for Forever's new dungeons are among them.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Improvements", items = {
+                { "More Forever quests know what they need. 26 Forever quests that were marked with no level requirement now carry one, so Show of Force and the others are no longer marked before you are high enough to take them. 23 quests that were marked for both factions, most of them on Zephras Isle, are now marked only for the faction that can take them.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Bug Fixes", items = {
+                { "The second Destruction in Deadmines quest was marked at the wrong quest giver. On WoW Forever it was marked at Sentinel Hill, on the Alba Fairmoon who gives the first Destruction in Deadmines, rather than at the Alba Fairmoon who offers it in the south of Westfall. It is now marked where she was seen.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Known Issues", items = {
+                { "Some Skyborne quests are marked for other characters. Many Zephras Isle quests can only be taken by Skyborne characters, but Everything Quests cannot yet record \"Skyborne only\" in its quest data, so they are marked for other characters, a character who is not Skyborne can see a Zephras Isle zone in the Chain Guide, and the Quest Browser can say \"Races: Alliance\" for a quest only the High Order can take, or \"Races: Alliance, Horde\" for one only Skyborne characters can take.", classic = true, sub = "ChainGuide" },
+                { "Dungeon quests new to Forever do not count as dungeon quests. This includes every quest for Forever's new dungeons. \"Dungeon and raid quests\" under \"Hide these quests on the map\" does not hide them, and the Quest Browser and Quest History do not list them as \"Dungeon or raid\".", classic = true, sub = "ChainGuide" },
+                { "A few quest chains new to Forever show every step at once. Where the quest data does not say which step comes first, or says it only for some characters, Everything Quests marks them all, so a few quest givers, such as one in Thunder Bluff and one in the Wetlands, show two to four quests with the same name.", classic = true, sub = "ChainGuide" },
+                { "Some Chain Guide zones belong to the other faction. On WoW Forever, Alliance characters see an Orgrimmar zone holding the Horde's Ahn'Qiraj war effort quests, and Horde characters an Ironforge zone holding the Alliance's, because those quests carry no faction in the quest data. Warlock class chains also list the other faction's warlock trainer, because the quest data gives a few of their quests to the wrong faction.", classic = true, sub = "ChainGuide" },
+                { "Many quest givers new to Forever have no name yet. Their markers still show where to go, but the tooltip, the Quest Browser and the Chain Guide cannot say who is standing there.", classic = true, sub = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.5.0", date = "2026-10-17",
         sections = {
             { head = "New Features", items = {

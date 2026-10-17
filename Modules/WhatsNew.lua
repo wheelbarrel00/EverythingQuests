@@ -5,6 +5,9 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.6.0", sections = {
+        { "211 more WoW Forever quests", "Everything Quests now knows 534 quests new to WoW Forever, up from 323, and marks 530 of them where you pick them up, with the most new ones in Tirisfal Glades, the Wetlands, Mulgore and Durotar. More of them also carry the level and faction they need, so fewer are marked before you can take them or for the wrong faction.", classic = true, sub = "ChainGuide" },
+    } },
     { version = "2.5.0", sections = {
         { "Open the Chain Guide from the tracker", "Right-click a quest on the tracker and pick Open Chain Guide to see its chain, with the quest highlighted. The menu offers it only for quests the Chain Guide lists.", sub = "ChainGuide" },
     } },

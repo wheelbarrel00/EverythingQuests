@@ -463,50 +463,22 @@ local collectedQuest = {}
 for id in pairs(newQuests) do collectedQuest[id] = true end
 
 local att = attDir and dofile((debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "tools/") .. "forever_att.lua")(attDir)
-local clientQuests = {}
+local clientQuests, clientBit, eraByBit = {}, {}, {}
 if questV2File then
     local csv = readAll(questV2File)
     assert(csv:match("^ID,"), questV2File .. " does not start with the ID column")
+    assert(csv:match("^ID,UniqueBitFlag[,\r\n]"), questV2File .. " does not have UniqueBitFlag as its second column")
     for line in csv:gmatch("[^\r\n]+") do
         local id = tonumber(line:match("^(%d+),"))
         if id then clientQuests[id] = true end
+        local bit = tonumber(line:match("^%d+,(%d+)"))
+        if id and bit and bit > 0 then
+            clientBit[id] = bit
+            if base.quests[id] then local l = sub(eraByBit, bit); l[#l + 1] = id end
+        end
     end
     assert(next(clientQuests), "no quest ids in " .. questV2File)
 end
-
--- ATT's own version number for WoW Forever 1.60.1, the one its awp and rwp fields use.
-local FOREVER_PATCH = 16001
-local ATT_UNOBTAINABLE = { [1] = "never implemented", [2] = "removed from the game" }
-local function attSkipReason(id, a)
-    if ATT_UNOBTAINABLE[a.unobtainable] then return ATT_UNOBTAINABLE[a.unobtainable] end
-    if a.addedIn and a.addedIn > FOREVER_PATCH then return "added after 1.60.1" end
-    if a.removedIn and a.removedIn <= FOREVER_PATCH then return "removed by 1.60.1" end
-    if a.variants then return "split by faction" end
-    if refusedByServer[id] and not titles[id] then return "refused by the server" end
-    if not clientQuests[id] then return "not in the client's quest table" end
-end
-
-local attQuests, attSkipped, attSkipNotes, skippedWhy = {}, {}, {}, {}
-for _, id in ipairs(sortedKeys(att and att.quests)) do
-    local a = att.quests[id]
-    if not base.quests[id] then
-        local why = attSkipReason(id, a)
-        if why and collectedQuest[id] then
-            attSkipNotes[#attSkipNotes + 1] = ("-- ATT KNOWN ANSWER MISMATCH: quest %d reads %s, but the collector saw it"):format(id, why)
-        end
-        if why and not collectedQuest[id] then
-            local list = sub(attSkipped, why)
-            list[#list + 1] = id
-            skippedWhy[id] = why
-        else
-            attQuests[id] = a
-            newQuests[id] = true
-        end
-    end
-end
-
-local qRows, nRows, oRows, iRows = {}, {}, {}, {}
-local needNpc, needObj, needItem = {}, {}, {}
 
 local RACE_BIT = { 1, 2, 4, 8, 16, 32, 64, 128 }
 -- Skyborne ids do not fit the Era mask, so each counts as its faction, read from Forever's ChrRaces table.
@@ -543,6 +515,73 @@ local function attRaceMask(a)
     if a.faction == 1 then return RACES_HORDE end
     if a.faction == 2 then return RACES_ALLIANCE end
 end
+
+-- ATT's own version number for WoW Forever 1.60.1, the one its awp and rwp fields use.
+local FOREVER_PATCH = 16001
+local SAME_AS_ERA = "the same quest as an Era quest"
+local ATT_UNOBTAINABLE = { [1] = "never implemented", [2] = "removed from the game" }
+local attSkipReason
+do
+    local function attCopySkip(a)
+        if ATT_UNOBTAINABLE[a.unobtainable] then return ATT_UNOBTAINABLE[a.unobtainable] end
+        if a.addedIn and a.addedIn > FOREVER_PATCH then return "added after 1.60.1" end
+        if a.removedIn and a.removedIn <= FOREVER_PATCH then return "removed by 1.60.1" end
+        if a.variants then return "split by faction" end
+    end
+
+    local function sameIds(list, want)
+        local have = {}
+        for _, v in ipairs(type(list) == "table" and list or {}) do have[v] = true end
+        for _, v in ipairs(want) do if not have[v] then return false end end
+        return count(have) == #want
+    end
+
+    -- The client gives every variant of a quest one completion bit, so an Era quest sharing it with the same givers and races is this quest listed again.
+    local function eraTwin(id, a)
+        if #a.givers + #a.objects == 0 then return nil end
+        for _, e in ipairs(eraByBit[clientBit[id]] or {}) do
+            local row = base.quests[e]
+            local sb = type(row[Q_STARTEDBY]) == "table" and row[Q_STARTEDBY] or {}
+            if sameIds(sb[1], a.givers) and sameIds(sb[2], a.objects) and (tonumber(row[Q_RACES]) or 0) == (attRaceMask(a) or 0) then
+                return e
+            end
+        end
+    end
+
+    function attSkipReason(id, a)
+        local why = attCopySkip(a)
+        -- A quest ATT lists twice stays in when any one of its copies not naming other givers passes these rules.
+        for _, alt in ipairs(a.alts or {}) do if why and not attCopySkip(alt) then why = nil end end
+        if why then return why end
+        if refusedByServer[id] and not titles[id] then return "refused by the server" end
+        if not clientQuests[id] then return "not in the client's quest table" end
+        local twin = eraTwin(id, a)
+        if twin then return SAME_AS_ERA, twin end
+    end
+end
+
+local attQuests, attSkipped, attSkipNotes, skippedWhy, twinOf = {}, {}, {}, {}, {}
+for _, id in ipairs(sortedKeys(att and att.quests)) do
+    local a = att.quests[id]
+    if not base.quests[id] then
+        local why, twin = attSkipReason(id, a)
+        if why and collectedQuest[id] then
+            attSkipNotes[#attSkipNotes + 1] = ("-- ATT KNOWN ANSWER MISMATCH: quest %d reads %s, but the collector saw it"):format(id, why)
+        end
+        if why and not collectedQuest[id] then
+            local list = sub(attSkipped, why)
+            list[#list + 1] = id
+            skippedWhy[id] = why
+            twinOf[id] = twin
+        else
+            attQuests[id] = a
+            newQuests[id] = true
+        end
+    end
+end
+
+local qRows, nRows, oRows, iRows = {}, {}, {}, {}
+local needNpc, needObj, needItem = {}, {}, {}
 
 local function attClassMask(a)
     local mask = 0
@@ -891,7 +930,10 @@ local attWaived = {}
 local function waived(fmt, ...) attWaived[#attWaived + 1] = ("-- att prerequisite waived: " .. fmt):format(...) end
 for _, qid in ipairs(sortedKeys(attQuests)) do
     local row, measured = qRows[qid], measuredPre[qid]
+    -- An Era quest's twin shares its completion bit, so a prerequisite on the twin is one on the Era quest.
+    measured = twinOf[measured] or measured
     for _, field in ipairs({ Q_PREGROUP, Q_PRESINGLE }) do
+        for i, p in ipairs(row[field] or {}) do row[field][i] = twinOf[p] or p end
         if row[field] then
             local kept = {}
             for _, p in ipairs(row[field]) do
@@ -1041,6 +1083,80 @@ local function lootPoints(objID)
     return pts
 end
 
+local attSoleGiver, attElsewhere, attSetAside = {}, { npc = {}, obj = {} }, {}
+do
+    -- ATT can give a giver another one's spot, so on a map where the collector targeted, killed or spoke to it only far from every ATT point, a sighting replaces them.
+    local SIGHT_PROOF = { SEEN_TARGET, SEEN_KILL, SEEN_TALK }
+    -- A sighting is where the player stood, often well away from the giver, so a map counts only when every ATT point there is over a tenth of the map from every sighting.
+    local SIGHT_REACH = 10
+    local attGiverPts = { npc = {}, obj = {} }
+
+    -- The giver's own row is placed by its dialogs, then its talk cells, so the replacement follows the same order.
+    local function attSighting(kind, id, ui)
+        local at = units[kind][id].at
+        for _, list in ipairs({ dialogPoints(kind, id), collapse(cellsWithBits(at, { SEEN_TALK })) }) do
+            for _, v in ipairs(list) do if decode(v) == ui then return v end end
+        end
+        -- Sightings scatter around where the giver stands, so one real sighting near their middle stands for them all.
+        local cells, sx, sy = {}, 0, 0
+        for _, v in ipairs(cellsWithBits(at, SIGHT_PROOF)) do
+            local cui, x, y = decode(v)
+            if cui == ui then cells[#cells + 1] = v; sx, sy = sx + x, sy + y end
+        end
+        local mx, my, best, bestD = sx / #cells, sy / #cells, nil, nil
+        for _, v in ipairs(cells) do
+            local _, x, y = decode(v)
+            local d = (x - mx) ^ 2 + (y - my) ^ 2
+            if not bestD or d < bestD then best, bestD = v, d end
+        end
+        return best
+    end
+    for _, qid in ipairs(sortedKeys(attQuests)) do
+        local a = attQuests[qid]
+        local kind, id = #a.givers == 1 and "npc" or "obj", a.givers[1] or a.objects[1]
+        -- An Era giver can stand in several places the dump knows, so one far sighting says nothing about ATT's point.
+        if #a.givers + #a.objects == 1 and not (kind == "npc" and base.npcs or base.objects)[id] then
+            attSoleGiver[qid] = { kind, id }
+            for _, p in ipairs(a.points) do local l = sub(attGiverPts[kind], id); l[#l + 1] = p end
+        end
+    end
+    for _, kind in ipairs({ "npc", "obj" }) do
+        for _, id in ipairs(sortedKeys(attGiverPts[kind])) do
+            local nearest = {}
+            for _, cell in ipairs(cellsWithBits(units[kind][id] and units[kind][id].at or {}, SIGHT_PROOF)) do
+                local ui, x, y = decode(cell)
+                for _, p in ipairs(attGiverPts[kind][id]) do
+                    if p[1] == ui then
+                        local d = math.sqrt((x - p[2]) ^ 2 + (y - p[3]) ^ 2)
+                        if not nearest[ui] or d < nearest[ui] then nearest[ui] = d end
+                    end
+                end
+            end
+            for _, ui in ipairs(sortedKeys(nearest)) do
+                if nearest[ui] > SIGHT_REACH then
+                    sub(attElsewhere[kind], id)[ui] = attSighting(kind, id, ui)
+                    attSetAside[#attSetAside + 1] = ("-- att giver point set aside: %s %d on map %d, its nearest sighting %.2f map units away")
+                        :format(kind, id, ui, nearest[ui])
+                end
+            end
+        end
+        for _, id in ipairs(sortedKeys(attPoints[kind])) do
+            local aside = attElsewhere[kind][id]
+            if aside then
+                local kept = {}
+                for _, v in ipairs(attPoints[kind][id]) do kept[#kept + 1] = aside[(decode(v))] or v end
+                attPoints[kind][id] = kept
+            end
+        end
+    end
+end
+
+local function attGiverElsewhere(qid, ui)
+    local g = attSoleGiver[qid]
+    local aside = g and attElsewhere[g[1]][g[2]]
+    return aside and aside[ui] or nil
+end
+
 for _, id in ipairs(sortedKeys(needNpc)) do
     if not base.npcs[id] then
         local u = units.npc[id] or {}
@@ -1119,8 +1235,8 @@ local function writeBlock(file, varName, rows, what, attFed)
     end
 end
 
--- Only dialogs that named a creature or object place a quest, the collector outranks ATT on a map, and ATT points carry a 1
-local ownStarts, ownStats = {}, { quests = 0, dialogs = 0, att = 0, contradicted = 0 }
+-- Dialogs that named a creature or object place a quest, the collector outranks ATT on a map, a set-aside giver's sighting stands in for ATT's point, and ATT points carry a 1
+local ownStarts, ownStats = {}, { quests = 0, dialogs = 0, att = 0, sightings = 0, contradicted = 0 }
 for _, qid in ipairs(sortedKeys(qRows)) do
     local st, a = starts[qid], attQuests[qid]
     local dialogs = {}
@@ -1137,6 +1253,7 @@ for _, qid in ipairs(sortedKeys(qRows)) do
         local ui, x, y = decode(v)
         list[#list + 1] = { areaFor(ui), x, y }
     end
+    local sighted = {}
     for _, p in ipairs(a and a.points or {}) do
         if packPoint(p[1], p[2], p[3]) then
             local seenOnMap, near = false, false
@@ -1149,6 +1266,14 @@ for _, qid in ipairs(sortedKeys(qRows)) do
             end
             if seenOnMap and not near then
                 ownStats.contradicted = ownStats.contradicted + 1
+            elseif not near and attGiverElsewhere(qid, p[1]) then
+                ownStats.contradicted = ownStats.contradicted + 1
+                if not sighted[p[1]] then
+                    sighted[p[1]] = true
+                    local _, x, y = decode(attGiverElsewhere(qid, p[1]))
+                    list[#list + 1] = { areaFor(p[1]), x, y }
+                    ownStats.sightings = ownStats.sightings + 1
+                end
             else
                 list[#list + 1] = { areaFor(p[1]), p[2], p[3], 1 }
                 ownStats.att = ownStats.att + 1
@@ -1191,77 +1316,79 @@ end
 
 io.stderr:write(("-- %d session(s) from %d file(s): %d new quest(s), %d creature(s), %d object(s), %d item(s), %d synthetic area(s)\n")
     :format(count(sessions), #sessionFiles, count(qRows), count(nRows), count(oRows), count(iRows), count(synthAreas)))
-io.stderr:write(("-- own starts: %d quest(s), %d dialog place(s), %d ATT point(s), %d ATT point(s) the collector contradicts on their map\n")
-    :format(ownStats.quests, ownStats.dialogs, ownStats.att, ownStats.contradicted))
+io.stderr:write(("-- own starts: %d quest(s), %d dialog place(s), %d ATT point(s), %d giver sighting(s) in place of ATT points, %d ATT point(s) the collector contradicts on their map\n")
+    :format(ownStats.quests, ownStats.dialogs, ownStats.att, ownStats.sightings, ownStats.contradicted))
 for _, line in ipairs(report) do io.stderr:write(line .. "\n") end
 
--- Every gate inferred for a quest the Era dump knows is graded against the dump on every run.
-local knownOk, knownBad = 0, 0
-local function checkKnown(what, qid, got, want, wantText)
-    if not base.quests[qid] then return end
-    if want == got then
-        knownOk = knownOk + 1
-    else
-        knownBad = knownBad + 1
-        io.stderr:write(("-- KNOWN ANSWER MISMATCH: quest %d %s reads %s, the Era dump says %s\n")
-            :format(qid, what, tostring(got), tostring(wantText or want)))
-    end
-end
-
-local nPre, nLevel, nDisputed = 0, 0, 0
-for _, qid in ipairs(sortedKeys(preSingle)) do
-    if type(preSingle[qid]) == "number" then
-        nPre = nPre + 1
-        local era = base.quests[qid] and base.quests[qid][Q_PRESINGLE]
-        -- The Era list is any-of, so a reading matching any entry is right.
-        local want = type(era) == "table" and (listHas(era, preSingle[qid]) and preSingle[qid] or era[1]) or nil
-        checkKnown("prerequisite", qid, preSingle[qid], want, type(era) == "table" and table.concat(era, " or ") or nil)
-    else
-        nDisputed = nDisputed + 1
-    end
-end
-for _, qid in ipairs(sortedKeys(reqLevel)) do
-    if type(reqLevel[qid]) == "number" then
-        nLevel = nLevel + 1
-        checkKnown("required level", qid, reqLevel[qid],
-                   base.quests[qid] and tonumber(base.quests[qid][Q_REQLEVEL]) or nil)
-    else
-        nDisputed = nDisputed + 1
-    end
-end
-
--- A title the server gave is graded against any name and level the collector or the Era dump already gave that quest.
-local tStats = { named = 0, same = 0, bad = 0, lvSame = 0, lvDiff = 0 }
-local tIssues = {}
-for _, qid in ipairs(sortedKeys(titles)) do
-    local r, meta, st, en = titles[qid], Q[qid] or {}, starts[qid], ends[qid]
-    local era = base.quests[qid]
-    local known = meta.n or (st and st.n) or (en and en.n) or (era and era[Q_NAME])
-    local knownLv = meta.lv or (st and st.qlv) or (en and en.qlv) or (era and tonumber(era[Q_QUESTLEVEL]))
-    if qRows[qid] and qRows[qid][Q_NAME] == r.n and not known then tStats.named = tStats.named + 1 end
-    if known then
-        if known == r.n then tStats.same = tStats.same + 1
+do
+    -- Every gate inferred for a quest the Era dump knows is graded against the dump on every run.
+    local knownOk, knownBad = 0, 0
+    local function checkKnown(what, qid, got, want, wantText)
+        if not base.quests[qid] then return end
+        if want == got then
+            knownOk = knownOk + 1
         else
-            tStats.bad = tStats.bad + 1
-            tIssues[#tIssues + 1] = ("-- TITLE KNOWN ANSWER MISMATCH: quest %d reads %q, the known name is %q"):format(qid, r.n, known)
+            knownBad = knownBad + 1
+            io.stderr:write(("-- KNOWN ANSWER MISMATCH: quest %d %s reads %s, the Era dump says %s\n")
+                :format(qid, what, tostring(got), tostring(wantText or want)))
         end
     end
-    if r.lv and knownLv then
-        if r.lv == knownLv then tStats.lvSame = tStats.lvSame + 1 else tStats.lvDiff = tStats.lvDiff + 1 end
-    end
-end
-if next(titles) then
-    io.stderr:write(("-- titles: %d read, %d name a quest nothing else names, %d known answer(s) confirmed, %d mismatch(es), quest level %d same %d differ\n")
-        :format(count(titles), tStats.named, tStats.same, tStats.bad, tStats.lvSame, tStats.lvDiff))
-    for _, line in ipairs(tIssues) do io.stderr:write(line .. "\n") end
-end
 
-io.stderr:write(("-- %d gate observation(s): %d prerequisite(s), %d required level(s), %d contradicted, %d known answer(s) confirmed, %d mismatch(es)\n")
-    :format(#observations, nPre, nLevel, nDisputed, knownOk, knownBad))
-for _, ob in ipairs(observations) do
-    io.stderr:write(("--   quest %d at %s, player level %s to %s: %s%s\n"):format(ob.quest, ob.src,
-        tostring(ob.lv1), tostring(ob.lv2), ob.verdict,
-        base.quests[ob.quest] and " [Era knows this quest]" or " [Forever only]"))
+    local nPre, nLevel, nDisputed = 0, 0, 0
+    for _, qid in ipairs(sortedKeys(preSingle)) do
+        if type(preSingle[qid]) == "number" then
+            nPre = nPre + 1
+            local era = base.quests[qid] and base.quests[qid][Q_PRESINGLE]
+            -- The Era list is any-of, so a reading matching any entry is right.
+            local want = type(era) == "table" and (listHas(era, preSingle[qid]) and preSingle[qid] or era[1]) or nil
+            checkKnown("prerequisite", qid, preSingle[qid], want, type(era) == "table" and table.concat(era, " or ") or nil)
+        else
+            nDisputed = nDisputed + 1
+        end
+    end
+    for _, qid in ipairs(sortedKeys(reqLevel)) do
+        if type(reqLevel[qid]) == "number" then
+            nLevel = nLevel + 1
+            checkKnown("required level", qid, reqLevel[qid],
+                       base.quests[qid] and tonumber(base.quests[qid][Q_REQLEVEL]) or nil)
+        else
+            nDisputed = nDisputed + 1
+        end
+    end
+
+    -- A title the server gave is graded against any name and level the collector or the Era dump already gave that quest.
+    local tStats = { named = 0, same = 0, bad = 0, lvSame = 0, lvDiff = 0 }
+    local tIssues = {}
+    for _, qid in ipairs(sortedKeys(titles)) do
+        local r, meta, st, en = titles[qid], Q[qid] or {}, starts[qid], ends[qid]
+        local era = base.quests[qid]
+        local known = meta.n or (st and st.n) or (en and en.n) or (era and era[Q_NAME])
+        local knownLv = meta.lv or (st and st.qlv) or (en and en.qlv) or (era and tonumber(era[Q_QUESTLEVEL]))
+        if qRows[qid] and qRows[qid][Q_NAME] == r.n and not known then tStats.named = tStats.named + 1 end
+        if known then
+            if known == r.n then tStats.same = tStats.same + 1
+            else
+                tStats.bad = tStats.bad + 1
+                tIssues[#tIssues + 1] = ("-- TITLE KNOWN ANSWER MISMATCH: quest %d reads %q, the known name is %q"):format(qid, r.n, known)
+            end
+        end
+        if r.lv and knownLv then
+            if r.lv == knownLv then tStats.lvSame = tStats.lvSame + 1 else tStats.lvDiff = tStats.lvDiff + 1 end
+        end
+    end
+    if next(titles) then
+        io.stderr:write(("-- titles: %d read, %d name a quest nothing else names, %d known answer(s) confirmed, %d mismatch(es), quest level %d same %d differ\n")
+            :format(count(titles), tStats.named, tStats.same, tStats.bad, tStats.lvSame, tStats.lvDiff))
+        for _, line in ipairs(tIssues) do io.stderr:write(line .. "\n") end
+    end
+
+    io.stderr:write(("-- %d gate observation(s): %d prerequisite(s), %d required level(s), %d contradicted, %d known answer(s) confirmed, %d mismatch(es)\n")
+        :format(#observations, nPre, nLevel, nDisputed, knownOk, knownBad))
+    for _, ob in ipairs(observations) do
+        io.stderr:write(("--   quest %d at %s, player level %s to %s: %s%s\n"):format(ob.quest, ob.src,
+            tostring(ob.lv1), tostring(ob.lv2), ob.verdict,
+            base.quests[ob.quest] and " [Era knows this quest]" or " [Forever only]"))
+    end
 end
 
 if att then
@@ -1316,6 +1443,19 @@ if att then
         io.stderr:write(("-- att skipped, %s: %s\n"):format(why, table.concat(attSkipped[why], " ")))
     end
     for _, line in ipairs(attWaived) do io.stderr:write(line .. "\n") end
+    for _, m in ipairs(att.merged) do
+        local gained = {}
+        if #m.filled > 0 then gained[#gained + 1] = "filled " .. table.concat(m.filled, ", ") end
+        if m.points > 0 then gained[#gained + 1] = ("%d point(s) added"):format(m.points) end
+        io.stderr:write(("-- att listed %d times: quest %d, %s\n"):format(m.copies, m.id, #gained > 0 and table.concat(gained, ", ") or "nothing new"))
+        for _, what in ipairs(m.conflicts) do
+            io.stderr:write(("-- ATT DUPLICATE CONFLICT: quest %d, %s: its copies disagree, the first copy's kept\n"):format(m.id, what))
+        end
+        for _, what in ipairs(m.opened) do
+            io.stderr:write(("-- ATT DUPLICATE CONFLICT: quest %d, %s: its copies disagree, so this check skips the quest only when every copy fails it\n"):format(m.id, what))
+        end
+    end
+    for _, line in ipairs(attSetAside) do io.stderr:write(line .. "\n") end
     for _, line in ipairs(attSkipNotes) do io.stderr:write(line .. "\n") end
     for _, line in ipairs(attIssues) do io.stderr:write(line .. "\n") end
 end
