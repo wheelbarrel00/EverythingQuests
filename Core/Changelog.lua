@@ -2,6 +2,21 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.5.0", date = "2026-10-17",
+        sections = {
+            { head = "New Features", items = {
+                { "Open the Chain Guide from the tracker. On retail and WoW Forever, the right-click menu of a quest on EQ Objective Tracker now has Open Chain Guide, below Open in Map & Quest Log. It opens the Chain Guide on that quest's chain with the quest highlighted, and it is there only for a quest the Chain Guide lists. A quest that sits in two chains opens the one you are following, as the quest log's Chain button does. Thanks to user_2igf1k3nab5s7rpa for the request.", sub = "ChainGuide" },
+            } },
+            { head = "Improvements", items = {
+                "Copy boxes keep their link. Every box in Everything Quests that shows a link to copy, such as the Discord invite or the links on the About tab, now puts the link back if you type over it, so a stray key can no longer change it before you copy it.",
+            } },
+            { head = "Bug Fixes", items = {
+                "Scroll bars drag the right way. In Everything Quests' windows, pressing a scroll bar's thumb made the view jump to the far end, so dragging seemed to run backwards. The thumb now stays where you pressed it and follows the cursor, and a press on the bar away from the thumb moves the thumb there.",
+                { "The Quest Browser's search box lets go of the keyboard. On Classic Era and Burning Crusade Classic, the search box kept the keyboard after you clicked somewhere else, so the keys you pressed to move typed into it instead. It now lets go as soon as you left-click outside it.", classic = true, sub = "QuestBrowser" },
+            } },
+        },
+    },
+    {
         version = "2.4.0", date = "2026-10-15",
         sections = {
             { head = "New Features", items = {

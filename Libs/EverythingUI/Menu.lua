@@ -11,8 +11,9 @@ local DIVIDER_SLOT = 9
 local MIN_WIDTH = 160
 local MAX_WIDTH = 320
 
-local ITEM_FIELDS = { kind = "string", text = "string", danger = "boolean", onClick = "function" }
-local KINDS = { title = true, divider = true }
+local ITEM_FIELDS = { kind = "string", text = "string", danger = "boolean", onClick = "function",
+                      checked = "boolean" }
+local KINDS = { title = true, divider = true, check = true }
 
 -- One menu serves every family addon for the session, as the dropdown list does, so two addons
 -- can never have a menu open at once. Kept in lib.shared, so a newer copy finds the same frame.
@@ -70,11 +71,27 @@ local function menu(ctx)
     return m
 end
 
+-- Painted as the settings checkbox is: a ticked box turns its fill and edge accent and shows the mark.
+local function paintBox(ctx, b)
+    local on = b._checked == true
+    b.box.fill:SetColorTexture(ctx:Color(on and "accent" or "input"))
+    for _, line in ipairs(b.box.edges) do line:SetColorTexture(ctx:Color(on and "accent" or "borderStrong")) end
+    b.box.mark:SetShown(on)
+end
+
 -- The action runs before the hide, the order Blizzard's own menu uses and the one the dialog
 -- needs: hidden first, a ReloadUI from its Yes was blocked on retail 12.1. Through xpcall so a
 -- raise cannot leave the menu on screen.
 local function click(b)
     local m = b:GetParent()
+    -- A check row ticks in place and leaves the menu up, so several can be set in one visit.
+    if b._kind == "check" then
+        b._checked = not b._checked
+        paintBox(b._ctx, b)
+        local action, on = b._onClick, b._checked
+        if action then xpcall(function() action(on) end, geterrorhandler()) end
+        return
+    end
     local gen = m.gen
     if b._onClick then xpcall(b._onClick, geterrorhandler()) end
     -- An action that opened the next menu keeps it up.
@@ -86,8 +103,8 @@ local function newRow(ctx, m)
     kit.Highlight(ctx, b)
     b.text = kit.Text(ctx, b, "label")
     b.data = kit.DataText(b)
+    -- The left edge is set on every paint, since a check row's text starts past its box.
     for _, fs in ipairs({ b.text, b.data }) do
-        fs:SetPoint("LEFT", PAD, 0)
         fs:SetPoint("RIGHT", -PAD, 0)
         fs:SetWordWrap(false)
     end
@@ -98,16 +115,46 @@ local function newRow(ctx, m)
     return b
 end
 
+-- Built the first time a row holds a check item rather than with the row, because the rows are
+-- shared for the session and one built by an older copy of the library has none.
+local function checkBox(ctx, b)
+    if b.box then return b.box end
+    local size = lib.tokens.spacing.checkbox
+    local box = CreateFrame("Frame", nil, b)
+    box:SetSize(size, size)
+    box:SetPoint("LEFT", PAD, 0)
+    box.fill = kit.Fill(ctx, box, "input")
+    box.edges = kit.Edge(ctx, box, "borderStrong")
+    box.mark = kit.Icon(ctx, box, "check", size, "accentText")
+    box.mark:SetPoint("CENTER")
+    b.box = box
+    return box
+end
+
 -- Every row is pooled and shared by every addon, so each one is painted whole on every open: a
 -- title, a danger item or a divider must leave nothing on the row the next menu gets.
 -- A string Barlow cannot draw goes to the second string, which only ever has the client's font.
 local function paint(ctx, b, item)
     local kind = item.kind
+    local check = kind == "check"
     b._kind = kind
+    b._ctx = ctx
     b._onClick = item.onClick
+    b._checked = nil
+    if check then b._checked = item.checked == true end
     b:SetHeight(kind == "divider" and DIVIDER_SLOT or lib.tokens.spacing.menuItemHeight)
-    b:EnableMouse(kind == nil)
+    b:EnableMouse(kind == nil or check)
     b.line:SetShown(kind == "divider")
+    if check then
+        checkBox(ctx, b):Show()
+        paintBox(ctx, b)
+    elseif b.box then
+        b.box:Hide()
+    end
+    local sp = lib.tokens.spacing
+    local inset = check and (PAD + sp.checkbox + sp.checkboxGap) or PAD
+    b.text:SetPoint("LEFT", inset, 0)
+    b.data:SetPoint("LEFT", inset, 0)
     if kind == "divider" then
         b.text:Hide()
         b.data:Hide()
@@ -135,6 +182,10 @@ local function layout(m)
         if b._kind ~= "divider" then
             local fs = b.data:IsShown() and b.data or b.text
             local w = fs:GetStringWidth() or 0
+            if b._kind == "check" then
+                local sp = lib.tokens.spacing
+                w = w + sp.checkbox + sp.checkboxGap
+            end
             if w > widest then widest = w end
         end
     end
@@ -142,8 +193,9 @@ local function layout(m)
     m:SetWidth(math.min(MAX_WIDTH, math.max(MIN_WIDTH, widest + PAD * 2 + 2)))
 end
 
--- A context menu at the cursor. items is a list of { kind, text, danger, onClick }: kind is nil
--- for an item, "title" or "divider". An item with no onClick only closes the menu.
+-- A context menu at the cursor. items is a list of { kind, text, danger, checked, onClick }: kind is
+-- nil for an item, "title", "divider" or "check". An item with no onClick only closes the menu. A
+-- check item ticks in place, hands onClick its new state and leaves the menu open.
 function Context:ShowMenu(items, owner)
     if type(items) ~= "table" or #items == 0 then
         error("EverythingUI: ShowMenu needs a list of items", 2)
@@ -167,6 +219,9 @@ function Context:ShowMenu(items, owner)
         if item.kind ~= "divider" and not item.text then
             error(("EverythingUI: ShowMenu item %d needs text"):format(i), 2)
         end
+        if item.checked ~= nil and item.kind ~= "check" then
+            error(("EverythingUI: ShowMenu item %d has checked but is not a check item"):format(i), 2)
+        end
     end
 
     local m = menu(self)
@@ -187,7 +242,10 @@ function Context:ShowMenu(items, owner)
     -- At UIParent's scale, as Blizzard's menu opens, whatever the scale of the frame clicked.
     -- Re-snapped on every open, because the UI scale can change between two.
     kit.SnapLines(m.edges)
-    for i = 1, #items do kit.SnapLines({ m.rows[i].line }) end
+    for i = 1, #items do
+        kit.SnapLines({ m.rows[i].line })
+        if m.rows[i].box then kit.SnapLines(m.rows[i].box.edges) end
+    end
     layout(m)
     local x, y = GetCursorPosition()
     local scale = UIParent:GetEffectiveScale()

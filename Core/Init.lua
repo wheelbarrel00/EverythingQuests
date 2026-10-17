@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 _G.EverythingQuests = ns
 ns.NAME = addonName
-ns.VERSION = "2.4.0"
+ns.VERSION = "2.5.0"
 
 ns.DISCORD_URL = "https://discord.gg/vm8K2WfQUE"
 
@@ -17,6 +17,7 @@ function ns:ShowDiscord()
         hasEditBox  = true,
         editBoxText = self.DISCORD_URL,
         highlightEditBox = true,
+        readOnly    = true,
     })
 end
 
@@ -31,6 +32,7 @@ function ns:ShowURL(url)
         hasEditBox  = true,
         editBoxText = url,
         highlightEditBox = true,
+        readOnly    = true,
     })
 end
 

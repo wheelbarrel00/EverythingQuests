@@ -73,6 +73,7 @@ function Context:CreateSearchField(parent, placeholder, onSubmit, tipTitle, tipB
         if text ~= "" then onSubmit(text) end
     end)
     paint()
+    kit.ReleaseOnClickAway(box, holder)
 
     holder.box = box
     holder.hint = hint

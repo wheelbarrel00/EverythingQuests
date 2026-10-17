@@ -5,6 +5,9 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.5.0", sections = {
+        { "Open the Chain Guide from the tracker", "Right-click a quest on the tracker and pick Open Chain Guide to see its chain, with the quest highlighted. The menu offers it only for quests the Chain Guide lists.", sub = "ChainGuide" },
+    } },
     { version = "2.4.0", sections = {
         { "The Promise of Tomorrow", "Patch 12.1.5's campaign has its own place in the Chain Guide with its chapters in order, the quests that take you into the Labyrinth of Kindo'jan are listed under Eversong Woods, and the Catalyst's Voidcore and Venomstone quests under Voidstorm. Following a chain now pins each step that is not in your quest log wherever the game gives its starting point on the map you are looking at.", retail = true },
         { "The game's own coordinates come first", "Everything Quests' coordinates under the minimap and on the world map now leave out whatever the game's own coordinates already show. The game turns those on by default. To keep Everything Quests' readouts, for example for two decimals, turn the game's off in its options under Map Coordinates.", sub = "ChainGuide" },

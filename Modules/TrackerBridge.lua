@@ -6,20 +6,20 @@ local Bridge = ns:RegisterSubsystem("TrackerBridge", {})
 local CHAIN_ICON = "Interface\\AddOns\\EverythingQuests\\Media\\chain.tga"
 local EQ_ICON    = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\eq-logo-v3.tga"
 
--- Header icons lay out right to left from EQOT's cogwheel, so the chain sits beside the cog
--- and EQ's logo goes outside it.
+-- Header icons run right to left from EQOT's cogwheel, so the chain sits next to it and EQ's logo beyond.
 local CHAIN_ORDER = 10
 local EQ_ORDER    = 20
 
 -- Lands between Focus (30) and Open in Map & Quest Log (40).
 local DIRECTIONS_ORDER = 35
+-- Lands between Open in Map & Quest Log (40) and Pop Out Quest Details (50).
+local CHAIN_MENU_ORDER = 45
 
 local function eqot()
     return _G.EQObjectiveTracker
 end
 
--- '## Dependencies:' cannot express a minimum version, so an older EQOT with no API module
--- satisfies it and still lands here nil.
+-- '## Dependencies:' cannot set a minimum version, so an EQOT without the API module lands here nil.
 local function api()
     local T = eqot()
     local mod = T and T.GetModule and T:GetModule("API")
@@ -36,8 +36,7 @@ function Bridge:ChainIconEnabled()
     return not DB or DB.db.profile.general.showChainGuideIcon ~= false
 end
 
--- Add and remove rather than dim, because the icon's visibility is EQ's setting and lives in
--- EQ's profile - EQOT's own dbKey mechanism can only read keys EQOT knows about.
+-- Added and removed here, since the setting lives in EQ's profile and EQOT's dbKey reads only its own.
 function Bridge:ApplyChainIcon()
     local A = api()
     if not A then return end
@@ -60,13 +59,38 @@ function Bridge:ApplyChainIcon()
     })
 end
 
+local function chainFor(questID)
+    local CG = ns:GetSubsystem("ChainGuide")
+    return questID and CG and CG.FindChainForQuest and CG:FindChainForQuest(questID) or nil
+end
+
+-- Shown only for a quest the Chain Guide lists, so no other quest gets a row that leads nowhere.
+function Bridge:ApplyChainMenu()
+    local A = api()
+    if not A or not ns:GetSubsystem("ChainGuide") then return end
+
+    A:AddMenuItem({
+        id         = "eq-chainguide",
+        providerID = "quests",
+        label      = L["Open Chain Guide"],
+        order      = CHAIN_MENU_ORDER,
+        shouldShow = function(_, questID) return chainFor(questID) ~= nil end,
+        onClick    = function(_, questID)
+            local chainID = chainFor(questID)
+            if not chainID then return end
+            local CG = ns:GetSubsystem("ChainGuide")
+            CG:Open()
+            CG:NavigateChain(chainID, questID)
+        end,
+    })
+end
+
 function Bridge:EQIconEnabled()
     local DB = ns:GetSubsystem("DB")
     return not DB or DB.db.profile.general.showEQIcon ~= false
 end
 
--- The tracker's cogwheel opens EQOT's options, so without this there is no icon on the tracker
--- that reaches Everything Quests.
+-- EQOT's cogwheel opens its own options, so this icon is the tracker's only way into EQ's options.
 function Bridge:ApplyEQIcon()
     local A = api()
     if not A then return end
@@ -99,8 +123,7 @@ function Bridge:OpenTrackerOptions()
     return false
 end
 
--- The tracker announces its focused row but has no coordinates of its own, and EQ owns the
--- quest database, so the arrow is placed here.
+-- EQOT announces the focused row without coordinates, and EQ owns the quest data, so EQ places the arrow.
 function Bridge:ApplyFocusArrow()
     local A = api()
     if not (A and A.AddFocusListener) then return end
@@ -108,14 +131,11 @@ function Bridge:ApplyFocusArrow()
 
     A:AddFocusListener({
         id      = "eq-quest-arrow",
-        -- The id space is only a quest id for the quests provider. Anything else sharing the
-        -- announcement would place an arrow for whichever quest happened to share its number.
+        -- Only the quests provider's entry ids are quest ids.
         onFocus = function(providerID, entryID)
             local Arrow = ns:GetSubsystem("QuestArrow")
             if not Arrow or providerID ~= "quests" then return end
-            -- EQOT sends one announcement per change with no intervening clear, so a quest EQ
-            -- cannot place has to take the old arrow down. Leaving it points TomTom at one quest
-            -- while the tracker highlights another.
+            -- EQOT sends no clear between two follows, so a quest EQ cannot place takes the old arrow down.
             -- An arrow the Chain Guide set for this very quest follows the game's point, which EQ's tables may lack
             if not (entryID and (Arrow:PointAtQuest(entryID) or (Arrow.Refresh and Arrow:Refresh(entryID)))) then
                 Arrow:Clear()
@@ -205,6 +225,7 @@ function Bridge:OnEnable()
             end,
         })
     end
+    self:ApplyChainMenu()
 
     self:ApplyChainIcon()
     self:ApplyEQIcon()

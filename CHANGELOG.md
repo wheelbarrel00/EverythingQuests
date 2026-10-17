@@ -5,6 +5,23 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-10-17
+
+On retail and WoW Forever, right-click a quest on the tracker to open the Chain Guide on its chain, and on Classic Era and Burning Crusade Classic the Quest Browser's search box lets go of the keyboard when you left-click elsewhere. Scroll bars in Everything Quests' windows also drag the right way.
+
+### New Features
+
+- **Open the Chain Guide from the tracker.** On retail and WoW Forever, the right-click menu of a quest on EQ Objective Tracker now has Open Chain Guide, below Open in Map & Quest Log. It opens the Chain Guide on that quest's chain with the quest highlighted, and it is there only for a quest the Chain Guide lists. A quest that sits in two chains opens the one you are following, as the quest log's Chain button does. Thanks to user_2igf1k3nab5s7rpa for the request.
+
+### Improvements
+
+- **Copy boxes keep their link.** Every box in Everything Quests that shows a link to copy, such as the Discord invite or the links on the About tab, now puts the link back if you type over it, so a stray key can no longer change it before you copy it.
+
+### Bug Fixes
+
+- **Scroll bars drag the right way.** In Everything Quests' windows, pressing a scroll bar's thumb made the view jump to the far end, so dragging seemed to run backwards. The thumb now stays where you pressed it and follows the cursor, and a press on the bar away from the thumb moves the thumb there.
+- **The Quest Browser's search box lets go of the keyboard.** On Classic Era and Burning Crusade Classic, the search box kept the keyboard after you clicked somewhere else, so the keys you pressed to move typed into it instead. It now lets go as soon as you left-click outside it.
+
 ## [2.4.0] - 2026-10-15
 
 The Chain Guide covers patch 12.1.5: the new campaign, The Promise of Tomorrow, the way into the Labyrinth of Kindo'jan, and the Catalyst's Voidcore and Venomstone quests. Everything Quests' coordinates also make way for the game's own.

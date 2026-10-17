@@ -16,7 +16,7 @@ local BUTTON_BOTTOM = 16
 local DIALOG_FIELDS = {
     title = "string", text = "string", button1 = "string", button2 = "string",
     onAccept = "function", onCancel = "function", hasEditBox = "boolean", maxLetters = "number",
-    editBoxText = "string", highlightEditBox = "boolean", danger = "boolean",
+    editBoxText = "string", highlightEditBox = "boolean", danger = "boolean", readOnly = "boolean",
 }
 
 local function finish(f, accepted)
@@ -156,6 +156,14 @@ local function build(ctx)
     kit.Edge(ctx, edit, "inputBorder")
     edit:SetScript("OnEscapePressed", function() finish(f, false) end)
     edit:SetScript("OnEnterPressed", function() finish(f, true) end)
+    -- A read-only field, such as a link to copy, undoes a keystroke and stays selected for Ctrl+C.
+    edit:SetScript("OnTextChanged", function(b, userInput)
+        local o = f.opts
+        if o and o.readOnly and userInput and b:GetText() ~= (o.editBoxText or "") then
+            b:SetText(o.editBoxText or "")
+            b:HighlightText()
+        end
+    end)
     edit:Hide()
     f.edit = edit
 
@@ -168,9 +176,9 @@ local function build(ctx)
 end
 
 -- A confirm or a prompt: a surface card with a title, its text, an optional field, a primary button
--- (a danger one with danger set, for a confirm that erases something) and an optional secondary
--- one. Opening one over another cancels the first, so no callback is ever silently dropped. Each
--- context has its own dialog, in its own accent.
+-- (a danger one with danger set, for a confirm that erases or resets something) and an optional
+-- secondary one. Opening one over another cancels the first, so no callback is ever silently dropped.
+-- Each context has its own dialog, in its own accent.
 function Context:ShowDialog(opts)
     if type(opts) ~= "table" or type(opts.title) ~= "string" or type(opts.text) ~= "string"
             or type(opts.button1) ~= "string" then
@@ -180,6 +188,9 @@ function Context:ShowDialog(opts)
         if DIALOG_FIELDS[key] ~= type(v) then
             error(("EverythingUI: ShowDialog got a bad or unknown field %s"):format(tostring(key)), 2)
         end
+    end
+    if opts.readOnly and not opts.hasEditBox then
+        error("EverythingUI: ShowDialog's readOnly needs hasEditBox", 2)
     end
     local f = self._dialog
     if not f then
@@ -222,7 +233,7 @@ function Context:ShowDialog(opts)
         edit:SetCursorPosition(0)
         edit:SetFocus()
         -- After SetFocus, which clears any selection of its own.
-        if opts.highlightEditBox then edit:HighlightText() end
+        if opts.highlightEditBox or opts.readOnly then edit:HighlightText() end
     else
         edit:Hide()
     end

@@ -60,8 +60,7 @@ local function ensureClassColorButton(ctx)
         local r, g, bl = classColor()
         if not r then return end
         -- SetColorRGB does not reliably move the 10.2.5+ picker, so re-open it seeded instead.
-        -- The reopen takes an addon-space alpha. With no box calibrate latches false, so the
-        -- conversion below is a no-op while the gate above holds and insurance if it widens.
+        -- The reopen takes an addon-space alpha, so a control that runs backwards is read backwards.
         local raw = ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha()
         local a = 1
         if type(raw) == "number" then
@@ -89,9 +88,9 @@ function Context:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
     -- color the picker was opened on rather than the seeded class color.
     local origR, origG, origB, origA = r, g, b, a
 
-    -- ElvUI's alpha box and the slider under it disagree about which end is opaque on 1.15.9:
-    -- a slider at 0.85 shows 15, and its Class button writes 0 meaning opaque, which this addon
-    -- stored as transparent. Whether Blizzard or ElvUI has it backwards is UNMEASURED.
+    -- Blizzard's Classic opacity slider runs backwards, 0 meaning opaque: its chat window seeds 1 - alpha
+    -- and reads 1 - GetColorAlpha(). ElvUI's box shows the true alpha (a slider at 0.85 shows 15), and
+    -- its Class button writes 0 for opaque. The Mainline picker (retail, Forever) reads straight.
 
     -- The alpha the picker addon's box is SHOWING, as a fraction. nil covers a box that is
     -- absent, unreadable, or reporting a percentage outside 0 to 100.
@@ -127,7 +126,7 @@ function Context:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
     end
 
     -- The control's own value for an addon-space alpha. Once the convention is known the seed
-    -- goes in right way round, which is what spares every later open a corrective write.
+    -- goes in right way around, which is what spares every later open a corrective write.
     local function controlValue(v)
         if state.alphaInverted then return 1 - v end
         return v
@@ -142,12 +141,13 @@ function Context:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
         cp.opacityFunc = fn
     end
 
-    -- Settles state.alphaInverted on the first open that can answer. No box at all is taken as
-    -- the game's own picker. A reading at an alpha near 0.5 cannot tell the two conventions apart,
-    -- so it probes where they differ rather than guessing.
+    -- Settles state.alphaInverted on the first open that can answer. Only the Classic picker has
+    -- OpacitySliderFrame, and with no picker addon's box on it that is Blizzard's own, which runs
+    -- backwards. A box reading near 0.5 cannot tell the two conventions apart, so it probes where
+    -- they differ rather than guessing.
     local function calibrate(na)
         if state.alphaInverted ~= nil or not (hasAlpha and OpacitySliderFrame) then return end
-        if not _G.ColorPPBoxA then state.alphaInverted = false return end
+        if not _G.ColorPPBoxA then state.alphaInverted = true return end
         local shown = shownAlpha()
         if not shown then return end
         local inverted = math.abs(shown - (1 - na)) < 0.01

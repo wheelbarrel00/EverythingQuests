@@ -100,9 +100,9 @@ Nothing was lost in the move. Existing users keep their position, size, fonts, c
 | **Everything Quests settings** | The Everything Quests logo beside the cogwheel, the minimap button, or `/eqs` |
 | **Chain Guide** (retail and WoW Forever) | The chain icon on the tracker, or `/eqs chain` |
 
-The Everything Quests icon on the tracker, and on retail and WoW Forever the Chain Guide icon, can each be switched off under `/eqs` > General. On retail and WoW Forever, Everything Quests also adds **Get Directions** to a quest's right-click menu on the tracker.
+The Everything Quests icon on the tracker, and on retail and WoW Forever the Chain Guide icon, can each be switched off under `/eqs` > General. On retail and WoW Forever, Everything Quests also adds **Get Directions** to a quest's right-click menu on the tracker, and **Open Chain Guide** for a quest the Chain Guide lists.
 
-**Prefer Blizzard's own tracker?** Tick **Use Blizzard's quest tracker** in the Tracker section of `/eqs` > General, or the same checkbox on EQ Objective Tracker's General tab. The interface reloads, the tracker window is gone and the game's own quest tracker is back, while everything else in Everything Quests keeps working. The tracker icons and Get Directions go with the window, so open Everything Quests with `/eqs` or the minimap button. "Only show markers for quests you are tracking" then follows the game's own tracked quests. On Classic Era and Burning Crusade Classic the game's tracker starts with nothing watched, so shift-click quests in the quest log to watch them, up to the game's limit of five. Untick the box to get the tracker window back, again after a reload.
+**Prefer Blizzard's own tracker?** Tick **Use Blizzard's quest tracker** in the Tracker section of `/eqs` > General, or the same checkbox on EQ Objective Tracker's General tab. The interface reloads, the tracker window is gone and the game's own quest tracker is back, while everything else in Everything Quests keeps working. The tracker icons, Get Directions and Open Chain Guide go with the window, so open Everything Quests with `/eqs` or the minimap button. "Only show markers for quests you are tracking" then follows the game's own tracked quests. On Classic Era and Burning Crusade Classic the game's tracker starts with nothing watched, so shift-click quests in the quest log to watch them, up to the game's limit of five. Untick the box to get the tracker window back, again after a reload.
 
 If the tracker is missing, check that EQ Objective Tracker is enabled in your AddOns list and that Use Blizzard's quest tracker is off. `/eqot status` prints what the tracker is doing and is the most useful thing to include in a bug report.
 
@@ -148,6 +148,7 @@ A standalone window for browsing quest chains, in the same style as the options 
 - **Lazy-built** — The window is constructed on first toggle to keep load times minimal
 - **Resizable** — Drag the grip in the bottom right corner, or use the maximize button beside the close button to fill the screen and back. The window remembers which you chose, and at a large window scale it shrinks to fit your screen
 - **Chain button** — The quest log's details pane has a Chain button that opens the quest's chain
+- **From the tracker** — Right-click a quest on the tracker and pick Open Chain Guide to open its chain with the quest highlighted (since v2.5.0)
 
 Currently covers the Midnight expansion: **Eversong Woods**, **Zul'Aman**, **Harandar**, **Arator**, **Voidstorm**, **The Sunstrider Omnium**, **Void Acropolis** and **The Coiled Isle**, plus the live **Midnight Campaign**, **The War of Light and Shadow**, **The Curse of Ula'tek** and **The Promise of Tomorrow** storylines.
 

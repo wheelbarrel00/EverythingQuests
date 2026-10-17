@@ -18,8 +18,14 @@ local SWATCH_GAP = 8
 local SPEAKER = 20
 local SPEAKER_GAP = 4
 local SUFFIX_GAP = 8
--- The family's no-sound value. Previewing it can only ever be silent.
+-- A border sample is its own size: four EDGE_SIZE corners have to leave a visible straight run
+-- between them or every edge file draws as the same corner blob.
+local EDGE_W, EDGE_H, EDGE_SIZE = 28, 18, 6
+-- The family's no-sound value, compared ignoring case (Cooldown Master saves "None"). Previewing
+-- it can only ever be silent.
 local NO_SOUND = "NONE"
+
+local paintRows
 
 -- One popup and one row pool serve every dropdown of every family addon for the session. Kept
 -- in lib.shared, so a newer copy loading later finds the same popup rather than a second one.
@@ -37,7 +43,8 @@ local function popup(ctx)
     sf:SetPoint("BOTTOMRIGHT", -1, POPUP_INSET)
     bar:SetPoint("TOPRIGHT", -3, -POPUP_INSET)
     bar:SetPoint("BOTTOMRIGHT", -3, POPUP_INSET)
-    p.scroll, p.content, p.bar, p.rows = sf, content, bar, {}
+    p.scroll, p.content, p.bar, p.rows, p.todo = sf, content, bar, {}, {}
+    bar:HookScript("OnValueChanged", function() paintRows(p) end)
     kit.CloseOnEscape(p)
 
     -- A click anywhere outside the list closes it. Hooked rather than set, so the Escape
@@ -74,21 +81,23 @@ local function placeText(holder, left)
     end
 end
 
+-- A face counts only when GetFont reads its own path back. A file that fails to load leaves the
+-- string with no font at all, a path LibSharedMedia still names after its addon is gone makes
+-- SetFont throw, and a face can also fail by returning false and keeping the PREVIOUS one.
+local function previewFace(fs, path)
+    if not path or path == "" then return false end
+    return pcall(fs.SetFont, fs, path, PREVIEW_SIZE, "") and fs:GetFont() == path
+end
+
 -- SetFont in BOTH directions, because an explicit SetFont is what has to be undone and
 -- SetFontObject was observed not undoing it: the shared popup's rows are pooled across every
 -- dropdown, and a font list left its faces on the profile and sound lists that reused them.
--- Success is read back with GetFont rather than from SetFont's return value, which is only
--- documented for EditBox - a file that fails to load leaves the string with no font at all.
 -- A string Barlow cannot draw goes to the second string, which only ever has the client's font.
 local function setLabel(ctx, holder, s, path, color)
     local themed, data = holder.text, holder.data
-    if path and path ~= "" then
-        themed:SetFont(path, PREVIEW_SIZE, "")
-        if not themed:GetFont() then kit.Style(ctx, themed, "label") end
-    else
-        kit.Style(ctx, themed, "label")
-    end
-    local useData = not (path and path ~= "") and kit.NeedsClientFont(s)
+    local previewed = previewFace(themed, path)
+    if not previewed then kit.Style(ctx, themed, "label") end
+    local useData = not previewed and kit.NeedsClientFont(s)
     themed:SetTextColor(ctx:Color(color))
     data:SetTextColor(ctx:Color(color))
     themed:SetText(s)
@@ -97,9 +106,28 @@ local function setLabel(ctx, holder, s, path, color)
     data:SetShown(useData)
 end
 
--- One popup is shared by every dropdown, so a row that grew a swatch has to give it back
--- when a plain list reuses it.
-local function decorateRow(b, value, decorate)
+-- Built on first use, since most lists never show a border. SetBackdrop rebuilds a NineSlice, so it
+-- runs only when this frame's border changes.
+local function paintEdge(holder, path)
+    local edge = holder.edge
+    if not edge then
+        edge = CreateFrame("Frame", nil, holder, BackdropTemplateMixin and "BackdropTemplate" or nil)
+        edge:SetSize(EDGE_W, EDGE_H)
+        edge:SetPoint("LEFT", PAD, 0)
+        holder.edge = edge
+    end
+    if path == "" then path = nil end
+    if edge._path ~= path and edge.SetBackdrop then
+        edge._path = path
+        edge:SetBackdrop(path and { edgeFile = path, edgeSize = EDGE_SIZE } or nil)
+        if path then edge:SetBackdropBorderColor(1, 1, 1, 1) end
+    end
+    edge:SetShown(path ~= nil)
+end
+
+-- One popup is shared by every dropdown, so a row that grew a swatch or a border has to give it
+-- back when a plain list reuses it.
+local function decorateRow(b, value, decorate, previewEdge)
     if decorate then
         if not b.swatch then
             b.swatchBg = b:CreateTexture(nil, "BACKGROUND")
@@ -119,7 +147,12 @@ local function decorateRow(b, value, decorate)
             b.swatchBg:Hide()
             b.swatch:Hide()
         end
-        placeText(b, PAD)
+        placeText(b, previewEdge and (PAD + EDGE_W + SWATCH_GAP) or PAD)
+    end
+    if previewEdge then
+        paintEdge(b, previewEdge(value))
+    elseif b.edge then
+        b.edge:Hide()
     end
 end
 
@@ -137,7 +170,78 @@ local function newRow(ctx, p)
     return b
 end
 
-local function showList(ctx, anchor, opts, onPick, decorate, current, previewFont)
+-- Enough rows to fill the list plus one for a part-scrolled line (a row per option made 124 KB of
+-- garbage per open of 495 textures on Era). Option i takes row (i - 1) % pool + 1, so only a row
+-- coming into view is painted.
+function paintRows(p)
+    local opts, rows = p.opts, p.rows
+    local sp = lib.tokens.spacing
+    local rowH, pool = sp.popupRowHeight, sp.popupMaxRows + 1
+    local first = math.floor((p.bar:GetValue() or 0) / rowH) + 1
+    local last = math.min(#opts, first + pool - 1)
+    for k = 1, #rows do
+        if first + (k - first) % pool > last then
+            rows[k]:Hide()
+            rows[k]._index = nil
+        end
+    end
+    local todo, n = p.todo, 0
+    for i = first, last do
+        local b = rows[(i - 1) % pool + 1]
+        if b._index ~= i or b._open ~= p.opens then
+            n = n + 1
+            todo[n] = i
+        end
+    end
+    local ctx, onPick, current = p.ctx, p.onPick, p.current
+    local decorate, previewFont, previewEdge = p.decorate, p.previewFont, p.previewEdge
+    local getTip = ctx.opts.tooltip
+    for t = 1, n do
+        local i = todo[t]
+        local b = rows[(i - 1) % pool + 1]
+        local opt = opts[i]
+        local tip = getTip()
+        local hadTip = tip:IsShown() and tip:IsOwned(b)
+        -- Hidden and unmarked while painted, so a host callback raising partway never leaves a row
+        -- showing at its new place with the option it had before.
+        b:Hide()
+        b._index = nil
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT",  p.content, "TOPLEFT",  0, -(i - 1) * rowH)
+        b:SetPoint("TOPRIGHT", p.content, "TOPRIGHT", 0, -(i - 1) * rowH)
+        b.suffix:SetText(opt.suffix or "")
+        decorateRow(b, opt.value, decorate, previewEdge)
+        -- Marked so 42 fonts or 27 sounds do not open with nothing saying which one is in use.
+        local isActive = (opt.value == current)
+        setLabel(ctx, b, opt.label, previewFont and previewFont(opt.value), isActive and "accentHi" or "text")
+        -- Set rather than hooked, so a row that carried a tip in one list carries none into the next.
+        if opt.tip then
+            local title, body = opt.label, opt.tip
+            -- Beside the list: above the hovered option it would cover the options over it.
+            b:SetScript("OnEnter", function(s) kit.ShowTip(getTip, s, title, body, "ANCHOR_RIGHT") end)
+            b:SetScript("OnLeave", function() getTip():Hide() end)
+        else
+            b:SetScript("OnEnter", nil)
+            b:SetScript("OnLeave", nil)
+        end
+        -- The pick runs before the hide, as the dialog's buttons do, because a pick can reload the
+        -- UI (a profile list does), and a ReloadUI from the dialog's Yes was blocked on retail 12.1
+        -- while the dialog hid first.
+        b:SetScript("OnClick", function()
+            xpcall(function() onPick(opt.value) end, geterrorhandler())
+            p:Hide()
+        end)
+        b:Show()
+        -- A scroll of eleven rows or more in one frame can hand the row under a still cursor another
+        -- option with no fresh OnEnter, so the tip it was showing follows the new option.
+        if hadTip then
+            if opt.tip then kit.ShowTip(getTip, b, opt.label, opt.tip, "ANCHOR_RIGHT") else tip:Hide() end
+        end
+        b._index, b._open = i, p.opens
+    end
+end
+
+local function showList(ctx, anchor, opts, onPick, decorate, current, previewFont, previewEdge)
     local sp = lib.tokens.spacing
     local p = popup(ctx)
     -- The popup hangs off UIParent, so it does not inherit the window's scale. Matching the
@@ -170,44 +274,17 @@ local function showList(ctx, anchor, opts, onPick, decorate, current, previewFon
     local scrolls = #opts > maxRows
     p.scroll:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", scrolls and -BAR_ROOM or -1, POPUP_INSET)
 
-    local getTip = ctx.opts.tooltip
+    p.ctx, p.opts, p.onPick, p.current = ctx, opts, onPick, current
+    p.decorate, p.previewFont, p.previewEdge = decorate, previewFont, previewEdge
+    p.opens = (p.opens or 0) + 1
     local activeIndex
     for i = 1, #opts do
-        local b = p.rows[i]
-        if not b then
-            b = newRow(ctx, p)
-            p.rows[i] = b
-        end
-        local opt = opts[i]
-        b:ClearAllPoints()
-        b:SetPoint("TOPLEFT",  p.content, "TOPLEFT",  0, -(i - 1) * rowH)
-        b:SetPoint("TOPRIGHT", p.content, "TOPRIGHT", 0, -(i - 1) * rowH)
-        b.suffix:SetText(opt.suffix or "")
-        decorateRow(b, opt.value, decorate)
-        -- Marked so 42 fonts or 27 sounds do not open with nothing saying which one is in use.
-        local isActive = (opt.value == current)
-        if isActive then activeIndex = i end
-        setLabel(ctx, b, opt.label, previewFont and previewFont(opt.value), isActive and "accentHi" or "text")
-        -- Set rather than hooked, so a row that carried a tip in one list carries none into the next.
-        if opt.tip then
-            local title, body = opt.label, opt.tip
-            -- Beside the list, as before: above the hovered option it would cover the options over it.
-            b:SetScript("OnEnter", function(s) kit.ShowTip(getTip, s, title, body, "ANCHOR_RIGHT") end)
-            b:SetScript("OnLeave", function() getTip():Hide() end)
-        else
-            b:SetScript("OnEnter", nil)
-            b:SetScript("OnLeave", nil)
-        end
-        -- The pick runs before the hide, as the dialog's buttons do, because a pick can reload the
-        -- UI (a profile list does), and a ReloadUI from the dialog's Yes was blocked on retail 12.1
-        -- while the dialog hid first.
-        b:SetScript("OnClick", function()
-            xpcall(function() onPick(opt.value) end, geterrorhandler())
-            p:Hide()
-        end)
-        b:Show()
+        if opts[i].value == current then activeIndex = i end
     end
-    for i = #opts + 1, #p.rows do p.rows[i]:Hide() end
+    for k = #p.rows + 1, math.min(#opts, maxRows + 1) do p.rows[k] = newRow(ctx, p) end
+    -- Hidden until painted, so a host callback raising partway leaves no row showing the last list
+    -- with its pick still attached.
+    for _, r in ipairs(p.rows) do r:Hide() end
 
     -- Taken from the anchor rather than the popup: the popup's own width is only two
     -- SetPoints old here and has not resolved yet.
@@ -230,6 +307,7 @@ local function showList(ctx, anchor, opts, onPick, decorate, current, previewFon
     p.bar:SetMinMaxValues(0, maxScroll)
     p.bar:SetShown(scrolls)
     p.bar:SetValue(want)
+    paintRows(p)
 end
 
 -- options is a list of { value =, label = } pairs, or a function returning one that is
@@ -241,7 +319,16 @@ end
 -- previewFont(value) returns a font file to draw that row's own label in, which is the only
 -- preview a font list can have - a swatch cannot show a typeface.
 -- onTest(value) adds a speaker button left of the field that replays the current pick.
-function Context:CreateDropdown(content, label, options, getter, setter, tooltip, decorate, onTest, previewFont)
+-- previewEdge(value) returns a border's edge file, drawn as a small framed sample in the swatch's
+-- place on the closed field and on every row. A dropdown takes decorate or previewEdge, not both.
+function Context:CreateDropdown(content, label, options, getter, setter, tooltip, decorate, onTest, previewFont,
+                                previewEdge)
+    if previewEdge and type(previewEdge) ~= "function" then
+        error("EverythingUI: CreateDropdown's previewEdge must be a function", 2)
+    end
+    if decorate and previewEdge then
+        error("EverythingUI: CreateDropdown takes decorate or previewEdge, not both", 2)
+    end
     local sp = lib.tokens.spacing
     local ctx = self
     local holder = CreateFrame("Frame", nil, content)
@@ -302,7 +389,8 @@ function Context:CreateDropdown(content, label, options, getter, setter, tooltip
         local after = (btn.suffix:GetText() or "") ~= ""
         for _, fs in ipairs({ btn.text, btn.data }) do
             fs:ClearAllPoints()
-            fs:SetPoint("LEFT", decorate and (PAD + SWATCH_W + SWATCH_GAP) or PAD, 0)
+            fs:SetPoint("LEFT", decorate and (PAD + SWATCH_W + SWATCH_GAP) or previewEdge and (PAD + EDGE_W + SWATCH_GAP)
+                or PAD, 0)
             if after then
                 fs:SetPoint("RIGHT", btn.suffix, "LEFT", -SUFFIX_GAP, 0)
             else
@@ -316,8 +404,9 @@ function Context:CreateDropdown(content, label, options, getter, setter, tooltip
     local function refresh()
         local current = getter()
         if decorate then decorate(btn, current) end
+        if previewEdge then paintEdge(btn, previewEdge(current)) end
         -- Hidden rather than left to look broken.
-        if speaker then speaker:SetShown(current ~= nil and current ~= NO_SOUND) end
+        if speaker then speaker:SetShown(current ~= nil and tostring(current):upper() ~= NO_SOUND) end
         local shown, suffix = tostring(current or ""), ""
         for _, opt in ipairs(resolveOptions()) do
             if opt.value == current then
@@ -335,7 +424,7 @@ function Context:CreateDropdown(content, label, options, getter, setter, tooltip
         showList(ctx, btn, resolveOptions(), function(v)
             setter(v)
             refresh()
-        end, decorate, getter(), previewFont)
+        end, decorate, getter(), previewFont, previewEdge)
     end)
 
     holder.button  = btn

@@ -19,6 +19,10 @@ local PICKER_GAP = 8
 local ICON_SIZE = 16
 local TEXT_GAP = 4
 local BULLET_INDENT = 12
+local FIELD_PAD = 10
+local ENTRY_HEIGHT = 24
+local ENTRY_INSET = 2
+local ENTRY_LETTERS = 12
 
 local function stripEscapes(s)
     if not s then return "" end
@@ -52,6 +56,8 @@ function Context:AttachTooltip(frame, title, body)
     local targets = { frame }
     if frame.slider then targets[#targets + 1] = frame.slider end
     if frame.button then targets[#targets + 1] = frame.button end
+    if frame.field then targets[#targets + 1] = frame.field end
+    if frame.box then targets[#targets + 1] = frame.box end
 
     local getTip = self.opts.tooltip
     -- Placed off the control's own frame whichever part is hovered, so a slider's track and its
@@ -261,7 +267,7 @@ function Context:CreateCheckbox(content, label, getter, setter, tooltip, icon)
         for _, line in ipairs(edges) do line:SetColorTexture(ctx:Color(on and "accent" or "borderStrong")) end
         mark:SetShown(on)
     end
-    -- A tab that puts the box back by hand, after a cancelled dialog, has to repaint it too.
+    -- A tab that puts the box back by hand, after a canceled dialog, has to repaint it too.
     local setChecked = cb.SetChecked
     cb.SetChecked = function(btn, v)
         setChecked(btn, v)
@@ -327,6 +333,20 @@ function Context:CreateTextRow(content, label, text)
     holder:SetLabelWidth(lib.tokens.spacing.labelColumn)
     return holder
 end
+
+-- Unlike retail and Forever, Classic keeps the keyboard on a click elsewhere, so this lets go as Mainline's
+-- ClearCurrentKeyboardFocus does: on a left click with no modifier held. Called after the box's own focus
+-- scripts, since SetScript drops hooks. A client without the event raises on it.
+local function releaseOnClickAway(box, area)
+    if not pcall(box.RegisterEvent, box, "GLOBAL_MOUSE_DOWN") then return end
+    box:UnregisterEvent("GLOBAL_MOUSE_DOWN")
+    box:SetScript("OnEvent", function(b, _, button)
+        if button == "LeftButton" and not IsModifierKeyDown() and not area:IsMouseOver() then b:ClearFocus() end
+    end)
+    box:HookScript("OnEditFocusGained", function(b) b:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
+    box:HookScript("OnEditFocusLost", function(b) b:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)
+end
+kit.ReleaseOnClickAway = releaseOnClickAway
 
 -- Built by hand rather than from OptionsSliderTemplate, whose name and children have
 -- moved between flavors. This works everywhere and needs no template at all.
@@ -425,9 +445,181 @@ function Context:CreateSlider(content, label, minV, maxV, step, getter, setter, 
         value:SetText(formatValue(slider:GetValue()))
     end
 
+    -- SetMinMaxValues clamps a value outside the new range and fires OnValueChanged (retail and Era,
+    -- 2026-10-11), so a new range is set under the same guard and the saved value shown again.
+    function holder.SetRange(lo, hi)
+        minV, maxV = lo, hi
+        suppress = true
+        slider:SetMinMaxValues(lo, hi)
+        slider:SetValue(getter() or lo)
+        suppress = false
+        value:SetText(formatValue(slider:GetValue()))
+        if format then holder.Fit() end
+    end
+
+    -- Opt in: a click on the readout turns it into a field for an exact value. Enter takes the number
+    -- on the step and inside the range, and Escape or a click away leaves the value as it was.
+    local ctx = self
+    function holder.EnableTyping()
+        if holder.entry then return holder end
+        local hit = CreateFrame("Button", nil, holder)
+        local box = CreateFrame("EditBox", nil, holder)
+        for _, f in ipairs({ hit, box }) do
+            f:SetPoint("LEFT", value, "LEFT")
+            f:SetPoint("RIGHT", value, "RIGHT")
+            f:SetHeight(ENTRY_HEIGHT)
+        end
+        kit.Highlight(ctx, hit)
+        box:SetAutoFocus(false)
+        box:SetFontObject(GameFontHighlight)
+        box:SetTextColor(ctx:Color("text"))
+        box:SetJustifyH("RIGHT")
+        box:SetTextInsets(ENTRY_INSET, ENTRY_INSET, 0, 0)
+        box:SetMaxLetters(ENTRY_LETTERS)
+        kit.Fill(ctx, box, "input")
+        kit.Edge(ctx, box, "borderStrong")
+        box:Hide()
+        local function close()
+            box:Hide()
+            value:Show()
+            hit:Show()
+        end
+        hit:SetScript("OnClick", function()
+            box:SetText(valueFmt:format(slider:GetValue()))
+            value:Hide()
+            hit:Hide()
+            box:Show()
+            box:SetFocus()
+            -- After SetFocus, which clears any selection of its own.
+            box:HighlightText()
+        end)
+        box:SetScript("OnEnterPressed", function(b)
+            -- A comma too, since German and French write 2,5.
+            local v = tonumber((b:GetText():gsub(",", ".")))
+            -- v == v turns away the not-a-number some runtimes read from "nan". SetValue holds the rest
+            -- to the slider's range.
+            if v and v == v then slider:SetValue(step and (math.floor((v - minV) / step + 0.5) * step + minV) or v) end
+            b:ClearFocus()
+            close()
+        end)
+        box:SetScript("OnEscapePressed", function(b)
+            b:ClearFocus()
+            close()
+        end)
+        box:SetScript("OnEditFocusLost", close)
+        releaseOnClickAway(box, box)
+        -- Opened from the row, so the number shows its tip where the rest of the row does.
+        if tooltip then
+            hit:SetScript("OnEnter", function() ctx:ShowTooltip(holder, label, tooltip) end)
+            hit:SetScript("OnLeave", function() ctx:HideTooltip() end)
+        end
+        holder.entry = box
+        return holder
+    end
+
     if tooltip then self:AttachTooltip(holder, label, tooltip) end
     content._controls[#content._controls + 1] = holder
     return holder, slider
+end
+
+local TEXT_FIELD_OPTS = { maxLetters = "number", numeric = "boolean", live = "boolean" }
+
+-- A one-line field with a label in its column. What is typed can be a name in any alphabet, so it draws
+-- in the client's own font object. The setter gets the text as typed, a numeric field's
+-- too. Live applies every keystroke, otherwise Enter or a click away commits. Escape puts back the
+-- text it had on focus.
+function Context:CreateTextField(content, label, getter, setter, tooltip, opts)
+    if type(getter) ~= "function" or type(setter) ~= "function" then
+        error("EverythingUI: CreateTextField needs a getter and a setter", 2)
+    end
+    if opts ~= nil and type(opts) ~= "table" then
+        error("EverythingUI: CreateTextField's opts must be a table", 2)
+    end
+    opts = opts or {}
+    for key, v in pairs(opts) do
+        if TEXT_FIELD_OPTS[key] ~= type(v) then
+            error(("EverythingUI: CreateTextField got a bad or unknown field %s"):format(tostring(key)), 2)
+        end
+    end
+    local sp = lib.tokens.spacing
+    local ctx = self
+    local holder = labelledHolder(self, content, label)
+
+    local field = CreateFrame("Frame", nil, holder)
+    field:SetHeight(sp.fieldHeight)
+    field:SetPoint("RIGHT")
+    kit.Fill(self, field, "input")
+    local edges = kit.Edge(self, field, "inputBorder")
+
+    local box = CreateFrame("EditBox", nil, field)
+    box:SetPoint("TOPLEFT", FIELD_PAD, 0)
+    box:SetPoint("BOTTOMRIGHT", -FIELD_PAD, 0)
+    box:SetAutoFocus(false)
+    box:SetFontObject(GameFontHighlight)
+    box:SetTextColor(self:Color("text"))
+    box:SetTextInsets(0, 0, 0, 0)
+    box:SetMaxLetters(opts.maxLetters or 0)
+    if opts.numeric then box:SetNumeric(true) end
+
+    holder.SetLabelWidth = function(_, w)
+        field:SetPoint("LEFT", holder, "LEFT", columnEdge(label, w), 0)
+    end
+    holder:SetLabelWidth(sp.labelColumn)
+
+    local before = ""
+    local function show()
+        local v = getter()
+        box:SetText(v ~= nil and tostring(v) or "")
+    end
+    -- The field then shows what was stored, so a host's tidying (a trimmed name, a number without its
+    -- leading zeros) is what stays, and it is also what Escape and the next commit compare against.
+    local function commit()
+        local t = box:GetText()
+        if t ~= before then setter(t) end
+        show()
+        before = box:GetText()
+    end
+    local function paint()
+        for _, line in ipairs(edges) do line:SetColorTexture(ctx:Color(box:HasFocus() and "borderStrong" or "inputBorder")) end
+    end
+    box:SetScript("OnEditFocusGained", function(b)
+        before = b:GetText()
+        paint()
+    end)
+    box:SetScript("OnEditFocusLost", function()
+        if opts.live then show() else commit() end
+        paint()
+    end)
+    box:SetScript("OnTextChanged", function(b, userInput)
+        if opts.live and userInput then setter(b:GetText()) end
+    end)
+    box:SetScript("OnEnterPressed", function(b)
+        b:ClearFocus()
+        if not opts.live then commit() end
+    end)
+    box:SetScript("OnEscapePressed", function(b)
+        if b:GetText() ~= before then
+            b:SetText(before)
+            if opts.live then setter(before) end
+        end
+        b:ClearFocus()
+    end)
+    releaseOnClickAway(box, field)
+    -- The box sits inside the field's padding, so a click on that padding still puts the cursor in it.
+    field:EnableMouse(true)
+    field:SetScript("OnMouseDown", function() box:SetFocus() end)
+
+    holder.field, holder.box = field, box
+    function holder.GetText() return box:GetText() end
+    function holder.SetText(_, s) box:SetText(s or "") end
+    holder.Refresh = function()
+        if not box:HasFocus() then show() end
+    end
+    holder.Refresh()
+
+    if tooltip then self:AttachTooltip(holder, label, tooltip) end
+    content._controls[#content._controls + 1] = holder
+    return holder
 end
 
 -- options is a list of { value =, label = } pairs. The value is what reaches the setter,
@@ -659,4 +851,21 @@ function Context:MeasureContent(content)
 
         content:SetHeight((top - lowest) + BOTTOM_PADDING)
     end)
+end
+
+-- A frame later, after MeasureContent has sized the page. The client works the scroll range out again
+-- only when asked.
+function Context:ScrollIntoView(frame)
+    local content = frame
+    while content and not content._euiColumn do content = content:GetParent() end
+    local sf = content and content:GetParent()
+    local bar = sf and sf._euiBar
+    if not bar then return end
+    local function reveal()
+        local top, at = content:GetTop(), frame:GetTop()
+        if not (top and at) then return end
+        if sf.UpdateScrollChildRect then sf:UpdateScrollChildRect() end
+        bar:SetValue(math.max(0, math.min(sf:GetVerticalScrollRange() or 0, top - at)))
+    end
+    C_Timer.After(0, reveal)
 end

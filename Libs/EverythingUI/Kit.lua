@@ -212,8 +212,7 @@ function kit.Highlight(ctx, frame, color)
     return t
 end
 
--- A file that fails to load leaves the string with no font at all, and SetFont's return value is
--- only documented for EditBox, so success is read back with GetFont.
+-- A file that fails to load leaves the string with no font at all, so success is read back with GetFont.
 function kit.Style(ctx, fs, style, color)
     local file, size, flags = ctx:Font(style)
     fs:SetFont(file, size, flags)
@@ -331,6 +330,62 @@ end
 
 -- A plain ScrollFrame with a slim draggable thumb and no arrow buttons. The thumb is the
 -- library's own texture, because a Slider takes a texture file on every flavor.
+-- A press on the thumb sent the value to the far end of the bar on every client, while the drag itself ran the right
+-- way (probed on retail, 2026-10-16), so the bar takes no mouse and a grip over it moves the thumb. A press on the
+-- thumb keeps hold where it landed, and a press on the track puts the thumb's middle under the cursor.
+function kit.DragThumb(bar, thumb, vertical)
+    bar:EnableMouse(false)
+    local grip = CreateFrame("Frame", nil, bar)
+    grip:SetAllPoints(bar)
+    grip:EnableMouse(true)
+    local hold
+    local function edge()
+        if vertical then return bar:GetTop() end
+        return bar:GetLeft()
+    end
+    local function along()
+        local scale = bar:GetEffectiveScale()
+        local x, y = GetCursorPosition()
+        if vertical then return edge() - y / scale end
+        return x / scale - edge()
+    end
+    local function travel()
+        if vertical then return bar:GetHeight() - thumb:GetHeight() end
+        return bar:GetWidth() - thumb:GetWidth()
+    end
+    local function follow()
+        local lo, hi = bar:GetMinMaxValues()
+        local room = travel()
+        if hi > lo and room > 0 and edge() then bar:SetValue(lo + (along() - hold) / room * (hi - lo)) end
+    end
+    local function stop()
+        hold = nil
+        grip:SetScript("OnUpdate", nil)
+    end
+    grip:SetScript("OnMouseDown", function(_, button)
+        if button ~= "LeftButton" or not edge() then return end
+        local lo, hi = bar:GetMinMaxValues()
+        local room = travel()
+        if hi <= lo or room <= 0 then return end
+        local size = vertical and thumb:GetHeight() or thumb:GetWidth()
+        local at = (bar:GetValue() - lo) / (hi - lo) * room
+        local pos = along()
+        if pos >= at and pos <= at + size then
+            hold = pos - at
+        else
+            hold = size / 2
+            follow()
+        end
+        grip:SetScript("OnUpdate", function()
+            if not IsMouseButtonDown("LeftButton") then return stop() end
+            follow()
+        end)
+    end)
+    grip:SetScript("OnMouseUp", stop)
+    grip:SetScript("OnHide", stop)
+    bar._euiGrip = grip
+end
+
 function kit.Scroll(ctx, parent)
     local sf = CreateFrame("ScrollFrame", nil, parent)
     local child = CreateFrame("Frame", nil, sf)
@@ -340,15 +395,16 @@ function kit.Scroll(ctx, parent)
     local bar = CreateFrame("Slider", nil, parent)
     bar:SetOrientation("VERTICAL")
     bar:SetWidth(SCROLLBAR_WIDTH)
-    bar:EnableMouse(true)
     bar:SetThumbTexture(ctx:Texture("slider-thumb"))
     local thumb = bar:GetThumbTexture()
     thumb:SetVertexColor(ctx:Color("borderStrong"))
     thumb:SetSize(SCROLLBAR_WIDTH, MIN_THUMB)
+    kit.DragThumb(bar, thumb, true)
     bar:SetMinMaxValues(0, 0)
     bar:SetValue(0)
     bar:Hide()
     bar:SetScript("OnValueChanged", function(_, v) sf:SetVerticalScroll(v) end)
+    sf._euiBar = bar
 
     sf:SetScript("OnScrollRangeChanged", function(self, _, yrange)
         -- Floored as Blizzard's own scroll frames floor it, so a fraction of a unit is no range at all.

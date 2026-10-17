@@ -20,7 +20,7 @@ local EQ_TAB_ICONS = {
 local ui = EUI:NewContext({
     id      = "EQ",
     title   = "Everything Quests",
-    version = ns.VERSION or "2.4.0",
+    version = ns.VERSION or "2.5.0",
     accent  = EUI.tokens.accents.EQ.accent,
     L       = L,
     tooltip = ns.Util.PinTooltip,
@@ -363,7 +363,7 @@ local function eqSlashHandler(msg)
         if C_CampaignInfo.GetAvailableCampaigns then
             for _, id in ipairs(C_CampaignInfo.GetAvailableCampaigns() or {}) do add(id) end
         end
-        -- GetAvailableCampaigns does not return every campaign - the live run missed both registered ones
+        -- GetAvailableCampaigns does not return every campaign, so the quest log is swept too
         if C_CampaignInfo.GetCampaignID and C_QuestLog
            and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetInfo then
             for i = 1, C_QuestLog.GetNumQuestLogEntries() do

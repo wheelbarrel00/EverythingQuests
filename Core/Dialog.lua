@@ -18,5 +18,7 @@ function Dialog:Show(opts)
         maxLetters       = opts.maxLetters,
         editBoxText      = opts.editBoxText,
         highlightEditBox = opts.highlightEditBox and true or nil,
+        -- The library refuses a read-only flag with no field to apply it to
+        readOnly         = (opts.readOnly and opts.hasEditBox) and true or nil,
     })
 end
