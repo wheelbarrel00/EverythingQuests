@@ -129,7 +129,7 @@ Replaces Blizzard's world quest icons with custom pins on both the world map and
 - **Click to super-track** and watch the quest; right-click for a menu to track or untrack it, super-track it, or look it up on Wowhead
 - **Docked panel** — A full-height World Quests list beside the world map, opened by a side tab styled to match Blizzard's or ElvUI's frame
 - **Zone quest list** — On zone maps, a list of that zone's world quests, sorted by time left, reward, faction or name
-- **Per-reward filters** — Toggle each reward category independently
+- **Per-reward filters** — Toggle each reward category independently. In the options, each filter's icon sits inside a ring of its color, so the filters double as a legend for the rings (since v2.6.1)
 - **Per-faction filters** — Grouped by expansion
 - **Persistent watch list** — Manually watched world quests survive login
 - **Account-wide completion cache** — Shared across characters
@@ -307,7 +307,7 @@ The options window shares EQ Objective Tracker's look: a sidebar of tabs, settin
 |---|---|
 | **General** | Auto-accept / auto-turn-in / join group quests, the Immersion hand-off (when Immersion is installed), show / hide minimap button, options window scale, update notice style, **quest announcements**, **party quest progress**, Use Blizzard's quest tracker, Open Tracker Settings and the tracker icons, profile management, reset to defaults |
 | **Map** | World-map quest pins, pin scale, objective pins per quest, pin rings, markers for tracked quests only, fading markers under your position, minimap objective pins (Classic), quests you can pick up with their level and holiday filters (Classic), dungeon / repeatable / profession quest filters (Classic), **coordinates**, quest progress on tooltips, **quest icons on nameplates** with their position, size and offsets |
-| **World Quests** | Master switch, world map pins, zone quest list and its sort order, per-reward filters, per-faction filters by expansion, pin scale |
+| **World Quests** | Master switch, world map pins, zone quest list and its sort order, per-reward filters (each icon inside its colored ring), per-faction filters by expansion, pin scale |
 | **Chain Guide** | Open on login, window scale, unrouted questlines (retail), the tracked chain on the world map, cross-character chain cache stats and reset, prune stale entries |
 | **Quest Browser** | Open Quest Browser (Classic Era, TBC and WoW Forever) |
 | **History** | Record completed quests, maximum entries kept, backfill from past completions, re-scan missing names, restore from backup, wipe history |

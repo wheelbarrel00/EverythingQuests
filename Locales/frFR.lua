@@ -122,6 +122,7 @@ L["Off: Everything Quests stops putting World Quests on the map - no world-map p
 L["Show world quest pins on the world map"] = "Affiche les marqueurs des Expéditions sur la carte du monde"
 L["Show zone quest list on zone maps"] = "Affiche la liste des Expéditions locales sur la carte de la zone"
 L["Filters by reward type"] = "Filtrer par type de récompense"
+L["Each icon sits inside the ring that world quests of this type wear on the world map. The quest you're following wears a larger yellow ring."] = "Chaque icône est entourée de l'anneau que portent sur la carte du monde les Expéditions de ce type. La quête en super-suivi porte un anneau jaune plus grand."
 L["Enable All"] = "Tout activer"
 L["Disable All"] = "Tout désactiver"
 L["Filter by faction"] = "Filtrer par faction"

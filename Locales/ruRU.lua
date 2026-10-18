@@ -124,6 +124,7 @@ L["Off: Everything Quests stops putting World Quests on the map - no world-map p
 L["Show world quest pins on the world map"] = "Показывать метки локальных заданий на карте мира"
 L["Show zone quest list on zone maps"] = "Показывать список заданий зоны на картах зон"
 L["Filters by reward type"] = "Фильтр по типу награды"
+L["Each icon sits inside the ring that world quests of this type wear on the world map. The quest you're following wears a larger yellow ring."] = "Каждый значок находится в кольце, которое на карте мира носят локальные задания этого типа. Выбранное задание носит более крупное желтое кольцо."
 L["Enable All"] = "Включить всё"
 L["Disable All"] = "Отключить всё"
 L["Filter by faction"] = "Фильтр по фракциям"

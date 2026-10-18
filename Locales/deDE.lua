@@ -114,6 +114,7 @@ L["Off: Everything Quests stops putting World Quests on the map - no world-map p
 L["Show world quest pins on the world map"] = "Weltquestmarkierungen auf der Weltkarte anzeigen"
 L["Show zone quest list on zone maps"] = "Gebietsquestliste auf Gebietskarten anzeigen"
 L["Filters by reward type"] = "Filter nach Belohnungsart"
+L["Each icon sits inside the ring that world quests of this type wear on the world map. The quest you're following wears a larger yellow ring."] = "Jedes Symbol sitzt in dem Ring, den Weltquests dieser Art auf der Weltkarte tragen. Die fokussierte Quest trägt einen größeren gelben Ring."
 L["Enable All"] = "Alle aktivieren"
 L["Disable All"] = "Alle deaktivieren"
 L["Filter by faction"] = "Nach Fraktion filtern"

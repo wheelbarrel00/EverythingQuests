@@ -114,6 +114,7 @@ L["Off: Everything Quests stops putting World Quests on the map - no world-map p
 L["Show world quest pins on the world map"] = "世界地圖顯示世界任務標記"
 L["Show zone quest list on zone maps"] = "區域地圖顯示區域任務列表"
 L["Filters by reward type"] = "按獎勵類型過濾"
+L["Each icon sits inside the ring that world quests of this type wear on the world map. The quest you're following wears a larger yellow ring."] = "每個圖示外的圓環，就是該類型世界任務在世界地圖上的圓環。正在超級追蹤的任務顯示更大的黃色圓環。"
 L["Enable All"] = "全部啟用"
 L["Disable All"] = "全部禁用"
 L["Filter by faction"] = "按陣營過濾"

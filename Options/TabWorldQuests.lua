@@ -46,8 +46,8 @@ local FILTER_ROWS = {
     { key = "resource",   label = L["Resources / Currencies"], icon = "Interface\\Icons\\Trade_Mining" },
     { key = "ap",         label = L["Artifact Power"],         icon = "Interface\\Icons\\INV_7XP_Inscription_TalentTome01" },
     { key = "profession", label = L["Profession quests"],      icon = "Interface\\Icons\\Trade_Engineering" },
-    { key = "pvp",        label = L["PvP"],                    icon = "Interface\\Icons\\Achievement_Bg_TopDmg" },
-    { key = "pet",        label = L["Pet battles"],            icon = "Interface\\Icons\\INV_Pet_Achievement_CaptureAPet" },
+    { key = "pvp",        label = L["PvP"],                    icon = "Interface\\Icons\\Achievement_BG_topDPS" },
+    { key = "pet",        label = L["Pet battles"],            icon = "Interface\\Icons\\INV_Pet_Achievement_CaptureAWildPet" },
     { key = "other",      label = L["Other / Uncategorized"],  icon = "Interface\\Icons\\INV_Misc_QuestionMark" },
 }
 
@@ -168,13 +168,36 @@ local function worldQuestsCard(self, content, stack, w)
     card:Add(w.zoneList, { dependent = true })
 end
 
+-- Pin.xml draws a 34 px ring around a 22 px icon
+local function wearRing(cb, key)
+    local rc = ns.WQRingColors and ns.WQRingColors[key]
+    if not rc then return end
+    local mask = cb:CreateMaskTexture()
+    mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    mask:SetAllPoints(cb.icon)
+    cb.icon:AddMaskTexture(mask)
+    local ring = cb:CreateTexture(nil, "ARTWORK", nil, 1)
+    ring:SetAtlas("worldquest-emissary-ring")
+    ring:SetDesaturated(true)
+    -- The set size, because the box has no anchor yet when the tab builds
+    local size = cb.icon:GetWidth(true) * 34 / 22
+    ring:SetSize(size, size)
+    ring:SetPoint("CENTER", cb.icon)
+    ring:SetVertexColor(rc[1], rc[2], rc[3], 1)
+    cb.ring = ring
+end
+
 local function filtersCard(self, content, stack, w)
     local card = stack(self:CreateGroup(content, L["Filters by reward type"]))
+    self:AttachTooltip(card.label, L["Filters by reward type"],
+        L["Each icon sits inside the ring that world quests of this type wear on the world map. The quest you're following wears a larger yellow ring."])
 
     local boxes = {}
     for _, row in ipairs(FILTER_ROWS) do
         local get, set = filterSetting(row.key)
         local cb = self:CreateCheckbox(content, row.label, get, set, nil, row.icon)
+        -- Masked, then sliced, the order Blizzard's RingedFrameTemplate.lua uses
+        wearRing(cb, row.key)
         local c = row.coords or ICON_TRIM
         cb.icon:SetTexCoord(c[1], c[2], c[3], c[4])
         boxes[#boxes + 1] = cb

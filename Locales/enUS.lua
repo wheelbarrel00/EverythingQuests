@@ -126,6 +126,7 @@ L["Off: Everything Quests stops putting World Quests on the map - no world-map p
 L["Show world quest pins on the world map"] = true
 L["Show zone quest list on zone maps"] = true
 L["Filters by reward type"] = true
+L["Each icon sits inside the ring that world quests of this type wear on the world map. The quest you're following wears a larger yellow ring."] = true
 L["Enable All"] = true
 L["Disable All"] = true
 L["Filter by faction"] = true

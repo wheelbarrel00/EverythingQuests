@@ -5,6 +5,18 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1] - 2026-10-17
+
+On retail, the World Quests tab's reward filters now show the ring color each kind of world quest wears on the map, and the PvP and Pet battles rows finally have their icons.
+
+### Improvements
+
+- **A legend for the world quest ring colors.** In the World Quests tab, each reward filter's icon is now round and sits inside the ring that world quests of that type wear on the world map, so the list of filters is also a guide to the ring colors. Hover the "Filters by reward type" title to read what the rings mean, including the larger yellow ring of the world quest you are following.
+
+### Bug Fixes
+
+- **PvP and Pet battles icons.** The PvP and Pet battles reward filters in the World Quests tab, and their rows in the reward summary of the World Quests panel beside the world map, showed no icon, because they pointed at icons the game does not have. They now show a PvP icon and a pet battle icon.
+
 ## [2.6.0] - 2026-10-17
 
 WoW Forever's quest data grows from 323 Forever quests to 534, more of them know the level and faction they need, and the second Destruction in Deadmines quest is marked near its own quest giver.

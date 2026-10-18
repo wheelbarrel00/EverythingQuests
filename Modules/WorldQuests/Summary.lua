@@ -16,8 +16,8 @@ local CATEGORY_DISPLAY = {
     resource   = { label = L["Resources"],      icon = "Interface\\Icons\\Trade_Mining" },
     ap         = { label = L["Artifact Power"], icon = "Interface\\Icons\\INV_7XP_Inscription_TalentTome01" },
     profession = { label = L["Professions"],    icon = "Interface\\Icons\\Trade_Engineering" },
-    pvp        = { label = L["PvP"],            icon = "Interface\\Icons\\Achievement_Bg_TopDmg" },
-    pet        = { label = L["Pet Battles"],    icon = "Interface\\Icons\\INV_Pet_Achievement_CaptureAPet" },
+    pvp        = { label = L["PvP"],            icon = "Interface\\Icons\\Achievement_BG_topDPS" },
+    pet        = { label = L["Pet Battles"],    icon = "Interface\\Icons\\INV_Pet_Achievement_CaptureAWildPet" },
     other      = { label = L["Other"],          icon = "Interface\\Icons\\INV_Misc_Gift_01" },
 }
 

@@ -124,6 +124,7 @@ L["Off: Everything Quests stops putting World Quests on the map - no world-map p
 L["Show world quest pins on the world map"] = "지도에 전역 퀘스트 핀 표시"
 L["Show zone quest list on zone maps"] = "지역 지도에 지역 퀘스트 목록 표시"
 L["Filters by reward type"] = "보상 종류별 필터"
+L["Each icon sits inside the ring that world quests of this type wear on the world map. The quest you're following wears a larger yellow ring."] = "각 아이콘은 이 종류의 전역 퀘스트가 지도에서 두르는 테두리 안에 있습니다. 집중 추적 중인 퀘스트는 더 큰 노란색 테두리를 두릅니다."
 L["Enable All"] = "모두 켜기"
 L["Disable All"] = "모두 끄기"
 L["Filter by faction"] = "세력별 필터"

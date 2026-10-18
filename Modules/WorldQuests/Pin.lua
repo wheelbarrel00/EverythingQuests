@@ -15,6 +15,7 @@ local RING_COLORS = {
     pet      = { 0.50, 0.85, 0.85 },
     other    = { 0.70, 0.70, 0.70 },
 }
+_ns.WQRingColors = RING_COLORS
 
 local Util = _ns.Util
 

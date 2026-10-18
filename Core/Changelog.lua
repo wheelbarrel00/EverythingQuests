@@ -2,6 +2,17 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.6.1", date = "2026-10-17",
+        sections = {
+            { head = "Improvements", items = {
+                { "A legend for the world quest ring colors. In the World Quests tab, each reward filter's icon is now round and sits inside the ring that world quests of that type wear on the world map, so the list of filters is also a guide to the ring colors. Hover the \"Filters by reward type\" title to read what the rings mean, including the larger yellow ring of the world quest you are following.", retail = true },
+            } },
+            { head = "Bug Fixes", items = {
+                { "PvP and Pet battles icons. The PvP and Pet battles reward filters in the World Quests tab, and their rows in the reward summary of the World Quests panel beside the world map, showed no icon, because they pointed at icons the game does not have. They now show a PvP icon and a pet battle icon.", retail = true },
+            } },
+        },
+    },
+    {
         version = "2.6.0", date = "2026-10-17",
         sections = {
             { head = "New Features", items = {
