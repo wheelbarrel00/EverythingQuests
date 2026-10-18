@@ -27,9 +27,13 @@ local function trim(s)
 end
 
 -- One line to type into, with a magnifier and a hint shown while it is empty and unfocused. Enter
--- hands the trimmed text to onSubmit and lets go of the keyboard, and Escape only lets go.
-function Context:CreateSearchField(parent, placeholder, onSubmit, tipTitle, tipBody)
+-- hands the trimmed text to onSubmit and lets go of the keyboard, and Escape only lets go. An
+-- onChange is handed the trimmed text on every change, for a search that answers as it is typed.
+function Context:CreateSearchField(parent, placeholder, onSubmit, tipTitle, tipBody, onChange)
     if type(onSubmit) ~= "function" then error("EverythingUI: CreateSearchField needs onSubmit", 2) end
+    if onChange ~= nil and type(onChange) ~= "function" then
+        error("EverythingUI: CreateSearchField's onChange must be a function", 2)
+    end
     local sp = lib.tokens.spacing
     local ctx = self
     local holder = CreateFrame("Frame", nil, parent)
@@ -65,7 +69,10 @@ function Context:CreateSearchField(parent, placeholder, onSubmit, tipTitle, tipB
     end
     box:SetScript("OnEditFocusGained", paint)
     box:SetScript("OnEditFocusLost", paint)
-    box:SetScript("OnTextChanged", paint)
+    box:SetScript("OnTextChanged", function(b)
+        paint()
+        if onChange then onChange(trim(b:GetText())) end
+    end)
     box:SetScript("OnEscapePressed", function(b) b:ClearFocus() end)
     box:SetScript("OnEnterPressed", function(b)
         local text = trim(b:GetText())

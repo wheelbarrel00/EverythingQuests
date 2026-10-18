@@ -2,6 +2,26 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.7.0", date = "2026-10-18",
+        sections = {
+            { head = "New Features", items = {
+                "Search your settings. The options window has a search box at the top of its sidebar. Type a word and it lists the settings and cards that match it, by name or by the card or tab they sit on, each with where it sits, such as Map > Coordinates. Click a result, or press Enter for the first one, to open its tab, scroll to it and light it up for a moment. It searches names, not tooltips.",
+            } },
+            { head = "Improvements", items = {
+                { "Two more hand-in markers. Crocs of the Sky and From the Ashes, in the Wetlands on WoW Forever, now have a marker where you hand them in.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Bug Fixes", items = {
+                { "Dungeon quests new to WoW Forever count as dungeon quests. A quest new to Forever that belongs to one of its dungeons and needs no earlier quest now counts as a dungeon quest: \"Dungeon and raid quests\" under \"Hide these quests on the map\" hides it, the Quest Browser tags it \"Dungeon or raid\", and Quest History's Type filter lists it as one. That is about half of the dungeon quests new to Forever that are marked on the map. Before, none of them did.", classic = true, sub = "ChainGuide" },
+                { "The Great Windborne Cat Spirit is for druids. On WoW Forever it was marked for every class at level 20. It is the Skyborne druids' version of The Great Cat Spirit, so it is now marked only for druids.", classic = true, sub = "ChainGuide" },
+                { "No \"Races: Alliance, Horde\" on Skyborne quests. For ten quests only Skyborne characters can take, nine of them on Zephras Isle, the Quest Browser said \"Races: Alliance, Horde\", which reads as open to everyone. It now shows no race line for them, as for any quest the data does not limit by race.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Known Issues", items = {
+                { "About half of the dungeon quests new to WoW Forever that are marked on the map still do not count as dungeon quests. One that follows an earlier quest and starts outside the dungeon, such as Unending Torment in Undercity or Destruction in Deadmines, is left out, because many quests like that are handed in somewhere else.", classic = true, sub = "ChainGuide" },
+                { "Some Skyborne quests are marked for other characters. Many Zephras Isle quests can only be taken by Skyborne characters, but Everything Quests cannot yet record \"Skyborne only\" in its quest data, so they are marked for other characters, a character who is not Skyborne can see a Zephras Isle zone in the Chain Guide, and the Quest Browser can say \"Races: Alliance\" for a quest only the High Order can take.", classic = true, sub = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.6.1", date = "2026-10-17",
         sections = {
             { head = "Improvements", items = {

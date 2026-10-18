@@ -193,6 +193,9 @@ L["Everything Quests saves a rolling backup of your history when you log out, an
 L["Join our Discord!"] = true
 L["Join our Discord"] = true
 L["Click to copy the invite link."] = true
+L["Search settings"] = true
+L["No settings match"] = true
+L["Search results"] = true
 L["|cffEBB706EQ|r: the Quest Browser needs the Classic quest data, which this version of the game does not load."] = true
 L["Version %s"] = true
 L["Everything Quests opens its full options in a dedicated window. Click the button below, or type |cffEBB706/eqs|r in chat."] = true

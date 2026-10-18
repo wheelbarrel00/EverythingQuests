@@ -22,6 +22,9 @@ lib.shared.colorPicker = state
 -- An alpha the two conventions disagree about, for when the one being opened does not.
 local PROBE_ALPHA = 0.25
 
+-- How often the Mainline picker's alpha is read while it is open.
+local ALPHA_POLL = 0.1
+
 -- Skipped when ElvUI is loaded, which puts its own class-color button on the picker.
 local function elvUILoaded()
     local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G["IsAddOnLoaded"]
@@ -42,8 +45,35 @@ local function ensurePickerHook()
     state.hooked = true
     ColorPickerFrame:HookScript("OnHide", function()
         if state.classButton then state.classButton:Hide() end
+        if state.watcher then state.watcher:Hide() end
         state.apply, state.reopen, state.cancel, state.owner = nil, nil, nil, nil
     end)
+end
+
+-- Blizzard's Mainline picker fires nothing while its opacity bar moves (measured on retail and
+-- Forever: the alpha landed only on Okay), so the alpha is read on a timer and applied when it moves.
+local function ensureAlphaWatcher()
+    if state.watcher then return state.watcher end
+    local w = CreateFrame("Frame", nil, ColorPickerFrame)
+    local since = 0
+    w:SetScript("OnUpdate", function(watcher, elapsed)
+        -- Another addon can open the picker over ours without hiding it, which fires no OnHide, so
+        -- its color must not be stored as ours.
+        if ColorPickerFrame.swatchFunc ~= state.apply then
+            watcher:Hide()
+            return
+        end
+        since = since + elapsed
+        if since < ALPHA_POLL then return end
+        since = 0
+        local a = ColorPickerFrame:GetColorAlpha()
+        if a == state.watchedAlpha then return end
+        state.watchedAlpha = a
+        if state.apply then state.apply() end
+    end)
+    w:Hide()
+    state.watcher = w
+    return w
 end
 
 local function ensureClassColorButton(ctx)
@@ -194,6 +224,11 @@ function Context:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
         -- hook that clears these. The owner is the window that closes this picker with itself.
         state.apply, state.reopen, state.cancel, state.owner = apply, openWith, cancel, ctx._window
         ensurePickerHook()
+        -- Seeded with the alpha the picker opened on, so the seed itself is never committed.
+        if hasAlpha and not OpacitySliderFrame and cp.GetColorAlpha then
+            state.watchedAlpha = cp:GetColorAlpha()
+            ensureAlphaWatcher():Show()
+        end
         local classBtn = ensureClassColorButton(ctx)
         if classBtn then classBtn:Show() end
     end

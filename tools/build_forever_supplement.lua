@@ -4,7 +4,8 @@
 --
 -- <eraDir> holds the Era dump build_questcoords.lua reads. <outDir> receives a copy of it, an area
 -- table that also covers maps only Forever has, forever<Kind>DB.lua rows that build_questcoords.lua
--- lays over the Era rows, and foreverStarts.lua, where each quest itself is offered.
+-- lays over the Era rows, foreverStarts.lua, where each quest itself is offered, and with --att
+-- foreverInstances.lua, the instances of the quests it counts as dungeon quests.
 --
 -- Only quests the Era dump does not know become rows. An Era creature, object or item that a new
 -- quest uses keeps its Era row, because the dump's spawn lists are better than what one player saw.
@@ -26,7 +27,7 @@ local BASE_PREFIX, OVERLAY_PREFIX = "classic", "forever"
 
 -- Upstream field positions, the same ones build_questcoords.lua reads.
 local Q_NAME, Q_STARTEDBY, Q_FINISHEDBY, Q_REQLEVEL, Q_QUESTLEVEL, Q_RACES = 1, 2, 3, 4, 5, 6
-local Q_CLASSES, Q_OBJECTIVES, Q_PREGROUP, Q_PRESINGLE, Q_EXCLUSIVE = 7, 10, 12, 13, 16
+local Q_CLASSES, Q_OBJECTIVES, Q_PREGROUP, Q_PRESINGLE, Q_EXCLUSIVE, Q_ZONEORSORT = 7, 10, 12, 13, 16, 17
 local Q_REQSKILL, Q_MINREP, Q_MAXREP, Q_SPECIALFLAGS = 18, 19, 20, 24
 local N_NAME, N_SPAWNS, N_FACTION = 1, 7, 13
 local O_NAME, O_SPAWNS = 1, 4
@@ -37,9 +38,9 @@ local OBJ_OBJECT, OBJ_ITEM, OBJ_KILLCREDIT = 2, 3, 5
 local RACES_ALLIANCE, RACES_HORDE = 77, 178
 local FACTION_TAG = { Alliance = "A", Horde = "H" }
 
--- Area ids for maps the Era area table does not cover, and ids for objectives no real creature or
--- object locates. Both sit far above anything the game uses and below the 1e7 the nameplate table packs.
+-- Ids the converter makes up, far above anything the game uses and below the 1e7 the nameplate table packs.
 local SYNTH_AREA_BASE = 9000000
+local SYNTH_INSTANCE_BASE = 9100000
 local PSEUDO_BASE = 9000000
 
 -- An attribution below this share of the leading candidate is a stray kill or loot that happened
@@ -599,7 +600,9 @@ end
 
 local attStats = { rows = 0, filled = 0, confirmed = 0, mismatched = 0, dropped = 0 }
 local attIssues, attPoints, attBoth, measuredPre = {}, { npc = {}, obj = {} }, {}, {}
-local attGivers = { npc = {}, obj = {} }
+local attGivers, attInstances = { npc = {}, obj = {} }, {}
+-- ATT lists follow-ups handed in elsewhere under an instance too, and this narrower rule is graded against the Era dump below.
+local function attDungeonQuest(a) return a.inst and (#a.points == 0 or not a.pre) end
 
 local function attMismatch(qid, what, detail)
     attStats.mismatched = attStats.mismatched + 1
@@ -669,6 +672,11 @@ local function mergeATT(qid, row, a, lines)
         fill(Q_RACES, races)
     end
     fill(Q_CLASSES, attClassMask(a))
+    -- The generator counts a quest sorted into one of these areas as a dungeon quest, through foreverInstances.lua.
+    if attDungeonQuest(a) then
+        fill(Q_ZONEORSORT, SYNTH_INSTANCE_BASE + a.inst)
+        local l = sub(attInstances, a.inst); l[#l + 1] = qid
+    end
 
     -- sqreq names how many of the list are needed, so 1 reads as any-of, the whole list as all-of, and a count between is dropped.
     local attAll, attAny = a.pre, nil
@@ -926,6 +934,32 @@ for _, qid in ipairs(sortedKeys(attQuests)) do
     end
 end
 
+local attGateNotes = { before = {}, after = {} }
+do
+    -- The client gives every variant of a quest one completion bit, so a quest with no class takes the one class all its variants carry.
+    local byBit, taken = {}, {}
+    for id, b in pairs(clientBit) do local l = sub(byBit, b); l[#l + 1] = id end
+    for _, qid in ipairs(sortedKeys(qRows)) do
+        local mask, from = nil, {}
+        if att and (tonumber(qRows[qid][Q_CLASSES]) or 0) == 0 and clientBit[qid] then
+            for _, s in ipairs(byBit[clientBit[qid]]) do
+                if s ~= qid then
+                    local srow = qRows[s] or base.quests[s]
+                    local c = tonumber(srow and srow[Q_CLASSES]) or 0
+                    if c == 0 or (mask and c ~= mask) then mask = false; break end
+                    mask, from[#from + 1] = c, s
+                end
+            end
+        end
+        if mask then table.sort(from); taken[qid] = { mask, from } end
+    end
+    for _, qid in ipairs(sortedKeys(taken)) do
+        qRows[qid][Q_CLASSES] = taken[qid][1]
+        attGateNotes.before[#attGateNotes.before + 1] = ("-- att class from completion bit: quest %d takes class mask %d from %s")
+            :format(qid, taken[qid][1], table.concat(taken[qid][2], " "))
+    end
+end
+
 local attWaived = {}
 local function waived(fmt, ...) attWaived[#attWaived + 1] = ("-- att prerequisite waived: " .. fmt):format(...) end
 for _, qid in ipairs(sortedKeys(attQuests)) do
@@ -995,6 +1029,15 @@ for _, qid in ipairs(sortedKeys(attQuests)) do
             end
         end
     end
+end
+
+do
+    -- Last, because the faction pass fills an unset mask: a quest for every race is gated by none, and the Quest Browser would list both factions.
+    local every = {}
+    for _, qid in ipairs(sortedKeys(qRows)) do
+        if qRows[qid][Q_RACES] == ALL_RACES then qRows[qid][Q_RACES] = nil; every[#every + 1] = qid end
+    end
+    if #every > 0 then attGateNotes.after[#attGateNotes.after + 1] = "-- att every race, so no race gate: " .. table.concat(every, " ") end
 end
 
 -- Runs before the creature and object rows, because an item's drop sources add to needNpc and needObj.
@@ -1314,6 +1357,19 @@ do
     end
 end
 
+if att then
+    local parts = { "-- Generated by tools/build_forever_supplement.lua from AllTheThings (MIT). [areaId] = ATT's instance id, for each instance a quest is sorted into.\nreturn {\n" }
+    for _, inst in ipairs(sortedKeys(attInstances)) do parts[#parts + 1] = ("[%d]=%d,\n"):format(SYNTH_INSTANCE_BASE + inst, inst) end
+    parts[#parts + 1] = "}\n"
+    local file = outDir .. "/" .. OVERLAY_PREFIX .. "Instances.lua"
+    writeAll(file, table.concat(parts))
+    local back = assert(loadfile(file))()
+    assert(count(back) == count(attInstances), file .. ": row count changed on reload")
+    for inst in pairs(attInstances) do
+        assert(back[SYNTH_INSTANCE_BASE + inst] == inst, ("%s: instance %d changed on reload"):format(file, inst))
+    end
+end
+
 io.stderr:write(("-- %d session(s) from %d file(s): %d new quest(s), %d creature(s), %d object(s), %d item(s), %d synthetic area(s)\n")
     :format(count(sessions), #sessionFiles, count(qRows), count(nRows), count(oRows), count(iRows), count(synthAreas)))
 io.stderr:write(("-- own starts: %d quest(s), %d dialog place(s), %d ATT point(s), %d giver sighting(s) in place of ATT points, %d ATT point(s) the collector contradicts on their map\n")
@@ -1439,10 +1495,26 @@ if att then
                 placed, PLACE_TOLERANCE, unplaced, attStats.dropped, #attWaived))
     io.stderr:write(("-- att era check: %d Era quest(s), required level %d same %d differ, prerequisites %d same %d differ\n")
         :format(era.quests, era.levelSame, era.levelDiff, era.preSame, era.preDiff))
+    local dg = { quests = 0, era = 0, flagged = 0, right = 0 }
+    for _, id in ipairs(sortedKeys(att.quests)) do
+        local a, q = att.quests[id], base.quests[id]
+        if q and a.inst then
+            local isDungeon = dungeonArea[tonumber(q[Q_ZONEORSORT]) or 0] or false
+            dg.quests, dg.era = dg.quests + 1, dg.era + (isDungeon and 1 or 0)
+            if attDungeonQuest(a) then dg.flagged, dg.right = dg.flagged + 1, dg.right + (isDungeon and 1 or 0) end
+        end
+    end
+    io.stderr:write(("-- att dungeon era check: %d Era quest(s) ATT lists in an instance, %d of them Era dungeon quests, the rule flags %d, %d of those rightly\n")
+        :format(dg.quests, dg.era, dg.flagged, dg.right))
     for _, why in ipairs(sortedKeys(attSkipped)) do
         io.stderr:write(("-- att skipped, %s: %s\n"):format(why, table.concat(attSkipped[why], " ")))
     end
+    for _, line in ipairs(attGateNotes.before) do io.stderr:write(line .. "\n") end
     for _, line in ipairs(attWaived) do io.stderr:write(line .. "\n") end
+    for _, line in ipairs(attGateNotes.after) do io.stderr:write(line .. "\n") end
+    for _, inst in ipairs(sortedKeys(attInstances)) do
+        io.stderr:write(("-- att instance %d: %s\n"):format(inst, table.concat(attInstances[inst], " ")))
+    end
     for _, m in ipairs(att.merged) do
         local gained = {}
         if #m.filled > 0 then gained[#gained + 1] = "filled " .. table.concat(m.filled, ", ") end

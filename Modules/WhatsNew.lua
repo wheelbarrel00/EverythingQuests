@@ -5,6 +5,10 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.7.0", sections = {
+        { "Search your settings", "Type in the box at the top of the options window's sidebar to find a setting by name, then pick a result to go straight to it." },
+        { "Dungeon quests on WoW Forever", "Quests new to WoW Forever that belong to one of its dungeons and need no earlier quest now count as dungeon quests in the map's quest filters, the Quest Browser and Quest History's Type filter.", classic = true, sub = "ChainGuide" },
+    } },
     { version = "2.6.0", sections = {
         { "211 more WoW Forever quests", "Everything Quests now knows 534 quests new to WoW Forever, up from 323, and marks 530 of them where you pick them up, with the most new ones in Tirisfal Glades, the Wetlands, Mulgore and Durotar. More of them also carry the level and faction they need, so fewer are marked before you can take them or for the wrong faction.", classic = true, sub = "ChainGuide" },
     } },

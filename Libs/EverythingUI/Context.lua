@@ -31,6 +31,9 @@ local LABELS = {
     discordTip      = true,
     testSound       = true,
     clear           = true,
+    search          = true,
+    searchEmpty     = true,
+    searchTitle     = true,
 }
 
 local function isRGB(v)
@@ -87,6 +90,10 @@ function lib:NewContext(opts)
     end
     if opts.discord and not labels.discord then
         error("EverythingUI: opts.discord needs opts.labels.discord", 2)
+    end
+    -- labels.search is what turns the settings search on, so the window of a host without it is unchanged.
+    if labels.search and not (labels.searchEmpty and labels.searchTitle) then
+        error("EverythingUI: opts.labels.search needs opts.labels.searchEmpty and opts.labels.searchTitle", 2)
     end
 
     local kept = {}

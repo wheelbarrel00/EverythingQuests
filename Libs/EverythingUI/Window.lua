@@ -17,6 +17,11 @@ local SCROLLBAR_BOTTOM = 8
 local TWO_LINE_BUTTON = 44
 local CHILD_GAP = 2
 local GUIDE_INSET = 4
+local SEARCH_GAP = 12
+local PATH_SEP = " > "
+local FLASH_ALPHA = 0.3
+local FLASH_HOLD = 0.4
+local FLASH_FADE = 1.2
 
 local TAB_FIELDS = {
     id = "string", title = "string", order = "number", build = "function",
@@ -98,7 +103,7 @@ local function layoutNav(ctx)
         if prev then
             b:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -gap)
         else
-            b:SetPoint("TOPLEFT", SIDEBAR_PADDING, -SIDEBAR_TOP)
+            b:SetPoint("TOPLEFT", SIDEBAR_PADDING, -(ctx._navTop or SIDEBAR_TOP))
         end
         prev = b
     end
@@ -120,6 +125,264 @@ local function layoutNav(ctx)
             end
         end
     end
+end
+
+local function fillPage(ctx, t)
+    if not t._built then
+        t._content._controls = {}
+        t.build(ctx, t._content)
+        t._built = true
+    end
+    if t._footer and not t._footerBuilt then
+        t.footer(ctx, t._footer)
+        t._footerBuilt = true
+    end
+    if t._header and not t._headerBuilt then
+        t.header(ctx, t._header)
+        t._headerBuilt = true
+    end
+end
+
+local function plain(s)
+    s = s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""):gsub("|A.-|a", ""):gsub("%s+", " ")
+    return (s:match("^ *(.-) *$"))
+end
+
+-- string.lower folds ASCII only, so the capitals of the Latin-1 and Cyrillic letters the family's languages
+-- use are folded by hand (UTF-8: A-grave to Thorn but the multiplication sign, then U+0400 to U+042F).
+local function fold(s)
+    s = s:lower():gsub("\195([\128-\158])", function(c)
+        local b = c:byte()
+        if b ~= 151 then return "\195" .. string.char(b + 32) end
+    end)
+    s = s:gsub("\208([\128-\175])", function(c)
+        local b = c:byte()
+        if b < 144 then return "\209" .. string.char(b + 16) end
+        if b < 160 then return "\208" .. string.char(b + 32) end
+        return "\209" .. string.char(b - 32)
+    end)
+    return s
+end
+
+-- A setting is a control the page refreshes, and a button counts by its caption. A text row is neither.
+local function labelOf(control, settings)
+    local fs
+    if settings[control] then
+        fs = control.label
+    elseif control.text and control.GetObjectType and control:GetObjectType() == "Button" then
+        fs = control.text
+    end
+    local s = fs and fs.GetText and fs:GetText()
+    if type(s) ~= "string" then return nil end
+    s = plain(s)
+    if s == "" then return nil end
+    return s
+end
+
+local function settingsOf(frame)
+    local set = {}
+    for _, c in ipairs(frame._controls or {}) do set[c] = true end
+    return set
+end
+
+-- In the sidebar's order. A group's pages are ordered among themselves, so _tabs alone can put them first.
+local function pagesInOrder(ctx)
+    local pages = {}
+    for _, t in ipairs(ctx._tabs or {}) do
+        if t.group then
+            for _, k in ipairs(t._kids) do pages[#pages + 1] = k end
+        elseif not t.parent then
+            pages[#pages + 1] = t
+        end
+    end
+    return pages
+end
+
+-- A setting a tab anchored to a card row by hand, such as a list's second column, is found right after that row.
+local function besideRows(content)
+    local isRow, rowControl, beside = {}, {}, {}
+    for _, card in ipairs(content._euiCards or {}) do
+        for _, row in ipairs(card._rows) do isRow[row], rowControl[row.control] = true, true end
+    end
+    for _, c in ipairs(content._controls or {}) do
+        local rel = not rowControl[c] and c:GetNumPoints() > 0 and select(2, c:GetPoint(1))
+        if rel and isRow[rel] then
+            local list = beside[rel] or {}
+            beside[rel] = list
+            list[#list + 1] = c
+        end
+    end
+    return beside
+end
+
+-- Every shown card and row of each built page, and the controls of each strip and footer.
+local function gather(ctx)
+    local found = {}
+    local function add(t, text, path, scroll, flash)
+        found[#found + 1] = { tab = t.id, text = text, path = path, scroll = scroll, flash = flash }
+    end
+    for _, t in ipairs(pagesInOrder(ctx)) do
+        if t._built then
+            local group = t.parent and tabById(ctx, t.parent)
+            local path = group and (group.title .. PATH_SEP .. t.title) or t.title
+            local content = t._content
+            local settings = settingsOf(content)
+            local beside = besideRows(content)
+            for _, card in ipairs(content._euiCards or {}) do
+                if card:IsShown() then
+                    local title = card.label and card.label:GetText()
+                    title = title and plain(title) or ""
+                    local cardPath = path
+                    if title ~= "" then
+                        cardPath = path .. PATH_SEP .. title
+                        add(t, title, path, card, card.panel)
+                    end
+                    for _, row in ipairs(card._rows) do
+                        if row.control:IsShown() then
+                            local label = labelOf(row.control, settings)
+                            if label then add(t, label, cardPath, row, row) end
+                            for _, c in ipairs(beside[row] or {}) do
+                                local sideLabel = c:IsShown() and labelOf(c, settings)
+                                if sideLabel then add(t, sideLabel, cardPath, row, row) end
+                            end
+                        end
+                    end
+                end
+            end
+            for _, bar in ipairs({ t._header or false, t._footer or false }) do
+                if bar then
+                    local barSettings = settingsOf(bar)
+                    for _, c in ipairs({ bar:GetChildren() }) do
+                        local label = c:IsShown() and labelOf(c, barSettings)
+                        if label then add(t, label, path, nil, c) end
+                    end
+                end
+            end
+        end
+    end
+    return found
+end
+
+-- Every word is in the name, its card's or its page's: names where each starts a word, then names holding them all,
+-- then places with a word only their card or page has. A word may sit inside another, as Chinese writes no spaces.
+local function match(ctx, text)
+    local words = {}
+    for w in fold(text):gmatch("%S+") do words[#words + 1] = w end
+    local tiers = { {}, {}, {} }
+    for _, m in ipairs(gather(ctx)) do
+        local own, all = fold(m.text), fold(m.path .. " " .. m.text)
+        local starts = " " .. own:gsub("%p", " ")
+        local tier = 1
+        for _, w in ipairs(words) do
+            if not all:find(w, 1, true) then tier = nil break end
+            if not own:find(w, 1, true) then
+                tier = 3
+            elseif tier == 1 and not starts:find(" " .. w, 1, true) then
+                tier = 2
+            end
+        end
+        if tier then
+            local list = tiers[tier]
+            list[#list + 1] = m
+        end
+    end
+    local out = tiers[1]
+    for i = 2, 3 do
+        for _, m in ipairs(tiers[i]) do out[#out + 1] = m end
+    end
+    return out
+end
+
+local function flash(ctx, frame)
+    local tex = frame._euiFlash
+    if not tex then
+        tex = frame:CreateTexture(nil, "ARTWORK")
+        tex:SetAllPoints()
+        local r, g, b = ctx:Color("accent")
+        tex:SetColorTexture(r, g, b, FLASH_ALPHA)
+        frame._euiFlash = tex
+    end
+    local driver = ctx._flashDriver
+    if not driver then
+        driver = CreateFrame("Frame", nil, ctx._window)
+        driver:Hide()
+        driver:SetScript("OnUpdate", function(d, elapsed)
+            d.t = d.t + elapsed
+            local a = 1
+            if d.t > FLASH_HOLD then a = 1 - (d.t - FLASH_HOLD) / FLASH_FADE end
+            if a <= 0 then
+                d.tex:Hide()
+                d:Hide()
+                return
+            end
+            d.tex:SetAlpha(a)
+        end)
+        ctx._flashDriver = driver
+    end
+    if driver.tex and driver.tex ~= tex then driver.tex:Hide() end
+    driver.tex, driver.t = tex, 0
+    tex:SetAlpha(1)
+    tex:Show()
+    driver:Show()
+end
+
+local function jump(ctx, m)
+    local t = tabById(ctx, m.tab)
+    local group = t and t.parent and tabById(ctx, t.parent)
+    if group then group._collapsed = nil end
+    ctx:SelectTab(m.tab)
+    if m.scroll then ctx:ScrollIntoView(m.scroll) end
+    flash(ctx, m.flash)
+end
+
+-- Every page is built the first time a search runs, since a page is otherwise built only when first opened.
+-- None is refreshed: a refresh can do real work, such as asking each provider for its entries.
+local function showResults(ctx, text)
+    local results = ctx._results
+    if not results:IsShown() then
+        for _, t in ipairs(ctx._tabs or {}) do
+            if not t.group then fillPage(ctx, t) end
+        end
+        local current = tabById(ctx, ctx._current)
+        if current and current._holder then
+            current._holder:Hide()
+            if current._footer then current._footer:Hide() end
+        end
+        results:Show()
+        ctx._window.section:SetText(ctx.opts.labels.searchTitle)
+    end
+    local matches = match(ctx, text)
+    ctx._matches = matches
+    local rows = {}
+    for i, m in ipairs(matches) do rows[i] = { key = i, text = m.text, value = m.path } end
+    results.list:SetRows(rows)
+    results.list:ScrollToRow(1)
+    results.empty:SetShown(#rows == 0)
+end
+
+local function searchChanged(ctx, text)
+    if text ~= "" then
+        showResults(ctx, text)
+    elseif ctx._results:IsShown() then
+        ctx:SelectTab(ctx._current)
+    end
+end
+
+local function buildResults(ctx, area)
+    local sp = lib.tokens.spacing
+    local results = CreateFrame("Frame", nil, area)
+    results:SetAllPoints()
+    results:Hide()
+    ctx._matches = {}
+    local list = ctx:CreateList(results, function(key)
+        local m = ctx._matches[key]
+        if m then jump(ctx, m) end
+    end)
+    list:SetPoint("TOPLEFT", sp.contentSides, -sp.contentTop)
+    list:SetPoint("BOTTOMRIGHT", -sp.contentSides, 0)
+    results.list = list
+    results.empty = ctx:CreateEmptyState(results, ctx.opts.labels.searchEmpty)
+    ctx._results = results
 end
 
 local function buildHeader(ctx, f)
@@ -165,6 +428,17 @@ end
 local function buildSidebar(ctx, f, sidebar)
     local sp = lib.tokens.spacing
     local width = sp.sidebarWidth - SIDEBAR_PADDING * 2
+    local searchLabel = ctx.opts.labels.search
+    if searchLabel then
+        local field = ctx:CreateSearchField(sidebar, searchLabel, function()
+            local m = ctx._matches[1]
+            if m then jump(ctx, m) end
+        end, nil, nil, function(text) searchChanged(ctx, text) end)
+        field:SetPoint("TOPLEFT", SIDEBAR_PADDING, -SIDEBAR_TOP)
+        field:SetPoint("TOPRIGHT", -SIDEBAR_PADDING, -SIDEBAR_TOP)
+        f.search = field
+        ctx._navTop = SIDEBAR_TOP + sp.fieldHeight + SEARCH_GAP
+    end
     for _, t in ipairs(ctx._tabs or {}) do
         local b = kit.NavItem(ctx, sidebar, width, t.title, not t.parent and t.icon or nil)
         local id = t.id
@@ -341,6 +615,12 @@ function Context:BuildSettings(name)
             ColorPickerFrame:Hide()
             if cancelPending then cancelPending() end
         end
+        if f.search then f.search.box:ClearFocus() end
+        local driver = self._flashDriver
+        if driver then
+            driver:Hide()
+            if driver.tex then driver.tex:Hide() end
+        end
     end)
 
     kit.Fill(self, f, "bg")
@@ -370,6 +650,7 @@ function Context:BuildSettings(name)
 
     buildSidebar(self, f, sidebar)
     buildTabs(self, area, footer)
+    if f.search then buildResults(self, area) end
 
     local first
     for _, t in ipairs(self._tabs or {}) do
@@ -408,19 +689,7 @@ local function refreshControls(t)
 end
 
 local function showPage(ctx, f, t)
-    if not t._built then
-        t._content._controls = {}
-        t.build(ctx, t._content)
-        t._built = true
-    end
-    if t._footer and not t._footerBuilt then
-        t.footer(ctx, t._footer)
-        t._footerBuilt = true
-    end
-    if t._header and not t._headerBuilt then
-        t.header(ctx, t._header)
-        t._headerBuilt = true
-    end
+    fillPage(ctx, t)
     if t.refresh then t.refresh(ctx, t._content) end
     refreshControls(t)
     if t._preview then
@@ -441,6 +710,9 @@ end
 function Context:SelectTab(id)
     local f = self._window
     if not f then return end
+    -- Any page shown ends a search, and the results go before the text so clearing it reopens nothing.
+    if self._results then self._results:Hide() end
+    if f.search and f.search.box:GetText() ~= "" then f.search:SetText("") end
     local asked = tabById(self, id)
     if asked and asked.group then id = asked._last or asked._kids[1].id end
     local was = self._current

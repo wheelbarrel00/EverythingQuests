@@ -1593,6 +1593,14 @@ if mode == "category" then
             if alt and alt ~= false then instanceArea[alt] = true end
         end
     end
+    -- foreverInstances.lua, from build_forever_supplement.lua, adds the area ids the converter gives ATT's instances.
+    local instancesPath = dir .. "/foreverInstances.lua"
+    local instancesFile = io.open(instancesPath, "rb")
+    if instancesFile then
+        instancesFile:close()
+        assert(PREFIX == "classic", "Forever instances cannot be applied to " .. PREFIX .. " data")
+        for areaId in pairs(assert(loadfile(instancesPath))()) do instanceArea[areaId] = true end
+    end
 
     local parts = {
         "local _, ns = ...\n",

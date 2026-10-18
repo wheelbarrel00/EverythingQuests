@@ -328,8 +328,6 @@ function kit.CloseOnEscape(frame)
     end)
 end
 
--- A plain ScrollFrame with a slim draggable thumb and no arrow buttons. The thumb is the
--- library's own texture, because a Slider takes a texture file on every flavor.
 -- A press on the thumb sent the value to the far end of the bar on every client, while the drag itself ran the right
 -- way (probed on retail, 2026-10-16), so the bar takes no mouse and a grip over it moves the thumb. A press on the
 -- thumb keeps hold where it landed, and a press on the track puts the thumb's middle under the cursor.
@@ -338,7 +336,9 @@ function kit.DragThumb(bar, thumb, vertical)
     local grip = CreateFrame("Frame", nil, bar)
     grip:SetAllPoints(bar)
     grip:EnableMouse(true)
-    local hold
+    -- The hold and the thumb's length at the press. A range that changes mid-drag resizes the thumb, and the hold
+    -- is scaled with it so the cursor stays on the thumb.
+    local hold, held
     local function edge()
         if vertical then return bar:GetTop() end
         return bar:GetLeft()
@@ -349,14 +349,21 @@ function kit.DragThumb(bar, thumb, vertical)
         if vertical then return edge() - y / scale end
         return x / scale - edge()
     end
+    local function size()
+        if vertical then return thumb:GetHeight() end
+        return thumb:GetWidth()
+    end
     local function travel()
-        if vertical then return bar:GetHeight() - thumb:GetHeight() end
-        return bar:GetWidth() - thumb:GetWidth()
+        if vertical then return bar:GetHeight() - size() end
+        return bar:GetWidth() - size()
+    end
+    local function start(lo, hi, room)
+        return (bar:GetValue() - lo) / (hi - lo) * room
     end
     local function follow()
         local lo, hi = bar:GetMinMaxValues()
         local room = travel()
-        if hi > lo and room > 0 and edge() then bar:SetValue(lo + (along() - hold) / room * (hi - lo)) end
+        if hi > lo and room > 0 and edge() then bar:SetValue(lo + (along() - hold * size() / held) / room * (hi - lo)) end
     end
     local function stop()
         hold = nil
@@ -366,26 +373,31 @@ function kit.DragThumb(bar, thumb, vertical)
         if button ~= "LeftButton" or not edge() then return end
         local lo, hi = bar:GetMinMaxValues()
         local room = travel()
-        if hi <= lo or room <= 0 then return end
-        local size = vertical and thumb:GetHeight() or thumb:GetWidth()
-        local at = (bar:GetValue() - lo) / (hi - lo) * room
+        held = size()
+        if hi <= lo or room <= 0 or held <= 0 then return end
         local pos = along()
-        if pos >= at and pos <= at + size then
-            hold = pos - at
-        else
-            hold = size / 2
+        local at = start(lo, hi, room)
+        if pos < at or pos > at + held then
+            hold = held / 2
             follow()
+            -- A thumb pinned at an end does not center on the cursor, so the hold is read from where it landed
+            at = start(lo, hi, room)
         end
+        hold = pos - at
         grip:SetScript("OnUpdate", function()
             if not IsMouseButtonDown("LeftButton") then return stop() end
             follow()
         end)
     end)
-    grip:SetScript("OnMouseUp", stop)
+    grip:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then stop() end
+    end)
     grip:SetScript("OnHide", stop)
     bar._euiGrip = grip
 end
 
+-- A plain ScrollFrame with a slim draggable thumb and no arrow buttons. The thumb is the
+-- library's own texture, because a Slider takes a texture file on every flavor.
 function kit.Scroll(ctx, parent)
     local sf = CreateFrame("ScrollFrame", nil, parent)
     local child = CreateFrame("Frame", nil, sf)
