@@ -118,8 +118,10 @@ Options:RegisterTab({
 
         card:Add(self:CreateButton(content, L["Populate from past completions"], nil, backfill,
             L["One-time per character: walks the list of quests this character has completed (according to the game's own record) and adds any that aren't already in your history. Entries created this way have no date — the game doesn't tell us when they happened."]))
-        card:Add(self:CreateButton(content, L["Re-scan for quest names"], nil, rescan,
-            L["Some quests in the backfilled history show up as \"Quest #12345\" because Blizzard hasn't sent the client their name yet. This button asks the server for every missing one. Quests the server flatly has no data for (retired or internal IDs) will keep their numeric placeholder."]))
+        if ns.Has.QuestDataRequest then
+            card:Add(self:CreateButton(content, L["Re-scan for quest names"], nil, rescan,
+                L["Some quests in the backfilled history show up as \"Quest #12345\" because Blizzard hasn't sent the client their name yet. This button asks the server for every missing one. Quests the server flatly has no data for (retired or internal IDs) will keep their numeric placeholder."]))
+        end
         card:Add(self:CreateButton(content, L["Restore history from backup"], nil, restore,
             L["Everything Quests saves a rolling backup of your history when you log out, and automatically restores it if your history is ever found empty or missing a character on load. Use this button to restore manually."]))
     end,

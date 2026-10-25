@@ -121,6 +121,14 @@ local function findChainForQuest(questID)
     return Database:PickChainForQuest(questID, CG and CG.GetTrackedChainID and CG:GetTrackedChainID())
 end
 
+-- The Quest Browser has a page only for a quest in the data's gates table, the test the Chain Guide's cards use
+local function browserFor(questID)
+    local QB = ns:GetSubsystem("QuestBrowser")
+    local A  = ns:GetSubsystem("AvailableQuests")
+    local D  = A and A.Data and A:Data()
+    if QB and QB.Open and questID and D and D.gates[questID] ~= nil then return QB end
+end
+
 local function openChain(chainID, questID)
     local CG = ns:GetSubsystem("ChainGuide")
     if not CG then return end
@@ -328,30 +336,32 @@ function HF:Build()
     local cfg = windowCfg()
     if cfg and cfg.resizeHintSeen then f.resizeHint:Hide() end
 
-    self._pages = {
-        { id = "quests",   title = L["Quests"],         icon = ctx:Texture("icon-history") },
-        { id = "timeline", title = L["Chain Timeline"], icon = ctx:Texture("icon-chain") },
-        { id = "stats",    title = L["Stats"],          icon = ctx:Texture("icon-stats") },
-    }
+    self._pages = { { id = "quests", title = L["Quests"], icon = ctx:Texture("icon-history") } }
+    if ns:GetSubsystem("ChainGuide") then
+        self._pages[#self._pages + 1] = { id = "timeline", title = L["Chain Timeline"], icon = ctx:Texture("icon-chain") }
+    end
+    self._pages[#self._pages + 1] = { id = "stats", title = L["Stats"], icon = ctx:Texture("icon-stats") }
     f.nav = ctx:CreateNav(f.sidebar, self._pages, function(id) self:SwitchTab(id) end)
 
     local width = SIDEBAR_W - SIDE_PAD * 2
     f.export = ctx:CreateButton(f.sidebar, L["Export"], width, function() self:_openExportPopup() end)
     f.export:SetPoint("BOTTOMLEFT", f.sidebar, "BOTTOMLEFT", SIDE_PAD, SIDE_BOTTOM)
-    f.rescan = ctx:CreateButton(f.sidebar, L["Re-scan names"], width, function()
-        local R = ns:GetSubsystem("History")
-        if not R then return end
-        local queued = R:RequestMissingTitles() or 0
-        if queued > 0 then
-            print((L["|cffEBB706EQ History:|r requested %d quest name%s from the server. Names will fill in over the next minute or two."]):format(
-                queued, queued == 1 and "" or "s"))
-        else
-            print(L["|cffEBB706EQ History:|r nothing left to look up — every entry that can be resolved already is."])
-        end
-    end)
-    f.rescan:SetPoint("BOTTOMLEFT", f.export, "TOPLEFT", 0, SIDE_BUTTON_GAP)
-    ctx:AttachTooltip(f.rescan, L["Re-scan for quest names"],
-        L["Asks the server for the name of any \"Quest #12345\" entries. They'll fill in over the next minute or two as responses arrive."])
+    if ns.Has.QuestDataRequest then
+        f.rescan = ctx:CreateButton(f.sidebar, L["Re-scan names"], width, function()
+            local R = ns:GetSubsystem("History")
+            if not R then return end
+            local queued = R:RequestMissingTitles() or 0
+            if queued > 0 then
+                print((L["|cffEBB706EQ History:|r requested %d quest name%s from the server. Names will fill in over the next minute or two."]):format(
+                    queued, queued == 1 and "" or "s"))
+            else
+                print(L["|cffEBB706EQ History:|r nothing left to look up — every entry that can be resolved already is."])
+            end
+        end)
+        f.rescan:SetPoint("BOTTOMLEFT", f.export, "TOPLEFT", 0, SIDE_BUTTON_GAP)
+        ctx:AttachTooltip(f.rescan, L["Re-scan for quest names"],
+            L["Asks the server for the name of any \"Quest #12345\" entries. They'll fill in over the next minute or two as responses arrive."])
+    end
 
     self._views = {}
     for _, p in ipairs(self._pages) do
@@ -361,10 +371,13 @@ function HF:Build()
         self._views[p.id] = view
     end
     buildQuestsPage(ctx, self._views.quests)
-    buildIntroPage(ctx, self._views.timeline,
-        L["Chains where you have at least one completed quest. Click a chain to expand and see per-quest completion dates."])
-    self._views.timeline.empty = ctx:CreateEmptyState(self._views.timeline.area, L["(no chain quests recorded yet)"])
-    self._views.timeline.empty:SetPoint("TOP", self._views.timeline.area, "CENTER", 0, 8)
+    local timeline = self._views.timeline
+    if timeline then
+        buildIntroPage(ctx, timeline,
+            L["Chains where you have at least one completed quest. Click a chain to expand and see per-quest completion dates."])
+        timeline.empty = ctx:CreateEmptyState(timeline.area, L["(no chain quests recorded yet)"])
+        timeline.empty:SetPoint("TOP", timeline.area, "CENTER", 0, 8)
+    end
     local stats = self._views.stats
     stats.area = ctx:CreateScrollArea(stats, { clearGrip = true })
     stats.area:SetAllPoints(stats)
@@ -414,11 +427,20 @@ local function questRow(ctx, content)
         if self._held and self._held > 0 and self._accepted then
             lines[#lines + 1] = (L["Accepted %1$s, held %2$s"]):format(fmtTime(self._accepted), ns.Util.FmtDurationLong(self._held))
         end
-        lines[#lines + 1] = L["Right-click to open in the Chain Guide"]
+        if ns:GetSubsystem("ChainGuide") then
+            lines[#lines + 1] = L["Right-click to open in the Chain Guide"]
+        elseif browserFor(self._questID) then
+            lines[#lines + 1] = L["Right-click for quest details"]
+        end
         ctx:ShowTooltip(self, self._fullName or ("Quest #" .. tostring(self._questID)), table.concat(lines, "\n"))
     end)
     r:SetScript("OnClick", function(self, button)
         if button ~= "RightButton" then return end
+        if not ns:GetSubsystem("ChainGuide") then
+            local QB = browserFor(self._questID)
+            if QB then QB:Open(self._questID) end
+            return
+        end
         local chainID = findChainForQuest(self._questID)
         if chainID then
             openChain(chainID, self._questID)

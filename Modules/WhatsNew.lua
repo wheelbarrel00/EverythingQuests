@@ -5,6 +5,10 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.8.0", sections = {
+        { "Quest History on Classic", "Every quest you turn in is now recorded across your characters, with a Quests page to search and filter and a Stats page for your streak, totals and trends. Each character's past quests are added the first time it logs in after this update. Open it with /eqs history or from the History tab in the options window.", sub = "HistoryFrame", without = "ChainGuide" },
+        { "A video tutorial", "There is now a video tutorial for Everything Quests on YouTube. You can find its link in the options window's About tab, under Tutorials." },
+    } },
     { version = "2.7.0", sections = {
         { "Search your settings", "Type in the box at the top of the options window's sidebar to find a setting by name, then pick a result to go straight to it." },
         { "Dungeon quests on WoW Forever", "Quests new to WoW Forever that belong to one of its dungeons and need no earlier quest now count as dungeon quests in the map's quest filters, the Quest Browser and Quest History's Type filter.", classic = true, sub = "ChainGuide" },
@@ -20,7 +24,7 @@ local RELEASES = {
         { "The game's own coordinates come first", "Everything Quests' coordinates under the minimap and on the world map now leave out whatever the game's own coordinates already show. The game turns those on by default. To keep Everything Quests' readouts, for example for two decimals, turn the game's off in its options under Map Coordinates.", sub = "ChainGuide" },
     } },
     { version = "2.3.0", sections = {
-        { "Quest History on WoW Forever", "Every turn-in across your characters, with the Quests, Chain Timeline and Stats pages, and each character's past quests added the first time it logs in. The Type filter uses the Quest Browser's groups, and hovering a quest in the Chain Guide shows the date this character finished it.", classic = true, sub = "HistoryFrame" },
+        { "Quest History on WoW Forever", "Every turn-in across your characters, with the Quests, Chain Timeline and Stats pages, and each character's past quests added the first time it logs in. The Type filter uses the Quest Browser's groups, and hovering a quest in the Chain Guide shows the date this character finished it.", classic = true, sub = "ChainGuide" },
         { "A tab and a key for the Quest Browser", "The Quest Browser has its own tab in the options window, and a Toggle Quest Browser key you can set in the game's Key Bindings.", sub = "QuestBrowser" },
         { "History and the Chain Guide", "Hovering a quest in the Chain Guide shows the date this character finished it, History's reward total counts only quests that earned XP or gold, and its name and Type sorts are quicker on a long history.", retail = true, sub = "HistoryFrame" },
         { "Only what applies to your version", "What's New and the About tab's changelog now leave out what your version of the game does not have, a command or key your version lacks says so, and Everything Quests' keys sit together under one heading in Key Bindings. The scroll bars also stop short of the resize grip." },

@@ -185,6 +185,7 @@ end
 function Util.ForThisClient(t)
     if type(t) ~= "table" then return true end
     if t.sub and not ns:GetSubsystem(t.sub) then return false end
+    if t.without and ns:GetSubsystem(t.without) then return false end
     if t.classic and not ns.HAS_CLASSIC_SPAWNS then return false end
     if t.retail and ns.HAS_CLASSIC_SPAWNS then return false end
     return true

@@ -2,14 +2,14 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, auto-accept and auto-turn-in, and the /eqs options window. WoW Forever support is a work in progress.
 ## Author: Wheelbarrel00
-## Version: 2.7.0
+## Version: 2.8.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
 ## IconTexture: Interface\AddOns\EverythingQuests\Media\Textures\eq-logo-v3
 ## X-Curse-Project-ID: 1544648
 
-# WoW Forever runs 1.x content, so this lists the Classic Era file set, the Chain Guide, Quest History and Forever's own data files.
+# WoW Forever runs 1.x content, so this lists the Classic Era file set, the Chain Guide and Forever's own data files.
 
 # The Chain Guide is built from the quest tables, as Classic quests belong to no client quest line.
 # check-toc: omit Modules/ChainGuide/QuestLineSource.lua

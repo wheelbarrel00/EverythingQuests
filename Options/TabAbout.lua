@@ -6,6 +6,7 @@ local Options = ns:GetSubsystem("Options")
 local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/everything-quests"
 local GITHUB_URL     = "https://github.com/wheelbarrel00/EverythingQuests"
 local BUG_URL        = "https://github.com/wheelbarrel00/EverythingQuests/issues"
+local TUTORIAL_URL   = "https://www.youtube.com/watch?v=1DSd7dnkj20"
 
 -- sub names the subsystem that serves the command, so a flavor without it does not list the command
 local COMMANDS = {
@@ -61,7 +62,7 @@ local function description()
     elseif ns:GetSubsystem("ChainGuide") then
         lead = L["Better questing for WoW Forever: objective markers on the world map and minimap, every quest giver with something for you, a guide to the quest chains, a history of every quest you turn in, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."]
     else
-        lead = L["Better questing for Classic: objective markers on the world map and minimap, every quest giver with something for you, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."]
+        lead = L["Better questing for Classic: objective markers on the world map and minimap, every quest giver with something for you, a history of every quest you turn in, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."]
     end
     return lead .. " " .. L["Its objective tracker is EQ Objective Tracker, a separate addon that installs with it."]
 end
@@ -129,9 +130,12 @@ end
 
 local function tutorialsCard(self, content, stack)
     local card = stack(self:CreateGroup(content, L["Tutorials"]))
-    local note = self:CreateTextBlock(content)
-    note:AddLine(L["Video tutorials are coming soon."], "hint")
-    card:Add(note, { fitHeight = true })
+    -- The video's own title, drawn raw like the add-on names below
+    local row = self:CreateTextRow(content, "Everything Quests Tutorial", "")
+    row.label:SetTextColor(self:Color("text"))
+    card:Add(row)
+    local watch = self:CreateButton(content, L["YouTube"], nil, function() ns:ShowURL(TUTORIAL_URL) end, nil, "ghost")
+    watch:SetPoint("LEFT", row.text, "LEFT", 0, 0)
 end
 
 local function addonsCard(self, content, stack)

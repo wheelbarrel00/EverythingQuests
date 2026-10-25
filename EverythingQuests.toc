@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Unified replacement for the Blizzard quest experience - world map overlays, nameplate quest icons, quest history, and a Midnight chain guide. The objective tracker installs alongside it as EQ Objective Tracker.
 ## Author: Wheelbarrel00
-## Version: 2.7.0
+## Version: 2.8.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -118,17 +118,17 @@ Modules\History\Frame.lua
 Modules\History\Session.lua
 
 # Data\QuestCoords_Classic.lua is Era quest data and no retail map uses those UiMapIDs, so it
-# is listed by the flavor TOCs ONLY. Both flavor TOCs are tracked now, so CI sees them and their
-# own listings satisfy coverage. The directive stays as the declaration of record, and
-# tools/check_toc.py errors if it goes stale.
+# is listed by the Vanilla TOC ONLY (TBC and Camelot list their own twins). Every flavor TOC is
+# tracked, so CI sees them and the Vanilla listing satisfies coverage. The directive stays as the
+# declaration of record, and tools/check_toc.py errors if it goes stale.
 # check-toc: flavor-only Data/QuestCoords_Classic.lua
 
-# Data\QuestSpawns_Classic.lua is the objective SPAWN map for the same flavors - every place a
+# Data\QuestSpawns_Classic.lua is the objective SPAWN map for Classic Era - every place a
 # quest can be advanced, rather than the one waypoint QuestCoords carries. Same reasoning, same
 # gate, and it defines a DIFFERENT global so the two load together rather than overwriting.
 # check-toc: flavor-only Data/QuestSpawns_Classic.lua
 
-# Data\QuestTurnIn_Classic.lua is where each quest is HANDED IN, for the same flavors. Neither
+# Data\QuestTurnIn_Classic.lua is where each quest is HANDED IN, for Classic Era. Neither
 # table above can answer that - QuestSpawns holds objective locations and QuestCoords' single
 # point IS the objective for any quest that has one, so a finished quest was being pinned at the
 # field it was farmed in. Retail gets the turn-in from Blizzard's own waypoint.

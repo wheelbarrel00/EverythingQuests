@@ -37,17 +37,27 @@ local function classColor()
     if c then return c.r, c.g, c.b end
 end
 
--- Installed independently of the class button, which ElvUI suppresses. These outlive a picker
--- that has closed unless something clears them, and a stale cancel would revert an already
--- committed color the next time the options window hides over an open picker.
+-- These outlive a picker that has closed unless something clears them, and a stale cancel would
+-- revert an already committed color the next time the options window hides over an open picker.
+local function detach()
+    if state.classButton then state.classButton:Hide() end
+    if state.watcher then state.watcher:Hide() end
+    state.apply, state.reopen, state.cancel, state.owner = nil, nil, nil, nil
+end
+
+-- Installed independently of the class button, which ElvUI suppresses.
 local function ensurePickerHook()
     if state.hooked or not ColorPickerFrame then return end
     state.hooked = true
-    ColorPickerFrame:HookScript("OnHide", function()
-        if state.classButton then state.classButton:Hide() end
-        if state.watcher then state.watcher:Hide() end
-        state.apply, state.reopen, state.cancel, state.owner = nil, nil, nil, nil
-    end)
+    ColorPickerFrame:HookScript("OnHide", detach)
+end
+
+-- Blizzard's open does not hide a picker that is already shown, so another addon opening it over a
+-- family one fires no OnHide. Every open detaches here instead, and a family open attaches again after.
+local function ensureOpenHook()
+    if state.openHooked or not (ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow) then return end
+    state.openHooked = true
+    hooksecurefunc(ColorPickerFrame, "SetupColorPickerAndShow", detach)
 end
 
 -- Blizzard's Mainline picker fires nothing while its opacity bar moves (measured on retail and
@@ -224,6 +234,7 @@ function Context:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
         -- hook that clears these. The owner is the window that closes this picker with itself.
         state.apply, state.reopen, state.cancel, state.owner = apply, openWith, cancel, ctx._window
         ensurePickerHook()
+        ensureOpenHook()
         -- Seeded with the alpha the picker opened on, so the seed itself is never committed.
         if hasAlpha and not OpacitySliderFrame and cp.GetColorAlpha then
             state.watchedAlpha = cp:GetColorAlpha()
@@ -236,15 +247,27 @@ function Context:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
     openWith(r, g, b, a)
 end
 
+-- The picker hands back what its controls hold, which can sit a step off the color it was seeded with.
+local CLASS_NEAR = 0.01
+local function nearClass(nr, ng, nb, kr, kg, kb)
+    return math.abs(nr - kr) < CLASS_NEAR and math.abs(ng - kg) < CLASS_NEAR and math.abs(nb - kb) < CLASS_NEAR
+end
+
 -- A labelled row: the label on the left and the swatch at the right end, where a slider's value
 -- ends. Its own width fits label, Clear and swatch, so a tab can hang it at the right end of a
 -- checkbox's row as that box's color.
-function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasAlpha, onClear)
+-- followClass adds a Class toggle that stores class = true in the color. The host draws the class
+-- color for such a color, so it is offered only where the host's readers honor it.
+function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasAlpha, onClear, followClass)
     local sp = lib.tokens.spacing
     local ctx = self
     local clearLabel = self.opts.labels.clear
     if onClear and not clearLabel then
         error("EverythingUI: a clearable color picker needs opts.labels.clear", 2)
+    end
+    local classTip = self.opts.labels.classColor
+    if followClass and not classTip then
+        error("EverythingUI: a class color picker needs opts.labels.classColor", 2)
     end
     local holder = CreateFrame("Frame", nil, content)
     holder:SetHeight(sp.fieldHeight)
@@ -272,18 +295,46 @@ function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasA
     tex:SetPoint("BOTTOMRIGHT", -SWATCH_INSET, SWATCH_INSET)
     kit.Highlight(self, swatch)
 
-    local clear
+    local clear, classToggle
     local function paint()
         local c = getter()
         local isSet = (c and c.r ~= nil) and true or false
-        if isSet then
+        local classOn = (followClass and c and c.class == true) and true or false
+        local kr, kg, kb
+        if classOn then kr, kg, kb = classColor() end
+        if kr then
+            tex:SetColorTexture(kr, kg, kb, c.a or 1)
+        elseif isSet then
             tex:SetColorTexture(c.r, c.g or 0, c.b or 0, c.a or 1)
         else
             tex:SetColorTexture(ctx:Color("track"))
         end
         if clear then clear:SetShown(isSet) end
+        if classToggle then
+            classToggle.lit:SetShown(classOn)
+            classToggle.text:SetTextColor(ctx:Color(classOn and "accentText" or "navText"))
+        end
     end
 
+    if followClass then
+        classToggle = self:CreateButton(holder, _G.CLASS or "Class", nil, function()
+            local c = getter()
+            local v = c and { r = c.r, g = c.g, b = c.b, a = c.a } or {}
+            -- An unset color starts from the class color, so turning Class off later leaves it showing.
+            if v.r == nil then
+                v.r, v.g, v.b = classColor()
+                if v.r == nil then v.r, v.g, v.b = 1, 1, 1 end
+                v.a = 1
+            end
+            if not (c and c.class == true) then v.class = true end
+            setter(v)
+            paint()
+        end)
+        classToggle.lit = kit.Fill(self, classToggle, "accent")
+        -- Against the swatch, so the room a hidden Clear keeps never sits between the two.
+        classToggle:SetPoint("RIGHT", swatch, "LEFT", -CLEAR_GAP, 0)
+        self:AttachTooltip(classToggle, _G.CLASS or "Class", classTip)
+    end
     -- Only clearable pickers get the button, so an unset swatch stays distinguishable
     -- from a deliberately black one.
     if onClear then
@@ -291,7 +342,7 @@ function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasA
             onClear()
             paint()
         end, nil, "ghost")
-        clear:SetPoint("RIGHT", swatch, "LEFT", -CLEAR_GAP, 0)
+        clear:SetPoint("RIGHT", classToggle or swatch, "LEFT", -CLEAR_GAP, 0)
     end
     -- Sized again by kit.Refit on screen, like a fitted button: sized only at build, a picker at a
     -- checkbox row's end ran its label under its swatch (2026-10-04).
@@ -302,6 +353,10 @@ function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasA
             clear:Fit()
             -- Room for Clear is kept while it is hidden, so the label does not move when it shows.
             width = width + clear:GetWidth() + CLEAR_GAP
+        end
+        if classToggle then
+            classToggle:Fit()
+            width = width + classToggle:GetWidth() + CLEAR_GAP
         end
         holder:SetWidth(width)
     end
@@ -315,14 +370,24 @@ function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasA
     swatch:SetScript("OnClick", function()
         local c = getter()
         -- Copied rather than aliased: the setter may hand this same table straight back.
-        local prev = c and { r = c.r, g = c.g, b = c.b, a = c.a } or nil
+        local prev = c and { r = c.r, g = c.g, b = c.b, a = c.a, class = c.class } or nil
         local function commit(v)
             setter(v)
             paint()
         end
         c = c or {}
-        ctx:ShowColorPicker(c.r or 1, c.g or 1, c.b or 1, c.a or 1, hasAlpha,
-            function(nr, ng, nb, na) commit({ r = nr, g = ng, b = nb, a = na }) end,
+        local kr, kg, kb
+        if followClass and c.class == true then kr, kg, kb = classColor() end
+        local own = { r = c.r, g = c.g, b = c.b }
+        -- Opened on the class color it is following, so only the opacity can change and keep it.
+        ctx:ShowColorPicker(kr or c.r or 1, kg or c.g or 1, kb or c.b or 1, c.a or 1, hasAlpha,
+            function(nr, ng, nb, na)
+                if kr and nearClass(nr, ng, nb, kr, kg, kb) then
+                    commit({ r = own.r, g = own.g, b = own.b, a = na, class = true })
+                else
+                    commit({ r = nr, g = ng, b = nb, a = na })
+                end
+            end,
             function() commit(prev) end)
     end)
 
@@ -335,6 +400,7 @@ function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasA
 
     holder.button  = swatch
     holder.clear   = clear
+    holder.class   = classToggle
     holder._euiClearGap = CLEAR_GAP
     holder.paint   = paint
     holder.Refresh = paint

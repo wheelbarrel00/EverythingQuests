@@ -5,6 +5,23 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-10-25
+
+Quest History comes to Classic Era and Burning Crusade Classic, and the About tab links the new Everything Quests video tutorial.
+
+### New Features
+
+- **Quest History on Classic Era and Burning Crusade Classic.** Every quest you turn in is recorded across your characters, with what it paid and, for a quest you accept from this update on, how long you held it. The Quests page lists them to search, filter by character, date or type, and sort, and the Stats page shows your streak, your activity day by day, your totals, trends over time and this session. Each character's past quests are added the first time it logs in after this update, without dates. The Type filter uses the Quest Browser's groups, and right-clicking a quest opens its Quest Browser page where it has one. Open it with /eqs history or from the History tab in the options window. There is no Chain Timeline page, because it lists the Chain Guide's chains.
+
+### Improvements
+
+- **A video tutorial.** There is now a video tutorial for Everything Quests on YouTube. The About tab's Tutorials card lists it: click YouTube to copy its link.
+- **Updated Korean.** Some of the Korean wording is updated. Translated by labrie75.
+
+### Known Issues
+
+- **Some past quests in Quest History show as "Quest #12345" on Classic Era and Burning Crusade Classic.** A past quest added the first time a character logs in after this update takes its name from the game or from Everything Quests' quest data. When neither has it, the quest keeps its number, because these versions of the game cannot be asked for a quest's name.
+
 ## [2.7.0] - 2026-10-18
 
 A search box in the options window finds a setting by name and takes you to it, and on WoW Forever, quests new to Forever that belong to a dungeon and need no earlier quest now count as dungeon quests.

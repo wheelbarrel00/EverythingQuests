@@ -508,7 +508,7 @@ L[" for the many hours spent translating Everything Quests into Traditional Chin
 L[" for the many hours spent translating Everything Quests into German."] = true
 L["Better questing across the whole game: markers for your quests on the world map, world quests with reward and faction filters, a guide to Midnight's quest chains, a history of every quest you turn in, and quest progress on nameplates."] = true
 L["Better questing for WoW Forever: objective markers on the world map and minimap, every quest giver with something for you, a guide to the quest chains, a history of every quest you turn in, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."] = true
-L["Better questing for Classic: objective markers on the world map and minimap, every quest giver with something for you, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."] = true
+L["Better questing for Classic: objective markers on the world map and minimap, every quest giver with something for you, a history of every quest you turn in, a browser for almost any quest you have not picked up yet, and quest progress on tooltips and nameplates."] = true
 L["Its objective tracker is EQ Objective Tracker, a separate addon that installs with it."] = true
 L["by Wheelbarrel00"] = true
 L["for WoW %s"] = true
@@ -518,7 +518,7 @@ L["Report a Bug"] = true
 L["Commands"] = true
 L["Tip: right-click the minimap button to open Options."] = true
 L["Tutorials"] = true
-L["Video tutorials are coming soon."] = true
+L["YouTube"] = true
 L["More Add-ons by Wheelbarrel00"] = true
 L["Thanks"] = true
 L["Built with feedback, reports, and ideas from the community — especially "] = true

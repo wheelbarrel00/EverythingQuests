@@ -31,6 +31,7 @@ local LABELS = {
     discordTip      = true,
     testSound       = true,
     clear           = true,
+    classColor      = true,
     search          = true,
     searchEmpty     = true,
     searchTitle     = true,

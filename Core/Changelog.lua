@@ -2,6 +2,21 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.8.0", date = "2026-10-25",
+        sections = {
+            { head = "New Features", items = {
+                { "Quest History on Classic Era and Burning Crusade Classic. Every quest you turn in is recorded across your characters, with what it paid and, for a quest you accept from this update on, how long you held it. The Quests page lists them to search, filter by character, date or type, and sort, and the Stats page shows your streak, your activity day by day, your totals, trends over time and this session. Each character's past quests are added the first time it logs in after this update, without dates. The Type filter uses the Quest Browser's groups, and right-clicking a quest opens its Quest Browser page where it has one. Open it with /eqs history or from the History tab in the options window. There is no Chain Timeline page, because it lists the Chain Guide's chains.", sub = "HistoryFrame", without = "ChainGuide" },
+            } },
+            { head = "Improvements", items = {
+                "A video tutorial. There is now a video tutorial for Everything Quests on YouTube. The About tab's Tutorials card lists it: click YouTube to copy its link.",
+                "Updated Korean. Some of the Korean wording is updated. Translated by labrie75.",
+            } },
+            { head = "Known Issues", items = {
+                { "Some past quests in Quest History show as \"Quest #12345\" on Classic Era and Burning Crusade Classic. A past quest added the first time a character logs in after this update takes its name from the game or from Everything Quests' quest data. When neither has it, the quest keeps its number, because these versions of the game cannot be asked for a quest's name.", sub = "HistoryFrame", without = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.7.0", date = "2026-10-18",
         sections = {
             { head = "New Features", items = {
@@ -108,7 +123,7 @@ ns.Changelog = {
         version = "2.3.0", date = "2026-10-09",
         sections = {
             { head = "New Features", items = {
-                { "Quest History on WoW Forever. Every turn-in across your characters, with the Quests, Chain Timeline and Stats pages from retail. The first time each character logs in, History adds the quests that character has already done, named from Everything Quests' own quest data, and any quest the data cannot name is asked of the server one at a time. The Type filter and sort use the Quest Browser's groups: dungeon or raid, world event, class, profession and repeatable. The Chain Timeline shows the Forever Chain Guide's chains you have made progress in, right-clicking a quest opens its chain, and hovering a quest in the Chain Guide shows the date this character finished it.", classic = true, sub = "HistoryFrame" },
+                { "Quest History on WoW Forever. Every turn-in across your characters, with the Quests, Chain Timeline and Stats pages from retail. The first time each character logs in, History adds the quests that character has already done, named from Everything Quests' own quest data, and any quest the data cannot name is asked of the server one at a time. The Type filter and sort use the Quest Browser's groups: dungeon or raid, world event, class, profession and repeatable. The Chain Timeline shows the Forever Chain Guide's chains you have made progress in, right-clicking a quest opens its chain, and hovering a quest in the Chain Guide shows the date this character finished it.", classic = true, sub = "ChainGuide" },
                 { "A tab and a key for the Quest Browser. On Classic Era, Burning Crusade Classic and WoW Forever the options window has a Quest Browser tab in place of the button on the General tab, and the game's Key Bindings have a Toggle Quest Browser key you can set.", sub = "QuestBrowser" },
                 "Only what applies to your version. From this update on, What's New and the About tab's changelog leave out what your version of the game does not have, and the About tab lists Everything Delves only on retail, where it runs. A /eqs command or a key your version does not have now says so, where most did nothing before.",
             } },

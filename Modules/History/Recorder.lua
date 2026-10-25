@@ -116,6 +116,7 @@ function R:OnInitialize()
     self._completion, self._mine = {}, {}
     self._giveUp = {}
     self._turnedIn = {}
+    self._removed = {}
 
     self._loadNotice = self:_guardOnLoad()
 
@@ -172,7 +173,7 @@ function R:OnEnable()
         self:Record(questID, xpReward, moneyReward)
     end)
 
-    -- Classic passes questLogIndex first and retail passes the id alone, so the id is last on both
+    -- Era and TBC pass questLogIndex first and retail and Forever pass the id alone, so the id is last on all four
     Events:On("QUEST_ACCEPTED", function(_, a, b)
         self:RecordAccept(b or a)
     end)
@@ -187,16 +188,18 @@ function R:OnEnable()
     Events:On("PLAYER_MONEY", function()
         self:RecordMoney()
     end)
-    Events:On("QUEST_DATA_LOAD_RESULT", function(_, questID, success)
-        local asked = questID ~= nil and questID == self._inFlight
-        if asked then self._inFlight = nil end
-        if success then
-            self:_fillTitle(questID)
-            if asked and not resolveTitle(questID) then self._giveUp[questID] = true end
-        elseif questID then
-            self._giveUp[questID] = true
-        end
-    end)
+    if ns.Has.QuestDataRequest then
+        Events:On("QUEST_DATA_LOAD_RESULT", function(_, questID, success)
+            local asked = questID ~= nil and questID == self._inFlight
+            if asked then self._inFlight = nil end
+            if success then
+                self:_fillTitle(questID)
+                if asked and not resolveTitle(questID) then self._giveUp[questID] = true end
+            elseif questID then
+                self._giveUp[questID] = true
+            end
+        end)
+    end
 
     Events:On("PLAYER_LOGOUT", function()
         self:_snapshotToBackup()
@@ -503,6 +506,8 @@ end
 -- having none, because the next hand-in then measures a duration from the wrong day.
 function R:RecordAccept(questID)
     if not questID then return end
+    -- Settle a pending removal while its marker and accept time are still here, assuming a hand-in's QUEST_TURNED_IN lands before any re-accept
+    self:_settleRemoval(questID)
     self._turnedIn[questID] = nil
     local mine = charTable(self.sv.accepted, charKey())
     if not enabled() or transientQuest(questID) then
@@ -512,17 +517,29 @@ function R:RecordAccept(questID)
     mine[questID] = (GetServerTime and GetServerTime()) or time()
 end
 
--- QUEST_TURNED_IN always precedes QUEST_REMOVED for a hand-in, so the marker is the only thing
--- separating the two. It is set even when recording is off, or toggling History mid-quest would
--- log a completed quest as abandoned.
+-- The only sign a removal was a hand-in, set even while recording is off because the settle reads that setting only when it runs
 function R:MarkTurnedIn(questID)
     if questID then self._turnedIn[questID] = true end
 end
 
 local MAX_ABANDONED = 250
+-- A removal waits this long before it counts as an abandon, so a QUEST_TURNED_IN arriving after QUEST_REMOVED still reads as a hand-in
+local ABANDON_WAIT = 1
 
 function R:RecordAbandon(questID)
     if not questID then return end
+    local pending = { t = (GetServerTime and GetServerTime()) or time() }
+    self._removed[questID] = pending
+    C_Timer.After(ABANDON_WAIT, function()
+        if self._removed[questID] == pending then self:_settleRemoval(questID) end
+    end)
+end
+
+function R:_settleRemoval(questID)
+    local pending = self._removed[questID]
+    if not pending then return end
+    self._removed[questID] = nil
+    local now = pending.t
     local at = self:_takeAccept(questID)
     if self._turnedIn[questID] then
         self._turnedIn[questID] = nil
@@ -532,7 +549,6 @@ function R:RecordAbandon(questID)
     -- else arriving here is a task, a bonus objective, or a quest that predates recording.
     if not at or not enabled() then return end
 
-    local now = (GetServerTime and GetServerTime()) or time()
     local key = charKey()
     local list = charTable(self.sv.abandoned, key)
     list[#list + 1] = {
@@ -580,7 +596,8 @@ function R:PruneAccepts()
 
     local dropped = 0
     for questID in pairs(mine) do
-        if not live[questID] then
+        -- A quest whose removal is still waiting has left the log, but its settle needs the accept
+        if not live[questID] and not self._removed[questID] then
             mine[questID] = nil
             dropped = dropped + 1
         end

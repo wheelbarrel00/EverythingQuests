@@ -1,4 +1,4 @@
-local MAJOR, MINOR = "EverythingUI-1.0", 54
+local MAJOR, MINOR = "EverythingUI-1.0", 56
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
