@@ -1,6 +1,6 @@
 package-as: EverythingQuests
 
-# CurseForge project ID (https://www.curseforge.com/wow/addons/everythingquests)
+# CurseForge project ID (https://www.curseforge.com/wow/addons/everything-quests)
 curse-id: 1544648
 
 enable-nolib-creation: no
@@ -28,8 +28,6 @@ ignore:
   - .vscode
   - screenshots
   - LICENSE
-  - claude.md
-  - .claude
   - .luarc.json
   - .luacheckrc
   - tools

@@ -2,7 +2,6 @@ local _, ns = ...
 
 local QI = ns:RegisterSubsystem("NameplateQuestIcons", {})
 
--- Defaults only - general.npIconSize and general.npIconTextSize override these
 local ICON_SIZE    = 24
 local DEFAULT_TEXT = 13
 local SPACING      = 3
@@ -16,6 +15,13 @@ local function cfg()
            (g.npIconOffsetX or 0), (g.npIconOffsetY or 0)
 end
 
+-- Midnight restricted APIs can hand back secret values that error if indexed or compared
+local _issecret = _G.issecretvalue
+local function ok(v)
+    if _issecret then return not _issecret(v) end
+    return true
+end
+
 local PLACEMENT = {
     RIGHT  = { point = "LEFT",   rel = "RIGHT",  x = 4,  y = 0 },
     LEFT   = { point = "RIGHT",  rel = "LEFT",   x = -4, y = 0 },
@@ -23,23 +29,27 @@ local PLACEMENT = {
     BOTTOM = { point = "TOP",    rel = "BOTTOM", x = 0,  y = -4 },
 }
 
+-- WoW Forever draws its level badge right of the health bar, so the icons start after it (retail, Era and TBC anchor it left)
+local function rightOf(plate)
+    local uf = plate.UnitFrame
+    local badge = type(uf) == "table" and uf.PlayerLevelDiffFrame
+    local shown = badge and badge:IsVisible()
+    if not (ok(shown) and shown) then return plate end
+    local _, _, relPoint = badge:GetPoint(1)
+    if ok(relPoint) and type(relPoint) == "string" and relPoint:find("RIGHT", 1, true) then return badge end
+    return plate
+end
+
 local function anchorFrame(f, plate, placement, offX, offY)
     local p = PLACEMENT[placement] or PLACEMENT.RIGHT
     f:ClearAllPoints()
-    f:SetPoint(p.point, plate, p.rel, p.x + (offX or 0), p.y + (offY or 0))
+    f:SetPoint(p.point, (p == PLACEMENT.RIGHT) and rightOf(plate) or plate, p.rel, p.x + (offX or 0), p.y + (offY or 0))
 end
 
 -- Numeric fallbacks: 17 = QuestTitle, 8 = QuestObjective (probed from live client).
 local LT = Enum and Enum.TooltipDataLineType
 local QUEST_TITLE     = (LT and LT.QuestTitle)     or 17
 local QUEST_OBJECTIVE = (LT and LT.QuestObjective) or 8
-
--- Midnight restricted APIs can hand back secret values that error if indexed or compared
-local _issecret = _G.issecretvalue
-local function ok(v)
-    if _issecret then return not _issecret(v) end
-    return true
-end
 
 local KILL_WORDS = { "slain", "slay", "kill", "defeat", "destroy", "eliminat", "wound" }
 local CHAT_WORDS = { "speak", "talk" }
@@ -436,10 +446,28 @@ local function questLogRefresh()
     refreshAllPlates("QUEST_LOG_UPDATE")
 end
 
+-- A nameplate addon can hide Blizzard's unit frame in its own handler after EQ's, so the anchor is read again a frame later
+local _recheck, _recheckQueued = {}, false
+local function recheckAnchors()
+    _recheckQueued = false
+    local _, _, placement, offX, offY = cfg()
+    for unit in pairs(_recheck) do
+        _recheck[unit] = nil
+        local plate = activePlates[unit] and C_NamePlate.GetNamePlateForUnit(unit)
+        local f = plate and plate.EQQuestIcons
+        if f then anchorFrame(f, plate, placement, offX, offY) end
+    end
+end
+
 local function onPlateAdded(_, unit)
     if not unit then return end
     activePlates[unit] = true
     updatePlate(unit, "NAME_PLATE_UNIT_ADDED")
+    _recheck[unit] = true
+    if not _recheckQueued then
+        _recheckQueued = true
+        C_Timer.After(0, recheckAnchors)
+    end
 end
 local function onPlateRemoved(_, unit)
     if not unit then return end
@@ -456,8 +484,6 @@ local function onQuestLogUpdate()
     end
 end
 
--- Split because the cache outlived its first consumer. The nameplate icons and the tooltip
--- lines both read it, and either one can be switched off while the other is on.
 local CACHE_EVENTS = {
     QUEST_LOG_UPDATE = onQuestLogUpdate,
     QUEST_ACCEPTED   = onQuestLogUpdate,
@@ -468,16 +494,14 @@ local PLATE_EVENTS = {
     NAME_PLATE_UNIT_REMOVED = onPlateRemoved,
 }
 
--- ONE cache serves both consumers. A second copy would let a mob's nameplate and its tooltip
--- describe the same objective differently, with each looking correct on its own.
+-- One cache for the nameplate icons and the tooltip lines, so the two never describe an objective differently
 local _holders, _holderCount = {}, 0
 
 function QI:HoldCache(id, want)
     local Events = ns:GetSubsystem("Events")
     if not Events then return end
     want = want and true or false
-    -- This early return is what makes a repeated call safe, not the counter below it. Removing it
-    -- lets one consumer asking twice register the events once and release them twice.
+    -- A repeated call returns here so each consumer counts once toward the holder count
     if (_holders[id] and true or false) == want then return end
     _holders[id] = want or nil
     _holderCount = _holderCount + (want and 1 or -1)

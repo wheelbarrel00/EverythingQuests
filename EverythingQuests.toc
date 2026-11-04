@@ -1,8 +1,8 @@
-## Interface: 120100, 120105, 120007
+## Interface: 120105, 120107
 ## Title: Everything Quests
 ## Notes: Unified replacement for the Blizzard quest experience - world map overlays, nameplate quest icons, quest history, and a Midnight chain guide. The objective tracker installs alongside it as EQ Objective Tracker.
 ## Author: Wheelbarrel00
-## Version: 2.8.0
+## Version: 2.8.1
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB

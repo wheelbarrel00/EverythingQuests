@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/WoW-Classic%20Era%201.15-C69B6D?style=flat-square" alt="WoW Classic Era" />
   <img src="https://img.shields.io/badge/WoW-Burning%20Crusade%202.5-A330C9?style=flat-square" alt="WoW Burning Crusade Classic" />
   <img src="https://img.shields.io/badge/WoW-Forever%201.60-3F7F5F?style=flat-square" alt="WoW Forever" />
-  <img src="https://img.shields.io/badge/Interface-120100%20%7C%2020506%20%7C%2016001%20%7C%2011509-333333?style=flat-square" alt="Interface" />
+  <img src="https://img.shields.io/badge/Interface-120105%20%7C%2020506%20%7C%2016001%20%7C%2011509-333333?style=flat-square" alt="Interface" />
   <a href="LICENSE"><img src="https://img.shields.io/github/license/wheelbarrel00/EverythingQuests?style=flat-square&color=333333" alt="License" /></a>
 </p>
 <p align="center">
@@ -24,7 +24,7 @@
 
 ## Overview
 
-Everything Quests replaces Blizzard's quest tracking and builds on the rest of its quest experience for **World of Warcraft: Midnight**, with limited support for **Classic Era**, **Burning Crusade Classic** and **WoW Forever**.
+Everything Quests replaces Blizzard's quest tracking and builds on the rest of its quest experience for **World of Warcraft: Midnight**, and also runs on **Classic Era**, **Burning Crusade Classic** and **WoW Forever** (see Classic support below).
 
 1. An on-screen **objective tracker** that replaces the default ObjectiveTrackerFrame, provided by [EQ Objective Tracker](https://www.curseforge.com/wow/addons/eq-objective-tracker) and installed automatically alongside this addon
 2. **Nameplate Quest Icons** — a quest icon plus the remaining count or percent on objective mobs in the 3D world
@@ -44,7 +44,7 @@ Open Options with **`/eqs`**, from the minimap button, from the Everything Quest
 
 ## Classic support
 
-Everything Quests runs on **Classic Era (1.15)**, **Burning Crusade Classic (2.5)** and **WoW Forever (1.60)**. On Classic Era and Burning Crusade Classic, support is deliberately partial: what ships is what was measured working on a live client, not the whole addon. WoW Forever loads the same feature set plus a Chain Guide of its own, and is still being checked there (see below). Elsewhere in this README, "Classic" covers all three unless a flavor is named.
+Everything Quests runs on **Classic Era (1.15)**, **Burning Crusade Classic (2.5)** and **WoW Forever (1.60)**. On Classic Era and Burning Crusade Classic, support is deliberately partial: what ships is what was measured working on a live client, not the whole addon. WoW Forever loads the same feature set plus a Chain Guide of its own. Elsewhere in this README, "Classic" covers all three unless a flavor is named.
 
 Era and TBC were measured identical across every game API the addon reads, so one implementation covers both. They differ only in their generated dataset — TBC ships its own, because Era quest data has nothing for Outland or for the Blood Elf and Draenei starting zones. WoW Forever has its own dataset too: the Classic Era data adjusted to Forever's maps, plus quests gathered by playing Forever itself and the WoW Forever quest data of [AllTheThings](https://github.com/ATTWoWAddon/AllTheThings). Each flavor's TOC lists exactly one set. They define the same globals and are alternatives, never companions.
 
@@ -69,8 +69,6 @@ Era and TBC were measured identical across every game API the addon reads, so on
 
 Forever runs 1.x content on the modern game client. Everything Quests loads its Classic Era feature set there, plus a Chain Guide of its own (see "Chain Guide" below), without World Quests.
 
-- **Checked there so far:** the world map and minimap markers, both for the quests in your log and for quests you can pick up, your group's quest progress on markers, your quest progress on item tooltips, nameplate icons, the Quest Browser, Quest History, the Chain Guide and the quest log's Chain button, the TomTom arrow for the quest you follow (with EQ Objective Tracker 1.27.0 or later), and switching to Blizzard's own quest tracker
-- **Included but not yet tested there:** everything else, including auto-accept and auto-turn-in, quest links and the rest of the group features
 - **One marker per quest.** Forever draws quest markers of its own, so Everything Quests no longer draws a second one beside the game's own on the world map, or on the minimap for the quests you track and the quest NPCs near you. The kill, loot and object markers stay, because the game draws nothing like them
 - **A quest database of its own.** It knows 547 quests new to Forever, most of them from the WoW Forever quest data of AllTheThings and the rest gathered by playing Forever. 530 of them have a marker where you pick them up and a Quest Browser entry, 143 of those on Zephras Isle and the rest across the starting zones, the capitals and beyond. Each of them is marked where it is actually offered, rather than at every spot its giver stands. Most of the quests gathered by playing also have a marker where you hand them in. They carry the level, races, classes and earlier quests they need where the data knows them, and a few may still be marked before you are high enough to take them. Many Zephras Isle quests are for Skyborne characters only, which Everything Quests cannot record yet, so they are also marked for other characters, and many quest givers new to Forever have no name yet. Quests new to Forever that belong to a dungeon and need no earlier quest count as dungeon quests in the map's filters, the Quest Browser and Quest History
 - **Four maps drawn over different ground.** Forever draws Stormwind City, Redridge Mountains, Mulgore and Eastern Plaguelands over different ground than Classic Era does, so the markers on those maps are converted to Forever's own. Stormwind and Redridge have been checked in game. Mulgore and Eastern Plaguelands are converted the same way but not yet checked
@@ -366,7 +364,7 @@ HereBeDragons is listed by the three Classic TOCs only. HBD-Pins calls `WorldMap
 
 | Metric | Value |
 |---|---|
-| Interface version | 120100, 120105, 120007 (Midnight 12.1 and 12.1.5), 20506 (Burning Crusade Classic 2.5), 16001 (WoW Forever 1.60) and 11509 (Classic Era 1.15) |
+| Interface version | 120105, 120107 (Midnight 12.1.5 and 12.1.7), 20506 (Burning Crusade Classic 2.5), 16001 (WoW Forever 1.60) and 11509 (Classic Era 1.15) |
 | SavedVariables | `EverythingQuestsDB` (account), `EverythingQuestsCharDB` (character), `EverythingQuestsChainCache` (account), `EverythingQuestsHistory` (account), `EverythingQuestsHistoryBackups` (account) |
 | API compliance | No protected actions and no taint. Auto-accept, auto-turn-in and joining group quests are opt-in and use insecure-only APIs (`C_GossipInfo`, `AcceptQuest`, `CompleteQuest`, `GetQuestReward`, `ConfirmAcceptQuest`); Alt pauses them. Chat announcements stay off until you choose a channel, and party quest progress travels as hidden addon messages |
 

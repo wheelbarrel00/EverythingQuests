@@ -5,6 +5,19 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1] - 2026-11-03
+
+On WoW Forever, quest icons on nameplates no longer cover the level beside the health bar, and on retail Everything Quests is marked up to date for patch 12.1.7.
+
+### Bug Fixes
+
+- **Nameplate quest icons covered the level on WoW Forever.** Forever shows a nameplate's level in a small badge just right of the health bar, where the quest icon and its count started, so they covered it. With the Position set to Right, the default, they now start just after the level badge, level with the health bar. With a nameplate addon that replaces the game's own nameplates, such as ElvUI, they sit where they did before. The X offset now counts from the end of the badge, so if you had changed it, setting it back to 0 puts the icons just after the badge.
+
+### Notes
+
+- **Patch 12.1.7.** On retail Everything Quests is now marked up to date for patch 12.1.7, so the game will not treat it as out of date once 12.1.7 is out.
+- **A new description in the AddOns list.** On Classic Era, Burning Crusade Classic and WoW Forever, Everything Quests' description in the game's AddOns list now names more of what it does there, such as the Quest Browser and Quest History, and no longer says "limited and growing" or "a work in progress".
+
 ## [2.8.0] - 2026-10-25
 
 Quest History comes to Classic Era and Burning Crusade Classic, and the About tab links the new Everything Quests video tutorial.
