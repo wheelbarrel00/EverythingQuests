@@ -5,6 +5,14 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.1] - 2026-11-05
+
+On WoW Forever, nameplate quest icons no longer cause an error, or go missing, when the game will not let addons measure a nameplate.
+
+### Bug Fixes
+
+- **Nameplate quest icons could cause an error on WoW Forever.** In 2.8.1 and 2.9.0, with the Position set to Right, the default, Everything Quests measured where a nameplate's level badge sat. The game refuses that in some situations, such as combat, and then Everything Quests caused a Lua error ("Can't measure restricted regions"), so that nameplate showed no quest icons. It no longer measures the badge: on WoW Forever the badge always sits right of the health bar, so on the game's own nameplates the icons start right after it, in combat too. Thanks to lanjian625 for the report.
+
 ## [2.9.0] - 2026-11-05
 
 On WoW Forever, quests offered only within a level range, such as the Warsong Gulch and Arathi Basin quests, are no longer marked once you are past that range. Everything Quests also knows 23 more Forever quests, and the dwarf shamans' Call of Water and Call of Fire come one step at a time.

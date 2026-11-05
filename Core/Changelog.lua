@@ -2,6 +2,14 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.9.1", date = "2026-11-05",
+        sections = {
+            { head = "Bug Fixes", items = {
+                { "Nameplate quest icons could cause an error on WoW Forever. In 2.8.1 and 2.9.0, with the Position set to Right, the default, Everything Quests measured where a nameplate's level badge sat. The game refuses that in some situations, such as combat, and then Everything Quests caused a Lua error (\"Can't measure restricted regions\"), so that nameplate showed no quest icons. It no longer measures the badge: on WoW Forever the badge always sits right of the health bar, so on the game's own nameplates the icons start right after it, in combat too. Thanks to lanjian625 for the report.", classic = true, sub = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.9.0", date = "2026-11-05",
         sections = {
             { head = "New Features", items = {

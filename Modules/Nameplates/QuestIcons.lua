@@ -29,15 +29,22 @@ local PLACEMENT = {
     BOTTOM = { point = "TOP",    rel = "BOTTOM", x = 0,  y = -4 },
 }
 
--- WoW Forever draws its level badge right of the health bar, so the icons start after it (retail, Era and TBC anchor it left)
+-- WoW Forever draws its level badge right of the health bar, so the icons start after it (retail, Era and TBC show theirs only on players' plates, which get no icons)
 local function rightOf(plate)
+    if not ns.HAS_CLASSIC_SPAWNS then return plate end
     local uf = plate.UnitFrame
     local badge = type(uf) == "table" and uf.PlayerLevelDiffFrame
     local shown = badge and badge:IsVisible()
-    if not (ok(shown) and shown) then return plate end
-    local _, _, relPoint = badge:GetPoint(1)
-    if ok(relPoint) and type(relPoint) == "string" and relPoint:find("RIGHT", 1, true) then return badge end
+    -- Never measured, as Forever refuses to measure the badge in combat, though anchoring to it worked there
+    if ok(shown) and shown then return badge end
     return plate
+end
+
+-- The count text sits on the nameplate too, so a refused or secret width falls back to an estimate
+local function textWidth(fs, label, textSize)
+    local done, w = pcall(fs.GetStringWidth, fs)
+    if done and ok(w) and type(w) == "number" then return math.ceil(w) end
+    return math.ceil(#label * textSize * 0.6)
 end
 
 local function anchorFrame(f, plate, placement, offX, offY)
@@ -394,9 +401,10 @@ local function render(plate, list, count, hostile)
 
             local advance = iconSize
             if q.type ~= "CHAT" and (q.isPercent or (q.value and q.value > 1)) then
-                ic.text:SetText(q.isPercent and (q.value .. "%") or q.value)
+                local label = q.isPercent and (q.value .. "%") or tostring(q.value)
+                ic.text:SetText(label)
                 ic.text:Show()
-                advance = advance + 2 + math.ceil(ic.text:GetStringWidth())
+                advance = advance + 2 + textWidth(ic.text, label, textSize)
             end
             x = x + advance + SPACING
         end
