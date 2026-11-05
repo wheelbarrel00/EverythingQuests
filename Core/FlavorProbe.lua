@@ -2018,8 +2018,9 @@ local EVENTS = {
     "QUEST_DATA_LOAD_RESULT", "QUESTLINE_UPDATE", "SUPER_TRACKING_CHANGED",
     "TASK_PROGRESS_UPDATE", "WORLD_QUEST_COMPLETED_BY_SPELL",
     "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED",
-    "PLAYER_LEVEL_UP", "SKILL_LINES_CHANGED", "UPDATE_FACTION", "ZONE_CHANGED_NEW_AREA",
+    "PLAYER_LEVEL_UP", "PLAYER_LEVEL_CHANGED", "SKILL_LINES_CHANGED", "UPDATE_FACTION", "ZONE_CHANGED_NEW_AREA",
     "QUEST_ACCEPT_CONFIRM", "GROUP_JOINED", "GROUP_LEFT", "GROUP_ROSTER_UPDATE",
+    "CVAR_UPDATE", "MINIMAP_UPDATE_TRACKING", "QUEST_POI_UPDATE",
 }
 
 function Probe:Events()
@@ -2403,9 +2404,9 @@ function Probe:Available()
     end
     -- countKeys answers the string "n/a" for a non-table, so these are %s rather than %d
     line("  quests with a start point=%s  with names=%s", countKeys(D.start), countKeys(D.names))
-    line("  gate rows: pre=%s preAll=%s excl=%s chain=%s parent=%s minRep=%s",
+    line("  gate rows: pre=%s preAll=%s excl=%s chain=%s parent=%s minRep=%s maxLevel=%s",
          countKeys(D.pre), countKeys(D.preAll), countKeys(D.excl),
-         countKeys(D.chain), countKeys(D.parent), countKeys(D.minRep))
+         countKeys(D.chain), countKeys(D.parent), countKeys(D.minRep), countKeys(D.maxLevel))
 
     line("2. this character, as the gates read it:")
     -- The same client calls the module makes, so a wrong reading here is the one the pins get
@@ -2698,8 +2699,8 @@ function Probe:QuestBrowser()
         line("  no record for %s", tostring(pick))
         return
     end
-    line("  #%s %q  level=%s  requires=%s", tostring(r.id), tostring(r.name),
-         tostring(r.level), tostring(r.reqLevel))
+    line("  #%s %q  level=%s  requires=%s  max=%s", tostring(r.id), tostring(r.name),
+         tostring(r.level), tostring(r.reqLevel), tostring(r.maxLevel))
     line("  available=%s  reason=%s  completed=%s  inLog=%s",
          tostring(r.available), tostring(r.reason), tostring(r.completed), tostring(r.inLog))
     line("  races=%s  classes=%s",

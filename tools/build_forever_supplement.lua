@@ -5,7 +5,8 @@
 -- <eraDir> holds the Era dump build_questcoords.lua reads. <outDir> receives a copy of it, an area
 -- table that also covers maps only Forever has, forever<Kind>DB.lua rows that build_questcoords.lua
 -- lays over the Era rows, foreverStarts.lua, where each quest itself is offered, and with --att
--- foreverInstances.lua, the instances of the quests it counts as dungeon quests.
+-- foreverInstances.lua, the instances of the quests it counts as dungeon quests, and foreverMaxLevels.lua,
+-- the top of each AllTheThings level range that starts at its quest's required level.
 --
 -- Only quests the Era dump does not know become rows. An Era creature, object or item that a new
 -- quest uses keeps its Era row, because the dump's spawn lists are better than what one player saw.
@@ -76,6 +77,8 @@ do
     os.remove(marker)
     assert(not same, "<outDir> must not be <eraDir>, or the next Era build would carry Forever rows")
 end
+-- A run without --att, or one that stops before the caps are written, must not leave the last run's caps for the generator.
+os.remove(outDir .. "/" .. OVERLAY_PREFIX .. "MaxLevels.lua")
 
 local function parseBlock(src, marker, label)
     local at = assert(src:find(marker, 1, true), "marker not found in " .. label)
@@ -308,6 +311,7 @@ end
 -- list, or has turned it in. A detail dialog cannot show a quest missing, so it is never that list.
 local observations = {}
 local visits, firstOffer = {}, {}
+local offerCheck = { seen = {}, notes = {} }
 for _, e in ipairs(timeline) do
     if e.kind == "dialog" then
         local src = tostring(e.d.src)
@@ -330,11 +334,42 @@ for _, e in ipairs(timeline) do
         for _, qid in ipairs(e.d.o or {}) do
             local byChar = sub(firstOffer, qid)
             byChar[e.char] = byChar[e.char] or e.t
+            local offers = sub(offerCheck.seen, qid)
+            offers[#offers + 1] = e
         end
         if not e.d.d then
             seen[#seen + 1] = e
             visits[visitKey] = seen
         end
+    end
+end
+
+-- What a character had done when offered a quest: its completed list at login, trusted empty only at level 1, plus its hand-ins since.
+do
+    local function doneAtLogin(S)
+        if S._done == nil then
+            S._done = false
+            if type(S.done0) == "table" and (#S.done0 > 0 or S.level0 == 1) then
+                S._done = {}
+                for _, q in ipairs(S.done0) do S._done[q] = true end
+            end
+        end
+        return S._done
+    end
+    -- Offered with none of the list done, not just some, as a list naming each faction's version of one quest is never met whole by one character.
+    function offerCheck.offeredWithNone(qid, list)
+        for _, e in ipairs(offerCheck.seen[qid] or {}) do
+            local done = doneAtLogin(sessions[e.key])
+            if done then
+                local met = false
+                for _, p in ipairs(list) do
+                    local turned = firstTurnIn[p] and firstTurnIn[p][e.char]
+                    if done[p] or (turned and turned <= e.t) then met = true end
+                end
+                if not met then return true end
+            end
+        end
+        return false
     end
 end
 
@@ -684,7 +719,18 @@ local function mergeATT(qid, row, a, lines)
         attAll = nil
         if a.preCount == 1 then attAny = a.pre else attStats.dropped = attStats.dropped + 1 end
     end
+    if (attAll or attAny) and offerCheck.offeredWithNone(qid, attAll or attAny) then
+        offerCheck.notes[#offerCheck.notes + 1] = ("-- att prerequisite left out, the quest was offered to a character with none of it: quest %d needs %s")
+            :format(qid, table.concat(attAll or attAny, attAll and " and " or " or "))
+        attAll, attAny = nil, nil
+    end
     local have = row[Q_PRESINGLE] and row[Q_PRESINGLE][1]
+    -- ATT never lets this quest's own breadcrumb gate it, and a window read across one cannot tell a breadcrumb from a requirement.
+    if have and att.quests[have] and att.quests[have].breadcrumb and listHas(a.pre, have) then
+        offerCheck.notes[#offerCheck.notes + 1] = ("-- att measured prerequisite dropped, ATT calls it a breadcrumb: quest %d after %d")
+            :format(qid, have)
+        row[Q_PRESINGLE], have = nil, nil
+    end
     measuredPre[qid] = have
     if have and (attAll or attAny) then
         if listHas(attAll, have) then
@@ -828,9 +874,23 @@ for _, qid in ipairs(sortedKeys(newQuests)) do
                     if not usedItems[id] and lowerName(drops[id] and drops[id].n) == want then pickId = id; break end
                 end
             end
+            -- A tie between ticked items is evidence for neither, so the objective gets no item rather than a guessed one.
+            local tied = false
+            if not pickId then
+                local top
+                for _, id in ipairs(byCountThenKey(ticked)) do
+                    if not usedItems[id] then
+                        if top ~= nil then
+                            tied = ticked[id] == top
+                            break
+                        end
+                        top = ticked[id]
+                    end
+                end
+            end
             -- Ticked items first, as a drop only tagged for the quest scores at most 1 and could win a tie.
-            if not pickId then pickId = leader(ticked, usedItems) or leader(candidates, usedItems) end
-            if not pickId and #tickCells(p) > 0 then
+            if not pickId and not tied then pickId = leader(ticked, usedItems) or leader(candidates, usedItems) end
+            if not pickId and not tied and #tickCells(p) > 0 then
                 pickId = pseudo("obj", tickCells(p), ("%s objective %d"):format(row[Q_NAME], i))
                 iRows[pickId] = { [I_NAME] = ("%s objective %d"):format(row[Q_NAME], i), [I_OBJDROPS] = { pickId } }
                 oRows[pickId] = true
@@ -839,7 +899,7 @@ for _, qid in ipairs(sortedKeys(newQuests)) do
                 if not base.items[pickId] then needItem[pickId] = { cells = tickCells(p) } end
             end
             itemsList[#itemsList + 1] = { pickId or 0 }
-            lines[#lines + 1] = ("objective %d item -> %s"):format(i, tostring(pickId or "none"))
+            lines[#lines + 1] = ("objective %d item -> %s"):format(i, tostring(pickId or (tied and "none, the ticked items tie" or "none")))
         elseif ty == "object" then
             local id = p and p.obj and leader(p.obj)
             if id and not base.objects[id] then needObj[id] = true end
@@ -1506,6 +1566,62 @@ if att then
     end
     io.stderr:write(("-- att dungeon era check: %d Era quest(s) ATT lists in an instance, %d of them Era dungeon quests, the rule flags %d, %d of those rightly\n")
         :format(dg.quests, dg.era, dg.flagged, dg.right))
+
+    -- Graded on Era quests, whose dump lists some breadcrumbs as prerequisites, so an offer without one counts against the rule only where ATT lists it too.
+    do
+        local checked, withATT, against = 0, {}, {}
+        for _, id in ipairs(sortedKeys(base.quests)) do
+            local q = base.quests[id]
+            local list = type(q[Q_PRESINGLE]) == "table" and #q[Q_PRESINGLE] > 0 and q[Q_PRESINGLE]
+                or type(q[Q_PREGROUP]) == "table" and #q[Q_PREGROUP] > 0 and q[Q_PREGROUP] or nil
+            if list and offerCheck.seen[id] then
+                checked = checked + 1
+                if offerCheck.offeredWithNone(id, list) then
+                    local a, attBacksOffer = att.quests[id], true
+                    for _, p in ipairs(list) do
+                        if not (att.quests[p] and att.quests[p].breadcrumb) and a and listHas(a.pre, p) then attBacksOffer = false end
+                    end
+                    local into = attBacksOffer and withATT or against
+                    into[#into + 1] = id
+                end
+            end
+        end
+        io.stderr:write(("-- att offer era check: %d Era quest(s) with a prerequisite were offered to a collected character, %d to one with none of it"
+            .. " (%d where ATT calls it a breadcrumb or lists no such prerequisite%s), %d against ATT too%s\n")
+            :format(checked, #withATT + #against, #withATT, #withATT > 0 and (": " .. table.concat(withATT, " ")) or "",
+                    #against, #against > 0 and (": " .. table.concat(against, " ")) or ""))
+        for _, line in ipairs(offerCheck.notes) do io.stderr:write(line .. "\n") end
+    end
+
+    -- A file of its own, as Era quests get caps too and the supplement never writes an Era quest's row.
+    do
+        local caps, fromEra, left = {}, 0, {}
+        for _, id in ipairs(sortedKeys(att.quests)) do
+            local a = att.quests[id]
+            local row = qRows[id] or base.quests[id]
+            if a.maxLevel and row then
+                local req = tonumber(row[Q_REQLEVEL]) or 0
+                if a.reqLevel == req and a.maxLevel >= req then
+                    caps[id] = a.maxLevel
+                    if base.quests[id] then fromEra = fromEra + 1 end
+                else
+                    left[#left + 1] = ("%d (ATT %s to %d, required level %d)"):format(id, tostring(a.reqLevel), a.maxLevel, req)
+                end
+            end
+        end
+        local parts = { "-- Generated by tools/build_forever_supplement.lua from AllTheThings (MIT). [questID] = the highest level the quest is offered at.\nreturn {\n" }
+        for _, id in ipairs(sortedKeys(caps)) do parts[#parts + 1] = ("[%d]=%d,\n"):format(id, caps[id]) end
+        parts[#parts + 1] = "}\n"
+        local file = outDir .. "/" .. OVERLAY_PREFIX .. "MaxLevels.lua"
+        writeAll(file, table.concat(parts))
+        local back = assert(loadfile(file))()
+        assert(count(back) == count(caps), file .. ": row count changed on reload")
+        for id, cap in pairs(caps) do assert(back[id] == cap, ("%s: quest %d changed on reload"):format(file, id)) end
+        io.stderr:write(("-- att level caps: %d quest(s), %d of them Era quests\n"):format(count(caps), fromEra))
+        if #left > 0 then
+            io.stderr:write("-- att level cap left out, the range does not fit the quest's required level: " .. table.concat(left, ", ") .. "\n")
+        end
+    end
     for _, why in ipairs(sortedKeys(attSkipped)) do
         io.stderr:write(("-- att skipped, %s: %s\n"):format(why, table.concat(attSkipped[why], " ")))
     end

@@ -72,7 +72,8 @@ local ICON = {
     chainnav  = { lib = "chevron-right",   color = "accentHi" },
 }
 local TITLE_COLOR = {
-    complete = "muted", skipped = "muted", passed = "muted", branch = "muted", locked = "muted", pending = "label",
+    complete = "muted", skipped = "muted", passed = "muted", branch = "muted", outleveled = "muted", locked = "muted",
+    pending = "label",
 }
 
 local function ui()
@@ -591,8 +592,10 @@ local function buildClassicTooltip(item, statusKey, reason)
             tip:AddLine((L["Level %d"]):format(lvl), 0.8, 0.8, 0.8)
         end
     end
-    local req = A and A:RequiredLevel(item.id)
-    if req and req > 1 then
+    local req, top = A and A:RequiredLevel(item.id), A and A:MaxLevel(item.id)
+    if req and top and top > req then
+        tip:AddLine((L["Requires level %d to %d"]):format(req, top), 0.8, 0.8, 0.8)
+    elseif req and req > 1 then
         tip:AddLine((L["Requires level %d"]):format(req), 0.8, 0.8, 0.8)
     end
 
@@ -983,7 +986,7 @@ function CV:Render(pane, chain, highlightQuestID, again)
 
         node.title:SetText(title)
         node.title:SetTextColor(ctx:Color((resolved.breadcrumb and "muted") or TITLE_COLOR[statusKey] or "text"))
-        node:SetAlpha(statusKey == "branch" and BRANCH_ALPHA or 1)
+        node:SetAlpha((statusKey == "branch" or statusKey == "outleveled") and BRANCH_ALPHA or 1)
 
         node.subtitle:ClearAllPoints()
         if inLog or isNext then

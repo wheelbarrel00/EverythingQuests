@@ -196,6 +196,7 @@ local REASON_IN_LOG      = "in your quest log"
 local REASON_HOLIDAY     = "holiday quest"
 local REASON_RACE_CLASS  = "race or class"
 local REASON_REQ_LEVEL   = "too low level"
+local REASON_MAX_LEVEL   = "above level range"
 local REASON_LOW_LEVEL   = "low level"
 local REASON_HIGH_LEVEL  = "high level"
 local REASON_PREREQ      = "prerequisite"
@@ -293,6 +294,8 @@ local function isAvailable(questID, D, hideLowLevel, floor, unfiltered)
 
     local reqLevel = math.floor(gates / 1e11)
     if reqLevel > 0 and _level < reqLevel then return false, REASON_REQ_LEVEL end
+    local maxLevel = D.maxLevel and D.maxLevel[questID]
+    if maxLevel and _level > maxLevel then return false, REASON_MAX_LEVEL end
 
     if hideLowLevel and floor then
         local questLevel = math.floor(gates % 1e11 / 1e9)
@@ -440,6 +443,11 @@ function M:RequiredLevel(questID)
     if not gates then return nil end
     local n = math.floor(gates / 1e11)
     return n > 0 and n or nil
+end
+
+function M:MaxLevel(questID)
+    local D = data()
+    return D and D.maxLevel and D.maxLevel[questID] or nil
 end
 
 function M:QuestLevel(questID)
@@ -645,6 +653,8 @@ function M:OnEnable()
     Events:On("QUEST_REMOVED",        invalidate)
     Events:On("QUEST_TURNED_IN",      invalidate)
     Events:On("PLAYER_LEVEL_UP",      invalidate)
+    -- In case UnitLevel still reads the old level while PLAYER_LEVEL_UP is handled
+    Events:On("PLAYER_LEVEL_CHANGED", invalidate)
     Events:On("PLAYER_ENTERING_WORLD", invalidate)
     Events:On("SKILL_LINES_CHANGED",  invalidate)
     Events:On("UPDATE_FACTION",       invalidate)

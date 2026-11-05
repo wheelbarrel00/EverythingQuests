@@ -69,7 +69,7 @@ function providerMixin:_DoRefresh()
         if raw and raw.type ~= "chain" and not raw.breadcrumb then
             local item = Database:GetVariation(raw, char)
             local qid  = item and item.id
-            -- A quest closed by a later step or another branch would be pinned as one still to come
+            -- A closed quest, one the game will no longer offer, would be pinned as one still to come
             if qid and not _seen[qid] and not (CS and CS:IsClosed(qid)) then
                 local rm, rx, ry, inLog = W:ResolveForPin(qid, chain, mapID)
                 if rm == mapID and rx and ry then

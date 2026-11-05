@@ -5,6 +5,9 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.9.0", sections = {
+        { "Level ranges on WoW Forever", "Battleground quests offered for one range of levels, such as the Warsong Gulch and Arathi Basin quests, are no longer marked once you are past the top of that range, and the Quest Browser shows the whole range. Everything Quests also knows 23 more Forever quests.", classic = true, sub = "ChainGuide" },
+    } },
     { version = "2.8.0", sections = {
         { "Quest History on Classic", "Every quest you turn in is now recorded across your characters, with a Quests page to search and filter and a Stats page for your streak, totals and trends. Each character's past quests are added the first time it logs in after this update. Open it with /eqs history or from the History tab in the options window.", sub = "HistoryFrame", without = "ChainGuide" },
         { "A video tutorial", "There is now a video tutorial for Everything Quests on YouTube. You can find its link in the options window's About tab, under Tutorials." },

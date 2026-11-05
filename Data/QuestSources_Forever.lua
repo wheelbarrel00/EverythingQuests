@@ -17,7 +17,7 @@ local _, ns = ...
 --
 -- English. The client cannot name a creature it has never seen and offers no way to
 -- ask by id on this flavor, so unlike a quest title there is nothing to prefer over it.
--- 112 creature(s) and 9 object(s) used only by Forever supplement quests have no name yet, so their pins and Quest Browser lines show none.
+-- 111 creature(s) and 10 object(s) used only by Forever supplement quests have no name yet, so their pins and Quest Browser lines show none.
 ns.CLASSIC_QUEST_SOURCES = {
 npc = {
 	[167]="Morhan Coppertongue",
@@ -499,6 +499,8 @@ npc = {
 	[3339]="Captain Thalo'thas Brightsun",
 	[3341]="Gann Stonespire",
 	[3344]="Kardris Dreamseeker",
+	[3347]="Yelmak",
+	[3348]="Kor'geld",
 	[3352]="Ormak Grimshot",
 	[3354]="Sorek",
 	[3362]="Ogunaro Wolfrunner",
@@ -864,6 +866,7 @@ npc = {
 	[6254]="Acolyte Wytula",
 	[6266]="Menara Voidrender",
 	[6286]="Zarrin",
+	[6289]="Rand Rhobart",
 	[6293]="Jorah Annison",
 	[6294]="Krom Stoutarm",
 	[6301]="Gorbold Steelhand",
@@ -1606,6 +1609,9 @@ npc = {
 	[17081]="Scout Bloodfist",
 	[17082]="Rifleman Torrig",
 	[49808]="Grenhild Darktalon",
+	[244808]="Aramis Hammerhand",
+	[246152]="Shari Stilwell",
+	[247226]="Kelsey Fargo",
 	[247229]="Daniel",
 	[248242]="Hamish Bergwort",
 	[248248]="Blixie Fitzwink",
@@ -1614,6 +1620,7 @@ npc = {
 	[248277]="Merell Ross",
 	[248415]="Tordrin Sternblade",
 	[249363]="Yala Windwatcher",
+	[251001]="Deathguard Kristof",
 	[251361]="Rorian the Dayseeker",
 	[251362]="Ailee Farheart",
 	[251363]="Dalia the Collector",
@@ -1632,6 +1639,9 @@ npc = {
 	[257554]="Halaan Hawk-Eye",
 	[263113]="Myriaal Mistwake",
 	[263399]="Sam Sarsaparilla",
+	[265812]="Eleanor Shackleton",
+	[265944]="William Pickman",
+	[267009]="Hadric Harlson",
 	[270269]="Arbal",
 	[270637]="Howin Kindfeather",
 	[270844]="Sylessa Duskwhisper",

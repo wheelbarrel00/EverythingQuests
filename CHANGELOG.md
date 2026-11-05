@@ -5,6 +5,31 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-11-05
+
+On WoW Forever, quests offered only within a level range, such as the Warsong Gulch and Arathi Basin quests, are no longer marked once you are past that range. Everything Quests also knows 23 more Forever quests, and the dwarf shamans' Call of Water and Call of Fire come one step at a time.
+
+### New Features
+
+- **Level ranges on WoW Forever.** Some quests are offered only within a range of levels, such as the Warsong Gulch and Arathi Basin quests, each for one ten-level bracket, and the Basic and Standard battleground care packages. Everything Quests now knows the top of each range, from the WoW Forever quest data of the AllTheThings addon. Once you are past it, the quest is no longer marked on the map, the Quest Browser says "You are past the highest level this quest is offered at.", and the Chain Guide dims it and leaves it out of the chain's progress. The Quest Browser and the Chain Guide's tooltip show the whole range, such as "Requires level 30 to 39". 59 quests have a range so far.
+
+### Improvements
+
+- **23 more WoW Forever quests.** Everything Quests now knows 570 quests new to WoW Forever, up from 547, all of the new ones from the newest WoW Forever quest data of the AllTheThings addon. 552 of them have a marker where you pick them up and a Quest Browser entry, every one of them named, and 522 of those carry the level they need. Most of the new ones are class quests or quests in the capitals, five of them in Orgrimmar.
+- **More markers from playing Forever.** 21 quests new to WoW Forever now have a marker where you hand them in, and 11 have markers for their objectives, among them Sticks and Bones, The Great Outdoors and Discipline.
+- **The dwarf shamans' Call of Water and Call of Fire come one step at a time.** On WoW Forever, the quest data now gives the order of the steps in these two chains, so a step is marked only once you have done the one before it. The one exception is the Call of Water step at the Minor Manifestation of Water in Silverpine Forest, which is still marked as soon as you can take it. Before, every Call of Water step and the first two Call of Fire steps were marked at once. Both chains are now marked only for dwarf shamans, rather than for any Alliance shaman. The Horde chains of the same names, the Call of Fire on Zephras Isle among them, are unchanged.
+- **More Forever quests wait for the quest before them.** Wild Eyes, Return to Quinn (Again), Her Name Is Olgra and A Difficult Path are now marked only once you have done the quest that comes before them. So are the fifth Arugal's Folly at Dalar Dawnweaver, once you have done the fourth, the second of the two night elf druid quests named The Great Cat Spirit, once you have done the first, and the later steps of A Lesson in Divinity, each once you have done the one before it.
+
+### Bug Fixes
+
+- **Elemental Unrest waited for Harmony in Balance.** On Zephras Isle it was marked only once you had done Harmony in Balance, but the game offers it without that, so it is now marked either way.
+- **Rascally Rodents marked kobolds in Echo Ridge Mine.** In Elwynn Forest on WoW Forever, Everything Quests had taken the item this quest needs to be Melted Candle, so it marked every kobold that drops one, including the Kobold Laborers in Echo Ridge Mine. What has been gathered by playing Forever no longer settles which item the quest needs, so for now Everything Quests marks no kobolds for it.
+
+### Known Issues
+
+- **Some Skyborne quests are marked for other characters.** Many Zephras Isle quests can only be taken by Skyborne characters, but Everything Quests cannot yet record "Skyborne only" in its quest data, so they are marked for other characters, a character who is not Skyborne can see a Zephras Isle zone in the Chain Guide, and the Quest Browser can say "Races: Alliance" for a quest only the High Order can take. The same goes for the two new druid quests named Moonglade: the one from Sheldras Moontree in Stormwind is for Skyborne druids only, and the one from Turak Runetotem in Thunder Bluff very likely is, but they are marked for every druid of their faction, so a Tauren druid can see two Moonglade quests at Turak Runetotem.
+- **A few quest chains new to Forever still show more than one step at once.** Where the quest data does not say which step a quest comes after, or says it only for some characters, Everything Quests marks that quest as soon as you can take it. This affects Stalk With The Earthmother in Thunder Bluff, the first steps of A Lesson in Divinity in Undercity and Tirisfal Glades, the Tauren druids' The Great Cat Spirit in Moonglade and one Call of Water step in Silverpine Forest, so a later step can be marked before an earlier one, and a quest giver can show two or three quests with the same name.
+
 ## [2.8.1] - 2026-11-03
 
 On WoW Forever, quest icons on nameplates no longer cover the level beside the health bar, and on retail Everything Quests is marked up to date for patch 12.1.7.

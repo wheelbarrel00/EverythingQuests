@@ -64,6 +64,8 @@ local function normalize(id, t, ctx)
     q.points = pointsOf(t)
     q.reqLevel = type(t.lvl) == "table" and t.lvl[1] or t.lvl
     if type(q.reqLevel) ~= "number" then q.reqLevel = nil end
+    q.maxLevel = type(t.lvl) == "table" and t.lvl[2] or nil
+    if type(q.maxLevel) ~= "number" then q.maxLevel = nil end
     q.faction = (t.r == 1 or t.r == 2) and t.r or nil
     q.races = numbers(t.races)
     q.classes = numbers(t.c)
@@ -83,7 +85,7 @@ local function normalize(id, t, ctx)
 end
 
 local DETAIL = {
-    { "reqLevel", label = "required level" }, { "faction", label = "faction" }, { "races", label = "races", set = true },
+    { "reqLevel", "maxLevel", label = "level range" }, { "faction", label = "faction" }, { "races", label = "races", set = true },
     { "classes", label = "classes", set = true }, { "pre", "preCount", label = "prerequisites", set = true },
     { "excl", label = "exclusive quests", set = true }, { "skill", label = "skill" }, { "minRep", label = "reputation floor" },
     { "maxRep", label = "reputation ceiling" }, { "repeatable", label = "repeatable" }, { "breadcrumb", label = "breadcrumb" },

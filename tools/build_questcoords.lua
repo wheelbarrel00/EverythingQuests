@@ -1073,6 +1073,23 @@ if mode == "available" then
         end
     end
 
+    -- foreverMaxLevels.lua, from build_forever_supplement.lua, holds the top of each AllTheThings level range it kept.
+    local maxLevel, capsPath, capsListed = {}, dir .. "/foreverMaxLevels.lua", 0
+    local capsFile = io.open(capsPath, "rb")
+    if capsFile then
+        capsFile:close()
+        assert(PREFIX == "classic", "Forever level caps cannot be applied to " .. PREFIX .. " data")
+        for id, cap in pairs(assert(loadfile(capsPath))()) do
+            capsListed = capsListed + 1
+            if start[id] then
+                local req = math.floor(gates[id] / 100000000000)
+                assert(type(cap) == "number" and cap >= req and cap <= 99,
+                       ("quest %d: level cap %s does not fit its required level %d"):format(id, tostring(cap), req))
+                maxLevel[id] = cap
+            end
+        end
+    end
+
     local sortedIds = {}
     for id in pairs(start) do sortedIds[#sortedIds + 1] = id end
     table.sort(sortedIds)
@@ -1112,6 +1129,9 @@ if mode == "available" then
         "ns.CLASSIC_QUEST_AVAILABLE = {\n",
         "start = {\n",
     }
+    if capsFile then
+        table.insert(parts, #parts - 1, "-- maxLevel [questID] = the highest level it is still offered at\n")
+    end
 
     local expect = {}
     for i = 1, #sortedIds do
@@ -1194,6 +1214,7 @@ if mode == "available" then
     emitScalar("skill", skill)
     emitScalar("minRep", minRep)
     emitScalar("maxRep", maxRep)
+    if capsFile then emitScalar("maxLevel", maxLevel) end
     parts[#parts + 1] = "},\n}\n"
 
     local text = table.concat(parts)
@@ -1279,6 +1300,10 @@ if mode == "available" then
         checkList("pre", pre)
         checkList("preAll", preAll)
         checkList("excl", excl)
+        for i = 1, #sortedIds do
+            local id = sortedIds[i]
+            assert((got.maxLevel and got.maxLevel[id]) == maxLevel[id], ("quest %d level cap changed on reload"):format(id))
+        end
 
         io.stderr:write(("-- verified %d start point(s) and %d gate row(s) by reload, max drift %.6f\n")
             :format(seen, gseen, worst))
@@ -1305,6 +1330,9 @@ if mode == "available" then
     io.stderr:write(("-- gate rows: pre=%d preAll=%d excl=%d chain=%d parent=%d skill=%d minRep=%d maxRep=%d names=%d\n")
         :format(countTbl(pre), countTbl(preAll), countTbl(excl), countTbl(chain),
                 countTbl(parent), countTbl(skill), countTbl(minRep), countTbl(maxRep), countTbl(names)))
+    if capsFile then
+        io.stderr:write(("-- level caps: %d quest(s), of %d in the caps file\n"):format(countTbl(maxLevel), capsListed))
+    end
     if ownStarts then
         io.stderr:write(("-- own starts: %d quest(s) with their own evidence, %d giver spot(s) kept, %d dropped, %d added\n")
             :format(ownStats.quests, ownStats.kept, ownStats.dropped, ownStats.added))

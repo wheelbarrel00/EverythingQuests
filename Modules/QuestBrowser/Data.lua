@@ -374,6 +374,7 @@ function QB:Record(questID)
         stored   = storedName(D, questID),
         level    = A:QuestLevel(questID),
         reqLevel = A:RequiredLevel(questID),
+        maxLevel = A:MaxLevel(questID),
     }
 
     local ok, why = A:Explain(questID)

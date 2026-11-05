@@ -36,15 +36,14 @@ local function browserCfg()
     return DB and DB.db and DB.db.profile and DB.db.profile.questBrowser
 end
 
--- The gate returns its refusal as a stable English key. Mapping it here with a literal L key per
--- branch is what keeps the phrase visible to the locale scanner - a computed L[reason] lookup
--- would work in game and never reach a translator.
+-- One literal L key per branch keeps each phrase visible to the locale scanner, which cannot read L[reason]
 local function reasonText(reason)
     if reason == "completed"            then return L["You have already completed this quest."] end
     if reason == "in your quest log"    then return L["This quest is already in your quest log."] end
     if reason == "holiday quest"        then return L["Part of a world event, so it is only offered while that event is running."] end
     if reason == "race or class"        then return L["Your race or class cannot take this quest."] end
     if reason == "too low level"        then return L["You do not meet the required level yet."] end
+    if reason == "above level range"    then return L["You are past the highest level this quest is offered at."] end
     if reason == "low level"            then return L["Too far below your level to be worth showing. Turn off the low level filter to see it."] end
     if reason == "high level"           then return L["The game colors this quest red for you, so it is out of reach for now. Turn off the high level filter to see it."] end
     if reason == "prerequisite"         then return L["An earlier quest has to be finished first."] end
@@ -461,7 +460,11 @@ function QB:RenderDetails()
 
     local bits = { "#" .. record.id }
     if record.level then bits[#bits + 1] = (L["Level %d"]):format(record.level) end
-    if record.reqLevel then bits[#bits + 1] = (L["Requires level %d"]):format(record.reqLevel) end
+    if record.reqLevel and record.maxLevel and record.maxLevel > record.reqLevel then
+        bits[#bits + 1] = (L["Requires level %d to %d"]):format(record.reqLevel, record.maxLevel)
+    elseif record.reqLevel then
+        bits[#bits + 1] = (L["Requires level %d"]):format(record.reqLevel)
+    end
     _y = _y + META_GAP
     f._meta:ClearAllPoints()
     f._meta:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)

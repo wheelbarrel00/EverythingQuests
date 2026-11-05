@@ -621,6 +621,7 @@ end
 -- Explain's refusal keys, compared as the Quest Browser compares them
 local REASON_LATER_STEP = "later step done"
 local REASON_BRANCH     = "took another branch"
+local REASON_MAX_LEVEL  = "above level range"
 
 local function ownStatus(questID)
     local A = avail()
@@ -638,10 +639,11 @@ local function ownStatus(questID)
     local gone = (why == REASON_LATER_STEP or why == REASON_BRANCH) and why or A:RuledOut(questID)
     if gone == REASON_LATER_STEP then return "passed", gone end
     if gone == REASON_BRANCH then return "branch", gone end
+    if why == REASON_MAX_LEVEL then return "outleveled", why end
     return "pending", why
 end
 
-local function isClosed(s) return s == "passed" or s == "branch" end
+local function isClosed(s) return s == "passed" or s == "branch" or s == "outleveled" end
 
 local _status, _why, _visiting = {}, {}, {}
 
