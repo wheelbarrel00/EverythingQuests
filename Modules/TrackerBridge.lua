@@ -135,9 +135,10 @@ function Bridge:ApplyFocusArrow()
         onFocus = function(providerID, entryID)
             local Arrow = ns:GetSubsystem("QuestArrow")
             if not Arrow or providerID ~= "quests" then return end
-            -- EQOT sends no clear between two follows, so a quest EQ cannot place takes the old arrow down.
-            -- An arrow the Chain Guide set for this very quest follows the game's point, which EQ's tables may lack
-            if not (entryID and (Arrow:PointAtQuest(entryID) or (Arrow.Refresh and Arrow:Refresh(entryID)))) then
+            -- EQOT sends no clear between two follows, so a quest nothing can place takes the old arrow down.
+            -- On Forever the game's point stands in where EQ's tables have none, and an arrow held for this quest stays when the game has none
+            if not (entryID and (Arrow:PointAtQuest(entryID) or Arrow:Refresh(entryID)
+                                 or Arrow:PointAtGame(entryID))) then
                 Arrow:Clear()
             end
         end,

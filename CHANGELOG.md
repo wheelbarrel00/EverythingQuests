@@ -5,6 +5,15 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.2] - 2026-11-06
+
+On WoW Forever, a quest you follow that Everything Quests has no objective or hand-in location for now gets a TomTom arrow at the game's own map marker for it, when the game has one. On Classic Era, Burning Crusade Classic and WoW Forever, an old Everything Quests arrow that TomTom brings back after a reload or at your next login is now removed the next time Everything Quests sets or clears its arrow.
+
+### Bug Fixes
+
+- **Some followed quests got no TomTom arrow on WoW Forever.** When you followed a quest, for example by clicking it in EQ Objective Tracker, Everything Quests pointed TomTom's arrow at places in its own quest data. For most quests new to WoW Forever, that data has no place yet for their objectives or hand-in, such as That Shadowvale Green Elixir and Tomb Weed in Tirisfal Glades, so following one gave it no arrow unless the Chain Guide had already set one for it, and clicking again did not help. For such a quest Everything Quests now asks the game where it is leading you for the quest, or else where it marks the quest on the map of the zone you are in or of the quest's own zone, and points the arrow there when the game has an answer. Quests its own data places keep the arrow they had. For such a quest in your log, clicking it in a Chain Guide chain, pressing Continue there, or picking Get Directions on the tracker's right-click menu now finds it from another zone too and opens the map on its zone, and without TomTom its coordinates are printed in chat. In a chain you track, its pin on the world map now sits at the game's marker where there is one, as it already did while you were in its zone, rather than where the quest starts.
+- **An old Everything Quests arrow could be left behind in TomTom.** TomTom saves its waypoints and brings them back after a reload or at your next login, unless you turned that off in its options, but by then Everything Quests had lost track of its own arrow. So when it next pointed its arrow at another place or quest, or cleared it, the old one stayed behind. Everything Quests now removes its own leftover arrows whenever it sets or clears its arrow. The cleanup leaves your own waypoints and those of other addons alone.
+
 ## [2.9.1] - 2026-11-05
 
 On WoW Forever, nameplate quest icons no longer cause an error, or go missing, when the game will not let addons measure a nameplate.

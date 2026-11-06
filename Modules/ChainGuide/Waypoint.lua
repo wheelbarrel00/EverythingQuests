@@ -188,29 +188,13 @@ local function openMap(mapID)
 end
 
 local function liveWaypoint(questID)
-    local Arrow = classicSource() and ns:GetSubsystem("QuestArrow")
-    if Arrow and Arrow.PointFor then
+    local Arrow = ns:GetSubsystem("QuestArrow")
+    if not Arrow then return nil end
+    if classicSource() then
         local m, x, y = Arrow:PointFor(questID)
         if m and x and y then return m, x, y end
     end
-    if C_QuestLog and C_QuestLog.GetNextWaypoint then
-        local m, x, y = C_QuestLog.GetNextWaypoint(questID)
-        if m and x and y and (x ~= 0 or y ~= 0) then return m, x, y end
-    end
-    if C_QuestLog and C_QuestLog.GetQuestsOnMap
-       and C_Map and C_Map.GetBestMapForUnit then
-        local pm = C_Map.GetBestMapForUnit("player")
-        local list = pm and C_QuestLog.GetQuestsOnMap(pm)
-        if list then
-            for i = 1, #list do
-                local e = list[i]
-                if e.questID == questID and e.x and e.y and (e.x ~= 0 or e.y ~= 0) then
-                    return pm, e.x, e.y
-                end
-            end
-        end
-    end
-    return nil
+    return Arrow:GamePoint(questID)
 end
 
 function W:ResolveForPin(questID, chain, viewMapID)

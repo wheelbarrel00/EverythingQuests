@@ -481,7 +481,6 @@ local function nearest(places)
     return places[1]
 end
 
--- Where the arrow points for a quest in the log that has a point, else a start or its turn-in, on your map first
 function QB:Waypoint(record)
     if not record then return nil end
     if record.inLog then

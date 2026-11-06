@@ -5,6 +5,7 @@ local _, ns = ...
 local Arrow = ns:RegisterSubsystem("QuestArrow", {})
 
 local _uid, _questID, _title
+local FROM = "Everything Quests"
 
 local function tomtom()
     local T = _G.TomTom
@@ -15,11 +16,27 @@ function Arrow:Available()
     return tomtom() ~= nil
 end
 
+-- TomTom brings saved waypoints back at login, when EQ no longer holds their handle. Retail's Chain Guide adds its own under the same tag
+local function removeLeftovers(T)
+    local all = ns.HAS_CLASSIC_SPAWNS and type(T.waypoints) == "table" and T.waypoints
+    if not all then return end
+    local stale = {}
+    for _, byKey in pairs(all) do
+        if type(byKey) == "table" then
+            for _, uid in pairs(byKey) do
+                if type(uid) == "table" and uid.from == FROM then stale[#stale + 1] = uid end
+            end
+        end
+    end
+    for i = 1, #stale do pcall(T.RemoveWaypoint, T, stale[i]) end
+end
+
 function Arrow:Clear()
     local T = tomtom()
-    -- Drop the handle only when the waypoint is really gone, or that arrow is stranded with
-    -- nothing left to remove it by.
-    if T and _uid and T.RemoveWaypoint then
+    if not (T and T.RemoveWaypoint) then return end
+    -- First: after TomTom reloads its waypoints the held handle is stale, and removing it takes the live copy out of TomTom's list while it stays shown
+    removeLeftovers(T)
+    if _uid then
         pcall(T.RemoveWaypoint, T, _uid)
         _uid = nil
     end
@@ -32,7 +49,7 @@ function Arrow:Set(mapID, x, y, title, questID)
     -- persistent, minimap and world are left unset so TomTom's own profile decides them.
     local ok, uid = pcall(T.AddWaypoint, T, mapID, x, y, {
         title = title,
-        from  = "Everything Quests",
+        from  = FROM,
         crazy = true,
     })
     if ok then _uid, _questID, _title = uid, questID, title end
@@ -46,9 +63,8 @@ end
 -- The game's point moves as objectives finish, and TomTom drops a waypoint on arrival, so a held arrow is set again
 function Arrow:Refresh(questID)
     if not self:Holds(questID) then return false end
-    local m, x, y
-    if C_QuestLog and C_QuestLog.GetNextWaypoint then m, x, y = C_QuestLog.GetNextWaypoint(questID) end
-    if m and x and y and (x ~= 0 or y ~= 0) then self:Set(m, x, y, _title, questID) end
+    local m, x, y = self:GamePoint(questID)
+    if m then self:Set(m, x, y, _title, questID) end
     return true
 end
 
@@ -57,6 +73,33 @@ local function playerMap()
     if not f then return nil end
     local ok, id = pcall(f, "player")
     return ok and id or nil
+end
+
+local function mapRow(mapID, questID)
+    local list = mapID and C_QuestLog and C_QuestLog.GetQuestsOnMap and C_QuestLog.GetQuestsOnMap(mapID)
+    if not list then return nil end
+    for i = 1, #list do
+        local e = list[i]
+        if e.questID == questID and e.x and e.y and (e.x ~= 0 or e.y ~= 0) then return e.x, e.y end
+    end
+end
+
+-- The quest's own zone is kept off retail, whose guide reads what it always did. Forever gave Tirisfal's row from Orgrimmar (2026-11-05)
+function Arrow:GamePoint(questID)
+    if not questID then return nil end
+    if C_QuestLog and C_QuestLog.GetNextWaypoint then
+        local m, x, y = C_QuestLog.GetNextWaypoint(questID)
+        if m and x and y and (x ~= 0 or y ~= 0) then return m, x, y end
+    end
+    local here = playerMap()
+    local x, y = mapRow(here, questID)
+    if x then return here, x, y end
+    local own = ns.HAS_CLASSIC_SPAWNS and _G.GetQuestUiMapID and _G.GetQuestUiMapID(questID)
+    if own and own ~= 0 and own ~= here then
+        x, y = mapRow(own, questID)
+        if x then return own, x, y end
+    end
+    return nil
 end
 
 -- srcID*1e9 + kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4), with the map as the outer key. Only
@@ -120,4 +163,15 @@ function Arrow:PointAtQuest(questID)
     local mapID, x, y, title = self:PointFor(questID)
     if not mapID then return false end
     return self:Set(mapID, x, y, title)
+end
+
+-- Forever only: following a quest on retail never set a TomTom arrow, and Era and TBC have no super-track to follow
+function Arrow:PointAtGame(questID)
+    if not (ns.HAS_CLASSIC_SPAWNS and C_SuperTrack and tomtom()) then return false end
+    local mapID, x, y = self:GamePoint(questID)
+    if not mapID then return false end
+    local Cache = ns:GetSubsystem("Cache")
+    local q = Cache and Cache:Get(questID)
+    local title = (q and q.title) or (ns.Util and ns.Util.QuestTitle(questID, true))
+    return self:Set(mapID, x, y, title, questID)
 end
