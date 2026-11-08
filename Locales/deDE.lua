@@ -254,6 +254,15 @@ L["Continue"] = "Fortfahren"
 L["Track this chain"] = "Diese Questreihe verfolgen"
 L["Follow this chain — its quests pin on the world map (next step highlighted) and your waypoint auto-advances to the next step as you complete it. Works even with this window closed. Click again to stop."] = "Folge dieser Questreihe. Ihre Quests werden auf der Weltkarte markiert (der nächste Schritt hervorgehoben) und dein Wegpunkt rückt automatisch weiter, sobald du einen Schritt abschließt. Das funktioniert auch bei geschlossenem Fenster. Klicke erneut, um damit aufzuhören."
 
+-- ─── Modules/ChainGuide/ClassicSource.lua ───
+L["Not counted on the zone progress bar: a dungeon or raid quest."] = "Wird in der Gebietsfortschrittsleiste nicht mitgezählt: eine Dungeon- oder Schlachtzugsquest."
+L["Not counted on the zone progress bar: a repeatable quest."] = "Wird in der Gebietsfortschrittsleiste nicht mitgezählt: eine wiederholbare Quest."
+L["Not counted on the zone progress bar: a profession quest."] = "Wird in der Gebietsfortschrittsleiste nicht mitgezählt: eine Berufsquest."
+L["Not counted on the zone progress bar: a holiday quest."] = "Wird in der Gebietsfortschrittsleiste nicht mitgezählt: eine Quest eines Weltereignisses."
+L["Not counted on the zone progress bar: part of the Ahn'Qiraj war effort."] = "Wird in der Gebietsfortschrittsleiste nicht mitgezählt: Teil der Kriegsanstrengungen von Ahn'Qiraj."
+L["Not counted on the zone progress bar: only another race or class can take it."] = "Wird in der Gebietsfortschrittsleiste nicht mitgezählt: Nur ein anderes Volk oder eine andere Klasse kann sie annehmen."
+L["Not counted on the zone progress bar: it needs a quest only another race or class can take."] = "Wird in der Gebietsfortschrittsleiste nicht mitgezählt: Sie erfordert eine Quest, die nur ein anderes Volk oder eine andere Klasse annehmen kann."
+
 -- ─── Modules/ChainGuide/Frame.lua ───
 L["Drag to resize"] = "Ziehen, um die Größe zu ändern"
 L["Options"] = "Optionen"

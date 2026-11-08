@@ -254,6 +254,8 @@ function QB:Build()
     f._statusIcon:SetSize(STATUS_ICON, STATUS_ICON)
     f._status = ctx:CreateText(content, "", "label")
     f._status:SetWordWrap(true)
+    f._zoneNote = ctx:CreateText(content, "", "hint")
+    f._zoneNote:SetWordWrap(true)
     f._directions = ctx:CreateButton(content, L["Get Directions"], nil, function() QB:GetDirections() end)
     f._empty = ctx:CreateEmptyState(f.body, L["Pick a quest on the left."])
     f._empty:SetPoint("TOP", f.body, "CENTER", 0, 8)
@@ -437,6 +439,7 @@ function QB:RenderDetails()
     local parts = { f._title, f._meta, f._statusIcon, f._status, f._directions }
     if not record then
         for _, p in ipairs(parts) do p:Hide() end
+        f._zoneNote:Hide()
         f._empty:Show()
         f._area:SetContentSize(_width, 1)
         return
@@ -510,6 +513,18 @@ function QB:RenderDetails()
         _y = _y + prev:GetHeight()
     end
 
+    local CS = ns:GetSubsystem("ChainGuideClassicSource")
+    local note = CS and CS:ZoneNotice(record.id)
+    f._zoneNote:SetShown(note ~= nil)
+    if note then
+        _y = _y + TAG_GAP
+        f._zoneNote:ClearAllPoints()
+        f._zoneNote:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)
+        f._zoneNote:SetWidth(_width - PAD_SIDE * 2)
+        f._zoneNote:SetText(note)
+        _y = _y + (f._zoneNote:GetStringHeight() or 12)
+    end
+
     local reqs = {}
     if record.races   then reqs[#reqs + 1] = (L["Races: %s"]):format(table.concat(record.races, ", ")) end
     if record.classes then reqs[#reqs + 1] = (L["Classes: %s"]):format(table.concat(record.classes, ", ")) end
@@ -544,7 +559,6 @@ function QB:RenderDetails()
     if record.chain then group(ctx, L["Leads to"], function(card) return refRows(ctx, card, { known(record.chain) }) end) end
     if record.excl and #record.excl > 0 then group(ctx, L["Instead of"], function(card) return refRows(ctx, card, record.excl) end) end
 
-    local CS = ns:GetSubsystem("ChainGuideClassicSource")
     local chainID = CS and CS:ChainForQuest(record.id)
     local Database = chainID and ns:GetSubsystem("ChainGuideDatabase")
     local chain = Database and Database.chains[chainID]

@@ -5,6 +5,21 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] - 2026-11-07
+
+On WoW Forever, EQ Objective Tracker's zone progress bar now shows how many of your zone's quests you have handed in, counted by Everything Quests. It needs EQ Objective Tracker 2.13.0 or later.
+
+### New Features
+
+- **A zone progress bar on WoW Forever.** EQ Objective Tracker's zone progress bar counts the game's questlines, which WoW Forever does not have, so on its own it shows nothing there. Everything Quests now counts the zone for it: the quests of the Chain Guide's chains for the zone you are in and the other quests that start there, only those your character can take, your own class quests included. Left out are dungeon and raid, repeatable, profession and holiday quests, the quests of the Ahn'Qiraj war effort, which WoW Forever may never run, and quests whose only way in is a quest another race or class must do. A quest counts as done once you have handed it in. Most quests the game will no longer offer you leave the total, as they leave a chain's progress in the Chain Guide: the other half of an either-or pair, an earlier step you skipped by taking a later one, or a quest whose level range you are past. So in most zones the bar can reach 100%, and its total can drop as you play. A cave or building counts toward the zone around it, and each capital city is a zone of its own, where many chains start, so a capital's total is large. A quest counts in every zone where it starts and in the zone its chain is filed under. While the bar is on, the Chain Guide's quest tooltips and the Quest Browser say why a quest is left out. This needs EQ Objective Tracker 2.13.0 or later, with Show zone progress bar turned on in its Appearance tab.
+
+### Known Issues
+
+- **The zone progress bar can stop short of 100% where a quest is for Skyborne characters only.** Everything Quests cannot yet record "Skyborne only" in its quest data, so for a character who is not Skyborne such a quest counts toward the total but can never be handed in. Among them are the Skyborne welcome quests in Stormwind, Orgrimmar, Alterac Mountains and Mulgore, some Zephras Isle quests and a few druid quests, such as one in Moonglade.
+- **A few quests never read as handed in.** The game does not record some quests as done, such as Digging Through the Dirt in Duskwood, so once handed in they stay in the zone progress bar's total and that zone's bar stops short of 100%. Onu is meditating in Darkshore has no hand-in at all in the quest data, so it holds the Alliance's Darkshore bar short too.
+- **Quests offered only below a reputation stay in the zone progress bar's total.** Once your standing is past such a quest's limit the game no longer offers it, but it still counts, so that zone's bar stops short of 100%. This is mostly the two Avast Ye quests in Stranglethorn Vale, which most characters are never offered, and a few Argent Dawn quests in Eastern Plaguelands.
+- **Some dungeon and raid quests still count toward the zone progress bar.** Where the quest data files one under a zone instead of its dungeon, such as some Scholomance quests in Western Plaguelands and some dungeon quests new to WoW Forever, it counts like any other quest there and can still be handed in.
+
 ## [2.9.2] - 2026-11-06
 
 On WoW Forever, a quest you follow that Everything Quests has no objective or hand-in location for now gets a TomTom arrow at the game's own map marker for it, when the game has one. On Classic Era, Burning Crusade Classic and WoW Forever, an old Everything Quests arrow that TomTom brings back after a reload or at your next login is now removed the next time Everything Quests sets or clears its arrow.

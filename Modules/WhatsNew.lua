@@ -5,6 +5,9 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.10.0", sections = {
+        { "A zone progress bar on WoW Forever", "With EQ Objective Tracker 2.13.0 or later, its zone progress bar now works on WoW Forever. Everything Quests counts how many of your zone's quests you have handed in, from the Chain Guide's chains for the zone and the other quests that start there. While the bar is on, the Chain Guide and the Quest Browser say why a quest is left out. Turn it on with Show zone progress bar in EQ Objective Tracker's Appearance tab.", classic = true, sub = "ChainGuide" },
+    } },
     { version = "2.9.0", sections = {
         { "Level ranges on WoW Forever", "Battleground quests offered for one range of levels, such as the Warsong Gulch and Arathi Basin quests, are no longer marked once you are past the top of that range, and the Quest Browser shows the whole range. Everything Quests also knows 23 more Forever quests.", classic = true, sub = "ChainGuide" },
     } },

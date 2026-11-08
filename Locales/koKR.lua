@@ -264,6 +264,15 @@ L["Continue"] = "계속"
 L["Track this chain"] = "이 연계 추적"
 L["Follow this chain — its quests pin on the world map (next step highlighted) and your waypoint auto-advances to the next step as you complete it. Works even with this window closed. Click again to stop."] = "이 연계를 따라갑니다 - 퀘스트가 지도에 표시되고(다음 단계 강조), 완료하면 경로가 다음 단계로 자동 이동합니다. 이 창을 닫아도 작동합니다. 다시 클릭하면 중지."
 
+-- ─── Modules/ChainGuide/ClassicSource.lua ───
+L["Not counted on the zone progress bar: a dungeon or raid quest."] = "지역 진행 막대에 포함되지 않음: 던전 또는 공격대 퀘스트입니다."
+L["Not counted on the zone progress bar: a repeatable quest."] = "지역 진행 막대에 포함되지 않음: 반복 퀘스트입니다."
+L["Not counted on the zone progress bar: a profession quest."] = "지역 진행 막대에 포함되지 않음: 전문기술 퀘스트입니다."
+L["Not counted on the zone progress bar: a holiday quest."] = "지역 진행 막대에 포함되지 않음: 월드 이벤트 퀘스트입니다."
+L["Not counted on the zone progress bar: part of the Ahn'Qiraj war effort."] = "지역 진행 막대에 포함되지 않음: 안퀴라즈 전쟁 준비의 일부입니다."
+L["Not counted on the zone progress bar: only another race or class can take it."] = "지역 진행 막대에 포함되지 않음: 다른 종족이나 직업만 수락할 수 있습니다."
+L["Not counted on the zone progress bar: it needs a quest only another race or class can take."] = "지역 진행 막대에 포함되지 않음: 다른 종족이나 직업만 수락할 수 있는 퀘스트가 필요합니다."
+
 -- ─── Modules/ChainGuide/Frame.lua ───
 L["Drag to resize"] = "드래그로 크기 조정"
 L["Options"] = "설정"

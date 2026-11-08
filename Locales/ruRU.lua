@@ -264,6 +264,15 @@ L["Continue"] = "Продолжить"
 L["Track this chain"] = "Отслеживать эту цепочку"
 L["Follow this chain — its quests pin on the world map (next step highlighted) and your waypoint auto-advances to the next step as you complete it. Works even with this window closed. Click again to stop."] = "Следуйте этой цепочке - её задания закрепляются на карте мира (следующий шаг выделяется), а ваша путевая точка автоматически перемещается к следующему шагу по мере выполнения. Работает даже при закрытом окне. Нажмите ещё раз, чтобы остановить."
 
+-- ─── Modules/ChainGuide/ClassicSource.lua ───
+L["Not counted on the zone progress bar: a dungeon or raid quest."] = "Не учитывается в полосе прогресса зоны: задание подземелья или рейда."
+L["Not counted on the zone progress bar: a repeatable quest."] = "Не учитывается в полосе прогресса зоны: повторяемое задание."
+L["Not counted on the zone progress bar: a profession quest."] = "Не учитывается в полосе прогресса зоны: задание профессии."
+L["Not counted on the zone progress bar: a holiday quest."] = "Не учитывается в полосе прогресса зоны: задание игрового события."
+L["Not counted on the zone progress bar: part of the Ahn'Qiraj war effort."] = "Не учитывается в полосе прогресса зоны: часть подготовки к войне в Ан'Кираже."
+L["Not counted on the zone progress bar: only another race or class can take it."] = "Не учитывается в полосе прогресса зоны: взять его может только другая раса или класс."
+L["Not counted on the zone progress bar: it needs a quest only another race or class can take."] = "Не учитывается в полосе прогресса зоны: для него нужно задание, которое может взять только другая раса или класс."
+
 -- ─── Modules/ChainGuide/Frame.lua ───
 L["Drag to resize"] = "Перетащите, чтобы изменить размер"
 L["Options"] = "Опции"

@@ -262,6 +262,15 @@ L["Continue"] = "Continuer"
 L["Track this chain"] = "Suivre cette suite"
 L["Follow this chain — its quests pin on the world map (next step highlighted) and your waypoint auto-advances to the next step as you complete it. Works even with this window closed. Click again to stop."] = "Suivez cette suite — ses quêtes s'épinglent sur la carte du monde (prochaine étape mise en évidence) et votre point de passage avance automatiquement à l'étape suivante au fur et à mesure que vous la complétez. Fonctionne même avec cette fenêtre fermée. Cliquez à nouveau pour arrêter."
 
+-- ─── Modules/ChainGuide/ClassicSource.lua ───
+L["Not counted on the zone progress bar: a dungeon or raid quest."] = "Non comptée dans la barre de progrès de la zone : une quête de donjon ou de raid."
+L["Not counted on the zone progress bar: a repeatable quest."] = "Non comptée dans la barre de progrès de la zone : une quête répétable."
+L["Not counted on the zone progress bar: a profession quest."] = "Non comptée dans la barre de progrès de la zone : une quête de profession."
+L["Not counted on the zone progress bar: a holiday quest."] = "Non comptée dans la barre de progrès de la zone : une quête d'événement mondial."
+L["Not counted on the zone progress bar: part of the Ahn'Qiraj war effort."] = "Non comptée dans la barre de progrès de la zone : elle fait partie de l'effort de guerre d'Ahn'Qiraj."
+L["Not counted on the zone progress bar: only another race or class can take it."] = "Non comptée dans la barre de progrès de la zone : seule une autre race ou classe peut la prendre."
+L["Not counted on the zone progress bar: it needs a quest only another race or class can take."] = "Non comptée dans la barre de progrès de la zone : elle nécessite une quête que seule une autre race ou classe peut prendre."
+
 -- ─── Modules/ChainGuide/Frame.lua ───
 L["Drag to resize"] = "Glisser pour redimensionner"
 L["Options"] = "Options"

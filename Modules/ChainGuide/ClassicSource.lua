@@ -12,6 +12,10 @@ local EMPTY = {}
 
 CS.chainOf = {}
 CS.stats   = {}
+CS.zoneStats = {}
+
+-- The zone bar's quests per map and each quest's lock answer, kept for the session and cleared with the chains
+local _zoneSets, _locked, _lockVisiting = {}, {}, {}
 
 local function avail()
     return ns:GetSubsystem("AvailableQuests")
@@ -449,6 +453,9 @@ function CS:Reset()
         end
     end
     wipe(self.chainOf)
+    wipe(_zoneSets)
+    wipe(_locked)
+    wipe(self.zoneStats)
     self.stats = {}
     self._built = false
 end
@@ -697,22 +704,179 @@ function CS:IsClosed(questID)
 end
 
 -- A quest the game will no longer offer leaves the count, or a chain with a branch could never reach its total
+local function tally(s, done, active, total)
+    if s == "complete" then return done + 1, active, total + 1 end
+    if s == "active" or s == "turnin" then return done, active + 1, total + 1 end
+    if isClosed(s) then return done, active, total end
+    return done, active, total + 1
+end
+
 function CS:Progress(chain)
     local items = chain and chain.items
     if not items then return 0, 0, 0 end
     fresh()
     local done, active, total = 0, 0, 0
     for i = 1, #items do
-        local s = statusOf(items[i].id)
-        if s == "complete" then
-            done, total = done + 1, total + 1
-        elseif s == "active" or s == "turnin" then
-            active, total = active + 1, total + 1
-        elseif not isClosed(s) then
-            total = total + 1
-        end
+        done, active, total = tally(statusOf(items[i].id), done, active, total)
     end
     return done, active, total
+end
+
+-- Instance, repeatable and profession quests are not a zone's to finish. Bits 4 (explored or scripted) and 8 (class) count
+local CAT_INSTANCE, CAT_REPEATABLE, CAT_PROFESSION = 1, 2, 16
+
+-- The Ahn'Qiraj war effort's quests that are not repeatable, left out as Forever may never run the event
+local WAR_EFFORT = {}
+for _, q in ipairs({ 8492, 8494, 8499, 8503, 8505, 8509, 8511, 8513, 8515, 8517, 8520, 8522, 8524, 8526, 8528,
+                     8532, 8542, 8545, 8549, 8580, 8582, 8588, 8590, 8600, 8604, 8607, 8609, 8611, 8613, 8615 }) do
+    WAR_EFFORT[q] = true
+end
+for q = 8792, 8797 do WAR_EFFORT[q] = true end
+for q = 8846, 8855 do WAR_EFFORT[q] = true end
+
+local function hasCategory(mask, flag)
+    return math.floor(mask / flag) % 2 == 1
+end
+
+-- Every way in needs a quest this character can never take, followed back as statusOf follows a closed one
+local function lockedOut(A, D, questID)
+    local v = _locked[questID]
+    if v ~= nil then return v, false end
+    if _lockVisiting[questID] then return false, true end
+    _lockVisiting[questID] = true
+    local locked, guessed = A:CanEverTake(questID) == false, false
+    local function ask(q)
+        local r, g = lockedOut(A, D, q)
+        guessed = guessed or g
+        return r
+    end
+    if not locked then
+        local pre = D.pre[questID]
+        if pre then
+            locked = #pre > 0
+            for i = 1, #pre do
+                if not ask(pre[i]) then locked = false break end
+            end
+        else
+            local preAll = D.preAll[questID]
+            for i = 1, preAll and #preAll or 0 do
+                if ask(preAll[i]) then locked = true break end
+            end
+        end
+        local parent = D.parent[questID]
+        if not locked and parent then locked = ask(parent) end
+    end
+    _lockVisiting[questID] = nil
+    -- A quest met again inside its own loop reads open, so only a locked answer or one that rests on no such guess is kept
+    local sure = locked or not guessed
+    if sure then _locked[questID] = locked end
+    return locked, not sure
+end
+
+-- Why the zone bar leaves a quest out, or nil when it counts. The second answer says the character cannot be read yet
+local function zoneReason(A, D, questID)
+    if not D.gates[questID] then return "unknown" end
+    if WAR_EFFORT[questID] then return "warEffort" end
+    local mask = ns.CLASSIC_QUEST_CATEGORY and ns.CLASSIC_QUEST_CATEGORY[questID]
+    if mask then
+        if hasCategory(mask, CAT_INSTANCE) then return "instance" end
+        if hasCategory(mask, CAT_REPEATABLE) then return "repeatable" end
+        if hasCategory(mask, CAT_PROFESSION) then return "profession" end
+    end
+    local holiday = ns.CLASSIC_QUEST_HOLIDAY and ns.CLASSIC_QUEST_HOLIDAY.event
+    if holiday and holiday[questID] then return "holiday" end
+    local can = A:CanEverTake(questID)
+    if can == nil then return nil, true end
+    if not can then return "notYours" end
+    -- Only once the character reads, as the answers are kept for the session
+    if lockedOut(A, D, questID) then return "locked" end
+    return nil
+end
+
+-- Every chain homed on the map and every quest that starts there, kept for the session as race and class never change
+local function zoneSet(mapID)
+    local set = _zoneSets[mapID]
+    if set then return set end
+    CS:Ensure()
+    local D, A, Database = data(), avail(), database()
+    if not (D and A and Database) then return nil end
+
+    local seen, out = {}, {}
+    local st = { starts = 0, chained = 0, union = 0, leftOut = 0, notYours = 0, locked = 0 }
+    local unread = false
+    local function add(q)
+        if seen[q] then return end
+        seen[q] = true
+        st.union = st.union + 1
+        local why, unreadable = zoneReason(A, D, q)
+        if unreadable then
+            unread = true
+        elseif not why then
+            out[#out + 1] = q
+        elseif why == "notYours" or why == "locked" then
+            st[why] = st[why] + 1
+        else
+            st.leftOut = st.leftOut + 1
+        end
+    end
+    for q, byMap in pairs(D.start) do
+        if byMap[mapID] then st.starts = st.starts + 1; add(q) end
+    end
+    for _, chain in pairs(Database.chains) do
+        if chain._generated and chain.category == mapID then
+            for i = 1, #chain.items do
+                st.chained = st.chained + 1
+                add(chain.items[i].id)
+            end
+        end
+    end
+    -- Not kept, so a character read too early is asked again instead of keeping an empty zone for the session
+    if unread then return nil end
+    table.sort(out)
+    st.counted = #out
+    _zoneSets[mapID], CS.zoneStats[mapID] = out, st
+    return out
+end
+
+-- For EQ Objective Tracker's zone bar: done is handed in, and the total moves as Progress's does. Nil where no quest of the map counts or the character cannot be read yet
+function CS:ZoneCount(mapID)
+    local set = type(mapID) == "number" and zoneSet(mapID)
+    if not set or #set == 0 then return nil end
+    fresh()
+    local done, active, total = 0, 0, 0
+    for i = 1, #set do
+        done, active, total = tally(statusOf(set[i]), done, active, total)
+    end
+    return done, total
+end
+
+local _notices
+-- Built at first use rather than at file scope, where the layout code uses L for its own lists
+local function zoneNotices()
+    if not _notices then
+        local L = ns.L
+        _notices = {
+            instance   = L["Not counted on the zone progress bar: a dungeon or raid quest."],
+            repeatable = L["Not counted on the zone progress bar: a repeatable quest."],
+            profession = L["Not counted on the zone progress bar: a profession quest."],
+            holiday    = L["Not counted on the zone progress bar: a holiday quest."],
+            warEffort  = L["Not counted on the zone progress bar: part of the Ahn'Qiraj war effort."],
+            notYours   = L["Not counted on the zone progress bar: only another race or class can take it."],
+            locked     = L["Not counted on the zone progress bar: it needs a quest only another race or class can take."],
+        }
+    end
+    return _notices
+end
+
+-- The line the Chain Guide and the Quest Browser show for a quest the zone bar leaves out, while that bar is on
+function CS:ZoneNotice(questID)
+    local Bridge = ns:GetSubsystem("TrackerBridge")
+    if not (questID and Bridge and Bridge:ZoneBarShown()) then return nil end
+    local D, A = data(), avail()
+    if not (D and A) then return nil end
+    local why = zoneReason(A, D, questID)
+    if not why then return nil end
+    return zoneNotices()[why]
 end
 
 -- What you are on first, then what you can pick up now, then what is still ahead, each the shallowest, and the other faction's capital last

@@ -207,6 +207,53 @@ function Bridge:ApplyTrackedRepaint()
     if fromSet then pcall(TS.OnDirty, TS, requestRepaint) end
 end
 
+local ZONE_COUNTER_ID = "eq-forever-zones"
+
+-- Its quest count catches the log arriving at login, which fires no QUEST_ACCEPTED
+local function questsInLog()
+    local count = C_QuestLog and C_QuestLog.GetNumQuestLogEntries
+    if not count then return nil end
+    local shown, quests = count()
+    return quests or shown
+end
+
+-- EQOT's zone bar counts quest lines, which Forever lacks, so EQ counts the zone where its chain builder runs
+function Bridge:ApplyZoneCounter()
+    local A = api()
+    if not (A and A.AddZoneCounter and A.ZoneCountChanged) then return end
+    local CS = ns:GetSubsystem("ChainGuideClassicSource")
+    if not CS then return end
+    if self._zoneCounter then return end
+    self._zoneCounter = A:AddZoneCounter({
+        id    = ZONE_COUNTER_ID,
+        count = function(mapID) return CS:ZoneCount(mapID) end,
+    }) and true or false
+    if not self._zoneCounter then return end
+
+    -- EQOT's own recounts miss accepts and level changes and can read EQ's caches before they clear, so EQ asks for one, which EQOT runs a frame later
+    local function changed() A:ZoneCountChanged() end
+    local Events = ns:GetSubsystem("Events")
+    Events:On("QUEST_ACCEPTED", changed)
+    Events:On("QUEST_TURNED_IN", changed)
+    Events:On("QUEST_REMOVED", changed)
+    Events:On("PLAYER_LEVEL_UP", changed)
+    Events:On("PLAYER_LEVEL_CHANGED", changed)
+    local lastInLog = questsInLog()
+    Events:On("QUEST_LOG_UPDATE", function()
+        local n = questsInLog()
+        if n ~= lastInLog then
+            lastInLog = n
+            changed()
+        end
+    end)
+end
+
+-- Whether the player turned EQOT's zone bar on, so no quest says it is left out of a bar that is not there
+function Bridge:ZoneBarShown()
+    local A = api()
+    return (self._zoneCounter and A and A.ZoneBarShown and A:ZoneBarShown()) and true or false
+end
+
 function Bridge:OnEnable()
     local A = api()
     if not A then
@@ -232,4 +279,5 @@ function Bridge:OnEnable()
     self:ApplyEQIcon()
     self:ApplyFocusArrow()
     self:ApplyTrackedRepaint()
+    self:ApplyZoneCounter()
 end

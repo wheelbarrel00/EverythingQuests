@@ -2866,6 +2866,25 @@ function Probe:ChainGuide()
         line("  next=%s (%s)  start point=%s %s,%s", val(step and step.id), step and val(CS:Status(step.id)) or "-",
              val(start and start.mapID), val(start and start.x), val(start and start.y))
     end
+
+    line("4. the zone bar's count, handed to EQ Objective Tracker:")
+    local Bridge = ns:GetSubsystem("TrackerBridge")
+    line("  registered=%s  bar shown=%s  (/eqot status names the zone the bar asked for)",
+         tostring(Bridge and Bridge._zoneCounter == true), tostring(Bridge and Bridge.ZoneBarShown and Bridge:ZoneBarShown()))
+    -- Every map from yours up, since the bar counts the first Zone map at or above you and this probe does not ask EQOT which
+    local m, hops = mapID, 0
+    while m and m > 0 and hops < 8 do
+        local done, total = CS:ZoneCount(m)
+        local st = CS.zoneStats[m]
+        if total and st then
+            line("  map %d: %d/%d  (counted %d of %d: starts %d, chain steps %d, left out %d, not yours %d, locked %d)",
+                 m, done, total, st.counted, st.union, st.starts, st.chained, st.leftOut, st.notYours, st.locked)
+        else
+            line("  map %d: no count", m)
+        end
+        local info = C_Map.GetMapInfo and C_Map.GetMapInfo(m)
+        m, hops = info and info.parentMapID, hops + 1
+    end
 end
 
 local SECTIONS = {

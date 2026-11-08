@@ -598,6 +598,8 @@ local function buildClassicTooltip(item, statusKey, reason)
     elseif req and req > 1 then
         tip:AddLine((L["Requires level %d"]):format(req), 0.8, 0.8, 0.8)
     end
+    local notice = CS:ZoneNotice(item.id)
+    if notice then tip:AddLine(notice, 0.7, 0.7, 0.7, true) end
 
     addCompletionLine(tip, item.id)
 

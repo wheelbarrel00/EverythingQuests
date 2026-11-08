@@ -254,6 +254,15 @@ L["Continue"] = "继续"
 L["Track this chain"] = "追踪该任务链"
 L["Follow this chain — its quests pin on the world map (next step highlighted) and your waypoint auto-advances to the next step as you complete it. Works even with this window closed. Click again to stop."] = "追踪该任务链：任务标记到世界地图，高亮下一步；完成后导航点自动跳转，窗口关闭也生效，再次点击停止追踪。"
 
+-- ─── Modules/ChainGuide/ClassicSource.lua ───
+L["Not counted on the zone progress bar: a dungeon or raid quest."] = "不计入区域进度条：地下城或团队副本任务。"
+L["Not counted on the zone progress bar: a repeatable quest."] = "不计入区域进度条：可重复任务。"
+L["Not counted on the zone progress bar: a profession quest."] = "不计入区域进度条：专业任务。"
+L["Not counted on the zone progress bar: a holiday quest."] = "不计入区域进度条：世界活动任务。"
+L["Not counted on the zone progress bar: part of the Ahn'Qiraj war effort."] = "不计入区域进度条：属于安其拉战争筹备。"
+L["Not counted on the zone progress bar: only another race or class can take it."] = "不计入区域进度条：只有其他种族或职业才能接取。"
+L["Not counted on the zone progress bar: it needs a quest only another race or class can take."] = "不计入区域进度条：需要一个只有其他种族或职业才能接取的任务。"
+
 -- ─── Modules/ChainGuide/Frame.lua ───
 L["Drag to resize"] = "拖拽调整大小"
 L["Options"] = "设置"
