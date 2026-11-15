@@ -5,6 +5,9 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.11.0", sections = {
+        { "432 more quests on WoW Forever", "Everything Quests now knows 1,002 quests new to WoW Forever, up from 570, among them 163 in Riverglades and many more for characters from level 31 to 40. Tomb Weed is now marked for every Horde character, and the Bandarion Keep quests for Orcs too.", classic = true, sub = "ChainGuide" },
+    } },
     { version = "2.10.0", sections = {
         { "A zone progress bar on WoW Forever", "With EQ Objective Tracker 2.13.0 or later, its zone progress bar now works on WoW Forever. Everything Quests counts how many of your zone's quests you have handed in, from the Chain Guide's chains for the zone and the other quests that start there. While the bar is on, the Chain Guide and the Quest Browser say why a quest is left out. Turn it on with Show zone progress bar in EQ Objective Tracker's Appearance tab.", classic = true, sub = "ChainGuide" },
     } },

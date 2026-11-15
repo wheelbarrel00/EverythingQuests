@@ -572,23 +572,49 @@ do
         return count(have) == #want
     end
 
+    local function sameAsEraRow(e, a)
+        local row = base.quests[e]
+        local sb = type(row[Q_STARTEDBY]) == "table" and row[Q_STARTEDBY] or {}
+        return sameIds(sb[1], a.givers) and sameIds(sb[2], a.objects) and (tonumber(row[Q_RACES]) or 0) == (attRaceMask(a) or 0)
+    end
+
+    local eraAlternatives
+    local function alternativesOf(id, a)
+        if not eraAlternatives then
+            eraAlternatives = {}
+            for _, e in ipairs(sortedKeys(att and att.quests)) do
+                if base.quests[e] then
+                    for _, x in ipairs(att.quests[e].excl or {}) do local l = sub(eraAlternatives, x); l[#l + 1] = e end
+                end
+            end
+        end
+        local out = {}
+        for _, e in ipairs(eraAlternatives[id] or {}) do out[#out + 1] = e end
+        for _, e in ipairs(a.excl or {}) do if base.quests[e] then out[#out + 1] = e end end
+        return out
+    end
+
     -- The client gives every variant of a quest one completion bit, so an Era quest sharing it with the same givers and races is this quest listed again.
     local function eraTwin(id, a)
         if #a.givers + #a.objects == 0 then return nil end
         for _, e in ipairs(eraByBit[clientBit[id]] or {}) do
-            local row = base.quests[e]
-            local sb = type(row[Q_STARTEDBY]) == "table" and row[Q_STARTEDBY] or {}
-            if sameIds(sb[1], a.givers) and sameIds(sb[2], a.objects) and (tonumber(row[Q_RACES]) or 0) == (attRaceMask(a) or 0) then
-                return e
-            end
+            if sameAsEraRow(e, a) then return e end
+        end
+        -- ATT can name the two as alternatives instead, on either row (8258 lists 7668 The Darkreaver Menace).
+        for _, e in ipairs(alternativesOf(id, a)) do
+            if sameAsEraRow(e, a) then return e end
         end
     end
+
+    -- Quests offered in a way the data cannot hold, each read in ATT's own description of it.
+    local OUTSIDE_THE_DATA = { [97540] = "offered only during an escort" }
 
     function attSkipReason(id, a)
         local why = attCopySkip(a)
         -- A quest ATT lists twice stays in when any one of its copies not naming other givers passes these rules.
         for _, alt in ipairs(a.alts or {}) do if why and not attCopySkip(alt) then why = nil end end
         if why then return why end
+        if OUTSIDE_THE_DATA[id] then return OUTSIDE_THE_DATA[id] end
         if refusedByServer[id] and not titles[id] then return "refused by the server" end
         if not clientQuests[id] then return "not in the client's quest table" end
         local twin = eraTwin(id, a)
@@ -1024,7 +1050,7 @@ local attWaived = {}
 local function waived(fmt, ...) attWaived[#attWaived + 1] = ("-- att prerequisite waived: " .. fmt):format(...) end
 for _, qid in ipairs(sortedKeys(attQuests)) do
     local row, measured = qRows[qid], measuredPre[qid]
-    -- An Era quest's twin shares its completion bit, so a prerequisite on the twin is one on the Era quest.
+    -- An Era quest's twin is the same quest, so a prerequisite on the twin is one on the Era quest.
     measured = twinOf[measured] or measured
     for _, field in ipairs({ Q_PREGROUP, Q_PRESINGLE }) do
         for i, p in ipairs(row[field] or {}) do row[field][i] = twinOf[p] or p end

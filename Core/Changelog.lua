@@ -2,6 +2,32 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.11.0", date = "2026-11-15",
+        sections = {
+            { head = "New Features", items = {
+                { "432 more WoW Forever quests, 163 of them in Riverglades. Everything Quests now knows 1,002 quests new to WoW Forever, up from 570, the new ones from the newest WoW Forever quest data of the AllTheThings addon. 977 of them have a marker where you pick them up and a Quest Browser entry, every one of them named, and 942 of those carry the level they need. Most of the new ones are for characters from level 31 to 40, among them 163 in Riverglades for both factions. Many others are in Desolace, Stranglethorn Vale, Shen'dralas, Alterac Mountains, Arathi Highlands and Azshara.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Improvements", items = {
+                { "More markers from playing Forever. 27 quests new to WoW Forever now have a marker where you hand them in, and 14 have markers for their objectives, among them Tomb Weed, Remnants of War and Wild Eyes.", classic = true, sub = "ChainGuide" },
+                { "More Forever quests wait for the quest before them. 15 quests new to WoW Forever are now marked only once you have done the quest that comes before them, among them A Curious Pair after Diplomatic Incident, An Underrated Talent after A Moon-Kissed Blade, Bandarion Keep after Remnants of War, The Hermit Tanner after Vrang's Game, Trouble in the Valley after The Hermit Tanner, Watching the Roads after Dalaran's Intentions and Highland Hides after Young Crocolisk Skins. The second Stalk With The Earthmother in Thunder Bluff now waits for the first, and is marked only for the classes that can take the first.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Bug Fixes", items = {
+                { "Tomb Weed was marked only for Undead characters. It is now marked for every Horde character once Doom Weed is done.", classic = true, sub = "ChainGuide" },
+                { "The Bandarion Keep quests were hidden from Orcs. A Righteous Cause, Leonid's Letter, As Above, So Below and The One That Got Away were marked only for Undead characters. Like Bandarion Keep itself, they are now marked for Orcs too, and As Above, So Below and The One That Got Away wait for A Righteous Cause.", classic = true, sub = "ChainGuide" },
+                { "One of the dwarf shamans' Call of Earth quests needed level 10. The one offered in Ironforge and Dun Morogh is now marked from level 4, like their other Call of Earth quests.", classic = true, sub = "ChainGuide" },
+                { "A Scribbled Letter in Northshire was marked for night elf warriors. The letter from Marshal McBride is now marked for human hunters.", classic = true, sub = "ChainGuide" },
+                { "Thunderhorn's Report was marked for Undead characters. It is now marked only for Tauren, once Wildmane Cleansing is done.", classic = true, sub = "ChainGuide" },
+                { "One Secure the Mountain in Dun Morogh waited for an optional quest. The one from Senir Whitebeard in Kharanos is now marked without the optional quest that leads to it.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Known Issues", items = {
+                { "The new quests have no hand-in or objective markers of their own yet. Everything Quests marks the quests added in this update only where you pick them up: the quest data they come from has no hand-ins for them, and Everything Quests does not read its objectives yet. Once one is in your log, the game's own map markers still show where to go, and with TomTom so does the tracker's arrow. Everything Quests' own markers will come from playing Forever.", classic = true, sub = "ChainGuide" },
+                { "Three dungeon quests no longer count as dungeon quests. The Wrath of Rath'mael, The New Plague and Highland Hides are picked up outside their dungeons, and the newest quest data now names a quest that comes before each of them. Everything Quests counts a quest new to Forever that belongs to a dungeon as a dungeon quest only when the quest data names no earlier quest for it, or no start point, so these three no longer count: the \"Dungeon and raid quests\" filter no longer hides them, the Quest Browser and Quest History no longer say \"Dungeon or raid\" for them, and EQ Objective Tracker's zone progress bar counts them.", classic = true, sub = "ChainGuide" },
+                { "Some Skyborne quests are marked for other characters. Many Zephras Isle quests can only be taken by Skyborne characters, but Everything Quests cannot yet record \"Skyborne only\" in its quest data, so they are marked for other characters, a character who is not Skyborne can see a Zephras Isle zone in the Chain Guide, and the Quest Browser can say \"Races: Alliance\" for a quest only the High Order can take. The same goes for the two druid quests named Moonglade that are new to Forever: the one from Sheldras Moontree in Stormwind and the one from Turak Runetotem in Thunder Bluff are for Skyborne druids only, but they are marked for every druid of their faction, so a Tauren druid can see two Moonglade quests at Turak Runetotem. The new Call of Fire from Beram Skychaser in Thunder Bluff is for Windshaper shamans only, but it is marked for every Horde shaman, beside the Call of Fire he already gives.", classic = true, sub = "ChainGuide" },
+                { "A few quest chains new to Forever still show more than one step at once. Where the quest data does not say which step a quest comes after, or says it only for some characters, Everything Quests marks that quest as soon as you can take it. This affects the third Stalk With The Earthmother in Thunder Bluff, the first steps of A Lesson in Divinity in Undercity and Tirisfal Glades, the druids' The Great Cat Spirit in Darnassus, Thunder Bluff and Moonglade, and Call of Water steps in Ironforge, Loch Modan and Silverpine Forest, so a later step can be marked before an earlier one, and a quest giver can show two or three quests with the same name.", classic = true, sub = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.10.0", date = "2026-11-07",
         sections = {
             { head = "New Features", items = {

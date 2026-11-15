@@ -166,15 +166,17 @@ return function(dir)
         if type(k) == "string" and k:match("^Create") then
             local ctor = function(id, t)
                 if type(id) == "table" and t == nil then id, t = nil, id end
-                return { kind = k, id = id, t = type(t) == "table" and t or {} }
+                t = type(t) == "table" and t or {}
+                -- The data can run a function over a built group that reads and writes its fields (5.4.12's library books).
+                return setmetatable({ kind = k, id = id, t = t }, { __index = t, __newindex = t })
             end
             rawset(self, k, ctor)
             return ctor
         end
         return inert
     end })
-    att.AddEventHandler = function(_, fn) handlers[#handlers + 1] = fn end
-    -- ATT keeps a quest's Alliance and Horde halves apart until it knows the player, so the caller sees both.
+    att.AddEventHandler = function(event, fn) handlers[#handlers + 1] = { fn = fn, hidden = event == "OnBuildHiddenDataCache" } end
+    -- ATT keeps a quest's Alliance and Horde halves apart until it knows the player, so the reader takes neither half.
     att.ResolveQuestData = function(t) return t end
     att.L = inert
 
@@ -185,10 +187,10 @@ return function(dir)
         setfenv(chunk, {})
         chunk("AllTheThings", att)
     end
-    local categories = {}
-    for _, fn in ipairs(handlers) do
-        setfenv(fn, {})
-        fn(categories)
+    local categories, hidden = {}, {}
+    for _, h in ipairs(handlers) do
+        setfenv(h.fn, {})
+        h.fn(h.hidden and hidden or categories)
     end
 
     local quests, duplicates, notes = {}, 0, {}
@@ -201,7 +203,8 @@ return function(dir)
         end
         local t = node.t
         -- ATT sets these three on a group for every quest below it.
-        ctx = { map = ctx.map, inst = ctx.inst, u = t.u or ctx.u, awp = t.awp or ctx.awp, rwp = t.rwp or ctx.rwp }
+        ctx = { map = ctx.map, inst = ctx.inst, u = ctx.forced or t.u or ctx.u, forced = ctx.forced, awp = t.awp or ctx.awp,
+                rwp = t.rwp or ctx.rwp }
         if kind == "CreateMap" then ctx.map = node.id
         elseif kind == "CreateInstance" then ctx.inst = node.id end
         if kind == "CreateQuest" and type(node.id) == "number" then
@@ -217,10 +220,15 @@ return function(dir)
         if type(t.g) == "table" then for _, child in ipairs(t.g) do walk(child, ctx) end end
         for _, child in ipairs(t) do walk(child, ctx) end
     end
-    local names = {}
-    for name in pairs(categories) do names[#names + 1] = name end
-    table.sort(names)
-    for _, name in ipairs(names) do walk(categories[name], {}) end
+    local function walkAll(set, ctxFor)
+        local names = {}
+        for name in pairs(set) do names[#names + 1] = name end
+        table.sort(names)
+        for _, name in ipairs(names) do walk(set[name], ctxFor(name)) end
+    end
+    walkAll(categories, function() return {} end)
+    -- ATT builds its own list from the listed categories alone, and marks everything in Never Implemented as never implemented.
+    walkAll(hidden, function(name) return name == "NeverImplemented" and { u = 1, forced = 1 } or {} end)
 
     local merged = {}
     for _, note in pairs(notes) do merged[#merged + 1] = note end
