@@ -50,6 +50,7 @@ local function reasonText(reason)
     if reason == "later step done"      then return L["A later step of this chain is already done or in your log."] end
     if reason == "took another branch"  then return L["You took a different branch of this quest line."] end
     if reason == "reputation"           then return L["Your reputation standing does not allow it."] end
+    if reason == "profession"           then return L["You do not have the skill this quest needs yet, or not at a high enough rank."] end
     if reason == "dungeon or raid quest" then return L["Hidden by your dungeon and raid filter."] end
     if reason == "repeatable quest"     then return L["Hidden by your repeatable quest filter."] end
     if reason == "profession quest"     then return L["Hidden by your profession quest filter."] end
@@ -529,9 +530,14 @@ function QB:RenderDetails()
     if record.races   then reqs[#reqs + 1] = (L["Races: %s"]):format(table.concat(record.races, ", ")) end
     if record.classes then reqs[#reqs + 1] = (L["Classes: %s"]):format(table.concat(record.classes, ", ")) end
     if record.skill then
-        -- The skill line id has no name lookup on this client, so the rank is all that can be
-        -- stated without inventing a profession name.
-        reqs[#reqs + 1] = (L["Requires a profession at rank %d"]):format(record.skill.value)
+        local skill = record.skill
+        if skill.name and skill.value <= 1 then
+            reqs[#reqs + 1] = (L["Requires %s"]):format(skill.name)
+        elseif skill.name then
+            reqs[#reqs + 1] = (L["Requires %1$s at rank %2$d"]):format(skill.name, skill.value)
+        else
+            reqs[#reqs + 1] = (L["Requires a profession at rank %d"]):format(skill.value)
+        end
     end
     if record.minRep then
         local who = record.minRep.name or (L["faction %d"]):format(record.minRep.faction)

@@ -224,6 +224,29 @@ function M:PointsFor(questID, mapID, q)
     return n, thinned, "spawn"
 end
 
+-- The quest's spawn maps, or its hand-in maps once finished, else its single point's map, plus the one given
+local _mapSeen = {}
+function M:MapsFor(questID, q, alsoMap, out)
+    wipe(out)
+    wipe(_mapSeen)
+    local function add(m)
+        if m and not _mapSeen[m] then _mapSeen[m] = true; out[#out + 1] = m end
+    end
+    local isComplete = q and q.isComplete
+    local byMap = isComplete and turnInMaps(questID)
+    local spawns = (not isComplete) and ns.Compat and ns.Compat.ClassicSpawns and ns.Compat.ClassicSpawns()
+    local maps = byMap or (spawns and spawns[questID])
+    if maps then
+        for m in pairs(maps) do add(m) end
+    else
+        -- A quest with objective spawns leaves its single point out, as that point is one of its objectives or its hand-in
+        local packed = ns.CLASSIC_QUEST_COORDS and ns.CLASSIC_QUEST_COORDS[questID]
+        if packed then add(math.floor(packed / 1e8)) end
+    end
+    add(alsoMap)
+    return out
+end
+
 -- The single point never counts, because for most quests it is the turn-in fallback, not the objective.
 local function classicDraws(questID, mapID, q)
     if not q or not (turnInMaps(questID) or spawnPoints(questID, mapID)) then return false end

@@ -3,13 +3,75 @@ local L = ns.L
 
 local R = ns:RegisterSubsystem("History", {})
 
+local function realmName()
+    return GetRealmName and GetRealmName() or "?"
+end
+
 local _charKey
 local function charKey()
     if _charKey then return _charKey end
-    local name  = UnitName and UnitName("player") or "?"
-    local realm = GetRealmName and GetRealmName() or "?"
-    _charKey = name .. "-" .. realm
+    _charKey = (ns.Compat.PlayerFullName() or "?") .. "-" .. realmName()
     return _charKey
+end
+
+local function append(new, old)
+    if type(new) ~= "table" or type(old) ~= "table" then return new end
+    for i = 1, #old do new[#new + 1] = old[i] end
+    return new
+end
+
+-- Every table keyed by character, most of them also in each backup snapshot, and how two of a kind merge
+local PER_CHARACTER = {
+    charBackfilled = function(new, old) return new or old end,
+    abandonCount = function(new, old) return (tonumber(new) or 0) + (tonumber(old) or 0) end,
+    goldDaily = function(new, old)
+        if type(new) ~= "table" or type(old) ~= "table" then return new end
+        for day, v in pairs(old) do new[day] = (tonumber(new[day]) or 0) + (tonumber(v) or 0) end
+        return new
+    end,
+    accepted = function(new, old)
+        if type(new) ~= "table" or type(old) ~= "table" then return new end
+        for q, t in pairs(old) do
+            if new[q] == nil then new[q] = t end
+        end
+        return new
+    end,
+    abandoned = append,
+    levels = append,
+}
+
+-- Through 2.12.0 a WoW Forever character was keyed by its first name alone, so its records move to the full name
+local function migrateFirstNameKey(sv, backups)
+    local first, surname = UnitName("player")
+    if type(first) ~= "string" or type(surname) ~= "string" or surname == "" then return end
+    local old, new = first .. "-" .. realmName(), charKey()
+    if old == new then return end
+    -- Merged, not skipped, where both already hold records, as after a downgrade and a second update
+    local function move(holder)
+        for field, merge in pairs(PER_CHARACTER) do
+            local t = holder[field]
+            if type(t) == "table" and t[old] ~= nil then
+                if t[new] == nil then t[new] = t[old] else t[new] = merge(t[new], t[old]) end
+                t[old] = nil
+            end
+        end
+        local entries = holder.entries
+        if type(entries) == "table" then
+            for i = 1, #entries do
+                local e = entries[i]
+                if type(e) == "table" and e.c == old then e.c = new end
+            end
+        end
+    end
+    move(sv)
+    for i = 1, #backups.snapshots do
+        if type(backups.snapshots[i]) == "table" then move(backups.snapshots[i]) end
+    end
+    local counts = backups.lastCounts
+    if counts[old] ~= nil then
+        counts[new] = (tonumber(counts[new]) or 0) + (tonumber(counts[old]) or 0)
+        counts[old] = nil
+    end
 end
 
 local function ensureSV()
@@ -118,6 +180,8 @@ function R:OnInitialize()
     self._turnedIn = {}
     self._removed = {}
 
+    -- Before the load guard, which counts this character's entries by its key
+    migrateFirstNameKey(self.sv, self.backups)
     self._loadNotice = self:_guardOnLoad()
 
     local entries = self.sv.entries

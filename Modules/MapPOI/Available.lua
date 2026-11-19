@@ -186,6 +186,93 @@ local function repFails(packed, wantAtLeast)
     return have > value
 end
 
+-- [skillLineID] = rank with its bonuses. M._skillsAll is true only once the whole list was read and, on Era and TBC, every name recognized
+local _skills = {}
+local _skillNameToID
+-- Also for /eqsprobe available: which route read the list, how many lines it had, and the first name no table knew
+M._skillsAll, M._skillRoute, M._skillLines, M._skillUnknown = false, nil, 0, nil
+
+local function skillNames()
+    local names = ns.SKILL_NAMES
+    if not names then return nil end
+    local locale = GetLocale and GetLocale()
+    return names[locale] or names.enUS
+end
+
+local function points(v)
+    return type(v) == "number" and v or 0
+end
+
+-- Bonus points count toward the rank too, so a doubtful case offers the quest rather than hiding it
+local function readSkills()
+    wipe(_skills)
+    M._skillsAll, M._skillRoute, M._skillLines, M._skillUnknown = false, nil, 0, nil
+    local S = _G.C_SkillInfo
+    if S and S.GetNumSkillLines and S.GetSkillLineInfo then
+        local okN, n = pcall(S.GetNumSkillLines)
+        if not (okN and type(n) == "number" and n > 0) then return end
+        M._skillRoute, M._skillLines = "ids", n
+        local all = true
+        for i = 1, n do
+            local ok, t = pcall(S.GetSkillLineInfo, i)
+            if not (ok and type(t) == "table") then
+                all = false
+            elseif t.isHeader then
+                if t.isCollapsed then all = false end
+            elseif type(t.skillID) == "number" and type(t.rank) == "number" then
+                _skills[t.skillID] = t.rank + points(t.tempPoints) + points(t.modifier)
+            end
+        end
+        M._skillsAll = all
+        return
+    end
+    -- Era and TBC name each skill in the client's language only, so the shipped names map it back to its id
+    local count, info, names = _G.GetNumSkillLines, _G.GetSkillLineInfo, skillNames()
+    if not (count and info and names) then return end
+    if not _skillNameToID then
+        _skillNameToID = {}
+        for id, name in pairs(names) do _skillNameToID[name] = id end
+    end
+    local okN, n = pcall(count)
+    if not (okN and type(n) == "number" and n > 0) then return end
+    M._skillRoute, M._skillLines = "names", n
+    local all = true
+    for i = 1, n do
+        local ok, name, isHeader, isExpanded, rank, temp, modifier = pcall(info, i)
+        if not ok then
+            all = false
+        elseif isHeader then
+            if not isExpanded then all = false end
+        else
+            local id = name and _skillNameToID[name]
+            if id and type(rank) == "number" then
+                _skills[id] = rank + points(temp) + points(modifier)
+            else
+                -- A name the shipped table lacks could be a renamed profession, so nothing reads as missing
+                all = false
+                M._skillUnknown = M._skillUnknown or tostring(name)
+            end
+        end
+    end
+    M._skillsAll = all
+end
+
+local function knownLine(line)
+    local names = ns.SKILL_NAMES
+    return names ~= nil and names.enUS ~= nil and names.enUS[line] ~= nil
+end
+
+local function skillFails(packed)
+    if not packed then return false end
+    -- A need of 0 still asks for the skill
+    local line, need = math.floor(packed / 1e4), math.max(packed % 1e4, 1)
+    local have = _skills[line]
+    -- A line with no shipped name can never be read by name, so its absence proves nothing
+    if have == nil and not (M._skillsAll and knownLine(line)) then return false end
+    M._gatesRun.profession = true
+    return (have or 0) < need
+end
+
 local function countReason(key)
     M._reason[key] = (M._reason[key] or 0) + 1
 end
@@ -203,6 +290,7 @@ local REASON_PREREQ      = "prerequisite"
 local REASON_LATER_STEP  = "later step done"
 local REASON_BRANCH      = "took another branch"
 local REASON_REPUTATION  = "reputation"
+local REASON_PROFESSION  = "profession"
 
 -- The Data/QuestCategory bits. The event bit (4) stays unread, as it comes from SF_EXPLORE, not holidays
 local CAT_INSTANCE, CAT_REPEATABLE, CAT_PROFESSION = 1, 2, 16
@@ -334,6 +422,8 @@ local function isAvailable(questID, D, hideLowLevel, floor, unfiltered)
     if repFails(D.minRep[questID], true) then return false, REASON_REPUTATION end
     if repFails(D.maxRep[questID], false) then return false, REASON_REPUTATION end
 
+    if skillFails(D.skill[questID]) then return false, REASON_PROFESSION end
+
     return true
 end
 
@@ -360,6 +450,7 @@ local function preparePass()
     readPlayer()
     if not ((_raceBit or _raceEveryOf) and _classBit) then return false end
     readCompleted()
+    readSkills()
     -- Set once the masks are readable, so it holds even on a pass that rejects every quest.
     M._gatesRun.raceClass = true
 
@@ -536,12 +627,23 @@ function M:StartsFor(questID, out)
     return n
 end
 
--- skillLineID*1e4 + requiredValue. The id has no name lookup here, so only the need can be shown
+-- skillLineID*1e4 + requiredValue
 function M:SkillGate(questID)
     local D = data()
     local v = D and D.skill[questID]
     if not v then return nil end
     return math.floor(v / 1e4), v % 1e4
+end
+
+-- In the client's language: the game's own name where it can give one, else the shipped name, else nil
+function M:SkillName(line)
+    local S = _G.C_SkillInfo
+    if S and S.GetSkillLineInfoByID then
+        local ok, t = pcall(S.GetSkillLineInfoByID, line)
+        if ok and type(t) == "table" and type(t.name) == "string" and t.name ~= "" then return t.name end
+    end
+    local names = skillNames()
+    return names and names[line] or nil
 end
 
 -- factionID*1e6 + standing. An if, as the and/or form answers the minimum when no maximum exists

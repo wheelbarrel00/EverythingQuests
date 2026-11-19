@@ -97,8 +97,11 @@ local function pinRows(self, content, card)
 
     card:Add(mapBox(self, content, "fadePinsOverPlayer", false, L["Fade markers that cover your position"],
         L["Makes any marker sitting on top of your own arrow see-through, so you can still find yourself on a zone that is drawing hundreds of them. Off by default. The markers are still there and still answer the mouse, they are only dimmed while you are standing under them."],
-        -- Applied at once rather than on the next fade tick, so the box and the map agree
-        function() if ns.QuestPinApplyFade then ns.QuestPinApplyFade() end end))
+        -- Applied at once rather than on the next fade tick, so the box and both maps agree
+        function()
+            if ns.QuestPinApplyFade then ns.QuestPinApplyFade() end
+            rebuildMinimap()
+        end))
 end
 
 local function availableRows(self, content, card, w)
@@ -145,7 +148,28 @@ local function mapCard(self, content, stack, w)
     if MinimapPins then
         card:Add(mapBox(self, content, "showMinimapPins", true, L["Show objective pins on the minimap"],
             L["Puts the same objective markers on the minimap as on the world map, for the zone you are standing in. They use the per-quest limit above. Hover one for the quest name and what it still needs."],
-            function() MinimapPins:Rebuild() end))
+            function()
+                MinimapPins:Rebuild()
+                w.sync()
+            end))
+        w.mmOn = function() return readMap("showMinimapPins") ~= false end
+        local edge = mapBox(self, content, "minimapEdgePins", true, L["Keep each quest's nearest marker on the minimap's edge"],
+            L["Keeps one marker for each quest in your log at the nearest spot its markers would show, such as an objective, or where you hand it in once it is finished, from any zone on your continent. When that spot is out of the minimap's range, the marker stays on the edge, in the direction to go, and fades the farther away it is."],
+            function() MinimapPins:Rebuild() end)
+        card:Add(edge, { dependent = true })
+        w.mm[#w.mm + 1] = edge
+        local size = self:CreateSlider(content, L["Minimap pin scale"], 0.5, 2.0, 0.05,
+            function()
+                local s = readMap("minimapPinScale")
+                return type(s) == "number" and s or 1.0
+            end,
+            function(value)
+                writeMap("minimapPinScale", value)
+                MinimapPins:ApplySize()
+            end,
+            L["Sets the size of the quest pins on the minimap."])
+        card:Add(size, { dependent = true })
+        w.mm[#w.mm + 1] = size
     end
     if Avail then availableRows(self, content, card, w) end
 end
@@ -165,7 +189,7 @@ local function categoryCard(self, content, stack)
     category("hideRepeatableQuests", L["Repeatable quests"],
         L["Leaves out the quests you can hand in over and over, usually a turn-in for reputation or a common trade good. They never stop being offered, so they stay on the map forever once you can see them."])
     category("hideProfessionQuests", L["Profession quests"],
-        L["Leaves out quests that require a trade skill, such as a Blacksmithing or Alchemy specialization. Everything Quests cannot read your skill levels on this version of the game, so these are offered even when you have not trained the profession they need."])
+        L["Leaves out quests that need a skill, such as Blacksmithing or Fishing, or Riding on Burning Crusade Classic. Even with this off, a quest that needs a skill you lack, or a higher rank of it, is left out, as long as Everything Quests can read your whole skill list, which a collapsed heading in your Skills tab stops."])
 end
 
 local function coordinatesCard(self, content, stack, w)
@@ -305,10 +329,12 @@ Options:RegisterTab({
     order = 20,
     build = function(self, content)
         local stack = Options.CardStack(self)
-        local w = { avail = {}, np = {} }
+        local w = { avail = {}, np = {}, mm = {} }
         w.sync = function()
             local availOn = w.availOn and w.availOn() and true or false
             for _, c in ipairs(w.avail) do self:SetDependent(c, availOn) end
+            local mmOn = w.mmOn and w.mmOn() and true or false
+            for _, c in ipairs(w.mm) do self:SetDependent(c, mmOn) end
             if w.prec then self:SetDependent(w.prec, w.coordOn() and true or false) end
             local npOn = w.npOn and w.npOn() and true or false
             for _, c in ipairs(w.np) do self:SetDependent(c, npOn) end

@@ -52,7 +52,7 @@ Era and TBC were measured identical across every game API the addon reads, so on
 
 - **Objective markers** on the world map and the minimap, drawn from a generated coordinate database rather than from the client, which exposes no quest coordinates at all
 - **Objective kind icons** — a colored badge per kind, red for something to kill, amber for something to loot and green for something to use, each with a dark outline so a busy zone stays readable. An objective inside a dungeon is marked at the dungeon entrance, with an archway of its own
-- **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites, reputation, completion, and whether a holiday quest's world event is actually running
+- **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites, reputation, completion, the profession or skill rank a quest needs, and whether a holiday quest's world event is actually running
 - **Named quest givers and finishers** — a marker for a quest you can pick up names who is standing there, and a marker for one you have finished names who takes it back, on the world map, the minimap and in the Quest Browser
 - **Nameplate quest icons**, resolved from the creature ID in the unit GUID, since a Classic Era or TBC unit tooltip carries no quest data
 - **The Quest Browser** — look up almost any quest in the game, including ones never picked up, with its level, race and class requirements, start and turn-in locations, prerequisites, and the reason it is not available yet. Its own tab in `/eqs`, `/eqs quests`, a key you bind to it, or right-click a gold marker
@@ -188,13 +188,15 @@ Custom quest pins on zone maps. On retail the icon sits in a red ring; on Classi
 - **Fixed size at every zoom** — `SetScalingLimits(1, s, s)` collapses Blizzard's zoom lerp to a constant, with a per-map-type factor so continent and world maps draw smaller. A scale slider and a per-quest pin limit live under `/eqs` > Map
 - **On Classic** — in-progress pins come from `Data/QuestSpawns_*.lua` and carry objective art rather than a `!`, marking every clustered location a quest can be advanced, with a per-quest minimum separation applied at read time so a low limit still spreads across the zone
 - **Turn-in pins on Classic** — a finished quest is placed from `Data/QuestTurnIn_*.lua`, at every map where it can be handed in. That table is authoritative once it knows a quest, because on Classic Era alone 475 quests hand in on a different map from their objective
-- **Available quest pins on Classic** — gold `!` markers for quests you can pick up but have not accepted, from `Data/QuestAvailable_*.lua`, gated on level, race, class, prerequisites, reputation and completion. Pins merge by location rather than by quest
+- **Available quest pins on Classic** — gold `!` markers for quests you can pick up but have not accepted, from `Data/QuestAvailable_*.lua`, gated on level, race, class, prerequisites, reputation, completion and the profession or skill rank a quest needs. Pins merge by location rather than by quest
 - **Source names on start and turn-in pins** — the creature or object each of those points belongs to is packed alongside its coordinate, and named from `Data/QuestSources_*.lua`. Creature and object IDs overlap numerically, so the point's *kind* decides which of the two name tables to read; nothing infers it from the ID. A quest that starts from a looted item stores no source, because its dropper could be either
 - **Holiday quests follow their season** — a Lunar Festival or Brewfest quest is pinned only while that world event is running, from `Data/QuestHolidays_*.lua`. On by default. The one date that moves each year fails open, so a year the table does not list shows those quests rather than hiding them
 - **Filters for a busy map**, all under `/eqs` > Map — leave out dungeon, repeatable or profession quests, hide quests below your level using the game's own gray threshold, or hide the ones it colors red for you. That last one is off by default, because a red quest is still worth knowing about if you mean to come back for it
 
 ### Minimap Objective Pins
-The same objective markers on the minimap, for the zone you are standing in, powered by HereBeDragons-Pins. Classic only, and keyed on `C_Map.GetBestMapForUnit` rather than the open world map. Pins are hover-only so clicks pass through to the minimap underneath.
+The same objective markers on the minimap, for the zone you are standing in, powered by HereBeDragons-Pins. Classic only, and keyed on `C_Map.GetBestMapForUnit` rather than the open world map. Pins are hover-only so clicks pass through to the minimap underneath, and hovering one also lists the quests on the pins beside it, as on the world map.
+
+Each quest in your log also keeps one marker at the nearest spot its markers would show, such as an objective, or its hand-in once it is finished, from any zone on your continent. Out of the minimap's range, the marker stays on the edge in the direction to go and fades the farther away it is. A **Minimap pin scale** slider sets the size of the pins, and **Fade markers that cover your position** fades the minimap's pins too.
 
 ### Quest Browser
 Classic only (Classic Era, Burning Crusade Classic and WoW Forever). A search-and-details window over EQ's own generated quest tables, answering the one thing a Classic client cannot: what a quest is before you have ever accepted it.
@@ -312,7 +314,7 @@ The options window shares EQ Objective Tracker's look: a sidebar of tabs, settin
 | Tab | Settings |
 |---|---|
 | **General** | Auto-accept / auto-turn-in / join group quests, the Immersion hand-off (when Immersion is installed), show / hide minimap button, options window scale, update notice style, **quest announcements**, **party quest progress**, Use Blizzard's quest tracker, Open Tracker Settings, the TomTom arrow for the focused quest (WoW Forever) and the tracker icons, profile management, reset to defaults |
-| **Map** | World-map quest pins, pin scale, objective pins per quest, pin rings, markers for tracked quests only, fading markers under your position, minimap objective pins (Classic), quests you can pick up with their level and holiday filters (Classic), dungeon / repeatable / profession quest filters (Classic), **coordinates**, quest progress on tooltips, **quest icons on nameplates** with their position, size and offsets |
+| **Map** | World-map quest pins, pin scale, objective pins per quest, pin rings, markers for tracked quests only, fading markers under your position, minimap objective pins with their edge markers and pin scale (Classic), quests you can pick up with their level and holiday filters (Classic), dungeon / repeatable / profession quest filters (Classic), **coordinates**, quest progress on tooltips, **quest icons on nameplates** with their position, size and offsets |
 | **World Quests** | Master switch, world map pins, zone quest list and its sort order, per-reward filters (each icon inside its colored ring), per-faction filters by expansion, pin scale |
 | **Chain Guide** | Open on login, window scale, unrouted questlines (retail), the tracked chain on the world map, cross-character chain cache stats and reset, prune stale entries |
 | **Quest Browser** | Open Quest Browser (Classic Era, TBC and WoW Forever) |
@@ -413,11 +415,13 @@ EverythingQuests/
 │   ├── QuestAvailable_*.lua          # Generated: where a quest starts, plus its gates
 │   ├── QuestCategory_*.lua           # Generated: dungeon / repeatable / class / profession
 │   ├── QuestHolidays_*.lua           # Generated: questID -> its world event
+│   ├── SkillNames_*.lua              # Generated: skill names in every client
+│   │                                 #   language, for the profession gate
 │   └── QuestSources_*.lua            # Generated: creature and object names for the
 │                                     #   points that start and finish a quest
 │                                     #   Each has a _Classic, a _TBC and a _Forever
-│                                     #   variant, except QuestHolidays, which Forever
-│                                     #   shares with Classic Era. A TOC lists exactly
+│                                     #   variant, except QuestHolidays and SkillNames,
+│                                     #   which Forever shares with Classic Era. A TOC lists exactly
 │                                     #   one set; they define the same globals
 ├── tools/                            # TOC and locale-format gates, plus their own
 │                                     #   self-tests, and the quest data generators

@@ -83,6 +83,15 @@ function Compat.CollectQuestLog(out)
     return out, walk(out, flatRow, reported)
 end
 
+-- On WoW Forever UnitName("player") answers a surname second and chat senders carry both names, while elsewhere the player has no second part
+function Compat.PlayerFullName()
+    local name, surname = UnitName("player")
+    if type(surname) ~= "string" or surname == "" then return name end
+    local consts = _G.Constants and _G.Constants.CharacterNameSeparatorConsts
+    local sep = consts and consts.CHARACTERNAME_SURNAME_SEPARATOR or " "
+    return name .. sep .. surname
+end
+
 -- True while EQOT runs Blizzard's tracker in place of its window, a choice EQOT fixes at login.
 function Compat.BlizzardTrackerInUse()
     local T = _G.EQObjectiveTracker

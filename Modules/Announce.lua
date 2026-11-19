@@ -26,7 +26,7 @@ end
 
 local function isSelf(author)
     if type(author) ~= "string" then return false end
-    return (author:match("^([^%-]+)") or author) == UnitName("player")
+    return (author:match("^([^%-]+)") or author) == ns.Compat.PlayerFullName()
 end
 
 local function wantsGroup()
@@ -82,16 +82,58 @@ local function prime(questID)
     if _linkText[questID] == nil then linkFor(questID) end
 end
 
+local function grammarForm(forms, n)
+    local list, start = {}, 1
+    repeat
+        local stop = forms:find(":", start, true)
+        list[#list + 1] = forms:sub(start, stop and stop - 1 or -1)
+        start = stop and stop + 1
+    until not stop
+    local pick = 1
+    if n and #list == 2 and n ~= 1 then
+        pick = 2
+    elseif n and #list == 3 then
+        local last, lastTwo = n % 10, n % 100
+        if last == 1 and lastTwo ~= 11 then
+            pick = 1
+        elseif last >= 2 and last <= 4 and (lastTwo < 12 or lastTwo > 14) then
+            pick = 2
+        else
+            pick = 3
+        end
+    end
+    return list[pick]
+end
+
+local PIPE = "\001"
+
+-- Outgoing chat refuses the client's grammar codes, which translated objective text can carry, and texture escapes
+local function chatSafe(raw)
+    if type(raw) ~= "string" then return raw end
+    local text = raw:gsub("||", PIPE)
+    local before = text
+    -- |4 and |7 pick a singular or plural form by the number just before them, as the client does
+    text = text:gsub("()|[47]([^;]*);", function(at, forms)
+        return grammarForm(forms, tonumber(before:sub(1, at - 1):match("(%d+)%D*$")))
+    end)
+    text = text:gsub("|3%-%d+%((.-)%)", "%1"):gsub("|1([^;]*);[^;]*;", "%1"):gsub("|[56]", "")
+    -- French takes d' before a vowel and de before anything else, and here every accented letter counts as a vowel
+    text = text:gsub("|2 *([AEIOUaeiou\195])", "d'%1"):gsub("|2 *", "de ")
+    text = text:gsub("|T.-|t ?", ""):gsub("|A.-|a ?", "")
+    return (text:gsub(PIPE, "||"))
+end
+
 local function sendChat(text, chatType)
     local chatInfo = _G["C_ChatInfo"]
     -- Addons may not message other players during an encounter, a keystone run or a PvP match.
     if chatInfo and chatInfo.InChatMessagingLockdown and chatInfo.InChatMessagingLockdown() then return end
     -- The bare global is only a deprecation fallback, which a client setting leaves undefined.
     local fn = (chatInfo and chatInfo.SendChatMessage) or _G["SendChatMessage"]
-    if type(fn) == "function" then pcall(fn, text, chatType) end
+    if type(fn) == "function" then pcall(fn, chatSafe(text), chatType) end
 end
 
-local function send(body)
+-- The printed copy keeps the client's own text, which the chat frame draws itself
+local function send(body, chatBody)
     if not body then return end
     local c = cfg()
 
@@ -99,7 +141,7 @@ local function send(body)
         print("|cffEBB706Everything Quests:|r " .. body)
     end
     if not wantsGroup() then return end
-    sendChat(MARK .. body, channel())
+    sendChat(MARK .. (chatBody or body), channel())
 end
 
 local function announceQuest(questID, pattern)
@@ -206,7 +248,8 @@ function AN:Sweep()
             if wanted and was and was < required and fulfilled >= required then
                 local link = linkFor(questID)
                 if link and o.text and o.text ~= "" then
-                    send(L["%1$s for %2$s"]:format(o.text, link))
+                    -- Resolved apart from the line, so a code takes its number from the objective, not the quest link
+                    send(L["%1$s for %2$s"]:format(o.text, link), L["%1$s for %2$s"]:format(chatSafe(o.text), link))
                 end
             end
         end

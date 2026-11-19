@@ -2,23 +2,34 @@ local _, ns = ...
 
 local C = ns:RegisterSubsystem("ChainGuideCharacters", {})
 
+local function realmName()
+    return GetRealmName and GetRealmName() or "?"
+end
+
 local function charKey()
-    local name  = UnitName  and UnitName("player")  or "?"
-    local realm = GetRealmName and GetRealmName()   or "?"
-    return name .. "-" .. realm
+    return (ns.Compat.PlayerFullName() or "?") .. "-" .. realmName()
+end
+
+-- Through 2.12.0 a WoW Forever character was keyed by its first name alone, so its record moves to the full name
+local function migrateFirstNameKey(cache, new)
+    local first, surname = UnitName("player")
+    if type(first) ~= "string" or type(surname) ~= "string" or surname == "" then return end
+    local old = first .. "-" .. realmName()
+    if old ~= new and cache[old] ~= nil and cache[new] == nil then cache[new], cache[old] = cache[old], nil end
 end
 
 function C:OnInitialize()
     local DB = ns:GetSubsystem("DB")
     self.cache = DB.chainCache
     self.charKey = charKey()
+    migrateFirstNameKey(self.cache, self.charKey)
     -- Keep this two-step - wrapping UnitClass in parens or an "or" truncates it to its first return and the locale-independent classFile ends up nil
     local _, classFile
     if UnitClass then _, classFile = UnitClass("player") end
     local rec = self.cache[self.charKey]
     if not rec then
         rec = {
-            name      = UnitName and UnitName("player"),
+            name      = ns.Compat.PlayerFullName(),
             class     = classFile,
             faction   = UnitFactionGroup and UnitFactionGroup("player"),
             completed = {},
@@ -27,6 +38,7 @@ function C:OnInitialize()
     elseif not rec.class then
         rec.class = classFile
     end
+    rec.name = ns.Compat.PlayerFullName()
     rec.lastSeen = time()              -- stamp the current char each login so PruneStaleRecords spares it
     self.char = rec
 end

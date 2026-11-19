@@ -2,6 +2,27 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.13.0", date = "2026-11-19",
+        sections = {
+            { head = "New Features", items = {
+                { "Your quests point the way from the edge of the minimap. Each quest in your log now keeps one marker at the nearest spot its markers would show, such as an objective, or where you hand it in once it is finished, from any zone on your continent. When that spot is out of the minimap's range, the marker stays on the edge of the minimap, in the direction to go, and fades the farther away it is. In range in your own zone, it gives way to the quest's usual minimap pins. Quests you can pick up get no marker. Turn it off with Keep each quest's nearest marker on the minimap's edge, in the Map tab under Show objective pins on the minimap.", classic = true },
+            } },
+            { head = "Improvements", items = {
+                { "Quests that need a profession are marked only for characters who have it. A quest that asks for a profession or another skill, such as Riding on Burning Crusade Classic, is no longer marked as one you can pick up until your character has that skill at the rank it needs. Skill bonuses, such as a racial one, count toward the rank. The Quest Browser now names the skill, such as Requires Alchemy at rank 20, and says when you do not have it yet.", classic = true },
+                { "A scale for minimap pins. A new Minimap pin scale slider in the Map tab sets the size of the quest pins on the minimap.", classic = true },
+                { "Minimap pins fade under your arrow, and their tooltip lists the pins beside them. With Fade markers that cover your position ticked, minimap pins on top of your arrow fade too, as the world map's do. Hovering a minimap pin now also lists the quests whose pins sit beside it, as the world map's tooltip does.", classic = true },
+            } },
+            { head = "Bug Fixes", items = {
+                { "Party progress and announcements on WoW Forever recognize your own character again. Every WoW Forever character now has a surname, and Everything Quests compared your group's messages with your first name only. Your own quest progress could be listed as a party member's, and with Hide announcements from other players ticked, your own announcements were hidden as well.", classic = true, sub = "ChainGuide" },
+                { "Quest History keeps each WoW Forever character apart. It kept each character's records under its first name and realm, so two characters with the same first name on one realm shared them. It now uses the full name. Each character's records move to it the first time it logs in, and where two characters shared them, the first of the two to log in keeps them.", classic = true, sub = "ChainGuide" },
+                "Objective announcements in some languages can now be sent. In some languages, a finished objective's text carries a code the game uses to pick the right form of a word, such as singular or plural, and group chat refuses a line containing one, so those announcements were never sent. Everything Quests now writes out the right word before sending.",
+            } },
+            { head = "Known Issues", items = {
+                { "While any heading in your Skills tab is collapsed, quests that need a profession are marked whether or not you have it, because Everything Quests cannot read the whole list. Open the headings and they are checked again.", classic = true },
+            } },
+        },
+    },
+    {
         version = "2.12.0", date = "2026-11-18",
         sections = {
             { head = "New Features", items = {

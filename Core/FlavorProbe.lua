@@ -2212,6 +2212,8 @@ function Probe:Minimap()
          tostring(MM._registered), tostring(MM._rejected))
     line("  quests yielded to Blizzard's own minimap marker=%s  (tracked, on Blizzard's rows: %s)",
          tostring(MM._yielded), tostring(countKeys(MM._blizzardMarks)))
+    line("  edge markers=%s  showing=%s  pins faded under your arrow=%s",
+         tostring(countKeys(MM._edge or {})), tostring(MM._edgeShown), tostring(MM._faded))
 
     line("3. can HereBeDragons place the player at all:")
     if HBD then
@@ -2450,7 +2452,6 @@ function Probe:Available()
          (C_Reputation and type(C_Reputation.GetFactionDataByID) == "function") and "present" or "absent",
          repByID and "present" or "absent")
     line("  A reputation gate that cannot be read shows the quest rather than hiding it.")
-    line("  requiredSkill is SHIPPED but never enforced - no reliable skill id lookup here.")
 
     -- A lunar table that ran out shows its quests like a running event, so coverage is printed
     local H = ns:GetSubsystem("QuestHolidays")
@@ -2463,10 +2464,14 @@ function Probe:Available()
     A:All()
     line("  stage=%q  quests considered=%s  AVAILABLE=%s  race route=%s",
          tostring(A._stage), tostring(A._resolved), tostring(A._availableN), tostring(A._raceRoute))
-    line("  gates that actually ran: raceClass=%s trivial=%s reputation=%s highLevel=%s season=%s",
+    line("  gates that actually ran: raceClass=%s trivial=%s reputation=%s highLevel=%s season=%s profession=%s",
          tostring(A._gatesRun.raceClass), tostring(A._gatesRun.trivial),
          tostring(A._gatesRun.reputation), tostring(A._gatesRun.highLevel),
-         tostring(A._gatesRun.season))
+         tostring(A._gatesRun.season), tostring(A._gatesRun.profession))
+    -- An incomplete or unrecognized skill list stops a missing skill from refusing a quest, so the reason is printed
+    line("  skill list: route=%s  lines=%s  all read and recognized=%s  first name not recognized=%s  locale=%s",
+         tostring(A._skillRoute), tostring(A._skillLines), tostring(A._skillsAll),
+         tostring(A._skillUnknown), tostring(GetLocale and GetLocale()))
     local reasons = {}
     for why, n in pairs(A._reason) do reasons[#reasons + 1] = ("%s=%d"):format(why, n) end
     table.sort(reasons)

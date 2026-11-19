@@ -5,6 +5,10 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.13.0", sections = {
+        { "Your quests point the way on the minimap", "Each quest in your log now keeps a marker at the nearest spot its markers would show, such as an objective, or its hand-in once it is finished, and when that spot is out of the minimap's range the marker stays on the edge, pointing the way and fading the farther away it is. Turn it off, or set the scale of minimap pins, in the Map tab under Show objective pins on the minimap.", classic = true },
+        { "Quests for the professions you have", "Quests that need a profession are now marked only for characters who have it, at the rank it needs, and the Quest Browser names the skill.", classic = true },
+    } },
     { version = "2.12.0", sections = {
         { "Turn off the TomTom arrow for the focused quest", "WoW Forever draws its own arrow to the quest you focus, and with TomTom installed Everything Quests points a TomTom arrow there too. To keep only the game's arrow, untick TomTom arrow for the focused quest in the Tracker card of the General tab. Quests are still focused as before, and Get Directions, the Quest Browser and the Chain Guide, a chain you track included, still set a TomTom arrow when you ask for directions.", classic = true, sub = "ChainGuide" },
     } },

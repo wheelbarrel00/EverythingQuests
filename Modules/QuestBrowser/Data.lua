@@ -450,7 +450,7 @@ function QB:Record(questID)
     if parentID then r.parent = { id = parentID, name = A:Title(parentID), done = A:IsCompleted(parentID) } end
 
     local skillLine, skillValue = A:SkillGate(questID)
-    if skillLine then r.skill = { line = skillLine, value = skillValue } end
+    if skillLine then r.skill = { line = skillLine, value = skillValue, name = A:SkillName(skillLine) } end
 
     for _, which in ipairs({ "min", "max" }) do
         local faction, value = A:RepGate(questID, which)

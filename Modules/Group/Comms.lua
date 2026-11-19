@@ -365,9 +365,10 @@ end
 -- UnitInParty is true for you, so a missed self test stores your own packet as a member's.
 local function isSelf(sender)
     if type(sender) ~= "string" then return false end
+    local me = ns.Compat.PlayerFullName()
     local name, realm = sender:match("^([^%-]+)%-(.+)$")
-    if not name then return sender == UnitName("player") end
-    if name ~= UnitName("player") then return false end
+    if not name then return sender == me end
+    if name ~= me then return false end
     local ownRealm = _G["GetNormalizedRealmName"]
     ownRealm = type(ownRealm) == "function" and ownRealm() or nil
     return ownRealm == nil or realm == ownRealm
