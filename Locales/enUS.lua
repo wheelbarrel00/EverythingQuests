@@ -76,6 +76,10 @@ L["Turns off the EQ Objective Tracker window and brings back the game's own ques
 L["Open Tracker Settings"] = true
 L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot."] = true
 L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."] = true
+L["Points your TomTom arrow at the focused quest each time it changes, including a quest the game focuses as you accept it. Untick to leave that to the game's own arrow: quests are still focused, and Get Directions, the Quest Browser, the Chain Guide and a tracked chain still set a TomTom arrow."] = true
+L["Requires TomTom addon."] = true
+L["TomTom is not loaded, but another addon is standing in for it, so these arrows go to that addon instead. It may show them in its own way, such as a journey to follow."] = true
+L["TomTom arrow for the focused quest"] = true
 L["Show Everything Quests icon on the tracker"] = true
 L["Adds the Everything Quests logo at the top right of the tracker, which opens this options window. The tracker's own cogwheel opens the tracker's settings instead. You can also reach this window from the minimap button or by typing /eqs."] = true
 L["Show Chain Guide icon on the tracker"] = true

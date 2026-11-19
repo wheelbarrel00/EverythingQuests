@@ -1,10 +1,9 @@
 local _, ns = ...
 
--- One TomTom waypoint slot shared by the map pin and the tracker's focused row, so clicking
--- one after the other retargets instead of leaving two arrows that cannot clear each other.
+-- One TomTom slot for every EQ arrow but retail's Chain Guide, so a new one replaces the last instead of leaving two
 local Arrow = ns:RegisterSubsystem("QuestArrow", {})
 
-local _uid, _questID, _title
+local _uid, _questID, _title, _followed
 local FROM = "Everything Quests"
 
 local function tomtom()
@@ -14,6 +13,12 @@ end
 
 function Arrow:Available()
     return tomtom() ~= nil
+end
+
+-- Another addon can answer TomTom's calls while TomTom itself is not loaded
+function Arrow:StandIn()
+    local loaded = C_AddOns and C_AddOns.IsAddOnLoaded
+    return (tomtom() and loaded and not loaded("TomTom")) and true or false
 end
 
 -- TomTom brings saved waypoints back at login, when EQ no longer holds their handle. Retail's Chain Guide adds its own under the same tag
@@ -42,7 +47,8 @@ function Arrow:Clear()
     end
 end
 
-function Arrow:Set(mapID, x, y, title, questID)
+-- followed marks an arrow the focus listener placed, the only kind unticking the focus arrow box takes down
+function Arrow:Set(mapID, x, y, title, questID, followed)
     local T = tomtom()
     if not (T and mapID and x and y) then return false end
     self:Clear()
@@ -52,7 +58,7 @@ function Arrow:Set(mapID, x, y, title, questID)
         from  = FROM,
         crazy = true,
     })
-    if ok then _uid, _questID, _title = uid, questID, title end
+    if ok then _uid, _questID, _title, _followed = uid, questID, title, followed == true end
     return ok and true or false
 end
 
@@ -60,11 +66,24 @@ function Arrow:Holds(questID)
     return questID ~= nil and _uid ~= nil and _questID == questID
 end
 
+function Arrow:Followed()
+    return _uid ~= nil and _followed == true
+end
+
+function Arrow:ClearFollowed()
+    if self:Followed() then self:Clear() end
+end
+
+-- With no arrow held, every EQ waypoint TomTom shows came back from an earlier session
+function Arrow:ClearLeftovers()
+    if not _uid then self:Clear() end
+end
+
 -- The game's point moves as objectives finish, and TomTom drops a waypoint on arrival, so a held arrow is set again
 function Arrow:Refresh(questID)
     if not self:Holds(questID) then return false end
     local m, x, y = self:GamePoint(questID)
-    if m then self:Set(m, x, y, _title, questID) end
+    if m then self:Set(m, x, y, _title, questID, true) end
     return true
 end
 
@@ -162,7 +181,7 @@ end
 function Arrow:PointAtQuest(questID)
     local mapID, x, y, title = self:PointFor(questID)
     if not mapID then return false end
-    return self:Set(mapID, x, y, title)
+    return self:Set(mapID, x, y, title, nil, true)
 end
 
 -- Forever only: following a quest on retail never set a TomTom arrow, and Era and TBC have no super-track to follow
@@ -173,5 +192,5 @@ function Arrow:PointAtGame(questID)
     local Cache = ns:GetSubsystem("Cache")
     local q = Cache and Cache:Get(questID)
     local title = (q and q.title) or (ns.Util and ns.Util.QuestTitle(questID, true))
-    return self:Set(mapID, x, y, title, questID)
+    return self:Set(mapID, x, y, title, questID, true)
 end

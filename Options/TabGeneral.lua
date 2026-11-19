@@ -200,7 +200,7 @@ local function partyCard(self, content, stack, deps)
     end
 end
 
-local function trackerCard(self, content, stack)
+local function trackerCard(self, content, stack, deps)
     local Bridge = ns:GetSubsystem("TrackerBridge")
     if not Bridge then return end
     local card = stack(self:CreateGroup(content, L["Tracker"]))
@@ -244,6 +244,34 @@ local function trackerCard(self, content, stack)
         ns.Compat.BlizzardTrackerInUse()
             and L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot."]
             or L["The tracker is now EQ Objective Tracker, a separate addon that Everything Quests installs for you. Its own options panel holds everything: position and size, fonts, colors, sections, filters, sorting and visibility. You can also open it by typing /eqot, or with the cogwheel at the top right of the tracker itself."]))
+
+    -- Shown under Blizzard's tracker too, since EQ Objective Tracker still announces the followed quest then
+    if Bridge:FocusArrowOffered() then
+        local Arrow = ns:GetSubsystem("QuestArrow")
+        local function hasTomTom() return Arrow and Arrow:Available() end
+        -- Read on each hover, since another addon can take TomTom's place or give it back after the window is built
+        local function arrowTip()
+            local tip = L["Points your TomTom arrow at the focused quest each time it changes, including a quest the game focuses as you accept it. Untick to leave that to the game's own arrow: quests are still focused, and Get Directions, the Quest Browser, the Chain Guide and a tracked chain still set a TomTom arrow."]
+            if not hasTomTom() then
+                return tip .. " " .. L["Requires TomTom addon."]
+            elseif Arrow:StandIn() then
+                return tip .. " " .. L["TomTom is not loaded, but another addon is standing in for it, so these arrows go to that addon instead. It may show them in its own way, such as a journey to follow."]
+            end
+            return tip
+        end
+        local arrowLabel = L["TomTom arrow for the focused quest"]
+        local arrowGet, arrowSet = generalSetting("focusArrow")
+        local arrow = self:CreateCheckbox(content, arrowLabel,
+            function() return arrowGet() ~= false end,
+            function(value)
+                arrowSet(value)
+                Bridge:ApplyFocusArrowSetting()
+            end)
+        arrow:HookScript("OnEnter", function() self:ShowTooltip(arrow, arrowLabel, arrowTip()) end)
+        arrow:HookScript("OnLeave", function() self:HideTooltip() end)
+        card:Add(arrow)
+        deps[#deps + 1] = { control = arrow, on = hasTomTom }
+    end
 
     -- Both icons sit on the EQ Objective Tracker window, which Blizzard's tracker replaces.
     if not ns.Compat.BlizzardTrackerInUse() then
@@ -395,7 +423,7 @@ Options:RegisterTab({
         generalCard(self, content, stack)
         announceCard(self, content, stack)
         partyCard(self, content, stack, deps)
-        trackerCard(self, content, stack)
+        trackerCard(self, content, stack, deps)
         profilesCard(self, content, stack)
         deps.sync()
     end,

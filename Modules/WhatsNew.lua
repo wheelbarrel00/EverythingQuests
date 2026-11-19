@@ -5,6 +5,9 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.12.0", sections = {
+        { "Turn off the TomTom arrow for the focused quest", "WoW Forever draws its own arrow to the quest you focus, and with TomTom installed Everything Quests points a TomTom arrow there too. To keep only the game's arrow, untick TomTom arrow for the focused quest in the Tracker card of the General tab. Quests are still focused as before, and Get Directions, the Quest Browser and the Chain Guide, a chain you track included, still set a TomTom arrow when you ask for directions.", classic = true, sub = "ChainGuide" },
+    } },
     { version = "2.11.0", sections = {
         { "432 more quests on WoW Forever", "Everything Quests now knows 1,002 quests new to WoW Forever, up from 570, among them 163 in Riverglades and many more for characters from level 31 to 40. Tomb Weed is now marked for every Horde character, and the Bandarion Keep quests for Orcs too.", classic = true, sub = "ChainGuide" },
     } },

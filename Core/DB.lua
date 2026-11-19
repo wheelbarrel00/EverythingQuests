@@ -8,8 +8,7 @@ DB.defaults = {
             autoAcceptQuests = false,
             autoTurnInQuests = false,
             autoConfirmGroupQuests = false,
-            -- EQ Objective Tracker draws these icons, but EQ owns whether they appear, so
-            -- TrackerBridge adds and removes the registration from here.
+            -- EQ Objective Tracker draws these icons, and TrackerBridge adds or removes them by these keys
             showChainGuideIcon = true,
             showEQIcon = true,
             npIconPlacement = "RIGHT",
@@ -18,6 +17,7 @@ DB.defaults = {
             npIconOffsetX   = 0,
             npIconOffsetY   = 0,
             questTooltips   = true,
+            focusArrow      = true,
         },
         announce = {
             -- Off, because every other value posts in other people's chat.

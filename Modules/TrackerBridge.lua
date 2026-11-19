@@ -123,18 +123,46 @@ function Bridge:OpenTrackerOptions()
     return false
 end
 
+-- Era and TBC have no game arrow beside EQ's, and on retail a focus never sets one
+function Bridge:FocusArrowOffered()
+    return (ns.HAS_CLASSIC_SPAWNS and C_SuperTrack and self._focusArrow) and true or false
+end
+
+function Bridge:FocusArrowOn()
+    -- Where no box shows, a saved false could never be ticked back, so it is not read
+    if not self:FocusArrowOffered() then return true end
+    local DB = ns:GetSubsystem("DB")
+    return not DB or DB.db.profile.general.focusArrow ~= false
+end
+
+-- Off takes down only an arrow the focus placed. On runs the listener on the quest focused now, and does nothing with none focused
+function Bridge:ApplyFocusArrowSetting()
+    if not self:FocusArrowOn() then
+        ns:GetSubsystem("QuestArrow"):ClearFollowed()
+        return
+    end
+    local A = api()
+    if A and A.GetFocus then self._focusArrow.onFocus(A:GetFocus()) end
+end
+
 -- EQOT announces the focused row without coordinates, and EQ owns the quest data, so EQ places the arrow.
 function Bridge:ApplyFocusArrow()
     local A = api()
     if not (A and A.AddFocusListener) then return end
     if not ns:GetSubsystem("QuestArrow") then return end
 
-    A:AddFocusListener({
+    local listener = {
         id      = "eq-quest-arrow",
         -- Only the quests provider's entry ids are quest ids.
         onFocus = function(providerID, entryID)
             local Arrow = ns:GetSubsystem("QuestArrow")
             if not Arrow or providerID ~= "quests" then return end
+            -- Ahead of the clear below, so with the box off no follow or clear takes down an arrow EQ holds
+            if not Bridge:FocusArrowOn() then
+                -- TomTom restores this character's EQ waypoints from an earlier session, a follow saved before the box went off among them
+                Arrow:ClearLeftovers()
+                return
+            end
             -- EQOT sends no clear between two follows, so a quest nothing can place takes the old arrow down.
             -- On Forever the game's point stands in where EQ's tables have none, and an arrow held for this quest stays when the game has none
             if not (entryID and (Arrow:PointAtQuest(entryID) or Arrow:Refresh(entryID)
@@ -142,7 +170,8 @@ function Bridge:ApplyFocusArrow()
                 Arrow:Clear()
             end
         end,
-    })
+    }
+    if A:AddFocusListener(listener) then self._focusArrow = listener end
 end
 
 -- Guarded per method: '## Dependencies:' cannot promise an EQOT new enough to offer the switch.

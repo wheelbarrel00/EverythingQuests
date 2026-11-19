@@ -5,6 +5,14 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0] - 2026-11-18
+
+On WoW Forever, you can now turn off the TomTom arrow that Everything Quests points at the quest you focus, and keep only the game's own arrow.
+
+### New Features
+
+- **The TomTom arrow for the focused quest can be turned off on WoW Forever.** WoW Forever draws its own arrow to the quest you focus, and with TomTom installed Everything Quests points a TomTom arrow there too. A new box in the Tracker card of the General tab, TomTom arrow for the focused quest, lets you leave that to the game's arrow. It starts ticked, so nothing changes unless you untick it. Unticked, focusing a quest no longer sets a TomTom arrow, whatever focused it: a click on a quest in the tracker, a click on a quest marker on the map, a quest you just accepted, or the quest focused again when you log in. Quests are still focused as before, and the game's own arrow and the tracker's highlight stay. You still get a TomTom arrow when you ask for directions: Get Directions on the tracker's right-click menu, Get Directions or a click on a location in the Quest Browser, a click on a quest or on Continue in the Chain Guide, and a chain you track in the Chain Guide, which moves the arrow to its next step each time you hand in one of its quests. While the box is unticked, such an arrow stays when you focus another quest, until TomTom clears it as you arrive or you set another, and after you reload or log out it goes the next time a quest is focused. Unticking the box takes down a TomTom arrow set by focusing a quest, and ticking it again points the TomTom arrow at the quest focused now, as focusing it would. Without TomTom the box is dimmed, unless another addon is standing in for TomTom, in which case the TomTom arrows Everything Quests sets go to that addon, and the box's tooltip says so. Requested by Chonaki.
+
 ## [2.11.0] - 2026-11-15
 
 On WoW Forever, Everything Quests now knows 1,002 quests new to Forever, up from 570, among them 163 in Riverglades, from the newest WoW Forever quest data of the AllTheThings addon. Tomb Weed is now marked for every Horde character, and the Bandarion Keep quests for Orcs too.
