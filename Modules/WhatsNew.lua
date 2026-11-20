@@ -5,6 +5,9 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.14.0", sections = {
+        { "Sort your quests by distance", "EQ Objective Tracker's Distance sort now works on this version of the game: Everything Quests measures how far away your quests are, so the nearest comes first and the list re-sorts as you move. It needs EQ Objective Tracker 2.18.0 or later: pick Distance as the Sort Order on its Tracker tab, or on the tracker's sort button.", sub = "QuestDistance" },
+    } },
     { version = "2.13.0", sections = {
         { "Your quests point the way on the minimap", "Each quest in your log now keeps a marker at the nearest spot its markers would show, such as an objective, or its hand-in once it is finished, and when that spot is out of the minimap's range the marker stays on the edge, pointing the way and fading the farther away it is. Turn it off, or set the scale of minimap pins, in the Map tab under Show objective pins on the minimap.", classic = true },
         { "Quests for the professions you have", "Quests that need a profession are now marked only for characters who have it, at the rank it needs, and the Quest Browser names the skill.", classic = true },

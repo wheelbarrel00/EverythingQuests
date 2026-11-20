@@ -277,6 +277,21 @@ function Bridge:ApplyZoneCounter()
     end)
 end
 
+local DISTANCE_ID = "eq-distance"
+
+-- EQOT's Distance sort asks the game on retail and Forever, and only Era and TBC list the module that answers here
+function Bridge:ApplyDistanceSource()
+    local A = api()
+    if not (A and A.AddDistanceSource and A.DistanceChanged) then return end
+    local D = ns:GetSubsystem("QuestDistance")
+    if not D or self._distance then return end
+    self._distance = A:AddDistanceSource({
+        id       = DISTANCE_ID,
+        distance = function(questID) return D:Yards(questID) end,
+    }) and true or false
+    if self._distance then D:Watch(function() A:DistanceChanged() end) end
+end
+
 -- Whether the player turned EQOT's zone bar on, so no quest says it is left out of a bar that is not there
 function Bridge:ZoneBarShown()
     local A = api()
@@ -309,4 +324,5 @@ function Bridge:OnEnable()
     self:ApplyFocusArrow()
     self:ApplyTrackedRepaint()
     self:ApplyZoneCounter()
+    self:ApplyDistanceSource()
 end

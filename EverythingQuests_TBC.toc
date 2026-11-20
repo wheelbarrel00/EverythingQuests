@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, the Quest Browser, Quest History, auto-accept and auto-turn-in, and the /eqs options window.
 ## Author: Wheelbarrel00
-## Version: 2.13.0
+## Version: 2.14.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -166,6 +166,10 @@ Modules\Group\Comms.lua
 # Reaches MapPOIProvider, ns.QuestPinTexture and ns.QuestPinObjectives at RUNTIME rather than
 # at file scope, so its position relative to Modules/MapPOI does not matter.
 Modules\Minimap\QuestPins.lua
+
+# Yards to each quest for EQ Objective Tracker's Distance sort, which the game answers itself on retail
+# and Forever. Reaches MapPOIProvider, Cache and HereBeDragons at RUNTIME, so its position does not matter.
+Modules\QuestDistance.lua
 
 # Reads the mob table below at RUNTIME, not at file scope, so it is listed before the data.
 Modules\Nameplates\QuestIcons.lua

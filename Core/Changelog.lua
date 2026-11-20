@@ -2,6 +2,14 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.14.0", date = "2026-11-19",
+        sections = {
+            { head = "New Features", items = {
+                { "The tracker's Distance sort works on Classic Era and Burning Crusade Classic. These versions of the game cannot tell an addon how far away a quest is, so EQ Objective Tracker's Distance sort did nothing there. Everything Quests now measures it from its own quest data: from you to the nearest spot of an objective you have not finished, or to where you hand the quest in once it is finished, or when Everything Quests has no spot for any of its objectives. The nearest quest comes first and the list re-sorts as you move. Quests on another continent, quests Everything Quests cannot place, such as one whose objectives it can place are done while one it cannot place is left, and every quest while you are inside an instance, such as a dungeon, raid or battleground, go to the bottom. It needs EQ Objective Tracker 2.18.0 or later: pick Distance as the Sort Order on its Tracker tab, or on the tracker's sort button.", sub = "QuestDistance" },
+            } },
+        },
+    },
+    {
         version = "2.13.0", date = "2026-11-19",
         sections = {
             { head = "New Features", items = {

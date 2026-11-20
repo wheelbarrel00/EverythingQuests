@@ -5,6 +5,14 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0] - 2026-11-19
+
+On Classic Era and Burning Crusade Classic, EQ Objective Tracker's Distance sort now works, with Everything Quests measuring how far away each quest is.
+
+### New Features
+
+- **The tracker's Distance sort works on Classic Era and Burning Crusade Classic.** These versions of the game cannot tell an addon how far away a quest is, so EQ Objective Tracker's Distance sort did nothing there. Everything Quests now measures it from its own quest data: from you to the nearest spot of an objective you have not finished, or to where you hand the quest in once it is finished, or when Everything Quests has no spot for any of its objectives. The nearest quest comes first and the list re-sorts as you move. Quests on another continent, quests Everything Quests cannot place, such as one whose objectives it can place are done while one it cannot place is left, and every quest while you are inside an instance, such as a dungeon, raid or battleground, go to the bottom. It needs EQ Objective Tracker 2.18.0 or later: pick Distance as the Sort Order on its Tracker tab, or on the tracker's sort button.
+
 ## [2.13.0] - 2026-11-19
 
 On Classic Era, Burning Crusade Classic and WoW Forever, each quest in your log now points the way from the edge of the minimap, and quests that need a profession are marked only for characters who have it. On WoW Forever, where every character now has a surname, your own party progress and announcements are recognized again.

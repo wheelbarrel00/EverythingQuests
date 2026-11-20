@@ -99,7 +99,7 @@ local function pinLimit()
     return math.max(1, math.floor(n))
 end
 
--- PointsFor's scratch, shared by both maps. Read it before the next call
+-- PointsFor's scratch, shared by every caller. Read it before the next call
 M._ptX, M._ptY, M._ptKind, M._ptMask, M._ptSrc = {}, {}, {}, {}, {}
 
 -- Generator kinds to the client's objective types, the one table the pins, plates and tooltips read
@@ -161,12 +161,12 @@ end
 -- For /eqsprobe mappoi. Counted in _DoRefresh, never in PointsFor, which the minimap also calls
 M._untrackedHidden = 0
 
--- The third return names the source, so /eqsprobe can tell sources and refusals apart
-function M:PointsFor(questID, mapID, q)
+-- ALL is for the Distance sort, which wants every live point, not only the ones a map would draw
+function M:PointsFor(questID, mapID, q, all)
     local X, Y, K, MK, S = self._ptX, self._ptY, self._ptKind, self._ptMask, self._ptSrc
     local isComplete = q and q.isComplete
 
-    if not ns.QuestPinTracked(q) then
+    if not all and not ns.QuestPinTracked(q) then
         return 0, 0, "untracked"
     end
 
@@ -198,7 +198,7 @@ function M:PointsFor(questID, mapID, q)
     end
 
     bucketObjectives(q)
-    local limit = pinLimit()
+    local limit = not all and pinLimit() or nil
     local n, thinned = 0, 0
     -- Per quest, so two different quests may still pin the same spot
     spreadReset()
@@ -213,7 +213,7 @@ function M:PointsFor(questID, mapID, q)
             local rest = v % 1e8
             local x = math.floor(rest / 1e4) / 1e4
             local y = (rest % 1e4) / 1e4
-            if spreadAccepts(x, y) then
+            if all or spreadAccepts(x, y) then
                 n = n + 1
                 X[n], Y[n], K[n], MK[n], S[n] = x, y, kind, mask, nil
             else

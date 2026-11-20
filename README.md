@@ -62,6 +62,7 @@ Era and TBC were measured identical across every game API the addon reads, so on
 - **Coordinates** on the world map and under the minimap, with a slider for how many decimals to show. On retail and WoW Forever they leave out whatever the game's own coordinates already show
 - **Two more ways to quiet a busy map** on top of the filters above, both off by default: leave out markers for quests you have untracked, and fade markers sitting on top of your own position
 - **Quest announcements** and **party quest progress**, shown on quest markers and tooltips, which also reads the progress the established Classic quest addon shares. **Joining group quests automatically** is included too, but has not been checked in game yet
+- **Distance sorting for the tracker** — with EQ Objective Tracker 2.18.0 or later, its Distance sort works here: Everything Quests measures how far away your quests are, to the nearest spot of an objective you have not finished, or to where you hand the quest in once it is finished, or when it has no spot for any of the quest's objectives. Quests on another continent, quests it cannot place, and every quest while you are inside an instance, such as a dungeon, raid or battleground, go to the bottom
 - **Auto-accept / auto-turn-in**, the **minimap button**, the **tracker bridge**, the **focus arrow**, and the **`/eqs`** options window (General, Map, Quest Browser, History and About tabs)
 - All bundled locales
 
@@ -105,7 +106,7 @@ Nothing was lost in the move. Existing users keep their position, size, fonts, c
 | **Everything Quests settings** | The Everything Quests logo beside the cogwheel, the minimap button, or `/eqs` |
 | **Chain Guide** (retail and WoW Forever) | The chain icon on the tracker, or `/eqs chain` |
 
-The Everything Quests icon on the tracker, and on retail and WoW Forever the Chain Guide icon, can each be switched off under `/eqs` > General. On WoW Forever, so can the TomTom arrow Everything Quests points at the quest you focus (**TomTom arrow for the focused quest**), leaving only the game's own arrow. On retail and WoW Forever, Everything Quests also adds **Get Directions** to a quest's right-click menu on the tracker, and **Open Chain Guide** for a quest the Chain Guide lists. On WoW Forever, where the game has no questlines for the tracker's zone progress bar to count, Everything Quests counts the zone you are in for it, with EQ Objective Tracker 2.13.0 or later (see the Chain Guide below).
+The Everything Quests icon on the tracker, and on retail and WoW Forever the Chain Guide icon, can each be switched off under `/eqs` > General. On WoW Forever, so can the TomTom arrow Everything Quests points at the quest you focus (**TomTom arrow for the focused quest**), leaving only the game's own arrow. On retail and WoW Forever, Everything Quests also adds **Get Directions** to a quest's right-click menu on the tracker, and **Open Chain Guide** for a quest the Chain Guide lists. On WoW Forever, where the game has no questlines for the tracker's zone progress bar to count, Everything Quests counts the zone you are in for it, with EQ Objective Tracker 2.13.0 or later (see the Chain Guide below). On Classic Era and Burning Crusade Classic, which cannot tell an addon how far away a quest is, Everything Quests measures it for the tracker's Distance sort, with EQ Objective Tracker 2.18.0 or later.
 
 **Prefer Blizzard's own tracker?** Tick **Use Blizzard's quest tracker** in the Tracker section of `/eqs` > General, or the same checkbox on EQ Objective Tracker's General tab. The interface reloads, the tracker window is gone and the game's own quest tracker is back, while everything else in Everything Quests keeps working. The tracker icons, Get Directions and Open Chain Guide go with the window, so open Everything Quests with `/eqs` or the minimap button. "Only show markers for quests you are tracking" then follows the game's own tracked quests. On Classic Era and Burning Crusade Classic the game's tracker starts with nothing watched, so shift-click quests in the quest log to watch them, up to the game's limit of five. Untick the box to get the tracker window back, again after a reload.
 
@@ -291,7 +292,7 @@ Tracker settings have their own panel and commands — see `/eqot` and `/eqot st
 
 These are mostly retail tools. On Classic Era, Burning Crusade Classic and WoW Forever, `/eqs profile`, `/eqs wqdebug`, `/eqs campdump`, `/eqs campfind` and `/eqs zonedump` say they are not available, and so does `/eqs chaindump` on Classic Era and Burning Crusade Classic. The rest print what the client has, often that an API is unavailable.
 
-`/eqsprobe` sections: `media`, `map`, `poi`, `pins`, `minimap`, `available`, `questbrowser`, `group`, `mappoi`, `flare`, `quest`, `port`, `tooltip`, `xp`, `events`, `ui`, `misc`. No argument runs all except `tooltip`, `mappoi`, `flare` and `xp`, each of which needs something set up first — and `flare` and `xp` both mutate state, so `/reload` after using `flare`.
+`/eqsprobe` sections: `media`, `map`, `poi`, `pins`, `minimap`, `distance`, `available`, `questbrowser`, `chainguide`, `group`, `mappoi`, `flare`, `quest`, `port`, `tooltip`, `xp`, `events`, `ui`, `misc`. No argument runs all except `tooltip`, `mappoi`, `flare` and `xp`, each of which needs something set up first — and `flare` and `xp` both mutate state, so `/reload` after using `flare`.
 
 ---
 
@@ -402,6 +403,7 @@ EverythingQuests/
 │   ├── QuestArrow.lua                # Shared TomTom waypoint slot
 │   ├── QuestAuto.lua                 # Auto-accept / auto-turn-in handlers, joining
 │   │                                 #   group quests, and standing aside for Immersion
+│   ├── QuestDistance.lua             # Yards to each quest for the tracker's Distance sort
 │   ├── QuestLink.lua                 # Shareable quest links in chat
 │   ├── TrackerBridge.lua             # Puts EQ's icons and menu entry onto
 │   │                                 #   EQ Objective Tracker via its public API

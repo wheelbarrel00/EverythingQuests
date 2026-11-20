@@ -2892,7 +2892,66 @@ function Probe:ChainGuide()
     end
 end
 
+function Probe:Distance()
+    out("quest distances for EQ Objective Tracker's Distance sort")
+
+    local D = ns:GetSubsystem("QuestDistance")
+    if not D then
+        line("  QuestDistance subsystem ABSENT. Only the Era and TBC TOCs list it, as EQ Objective Tracker asks the game")
+        line("  on retail and Forever. Correct there, a fault on Era or TBC.")
+        return
+    end
+
+    local Bridge = ns:GetSubsystem("TrackerBridge")
+    local T = _G["EQObjectiveTracker"]
+    local A = T and T.GetModule and T:GetModule("API")
+    line("1. the tracker: AddDistanceSource=%s  DistanceChanged=%s  registered=%s",
+         type(A and A.AddDistanceSource), type(A and A.DistanceChanged), tostring(Bridge and Bridge._distance))
+
+    line("2. you, as HereBeDragons reads you:")
+    local HBD = LibStub and LibStub("HereBeDragons-2.0", true)
+    if not HBD then
+        line("  HereBeDragons-2.0 ABSENT - nothing can be measured")
+        return
+    end
+    local px, py, pinst = HBD:GetPlayerWorldPosition()
+    local inInstance = _G["IsInInstance"]
+    local inside, kind
+    if inInstance then inside, kind = inInstance() end
+    line("  world x=%s y=%s  continent=%s  in an instance=%s (%s)", val(px), val(py), val(pinst),
+         tostring(inside), tostring(kind))
+
+    line("3. each quest in the log by EQ's yards, nearest first, unknown last:")
+    local Cache = ns:GetSubsystem("Cache")
+    local clock = _G["debugprofilestop"]
+    local rows = {}
+    for qid, q in pairs(Cache and Cache:All() or {}) do
+        local t0 = clock and clock()
+        local yards = D:Yards(qid)
+        local first = t0 and (clock() - t0)
+        t0 = clock and clock()
+        D:Yards(qid)
+        local again = t0 and (clock() - t0)
+        -- Inside an instance no read runs, so a count kept from the open world is not shown as this place's
+        local c = D._points[qid]
+        rows[#rows + 1] = { qid = qid, title = tostring(q.title), done = q.isComplete == true,
+                            yards = yards, n = c and c.inst == pinst and c.n or nil, first = first, again = again }
+    end
+    table.sort(rows, function(a, b)
+        if a.yards and b.yards then return a.yards < b.yards end
+        if a.yards or b.yards then return a.yards ~= nil end
+        return a.qid < b.qid
+    end)
+    for _, r in ipairs(rows) do
+        line("  %d %s  done=%s  points here=%s  yards=%s  ms=%s then %s", r.qid, r.title, tostring(r.done),
+             tostring(r.n), r.yards and ("%.0f"):format(r.yards) or "nil",
+             r.first and ("%.3f"):format(r.first) or "?", r.again and ("%.3f"):format(r.again) or "?")
+    end
+    if #rows == 0 then line("  the quest log is empty") end
+end
+
 local SECTIONS = {
+    distance = Probe.Distance,
     media   = Probe.Media,
     group   = Probe.Group,
     xp      = Probe.XP,
@@ -2934,12 +2993,12 @@ function Probe:Run(msg)
         return
     end
     if which ~= "" then
-        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, available, questbrowser, chainguide, group, flare, quest, port, tooltip, xp, events, ui, misc, or none for all",
+        out("unknown section %q - use media, map, poi, pins, mappoi, minimap, distance, available, questbrowser, chainguide, group, flare, quest, port, tooltip, xp, events, ui, misc, or none for all",
             which)
         return
     end
     out("EQ %s - full flavor probe", tostring(ns.VERSION))
-    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "available", "questbrowser", "chainguide", "group", "quest", "events", "ui" }) do
+    for _, name in ipairs({ "misc", "port", "media", "map", "poi", "pins", "minimap", "distance", "available", "questbrowser", "chainguide", "group", "quest", "events", "ui" }) do
         runSection(self, name, SECTIONS[name])
     end
     -- tooltip, mappoi, flare and xp need setup, and flare and xp mutate, so a blind run leaves them out
