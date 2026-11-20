@@ -583,6 +583,8 @@ L["How precise the numbers are. Zero is whole numbers, which is enough to find a
 L["Tooltips"] = "滑鼠提示"
 L["Show quest progress on tooltips"] = "滑鼠提示顯示任務進度"
 L["Adds the quest name and what it still needs to the tooltips you already see in the game. Hovering an item in your bags tells you which quest wants it and how many are still missing. On Classic, hovering an enemy also tells you which quest it counts toward, which the game itself never says there. Only quests already in your log are listed, and nothing is added to a tooltip that has nothing to say."] = "在遊戲中已有的滑鼠提示上補充任務名稱以及仍需完成的內容。將滑鼠移到背包物品上，會告訴你哪個任務需要它、還差多少。在懷舊服中，將滑鼠移到敵人身上還會告訴你它計入哪個任務，而遊戲本身在那裡從不提示這一點。僅列出已在任務日誌中的任務，若無內容可說則不會向提示新增任何東西。"
+L["Show an NPC's quests on its tooltip"] = "滑鼠提示顯示NPC的任務"
+L["Hovering an NPC lists the quests in your log that you hand in to it, then the quests it offers you, even ones your map's filters hide. Holiday quests are shown only while their world event is running. Up to five are listed."] = "滑鼠懸浮在NPC上時，先列出任務日誌中需向該NPC提交的任務，再列出其向你提供的任務（包括被地圖過濾隱藏的任務）。節日任務僅在對應世界活動進行期間顯示。最多列出五個。"
 L["Nameplate Quest Icons"] = "姓名板任務圖示"
 L["Quest icons on nameplates"] = "姓名板任務圖示"
 L["Shows the \"!\" + count on objective mobs."] = "目標怪物姓名板顯示感嘆號與進度計數。"

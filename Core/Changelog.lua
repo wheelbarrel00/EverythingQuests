@@ -2,6 +2,30 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.15.0", date = "2026-11-20",
+        sections = {
+            { head = "New Features", items = {
+                { "Hover an NPC to see its quests. On Classic Era, Burning Crusade Classic and WoW Forever, an NPC's tooltip now lists the quests in your log that you hand in to it, with a yellow \"?\" once a quest is ready to hand in and a grey icon while you are still working on it, then the quests it offers you, with a gold \"!\". Ready quests come first, then the ones you are working on, then the offers, each nearest your level first, with its level in the color of how hard it is for you, and a quest on offer that you can repeat says \"Repeatable quest\" on the right. The offers are the quests the NPC would give you now, as far as Everything Quests' quest data knows, even ones your map's filters hide, such as low-level or dungeon quests, and holiday quests only while their world event is running. Up to five are listed, then how many more. Enemies show none. It is on by default: \"Show an NPC's quests on its tooltip\", in the Tooltips card of the Map tab.", classic = true },
+                { "281 more WoW Forever quests, 141 of them in Mount Hyjal. Everything Quests now knows 1,283 quests new to WoW Forever, up from 1,002, the new ones from the newest WoW Forever quest data of the AllTheThings addon. 1,251 of them have a marker where you pick them up and a Quest Browser entry, every one of them named, and 1,216 of those carry the level they need. Most of the new ones are for characters from level 51 to 60, among them 141 in Mount Hyjal, and 32 more are in Azshara, most of them for levels 44 to 50.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Improvements", items = {
+                { "More markers from playing Forever. 46 quests new to WoW Forever now have a marker where you hand them in, and 30 have markers for their objectives, most of them on Zephras Isle, among them The Cirrusfly Queen, Havoc in the Highlands and Blood Tithe. The Grave Knight now has a hand-in marker at Melisara in Hillsbrad Foothills.", classic = true, sub = "ChainGuide" },
+                { "More Forever quests wait for the quest before them. An Acquaintance in Southshore now waits for Troll Witchery, Take Two With Water and Magics of the Drowned City wait for An Acquaintance in Southshore, and the second The Eye of Bhossca, a rogue quest in Silverpine Forest, waits for the first.", classic = true, sub = "ChainGuide" },
+                { "Important Heirlooms, in Ironforge, is now marked for Horde characters too, as the newest quest data has it.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Known Issues", items = {
+                { "Some NPCs do not list every quest. A quest you hand in to an object, or to someone inside a dungeon, and a quest given out inside a dungeon, get no line.", classic = true },
+                { "Most quests new to WoW Forever have no hand-in yet, so the NPC who takes one in does not list it on its tooltip.", classic = true, sub = "ChainGuide" },
+                { "Battleground quest givers list earlier level brackets. On Classic Era and Burning Crusade Classic, the quest data has no top level for battleground quests, so their givers, such as Field Marshal Oslight and Deathmaster Dwire in the Arathi Highlands, list every bracket you have reached, and early in a bracket the earlier bracket's quests can come first.", classic = true, without = "ChainGuide" },
+                { "Some daily quests all show at once. On Burning Crusade Classic, the daily quests the game picks one of each day, such as the dungeon and cooking dailies in Shattrath City and the fishing dailies in Terokkar Forest, are all listed.", classic = true, without = "ChainGuide" },
+                { "Some quests show as ready to hand in too early. On Classic Era and Burning Crusade Classic, the game does not mark a quest you only deliver as complete, so Everything Quests shows a quest with no objectives in your log as ready to hand in. A quest you finish by doing something your quest log does not count, such as using a quest item, looks the same until it is done, so it can show the yellow \"?\" early. Any quest can also show it for a moment right after you accept it, until the game sends its objectives. Escorts and quests finished by exploring show as in progress until they are done.", classic = true, without = "ChainGuide" },
+                { "On WoW Forever, a quest's level color on an NPC's tooltip can differ from your quest log's, and a quest you failed is not listed by the NPC who gave it.", classic = true, sub = "ChainGuide" },
+                { "Two dungeon quests no longer count as dungeon quests. Take Two With Water and Magics of the Drowned City are picked up outside their dungeon, and the newest quest data now names a quest that comes before them. Everything Quests counts a quest new to Forever that belongs to a dungeon as a dungeon quest only when the quest data names no earlier quest for it, or no start point, so these two no longer count: the \"Dungeon and raid quests\" filter no longer hides them, the Quest Browser and Quest History no longer say \"Dungeon or raid\" for them, and EQ Objective Tracker's zone progress bar can now count them.", classic = true, sub = "ChainGuide" },
+                { "The new quests have no hand-in or objective markers of their own yet. Everything Quests marks the quests added in this update only where you pick them up: the quest data they come from has no hand-ins for them, and Everything Quests does not read its objectives yet. Once one is in your log, the game's own map markers still show where to go, and with TomTom so does the tracker's arrow.", classic = true, sub = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.14.0", date = "2026-11-19",
         sections = {
             { head = "New Features", items = {

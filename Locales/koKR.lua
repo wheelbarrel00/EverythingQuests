@@ -593,6 +593,8 @@ L["How precise the numbers are. Zero is whole numbers, which is enough to find a
 L["Tooltips"] = "툴팁"
 L["Show quest progress on tooltips"] = "툴팁에 퀘스트 진행도 표시"
 L["Adds the quest name and what it still needs to the tooltips you already see in the game. Hovering an item in your bags tells you which quest wants it and how many are still missing. On Classic, hovering an enemy also tells you which quest it counts toward, which the game itself never says there. Only quests already in your log are listed, and nothing is added to a tooltip that has nothing to say."] = "게임에서 이미 보이는 툴팁에 퀘스트 이름과 남은 목표를 덧붙입니다. 가방의 아이템에 마우스를 올리면 어느 퀘스트에 필요한지, 몇 개가 모자란지 알려줍니다. 클래식에서는 적에게 마우스를 올렸을 때 어느 퀘스트에 해당하는지도 알려주는데, 게임 자체는 그곳에서 이를 전혀 알려주지 않습니다. 퀘스트 일지에 있는 퀘스트만 나열하며, 표시할 내용이 없으면 툴팁에 아무것도 추가하지 않습니다."
+L["Show an NPC's quests on its tooltip"] = "툴팁에 NPC의 퀘스트 표시"
+L["Hovering an NPC lists the quests in your log that you hand in to it, then the quests it offers you, even ones your map's filters hide. Holiday quests are shown only while their world event is running. Up to five are listed."] = "NPC에 마우스를 올리면 퀘스트 일지에서 그 NPC에게 완료할 퀘스트를 먼저 보여주고, 이어서 그 NPC가 당신에게 제공하는 퀘스트를 지도 필터로 숨긴 것까지 포함해 보여줍니다. 축제 퀘스트는 해당 월드 이벤트가 진행 중일 때만 표시됩니다. 최대 다섯 개까지 표시합니다."
 L["Nameplate Quest Icons"] = "이름표 퀘스트 아이콘"
 L["Quest icons on nameplates"] = "이름표에 퀘스트 아이콘"
 L["Shows the \"!\" + count on objective mobs."] = "목표 몹에 \"!\" + 개수를 표시합니다."

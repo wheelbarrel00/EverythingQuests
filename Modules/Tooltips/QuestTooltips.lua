@@ -1,6 +1,7 @@
 local _, ns = ...
 
 local QT = ns:RegisterSubsystem("QuestTooltips", {})
+local L = ns.L
 
 -- The nameplates' MAX_ICON_SLOTS, so a mob never lists more of your objectives than its plate shows
 local MAX_QUESTS = 4
@@ -17,10 +18,26 @@ QT.route     = "none"
 QT.unitCalls, QT.unitLines = 0, 0
 QT.itemCalls, QT.itemLines = 0, 0
 QT.partyLines = 0
+QT.giverLines = 0
 
 local function wanted()
     local DB = ns:GetSubsystem("DB")
     return not DB or DB.db.profile.general.questTooltips ~= false
+end
+
+-- Only where the availability gate loads, so retail never reaches the quest giver lines
+local function giversWanted()
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    if not (Avail and Avail.QuestsStartedBy) then return false end
+    local DB = ns:GetSubsystem("DB")
+    return not DB or DB.db.profile.general.npcQuestTooltips ~= false
+end
+
+-- Midnight restricted APIs can hand back secret values that error if compared
+local _issecret = _G.issecretvalue
+local function readable(v)
+    if _issecret then return not _issecret(v) end
+    return true
 end
 
 -- The nameplate module owns the quest objective cache and its creature inversion. Asking it
@@ -180,35 +197,219 @@ local function stamp(tooltip, key)
     tooltip.eqTooltipLines = (type(tooltip.NumLines) == "function") and tooltip:NumLines() or 0
 end
 
+-- The option's tooltip promises five, so change its text with this
+local GIVER_MAX = 5
+
+-- The kind both the start and the turn-in tables give a creature, the only source that is a unit
+local SOURCE_NPC = 1
+
+-- The game's dialog icons. Its in-progress "?" is an atlas on WoW Forever and a file on Era and TBC, though Era's own dialogs never draw that file
+local ICON_OFFER = "|TInterface\\GossipFrame\\AvailableQuestIcon:14:14|t "
+local ICON_READY = "|TInterface\\GossipFrame\\ActiveQuestIcon:14:14|t "
+local WIP_ATLAS  = "SideInProgressquesticon"
+local _iconWip
+
+local function wipIcon()
+    if not _iconWip then
+        local T = _G.C_Texture
+        local okA, info = false, nil
+        if T and type(T.GetAtlasInfo) == "function" then okA, info = pcall(T.GetAtlasInfo, WIP_ATLAS) end
+        _iconWip = (okA and type(info) == "table") and ("|A:" .. WIP_ATLAS .. ":14:14|a ")
+                   or "|TInterface\\GossipFrame\\IncompleteQuestIcon:14:14|t "
+    end
+    return _iconWip
+end
+
+local RANK_READY, RANK_WIP, RANK_OFFER = 1, 2, 3
+local REPEAT_R, REPEAT_G, REPEAT_B = 0.6, 0.85, 0.6
+local MORE_R, MORE_G, MORE_B = 0.6, 0.6, 0.6
+
+local _givers, _giverN, _sorted = {}, 0, {}
+local _playerLevel = 0
+
+local function addGiver(rank, questID, level, title, repeatable)
+    _giverN = _giverN + 1
+    local e = _givers[_giverN]
+    if not e then e = {}; _givers[_giverN] = e end
+    e.rank, e.questID, e.level, e.title, e.repeatable = rank, questID, level, title, repeatable
+end
+
+local function gap(e)
+    if not (e.level and e.level > 0) then return math.huge end
+    return math.abs(e.level - _playerLevel)
+end
+
+-- Nearest your level first, so at the level cap a battlemaster's own quests lead the old brackets Era's and TBC's data leave uncapped
+local function giverOrder(a, b)
+    if a.rank ~= b.rank then return a.rank < b.rank end
+    local ga, gb = gap(a), gap(b)
+    if ga ~= gb then return ga < gb end
+    local la, lb = a.level or 0, b.level or 0
+    if la ~= lb then return la < lb end
+    if a.title ~= b.title then return (a.title or "") < (b.title or "") end
+    return a.questID < b.questID
+end
+
+-- A live answer, or nil where the client has no such call or hides the value
+local function liveFlag(fn, questID)
+    if type(fn) ~= "function" then return nil end
+    local ok, v = pcall(fn, questID)
+    if ok and readable(v) and type(v) == "boolean" then return v end
+    return nil
+end
+
+-- WoW Forever's cache never reads a failed flag and can keep an untracked quest's complete flag from its last full rebuild, so both are asked live
+local function handInRank(questID, q, Avail)
+    local CQ = C_QuestLog
+    -- A failed quest cannot be handed in
+    if q.isFailed or liveFlag(CQ and CQ.IsFailed, questID) then return nil end
+    local done = liveFlag(CQ and CQ.IsComplete, questID)
+    -- WoW Forever flags a quest with no objectives complete too (measured), so a live answer is final
+    if done ~= nil then return done and RANK_READY or RANK_WIP end
+    if q.isComplete then return RANK_READY end
+    local objs = q.objectives
+    if not objs or #objs == 0 then
+        -- A quest finished by exploring or a script can have no objective too, and reads complete only once it is done
+        if Avail:IsExplorationOrScripted(questID) then return RANK_WIP end
+        -- A delivery has no objective to finish, so the hand-in is all that is left
+        return RANK_READY
+    end
+    for i = 1, #objs do
+        if not objs[i].finished then return RANK_WIP end
+    end
+    return RANK_READY
+end
+
+local function takesIn(questID, npcID)
+    local byMap = ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID]
+    if not byMap then return false end
+    for _, list in pairs(byMap) do
+        for i = 1, #list do
+            local v = list[i]
+            if math.floor(v / 1e9) == npcID and math.floor(v / 1e8) % 10 == SOURCE_NPC then return true end
+        end
+    end
+    return false
+end
+
+-- The color Era's and TBC's quest log give that level. WoW Forever's log grades each quest through C_PlayerInfo, so it can differ there
+local function levelColor(level)
+    local f = _G.GetQuestDifficultyColor
+    if level and level > 0 and type(f) == "function" then
+        local ok, c = pcall(f, level)
+        if ok and type(c) == "table" and type(c.r) == "number" then return c.r, c.g, c.b end
+    end
+    return TITLE_R, TITLE_G, TITLE_B
+end
+
+-- Enemies only, as a neutral NPC you could attack, such as a Booty Bay goblin, still offers quests
+local function hostile(unit)
+    local f = _G.UnitIsEnemy
+    if type(f) ~= "function" then return false end
+    local ok, v = pcall(f, "player", unit)
+    return ok and readable(v) and v == true
+end
+
+local function giverLines(tooltip, unit)
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    local QI = objectiveCache()
+    local npcID = QI and QI.CreatureID and QI:CreatureID(unit)
+    if not (Avail and npcID) or hostile(unit) then return 0 end
+
+    _giverN = 0
+    local Cache = ns:GetSubsystem("Cache")
+    local quests = Cache and Cache:All()
+    if quests then
+        for questID, q in pairs(quests) do
+            local rank = takesIn(questID, npcID) and handInRank(questID, q, Avail)
+            if rank then addGiver(rank, questID, q.level, q.title or Avail:Title(questID)) end
+        end
+    end
+    local offers = Avail:QuestsStartedBy(npcID)
+    if offers then
+        for i = 1, #offers do
+            local questID = offers[i]
+            if Avail:Offers(questID) then
+                addGiver(RANK_OFFER, questID, Avail:QuestLevel(questID), Avail:Title(questID),
+                         Avail:IsRepeatable(questID))
+            end
+        end
+    end
+    if _giverN == 0 then return 0 end
+
+    _playerLevel = UnitLevel and UnitLevel("player") or 0
+    wipe(_sorted)
+    for i = 1, _giverN do _sorted[i] = _givers[i] end
+    table.sort(_sorted, giverOrder)
+
+    tooltip:AddLine(" ")
+    local shown = math.min(_giverN, GIVER_MAX)
+    for i = 1, shown do
+        local e = _sorted[i]
+        local icon = (e.rank == RANK_READY and ICON_READY) or (e.rank == RANK_WIP and wipIcon()) or ICON_OFFER
+        local level = (e.level and e.level > 0) and ("[%d] "):format(e.level) or ""
+        local r, g, b = levelColor(e.level)
+        if e.rank == RANK_OFFER and e.repeatable then
+            tooltip:AddDoubleLine(icon .. level .. (e.title or ""), L["Repeatable quest"], r, g, b,
+                                  REPEAT_R, REPEAT_G, REPEAT_B)
+        else
+            tooltip:AddLine(icon .. level .. (e.title or ""), r, g, b)
+        end
+    end
+    local lines = shown + 1
+    if _giverN > shown then
+        tooltip:AddLine((L["and %d more"]):format(_giverN - shown), MORE_R, MORE_G, MORE_B)
+        lines = lines + 1
+    end
+    return lines
+end
+
 local function onUnit(tooltip)
     QT.unitCalls = QT.unitCalls + 1
-    if not (tooltip and wanted()) then return end
+    if not tooltip then return end
+    -- Retail and Forever draw a mob's objective lines from the tooltip data, so EQ adds none of those
+    local objectives = wanted() and not ns.Has.TooltipDataUnit
+    local givers = giversWanted()
+    if not (objectives or givers) then return end
     if tooltip.IsForbidden and tooltip:IsForbidden() then return end
-    -- Retail and Forever build this tooltip from data that carries the quest lines, so EQ adds nothing
-    if ns.Has.TooltipDataUnit then return end
     local QI = objectiveCache()
-    if not (QI and QI.UnitObjectives) then return end
+    if objectives and not (QI and QI.UnitObjectives) then objectives = false end
+    if not (objectives or givers) then return end
     if type(tooltip.GetUnit) ~= "function" then return end
 
-    local ok, _, unit = pcall(tooltip.GetUnit, tooltip)
+    local ok, _, unit, tipGUID = pcall(tooltip.GetUnit, tooltip)
     if not ok then return end
-    -- GetUnit answers a name with no token for a plain world mouseover, which is the common
-    -- case here rather than an edge one.
-    if not unit and UnitExists and UnitExists("mouseover") then unit = "mouseover" end
-    if not unit then return end
+    -- GetUnit can answer a name with no unit token for a world mouseover. WoW Forever's names the GUID, so the mouseover stands in only for that unit
+    if not unit and UnitExists and UnitExists("mouseover") then
+        if type(tipGUID) ~= "string" then
+            unit = "mouseover"
+        elseif readable(tipGUID) then
+            local over = UnitGUID and UnitGUID("mouseover")
+            if over and readable(over) and over == tipGUID then unit = "mouseover" end
+        end
+    end
+    -- WoW Forever's token can be secret where it restricts the unit's identity, and UnitGUID refuses it from an addon
+    if not (unit and readable(unit)) then return end
 
     local guid = UnitGUID and UnitGUID(unit)
-    if not guid then return end
-    if alreadyAdded(tooltip, guid) then return end
+    if not (guid and readable(guid)) then return end
+    -- A post-call follows a fresh build of the tooltip, so only the script hooks can fire twice on one render
+    local guarded = QT.route ~= "TooltipDataProcessor"
+    if guarded and alreadyAdded(tooltip, guid) then return end
 
-    local D = groupData()
-    local n = QI:UnitObjectives(unit, _entries)
-    local added, party = addLines(tooltip, n, D)
-    party = party + addPartyOnly(tooltip, unit, D, added, added > 0)
-    QT.unitLines = QT.unitLines + added
-    QT.partyLines = QT.partyLines + party
+    local added, party = 0, 0
+    if objectives then
+        local D = groupData()
+        local n = QI:UnitObjectives(unit, _entries)
+        added, party = addLines(tooltip, n, D)
+        party = party + addPartyOnly(tooltip, unit, D, added, added > 0)
+        QT.unitLines = QT.unitLines + added
+        QT.partyLines = QT.partyLines + party
+    end
+    local giver = givers and giverLines(tooltip, unit) or 0
+    QT.giverLines = QT.giverLines + giver
     -- Never stamp a zero-add pass. It records the base count, and every later render of this unit is refused
-    if added + party > 0 then stamp(tooltip, guid) end
+    if guarded and added + party + giver > 0 then stamp(tooltip, guid) end
 end
 
 local function onItem(tooltip, data)
@@ -271,9 +472,8 @@ function QT:ApplyEnabled()
     local on = wanted()
     local QI = objectiveCache()
     if QI and QI.HoldCache then QI:HoldCache("tooltips", on) end
-    -- HookScript cannot be undone, so the hooks go in once and the option is read per tooltip
-    -- rather than being wired to the installation.
-    if on and self.route == "none" then
+    -- Neither route can be undone, so the hooks go in once and both options are read per tooltip
+    if (on or giversWanted()) and self.route == "none" then
         if not installModern() then installLegacy() end
     end
 end

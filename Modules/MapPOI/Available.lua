@@ -627,6 +627,34 @@ function M:StartsFor(questID, out)
     return n
 end
 
+-- The start table's kind for a creature giver, the only kind whose source id is a unit you can hover
+local START_NPC = 1
+
+-- [creatureID] = { questID, ... }, built on the first tooltip that asks and kept, as the data never changes
+local _byGiver
+
+function M:QuestsStartedBy(npcID)
+    local D = data()
+    if not (D and npcID) then return nil end
+    if not _byGiver then
+        _byGiver = {}
+        for questID, byMap in pairs(D.start) do
+            for _, list in pairs(byMap) do
+                for i = 1, #list do
+                    local kind, _, _, _, src = decodeStart(list[i])
+                    if kind == START_NPC and src > 0 then
+                        local quests = _byGiver[src]
+                        if not quests then quests = {}; _byGiver[src] = quests end
+                        -- One quest's points are walked together, so a repeat of it can only be the last entry
+                        if quests[#quests] ~= questID then quests[#quests + 1] = questID end
+                    end
+                end
+            end
+        end
+    end
+    return _byGiver[npcID]
+end
+
 -- skillLineID*1e4 + requiredValue
 function M:SkillGate(questID)
     local D = data()
@@ -667,6 +695,14 @@ function M:Explain(questID, unfiltered)
     if not _prepared and not preparePass() then return nil end
     if unfiltered then return isAvailable(questID, D, false, nil, true) end
     return isAvailable(questID, D, _hideLowLevel, _floor)
+end
+
+-- What the game would offer, without the map's filters or its whole pass, as an NPC tooltip asks per quest on a hover
+function M:Offers(questID)
+    local D = data()
+    if not (D and questID and D.gates[questID]) then return nil end
+    if not _prepared and not preparePass() then return nil end
+    return isAvailable(questID, D, false, nil, true) == true
 end
 
 -- Explain names only the first gate that fails, and a prerequisite still missing would hide a branch already lost

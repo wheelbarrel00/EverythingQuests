@@ -1556,12 +1556,21 @@ local function tooltipWriteRoute()
     local DB = ns:GetSubsystem("DB")
     local optionOn = not DB or DB.db.profile.general.questTooltips ~= false
     line("option 'Show quest progress on tooltips': %s", optionOn and "ON" or "OFF")
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    local giverOn = Avail ~= nil and Avail.QuestsStartedBy ~= nil
+                    and (not DB or DB.db.profile.general.npcQuestTooltips ~= false)
+    if Avail and Avail.QuestsStartedBy then
+        line("option 'Show an NPC's quests on its tooltip': %s   quest giver lines added so far=%d  (the spacer and 'and N more' lines included)",
+             giverOn and "ON" or "OFF", QT.giverLines or 0)
+    else
+        line("quest giver lines: not on this client (no availability gate loaded)")
+    end
     line("route installed: %s", tostring(QT.route))
     if QT.route == "none" then
-        if not optionOn then
-            line("  nothing installed because the OPTION IS OFF. That is not a route problem.")
+        if not (optionOn or giverOn) then
+            line("  nothing installed because the tooltip option(s) are OFF. That is not a route problem.")
         else
-            line("  nothing installed, and the option is on, so neither route above resolved.")
+            line("  nothing installed, and an option is on, so neither route above resolved.")
         end
     end
     if type(QT.hooks) == "table" then
@@ -1580,7 +1589,8 @@ local function tooltipWriteRoute()
 
     line("mob table loaded: %s", tostring(ns.CLASSIC_QUEST_NPCS ~= nil))
     if ns.Has and ns.Has.TooltipDataUnit then
-        line("  unit lines are OFF here BY DESIGN - this client draws its own quest lines from its tooltip data")
+        line("  unit objective lines are OFF here BY DESIGN - this client draws its own quest lines from its tooltip data")
+        if giverOn then line("  quest giver lines (offers and hand-ins) are still added here") end
     end
 
     local QI = ns:GetSubsystem("NameplateQuestIcons")
@@ -1610,6 +1620,7 @@ local function tooltipLiveTest()
     local parent = _G["UIParent"]
 
     local unitsBefore, unitLinesBefore = QT.unitCalls or 0, QT.unitLines or 0
+    local giverBefore = QT.giverLines or 0
     local unitExists = resolve("UnitExists")
     local driveUnit
     if type(unitExists) == "function" then
@@ -1623,17 +1634,17 @@ local function tooltipLiveTest()
         pcall(gt.ClearLines, gt)
         local ok = pcall(gt.SetUnit, gt, driveUnit)
         local fired = (QT.unitCalls or 0) > unitsBefore
-        line("SetUnit(%s): call %s, hook fired=%s, EQ added %d objective line(s)",
+        line("SetUnit(%s): call %s, hook fired=%s, EQ added %d objective line(s) and %d quest giver line(s)",
              driveUnit, ok and "ok" or "RAISED", tostring(fired),
-             (QT.unitLines or 0) - unitLinesBefore)
+             (QT.unitLines or 0) - unitLinesBefore, (QT.giverLines or 0) - giverBefore)
         if not fired and QT.route == "none" then
             line("  the hook did not fire because NOTHING IS INSTALLED - see the route line at the")
-            line("  top of this section. Switch the option on before reading this as a defect.")
+            line("  top of this section. Switch a tooltip option on before reading this as a defect.")
         elseif not fired then
             line("  the unit hook did NOT fire while a route IS installed. That is the ROUTE, not")
             line("  the data. Data problems show as fired=true with 0 lines.")
         elseif ns.Has and ns.Has.TooltipDataUnit then
-            line("  0 lines is CORRECT here - this client writes its own unit quest lines.")
+            line("  0 objective lines is CORRECT here - this client writes its own.")
         end
         pcall(gt.Hide, gt)
     elseif unitsBefore > 0 then
@@ -1704,7 +1715,7 @@ local function tooltipLiveTest()
         line("  the item hook did NOT fire, and that item IS wanted by a quest in your log,")
         line("  so the match is not the fault. The route is.")
     elseif (QT.itemLines or 0) == itemLinesBefore then
-        line("  the hook fired and EQ added nothing. onItem stands aside when the option above is off, or")
+        line("  the hook fired and EQ added nothing. onItem stands aside when 'Show quest progress on tooltips' is off, or")
         line("  when the client's own item data tags a quest line (the next section, retail and Forever")
         line("  only). Otherwise the item's name or its quest data did not reach EQ's lines.")
     end

@@ -261,6 +261,21 @@ local function tooltipsCard(self, content, stack)
             if QT then QT:ApplyEnabled() end
         end,
         L["Adds the quest name and what it still needs to the tooltips you already see in the game. Hovering an item in your bags tells you which quest wants it and how many are still missing. On Classic, hovering an enemy also tells you which quest it counts toward, which the game itself never says there. Only quests already in your log are listed, and nothing is added to a tooltip that has nothing to say."]))
+    -- Only where the availability gate loads, as it is what decides which quests an NPC offers you
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    if not (Avail and Avail.QuestsStartedBy) then return end
+    card:Add(self:CreateCheckbox(content, L["Show an NPC's quests on its tooltip"],
+        function()
+            local DB = ns:GetSubsystem("DB")
+            return not DB or DB.db.profile.general.npcQuestTooltips ~= false
+        end,
+        function(v)
+            local DB = ns:GetSubsystem("DB")
+            if DB then DB.db.profile.general.npcQuestTooltips = v and true or false end
+            local QT = ns:GetSubsystem("QuestTooltips")
+            if QT then QT:ApplyEnabled() end
+        end,
+        L["Hovering an NPC lists the quests in your log that you hand in to it, then the quests it offers you, even ones your map's filters hide. Holiday quests are shown only while their world event is running. Up to five are listed."]))
 end
 
 local function nameplateCard(self, content, stack, w)

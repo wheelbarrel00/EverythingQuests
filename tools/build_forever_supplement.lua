@@ -1102,6 +1102,12 @@ for _, qid in ipairs(sortedKeys(attQuests)) do
                 elseif how == "some" then partial[#partial + 1] = p
                 else waived("quest %d needs %d, which no character taking it can take", qid, p) end
             end
+            -- One character's measurement says nothing of the others, so a measured entry that fits only some, kept alone, joins counterparts that together cover everyone
+            if #full == 1 and full[1] == measured and #partial > 0 and reach(qid, measured) == "some" then
+                local either = {}
+                for _, p in ipairs(all) do if p == measured or listHas(partial, p) then either[#either + 1] = p end end
+                if coversEveryone(qid, either) then full, partial = {}, either end
+            end
             row[Q_PREGROUP] = #full > 0 and full or nil
             if #partial > 0 and #full > 0 then
                 waived("quest %d needs %s, which only some characters taking it can take", qid, table.concat(partial, " "))
@@ -1124,6 +1130,40 @@ do
         if qRows[qid][Q_RACES] == ALL_RACES then qRows[qid][Q_RACES] = nil; every[#every + 1] = qid end
     end
     if #every > 0 then attGateNotes.after[#attGateNotes.after + 1] = "-- att every race, so no race gate: " .. table.concat(every, " ") end
+end
+
+do
+    -- Values the rules above leave wrong that ATT's own data or the client's completion flags settle, applied last so they are final
+    local CORRECTIONS = {
+        [79939] = { classes = 2, preAll = { 96438 }, why = "its only prerequisite, Battle at the Mannoroc Coven, is for paladins" },
+        [92842] = { races = RACES_ALLIANCE, why = "97319, which shares its completion flag, is the Horde version" },
+        [97411] = { classes = 2, why = "ATT's rewards are for paladins, and the Era quests sharing its completion flag cover the other Horde classes" },
+        [99194] = { races = RACES_ALLIANCE, why = "its giver's other donations are Alliance, and the Horde ones have a giver of their own" },
+        [99435] = { preAll = { 6402 }, why = "Era 6403, which shares its completion flag, needs 6402" },
+    }
+    local function shown(v) return type(v) == "table" and table.concat(v, " ") or tostring(v or "none") end
+    local notes = attGateNotes.after
+    for _, qid in ipairs(sortedKeys(CORRECTIONS)) do
+        local fix, row = CORRECTIONS[qid], qRows[qid]
+        if not row then
+            notes[#notes + 1] = ("-- att correction not applied, quest %d is not in the build"):format(qid)
+        else
+            for _, f in ipairs({ { "classes", Q_CLASSES }, { "races", Q_RACES }, { "preAll", Q_PREGROUP } }) do
+                local want = fix[f[1]]
+                if want ~= nil then
+                    local have = row[f[2]]
+                    if shown(have) == shown(want) then
+                        notes[#notes + 1] = ("-- att correction no longer needed: quest %d %s already %s"):format(qid, f[1], shown(want))
+                    else
+                        row[f[2]] = want
+                        -- The availability gate reads an any-of list instead of an all-of one
+                        if f[2] == Q_PREGROUP then row[Q_PRESINGLE] = nil end
+                        notes[#notes + 1] = ("-- att correction: quest %d %s %s -> %s, because %s"):format(qid, f[1], shown(have), shown(want), fix.why)
+                    end
+                end
+            end
+        end
+    end
 end
 
 -- Runs before the creature and object rows, because an item's drop sources add to needNpc and needObj.

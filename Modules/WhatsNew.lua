@@ -5,6 +5,10 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.15.0", sections = {
+        { "Hover an NPC to see its quests", "An NPC's tooltip now lists the quests in your log that you hand in to it, then the quests it offers you, each with its level, ready quests first. You can turn it off in the Tooltips card of the Map tab: \"Show an NPC's quests on its tooltip\".", classic = true },
+        { "281 more quests on WoW Forever", "Everything Quests now knows 1,283 quests new to WoW Forever, up from 1,002, most of the new ones for characters from level 51 to 60, among them 141 in Mount Hyjal, and 32 more in Azshara.", classic = true, sub = "ChainGuide" },
+    } },
     { version = "2.14.0", sections = {
         { "Sort your quests by distance", "EQ Objective Tracker's Distance sort now works on this version of the game: Everything Quests measures how far away your quests are, so the nearest comes first and the list re-sorts as you move. It needs EQ Objective Tracker 2.18.0 or later: pick Distance as the Sort Order on its Tracker tab, or on the tracker's sort button.", sub = "QuestDistance" },
     } },

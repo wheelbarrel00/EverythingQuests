@@ -17,6 +17,7 @@ DB.defaults = {
             npIconOffsetX   = 0,
             npIconOffsetY   = 0,
             questTooltips   = true,
+            npcQuestTooltips = true,
             focusArrow      = true,
         },
         announce = {
