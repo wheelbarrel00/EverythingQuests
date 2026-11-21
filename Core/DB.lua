@@ -19,6 +19,7 @@ DB.defaults = {
             questTooltips   = true,
             npcQuestTooltips = true,
             focusArrow      = true,
+            warnSkippedBreadcrumbs = true,
         },
         announce = {
             -- Off, because every other value posts in other people's chat.

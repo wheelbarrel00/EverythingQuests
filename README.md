@@ -53,6 +53,7 @@ Era and TBC were measured identical across every game API the addon reads, so on
 - **Objective markers** on the world map and the minimap, drawn from a generated coordinate database rather than from the client, which exposes no quest coordinates at all
 - **Objective kind icons** — a colored badge per kind, red for something to kill, amber for something to loot and green for something to use, each with a dark outline so a busy zone stays readable. An objective inside a dungeon is marked at the dungeon entrance, with an archway of its own
 - **Turn-in markers** at every location a finished quest can be handed in, and **markers for quests you can pick up**, gated on level, race, class, prerequisites, reputation, completion, the profession or skill rank a quest needs, and whether a holiday quest's world event is actually running
+- **Breadcrumb quests** — a quest you can pick up without the breadcrumb quest that sends you to it is marked for you, a breadcrumb's marker goes once a quest it leads to is in your log or handed in, and while you carry a breadcrumb the quest it leads to waits until you hand the breadcrumb in. When you take a quest while you could still have done its breadcrumb, a line in chat names the breadcrumb you skipped (a box in the General tab turns it off). Which quests are breadcrumbs comes from AllTheThings' quest data
 - **Named quest givers and finishers** — a marker for a quest you can pick up names who is standing there, and a marker for one you have finished names who takes it back, on the world map, the minimap and in the Quest Browser
 - **Nameplate quest icons**, resolved from the creature ID in the unit GUID, since a Classic Era or TBC unit tooltip carries no quest data
 - **The Quest Browser** — look up almost any quest in the game, including ones never picked up, with its level, race and class requirements, start and turn-in locations, prerequisites, and the reason it is not available yet. Its own tab in `/eqs`, `/eqs quests`, a key you bind to it, or right-click a gold marker
@@ -161,8 +162,8 @@ Currently covers the Midnight expansion: **Eversong Woods**, **Zul'Aman**, **Har
 
 **On WoW Forever** the game has no quest line data for Classic quests, so the Chain Guide builds its chains from Everything Quests' own quest data the first time you open it:
 
-- **Every chain your character can take** — quests joined to the quests that lead to them and follow them, each chain named after its first quest and filed under the zone where it starts. Zones are listed by level, with their level range, and the guide first opens on your current zone
-- **Where you stand** — each quest shows whether you have done it, have it in your log, can pick it up now or cannot yet. A quest you skipped by finishing a later step, or closed off by taking another branch, is shown as such and left out of the chain's progress
+- **Every chain your character can take** — quests joined to the quests that lead to them and follow them, each chain named after its first quest and filed under the zone where its first quest that is not a breadcrumb starts. Zones are listed by level, with their level range, and the guide first opens on your current zone
+- **Where you stand** — each quest shows whether you have done it, have it in your log, can pick it up now or cannot yet. A quest you skipped by finishing a later step, or closed off by taking another branch, is shown as such and left out of the chain's progress. A breadcrumb quest is marked "(optional)", left out of the chain's progress and never named your next step unless you carry it
 - **Tooltips** — who gives a quest, who takes it back where Everything Quests knows it, and, when you cannot take it yet, why, in the Quest Browser's own words. Right-click a quest to open it in the Quest Browser, which names the chain a quest belongs to
 - **Wide chains stay readable** — a quest with many follow-ups that lead nowhere else, such as the Camping 101 quests, shows them in a panel of their own rows
 - **Track, Continue and search** — track a chain to see its quests on the world map, use Continue for a TomTom arrow to your next step, and search by quest name or ID
@@ -204,7 +205,7 @@ Each quest in your log also keeps one marker at the nearest spot its markers wou
 Classic only (Classic Era, Burning Crusade Classic and WoW Forever). A search-and-details window over EQ's own generated quest tables, answering the one thing a Classic client cannot: what a quest is before you have ever accepted it.
 
 - **Search** by name substring, by quest ID, or `"quoted"` for a whole-title match. The scan runs against the shipped English titles, because the client can only name a quest it has already seen; the row you see uses the client's own wording where it knows it
-- **Details** — quest level, required level, race and class gates, category, every map it starts / has objectives / turns in on, prerequisites (any-of vs all-of), follow-ups, exclusions, and skill and reputation gates
+- **Details** — quest level, required level, race and class gates, category, every map it starts / has objectives / turns in on, prerequisites (any-of vs all-of), follow-ups, exclusions, breadcrumbs (tagged, with the quests they lead to and the breadcrumbs that lead to a quest), and skill and reputation gates
 - **The reason it is unavailable** comes from `AvailableQuests:Explain`, the *same* gate that decides which gold markers are drawn. There is deliberately one implementation — a second copy would let the window and the map disagree while both looked right
 - **Clickable throughout** — a location opens the world map there and sets a TomTom waypoint; a prerequisite or follow-up navigates to that quest. References the data cannot describe render as plain text rather than a dead link
 - **Who to talk to** — the Starts and Turn in rows name the giver and the finisher. A row is merged per map while a map pin is merged per coordinate, so a row covering several different people names all of them rather than picking one
@@ -315,7 +316,7 @@ The options window shares EQ Objective Tracker's look: a sidebar of tabs, settin
 
 | Tab | Settings |
 |---|---|
-| **General** | Auto-accept / auto-turn-in / join group quests, the Immersion hand-off (when Immersion is installed), show / hide minimap button, options window scale, update notice style, **quest announcements**, **party quest progress**, Use Blizzard's quest tracker, Open Tracker Settings, the TomTom arrow for the focused quest (WoW Forever) and the tracker icons, profile management, reset to defaults |
+| **General** | Auto-accept / auto-turn-in / join group quests, the Immersion hand-off (when Immersion is installed), a warning when you skip a breadcrumb quest (Classic), show / hide minimap button, options window scale, update notice style, **quest announcements**, **party quest progress**, Use Blizzard's quest tracker, Open Tracker Settings, the TomTom arrow for the focused quest (WoW Forever) and the tracker icons, profile management, reset to defaults |
 | **Map** | World-map quest pins, pin scale, objective pins per quest, pin rings, markers for tracked quests only, fading markers under your position, minimap objective pins with their edge markers and pin scale (Classic), quests you can pick up with their level and holiday filters (Classic), dungeon / repeatable / profession quest filters (Classic), **coordinates**, quest progress on tooltips, an NPC's quests on its tooltip (Classic), **quest icons on nameplates** with their position, size and offsets |
 | **World Quests** | Master switch, world map pins, zone quest list and its sort order, per-reward filters (each icon inside its colored ring), per-faction filters by expansion, pin scale |
 | **Chain Guide** | Open on login, window scale, unrouted questlines (retail), the tracked chain on the world map, cross-character chain cache stats and reset, prune stale entries |
@@ -513,7 +514,7 @@ This project is licensed under the [MIT License](LICENSE).
 - Fonts and textures shared with other addons through **[LibSharedMedia](https://www.curseforge.com/wow/addons/libsharedmedia-3-0)**
 - Minimap pin placement powered by **[HereBeDragons](https://www.curseforge.com/wow/addons/herebedragons)**
 - The options window's font is **[Barlow](https://github.com/jpt/barlow)**, used under the SIL Open Font License (its notice ships in `Libs/EverythingUI/Media/Fonts/OFL.txt`)
-- WoW Forever quest data from **[AllTheThings](https://github.com/ATTWoWAddon/AllTheThings)**, used under the MIT License (its notice ships in `Data/AllTheThings MIT LICENSE.txt`)
+- WoW Forever quest data, and which quests are breadcrumbs on Classic Era, Burning Crusade Classic and WoW Forever, from **[AllTheThings](https://github.com/ATTWoWAddon/AllTheThings)**, used under the MIT License (its notice ships in `Data/AllTheThings MIT LICENSE.txt`)
 - WoW API references from **[Warcraft Wiki](https://warcraft.wiki.gg)**
 
 ---

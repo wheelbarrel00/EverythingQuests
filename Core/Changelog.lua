@@ -2,6 +2,28 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.16.0", date = "2026-11-20",
+        sections = {
+            { head = "New Features", items = {
+                { "Breadcrumb quests. A breadcrumb quest sends you to another quest giver. Deputy Willem's quest Eagan Peltskinner, for example, sends you to Eagan Peltskinner himself for Wolves Across the Border. On Classic Era, Burning Crusade Classic and WoW Forever, Everything Quests now does what the game does with them: a breadcrumb's \"!\" goes once a quest it leads to is in your quest log or handed in, and while you carry a breadcrumb, the quest it leads to is not marked until you hand the breadcrumb in. Which quests are breadcrumbs comes from the AllTheThings addon's quest data.", classic = true },
+                { "A line in chat when you skip a breadcrumb. When you accept a quest while you could still have done the breadcrumb quest that leads to it, a line in chat names that breadcrumb, as the game stops offering it. Nothing is said for a breadcrumb you could not have taken, or when you came by another breadcrumb. Click a quest in the line to open it in the Quest Browser. It is on by default: \"Warn when you skip a breadcrumb quest\", in the General card of the General tab.", classic = true },
+            } },
+            { head = "Improvements", items = {
+                { "The Quest Browser knows breadcrumbs. A breadcrumb quest is tagged \"Breadcrumb\", its \"Leads to\" card names the quests it leads to, and a quest it leads to lists it under \"Breadcrumb quests that lead here\". The reason a quest is not on offer now says when a breadcrumb in your log comes first, or when a quest a breadcrumb leads to is already in your log or done.", classic = true },
+                { "Breadcrumbs in the Chain Guide. On WoW Forever, a breadcrumb quest now sits in the chain of the quest it leads to, marked \"(optional)\". It is left out of the chain's progress, the chain's next step never points at a breadcrumb you have not taken, and one you carry keeps its map pin.", classic = true, sub = "ChainGuide" },
+                { "Breadcrumbs no longer decide a chain's zone. On WoW Forever, a chain is now filed under the zone where its first quest that is not a breadcrumb starts, rather than where its breadcrumb is handed out, so some chains moved: Journey to Stonetalon Peak is now under Stonetalon Mountains instead of Ashenvale, and Elmore's Task under Stormwind City instead of Elwynn Forest. EQ Objective Tracker's zone progress bar counts each chain in its new zone.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Bug Fixes", items = {
+                { "Quests you can pick up without their breadcrumb are now marked. Everything Quests' quest data listed many breadcrumbs as something you had to finish first, so if you skipped one, the quest it leads to never got its \"!\" and the Quest Browser said an earlier quest had to be finished first. This affected 87 quests on Classic Era, 136 on Burning Crusade Classic and 86 on WoW Forever, among them Wolves Across the Border in Elwynn Forest, Jitters' Growling Gut in Duskwood and Wild Hearts in Silverpine Forest.", classic = true },
+                { "Securing the Supply Lines is marked after Taking Back Silithus. On Classic Era and WoW Forever, Everything Quests' quest data treated Taking Back Silithus and the quest it leads to, Securing the Supply Lines in Silithus, as two ways to go, so once you handed the breadcrumb in, Securing the Supply Lines was no longer marked.", classic = true },
+                { "Breadcrumbs no longer keep their \"!\" forever. 34 breadcrumb quests on Classic Era, 69 on Burning Crusade Classic and 52 on WoW Forever stayed marked after you took a quest they lead to, among them The Ashenvale Hunt from Orgrimmar and from Thunder Bluff, Kingly Shakedown in Ironforge and The Quartermaster in Alterac Valley.", classic = true },
+            } },
+            { head = "Known Issues", items = {
+                { "Breadcrumbs are only as complete as the quest data. A breadcrumb the AllTheThings quest data does not mark as one still keeps its \"!\" after you take the quest it leads to.", classic = true },
+            } },
+        },
+    },
+    {
         version = "2.15.0", date = "2026-11-20",
         sections = {
             { head = "New Features", items = {

@@ -287,6 +287,8 @@ local REASON_MAX_LEVEL   = "above level range"
 local REASON_LOW_LEVEL   = "low level"
 local REASON_HIGH_LEVEL  = "high level"
 local REASON_PREREQ      = "prerequisite"
+local REASON_BREADCRUMB  = "breadcrumb in your log"
+local REASON_FOLLOW_UP   = "follow-up taken"
 local REASON_LATER_STEP  = "later step done"
 local REASON_BRANCH      = "took another branch"
 local REASON_REPUTATION  = "reputation"
@@ -331,22 +333,63 @@ local function categoryHidden(questID)
     return nil
 end
 
--- A later step or another branch in the log or done, which keeps the game from offering the quest
-local function ruledOut(questID, D)
+-- [follow-up questID] = { breadcrumb questID, ... }, built at first use from the shipped leads, which never change
+local _ledBy
+
+local function ledBy(D)
+    if not _ledBy then
+        _ledBy = {}
+        for crumb, to in pairs(D.leads or {}) do
+            for i = 1, #to do
+                local list = _ledBy[to[i]]
+                if not list then list = {}; _ledBy[to[i]] = list end
+                list[#list + 1] = crumb
+            end
+        end
+        for _, list in pairs(_ledBy) do table.sort(list) end
+    end
+    return _ledBy
+end
+
+-- On Era and Forever, Taking Back Silithus and Securing the Supply Lines list each other as branches, so a breadcrumb's own link is never one
+local function branchTaken(questID, D, leads)
+    local excl = D.excl[questID]
+    if excl then
+        local crumbs = D.leads and ledBy(D)[questID]
+        for i = 1, #excl do
+            local other = excl[i]
+            local own = false
+            for k = 1, leads and #leads or 0 do
+                if leads[k] == other then own = true end
+            end
+            for k = 1, crumbs and #crumbs or 0 do
+                if crumbs[k] == other then own = true end
+            end
+            if not own and (logState(other) or isCompleted(other)) then return true end
+        end
+    end
+    return false
+end
+
+-- A later step or another branch in the log or done, which keeps the game from offering the quest. Taking setAside, always one of its own follow-ups, is not counted
+local function ruledOut(questID, D, setAside)
+    local leads = D.leads and D.leads[questID]
+    if leads then
+        -- A breadcrumb's chain link often names its follow-up, so the follow-up comes first, and a branch taken before both
+        if branchTaken(questID, D, leads) then return REASON_BRANCH end
+        for i = 1, #leads do
+            local q = leads[i]
+            if q ~= setAside and (logState(q) or isCompleted(q)) then return REASON_FOLLOW_UP end
+        end
+    end
+
     local nextID = D.chain[questID]
-    if nextID then
+    if nextID and nextID ~= setAside then
         local nextInLog = logState(nextID)
         if nextInLog or isCompleted(nextID) then return REASON_LATER_STEP end
     end
 
-    local excl = D.excl[questID]
-    if excl then
-        for i = 1, #excl do
-            local other = excl[i]
-            local otherInLog = logState(other)
-            if otherInLog or isCompleted(other) then return REASON_BRANCH end
-        end
-    end
+    if branchTaken(questID, D, leads) then return REASON_BRANCH end
     return nil
 end
 
@@ -414,6 +457,14 @@ local function isAvailable(questID, D, hideLowLevel, floor, unfiltered)
     if parent then
         local parentInLog = logState(parent)
         if not parentInLog then return false, REASON_PREREQ end
+    end
+
+    -- Measured on Era: Eagan Peltskinner does not offer Wolves Across the Border (33) while the breadcrumb to him (5261) is in the log
+    local crumbs = ledBy(D)[questID]
+    if crumbs then
+        for i = 1, #crumbs do
+            if logState(crumbs[i]) then return false, REASON_BREADCRUMB end
+        end
     end
 
     local gone = ruledOut(questID, D)
@@ -714,6 +765,65 @@ function M:RuledOut(questID)
     return ruledOut(questID, D)
 end
 
+function M:LeadsTo(questID)
+    local D = data()
+    return D and D.leads and questID and D.leads[questID] or nil
+end
+
+function M:LedBy(questID)
+    local D = data()
+    if not (D and D.leads and questID) then return nil end
+    return ledBy(D)[questID]
+end
+
+-- The breadcrumbs to a quest that this character could still have taken until taking the quest closed them
+function M:SkippedBreadcrumbs(questID, out)
+    for i = #out, 1, -1 do out[i] = nil end
+    local D = data()
+    local crumbs = D and D.leads and ledBy(D)[questID]
+    if not crumbs then return out end
+    if not _prepared and not preparePass() then return out end
+    -- A breadcrumb done means you came the way it sent you, so none of the others is named
+    for i = 1, #crumbs do
+        if isCompleted(crumbs[i]) then return out end
+    end
+    for i = 1, #crumbs do
+        local crumb = crumbs[i]
+        if D.gates[crumb] then
+            local ok, why = isAvailable(crumb, D, false, nil, true)
+            -- ruledOut stopped at the follow-up, so its other gates are asked here with this quest set aside
+            if why == REASON_FOLLOW_UP then
+                ok = not (ruledOut(crumb, D, questID) or repFails(D.minRep[crumb], true)
+                          or repFails(D.maxRep[crumb], false) or skillFails(D.skill[crumb]))
+            end
+            if ok then out[#out + 1] = crumb end
+        end
+    end
+    return out
+end
+
+local _warned, _skipped = {}, {}
+
+-- One line per breadcrumb title, as a follow-up's breadcrumbs are often one quest offered by several givers
+function M:WarnSkipped(questID)
+    local DB = ns:GetSubsystem("DB")
+    local general = DB and DB.db.profile.general
+    if (general and general.warnSkippedBreadcrumbs == false) or type(questID) ~= "number" or _warned[questID] then return end
+    if #self:SkippedBreadcrumbs(questID, _skipped) == 0 then return end
+    _warned[questID] = true
+    local QL = ns:GetSubsystem("QuestLink")
+    local function named(id) return (QL and QL.Link and QL:Link(id)) or self:Title(id) end
+    local said = {}
+    for i = 1, #_skipped do
+        local title = self:Title(_skipped[i])
+        if not said[title] then
+            said[title] = true
+            print(ns.L["|cffEBB706EQ|r: by accepting %s, you skipped its breadcrumb quest %s, which is no longer offered."]
+                :format(named(questID), named(_skipped[i])))
+        end
+    end
+end
+
 -- Race and class alone, the two gates no amount of play changes. Nil when the character cannot be read
 function M:CanEverTake(questID)
     local D = data()
@@ -787,7 +897,12 @@ function M:OnEnable()
     local function invalidate() M:Invalidate() end
     -- QUEST_LOG_UPDATE is the only event for a quest failing in place, and it brings a cold login's log
     Events:On("QUEST_LOG_UPDATE",     invalidate)
-    Events:On("QUEST_ACCEPTED",       invalidate)
+    Events:On("QUEST_ACCEPTED", function(_, a, b)
+        invalidate()
+        -- Era and TBC pass the log index first, Forever the id alone. Half a second later, so the line follows the game's own accept message
+        local questID = b or a
+        C_Timer.After(0.5, function() M:WarnSkipped(questID) end)
+    end)
     Events:On("QUEST_REMOVED",        invalidate)
     Events:On("QUEST_TURNED_IN",      invalidate)
     Events:On("PLAYER_LEVEL_UP",      invalidate)

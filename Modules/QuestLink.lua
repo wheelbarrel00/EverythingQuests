@@ -141,6 +141,14 @@ function QL:TextFor(questID)
     return ns.Compat.QuestLinkText(questID, title, A and A.QuestLevel and A:QuestLevel(questID))
 end
 
+-- For EQ's own chat lines: a click opens the Quest Browser, as a shared reference does
+function QL:Link(questID)
+    local A = ns:GetSubsystem("AvailableQuests")
+    local title = A and A.Title and A:Title(questID)
+    if type(title) ~= "string" or title == "" or not browserKnows(questID) then return nil end
+    return hyperlink(questID, A.QuestLevel and A:QuestLevel(questID), title)
+end
+
 function QL:Share(questID)
     local active = _G["ChatEdit_GetActiveWindow"]
     local box = type(active) == "function" and active()

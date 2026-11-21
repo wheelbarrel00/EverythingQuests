@@ -32,6 +32,8 @@ L["Auto-accept quests"] = "Accepter les quêtes automatiquement"
 L["Auto-turn-in quests"] = "Rendre les quêtes automatiquement"
 L["Join group quests automatically"] = "Rejoindre les quêtes de groupe automatiquement"
 L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."] = "Quand quelqu'un de votre groupe lance une escorte ou une autre quête que le jeu vous propose de rejoindre, EQ répond oui à votre place. Uniquement pour les personnes réellement dans votre groupe - un inconnu qui en lance une à côté de vous est ignoré."
+L["Warn when you skip a breadcrumb quest"] = "Avertir quand vous sautez une quête de liaison"
+L["A breadcrumb quest sends you to another quest giver, and the game stops offering it once you take the quest it leads to. If you take that quest while you could still have done the breadcrumb, a line in chat names the breadcrumb you skipped."] = "Une quête de liaison vous envoie vers un autre donneur de quête, et le jeu cesse de la proposer dès que vous prenez la quête vers laquelle elle mène. Si vous prenez cette quête alors que vous pouviez encore faire la quête de liaison, une ligne dans la fenêtre de discussion nomme la quête de liaison sautée."
 L["Show minimap button"] = "Afficher le boûton de la mini-carte"
 L["Options Window Scale"] = "Échelle de la fenêtre d'options"
 L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."] = "Redimensionne uniquement cette fenêtre d'options d'Everything Quests. Cela ne modifie pas le module de suivi des quêtes ni rien de ce qui est affiché dans le monde du jeu. La nouvelle taille s'applique lorsque vous relâchez le curseur."
@@ -402,6 +404,9 @@ L["Quest history for %s was missing; restored a backup from %s (%d entries)."] =
 L["Cursor"] = "Curseur"
 L["Player"] = "Joueur"
 
+-- ─── Modules/MapPOI/Available.lua ───
+L["|cffEBB706EQ|r: by accepting %s, you skipped its breadcrumb quest %s, which is no longer offered."] = "|cffEBB706EQ|r : en acceptant %s, vous avez sauté sa quête de liaison %s, qui n'est plus proposée."
+
 -- ─── Modules/MapPOI/Pin.lua ───
 L["Dungeon entrance"] = "Entrée du donjon"
 L["Available quest"] = "Quête disponible"
@@ -424,6 +429,8 @@ L["You are past the highest level this quest is offered at."] = "Vous avez dépa
 L["Too far below your level to be worth showing. Turn off the low level filter to see it."] = "Trop en dessous de votre niveau pour être affichée. Désactivez le filtre des quêtes de bas niveau pour la voir."
 L["The game colors this quest red for you, so it is out of reach for now. Turn off the high level filter to see it."] = "Le jeu colore cette quête en rouge pour vous, elle est donc hors de portée pour le moment. Désactivez le filtre des quêtes de haut niveau pour la voir."
 L["An earlier quest has to be finished first."] = "Une quête précédente doit d'abord être terminée."
+L["A breadcrumb quest in your log sends you here. Hand it in first."] = "Une quête de liaison de votre journal vous envoie ici. Rendez-la d'abord."
+L["A quest this breadcrumb leads to is already done or in your log."] = "Une quête vers laquelle mène cette quête de liaison est déjà terminée ou dans votre journal."
 L["A later step of this chain is already done or in your log."] = "Une étape ultérieure de cette chaîne est déjà terminée ou dans votre journal."
 L["You took a different branch of this quest line."] = "Vous avez suivi une autre branche de cette série de quêtes."
 L["Your reputation standing does not allow it."] = "Votre niveau de réputation ne le permet pas."
@@ -449,6 +456,7 @@ L["%d quests (showing the first %d)"] = "%d quêtes (les %d premières affichée
 L["%d locations"] = "%d emplacements"
 L["Failed, so you can take it again."] = "Échouée, vous pouvez donc la reprendre."
 L["Not available to you right now."] = "Pas disponible pour vous actuellement."
+L["Breadcrumb"] = "Quête de liaison"
 L["Races: %s"] = "Races : %s"
 L["Classes: %s"] = "Classes : %s"
 L["Requires %s"] = "Nécessite %s"
@@ -463,6 +471,7 @@ L["Finish all of these first"] = "Terminez d'abord toutes celles-ci"
 L["Finish one of these first"] = "Terminez d'abord l'une de celles-ci"
 L["Part of"] = "Fait partie de"
 L["Leads to"] = "Mène à"
+L["Breadcrumb quests that lead here"] = "Quêtes de liaison menant ici"
 L["Instead of"] = "À la place de"
 
 -- ─── Modules/TrackerBridge.lua ───

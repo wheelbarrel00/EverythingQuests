@@ -66,13 +66,14 @@ function providerMixin:_DoRefresh()
     wipe(_seen)
     for i = 1, #items do
         local raw = items[i]
-        if raw and raw.type ~= "chain" and not raw.breadcrumb then
+        if raw and raw.type ~= "chain" and (CS or not raw.breadcrumb) then
             local item = Database:GetVariation(raw, char)
             local qid  = item and item.id
             -- A closed quest, one the game will no longer offer, would be pinned as one still to come
             if qid and not _seen[qid] and not (CS and CS:IsClosed(qid)) then
                 local rm, rx, ry, inLog = W:ResolveForPin(qid, chain, mapID)
-                if rm == mapID and rx and ry then
+                -- Forever's next step can be a breadcrumb you are on, so one in your log keeps its pin
+                if rm == mapID and rx and ry and (not raw.breadcrumb or inLog) then
                     _seen[qid] = true
                     local status
                     if qid == nextID then

@@ -24,6 +24,8 @@ L["Auto-accept quests"] = "自动接受任务"
 L["Auto-turn-in quests"] = "自动提交任务"
 L["Join group quests automatically"] = "自动加入队伍任务"
 L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."] = "队伍中有人开始护送或其他需要确认加入的任务时，EQ 自动替你同意。仅限真正在队伍中的玩家，身边陌生人开始的任务不受影响。"
+L["Warn when you skip a breadcrumb quest"] = "跳过引导任务时提醒"
+L["A breadcrumb quest sends you to another quest giver, and the game stops offering it once you take the quest it leads to. If you take that quest while you could still have done the breadcrumb, a line in chat names the breadcrumb you skipped."] = "引导任务会把你指引到另一个任务NPC，一旦你接取它指向的任务，游戏就不再提供它。若你在仍可完成引导任务时就接取了那个任务，聊天框会提示你跳过的引导任务。"
 L["Show minimap button"] = "显示小地图按钮"
 L["Options Window Scale"] = "设置窗口缩放"
 L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."] = "仅调整Everything Quests选项窗口大小。不会修改任务追踪框或游戏内任何显示内容。松开滑块后新尺寸生效。"
@@ -394,6 +396,9 @@ L["Quest history for %s was missing; restored a backup from %s (%d entries)."] =
 L["Cursor"] = "光标"
 L["Player"] = "玩家"
 
+-- ─── Modules/MapPOI/Available.lua ───
+L["|cffEBB706EQ|r: by accepting %s, you skipped its breadcrumb quest %s, which is no longer offered."] = "|cffEBB706EQ|r：接受%s后，你跳过了其引导任务%s，该任务已不再提供。"
+
 -- ─── Modules/MapPOI/Pin.lua ───
 L["Dungeon entrance"] = "地下城入口"
 L["Available quest"] = "可接取任务"
@@ -416,6 +421,8 @@ L["You are past the highest level this quest is offered at."] = "你已超过可
 L["Too far below your level to be worth showing. Turn off the low level filter to see it."] = "等级远低于你，不值得显示。关闭低等级过滤器即可看到。"
 L["The game colors this quest red for you, so it is out of reach for now. Turn off the high level filter to see it."] = "游戏将此任务标为红色，目前难以完成。关闭高等级过滤器即可看到。"
 L["An earlier quest has to be finished first."] = "需要先完成前置任务。"
+L["A breadcrumb quest in your log sends you here. Hand it in first."] = "你任务日志中的引导任务会指引你来这里，请先提交它。"
+L["A quest this breadcrumb leads to is already done or in your log."] = "此引导任务指向的任务已完成，或已在你的任务日志中。"
 L["A later step of this chain is already done or in your log."] = "此任务链的后续步骤已完成，或已在你的任务日志中。"
 L["You took a different branch of this quest line."] = "你选择了此任务线的另一个分支。"
 L["Your reputation standing does not allow it."] = "你的声望等级不满足要求。"
@@ -441,6 +448,7 @@ L["%d quests (showing the first %d)"] = "%d 个任务（显示前 %d 个）"
 L["%d locations"] = "%d 个地点"
 L["Failed, so you can take it again."] = "已失败，可以重新接取。"
 L["Not available to you right now."] = "你目前无法接取。"
+L["Breadcrumb"] = "引导任务"
 L["Races: %s"] = "种族：%s"
 L["Classes: %s"] = "职业：%s"
 L["Requires %s"] = "需要 %s"
@@ -455,6 +463,7 @@ L["Finish all of these first"] = "需先完成以下全部"
 L["Finish one of these first"] = "需先完成以下之一"
 L["Part of"] = "所属"
 L["Leads to"] = "后续"
+L["Breadcrumb quests that lead here"] = "指向此任务的引导任务"
 L["Instead of"] = "替代"
 
 -- ─── Modules/TrackerBridge.lua ───

@@ -5,8 +5,9 @@
 -- <eraDir> holds the Era dump build_questcoords.lua reads. <outDir> receives a copy of it, an area
 -- table that also covers maps only Forever has, forever<Kind>DB.lua rows that build_questcoords.lua
 -- lays over the Era rows, foreverStarts.lua, where each quest itself is offered, and with --att
--- foreverInstances.lua, the instances of the quests it counts as dungeon quests, and foreverMaxLevels.lua,
--- the top of each AllTheThings level range that starts at its quest's required level.
+-- foreverInstances.lua, the instances of the quests it counts as dungeon quests, foreverMaxLevels.lua,
+-- the top of each AllTheThings level range that starts at its quest's required level, and breadcrumbs.lua,
+-- each AllTheThings breadcrumb and the quests it leads to.
 --
 -- Only quests the Era dump does not know become rows. An Era creature, object or item that a new
 -- quest uses keeps its Era row, because the dump's spawn lists are better than what one player saw.
@@ -77,8 +78,9 @@ do
     os.remove(marker)
     assert(not same, "<outDir> must not be <eraDir>, or the next Era build would carry Forever rows")
 end
--- A run without --att, or one that stops before the caps are written, must not leave the last run's caps for the generator.
+-- A run without --att, or one that stops before the caps are written, must not leave the last run's caps or breadcrumbs for the generator.
 os.remove(outDir .. "/" .. OVERLAY_PREFIX .. "MaxLevels.lua")
+os.remove(outDir .. "/breadcrumbs.lua")
 
 local function parseBlock(src, marker, label)
     local at = assert(src:find(marker, 1, true), "marker not found in " .. label)
@@ -1686,6 +1688,31 @@ if att then
         io.stderr:write(("-- att level caps: %d quest(s), %d of them Era quests\n"):format(count(caps), fromEra))
         if #left > 0 then
             io.stderr:write("-- att level cap left out, the range does not fit the quest's required level: " .. table.concat(left, ", ") .. "\n")
+        end
+    end
+    do
+        -- A follow-up the collector saw offered while its breadcrumb was in the log drops out of that breadcrumb's row (Agitators after Elemental Unrest)
+        local crumbs, together = {}, {}
+        for id, a in pairs(att.quests) do
+            if a.breadcrumb and a.next then
+                local kept = {}
+                for _, t in ipairs(a.next) do
+                    local seen = false
+                    for _, e in ipairs(offerCheck.seen[t] or {}) do
+                        if listHas(e.d.a, id) then seen = true end
+                    end
+                    if seen then together[#together + 1] = ("%d after %d"):format(t, id) else kept[#kept + 1] = t end
+                end
+                crumbs[id] = { breadcrumb = true, next = kept }
+            end
+        end
+        local write = dofile((debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "tools/") .. "build_breadcrumbs.lua")
+        local n, links = write(crumbs, outDir .. "/breadcrumbs.lua", attDir)
+        io.stderr:write(("-- att breadcrumbs: %d quest(s) leading to %d follow-up(s)\n"):format(n, links))
+        if #together > 0 then
+            table.sort(together)
+            io.stderr:write("-- att breadcrumb left out, the collector saw the quest offered while it was in the log: "
+                .. table.concat(together, ", ") .. "\n")
         end
     end
     for _, why in ipairs(sortedKeys(attSkipped)) do

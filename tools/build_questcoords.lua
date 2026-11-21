@@ -1090,6 +1090,53 @@ if mode == "available" then
         end
     end
 
+    -- breadcrumbs.lua, from build_breadcrumbs.lua: a breadcrumb is no gate itself, as AllTheThings counts none missing, and one of its follow-ups taken closes it.
+    local leads, crumbsPath = {}, dir .. "/breadcrumbs.lua"
+    local crumbsFile, crumbs = io.open(crumbsPath, "rb"), nil
+    if crumbsFile then
+        crumbsFile:close()
+        crumbs = { listed = 0, voided = {}, dropped = {}, through = {} }
+        local isCrumb = {}
+        for b, to in pairs(assert(loadfile(crumbsPath))()) do
+            assert(type(b) == "number" and type(to) == "table" and #to > 0, crumbsPath .. ": a row is not a quest and its follow-ups")
+            crumbs.listed = crumbs.listed + 1
+            isCrumb[b] = to
+            if start[b] then leads[b] = idList(to) end
+        end
+        for id in pairs(start) do
+            if pre[id] then
+                local here, swapped, rest, seen = false, false, {}, {}
+                for _, p in ipairs(pre[id]) do
+                    for _, q in ipairs(isCrumb[p] or { p }) do
+                        if isCrumb[p] and q == id then here = true end
+                        if isCrumb[p] then swapped = true end
+                        if q ~= id and not seen[q] then seen[q] = true; rest[#rest + 1] = q end
+                    end
+                end
+                if here then
+                    -- The gate reads preAll only when there is no any-of list, so voiding one must not wake an all-of list.
+                    assert(not preAll[id], ("quest %d: voiding its any-of list would start gating it on its all-of list"):format(id))
+                    pre[id] = nil
+                    crumbs.voided[#crumbs.voided + 1] = id
+                elseif swapped then
+                    -- A breadcrumb to another quest stands for where it leads, as TBC's 9549 waits for 9548, not its breadcrumb 10063
+                    pre[id] = idList(rest)
+                    crumbs.through[#crumbs.through + 1] = id
+                end
+            end
+            if preAll[id] then
+                local kept = {}
+                for _, p in ipairs(preAll[id]) do
+                    if isCrumb[p] then crumbs.dropped[#crumbs.dropped + 1] = id else kept[#kept + 1] = p end
+                end
+                preAll[id] = #kept > 0 and kept or nil
+            end
+        end
+        table.sort(crumbs.voided)
+        table.sort(crumbs.dropped)
+        table.sort(crumbs.through)
+    end
+
     local sortedIds = {}
     for id in pairs(start) do sortedIds[#sortedIds + 1] = id end
     table.sort(sortedIds)
@@ -1129,6 +1176,14 @@ if mode == "available" then
         "ns.CLASSIC_QUEST_AVAILABLE = {\n",
         "start = {\n",
     }
+    if crumbs then
+        for i = 1, #parts do
+            if parts[i]:find("^%-%- parent ") then
+                table.insert(parts, i + 1, "-- leads  [questID] = { questID, ... }  a breadcrumb: any of these taken or completed rules it out, and none is offered while it is in the log\n")
+                break
+            end
+        end
+    end
     if capsFile then
         table.insert(parts, #parts - 1, "-- maxLevel [questID] = the highest level it is still offered at\n")
     end
@@ -1211,6 +1266,7 @@ if mode == "available" then
     emitList("excl", excl)
     emitScalar("chain", chain)
     emitScalar("parent", parent)
+    if crumbs then emitList("leads", leads) end
     emitScalar("skill", skill)
     emitScalar("minRep", minRep)
     emitScalar("maxRep", maxRep)
@@ -1300,6 +1356,7 @@ if mode == "available" then
         checkList("pre", pre)
         checkList("preAll", preAll)
         checkList("excl", excl)
+        if crumbs then checkList("leads", leads) else assert(got.leads == nil, "leads emitted with no breadcrumbs file") end
         for i = 1, #sortedIds do
             local id = sortedIds[i]
             assert((got.maxLevel and got.maxLevel[id]) == maxLevel[id], ("quest %d level cap changed on reload"):format(id))
@@ -1332,6 +1389,13 @@ if mode == "available" then
                 countTbl(parent), countTbl(skill), countTbl(minRep), countTbl(maxRep), countTbl(names)))
     if capsFile then
         io.stderr:write(("-- level caps: %d quest(s), of %d in the caps file\n"):format(countTbl(maxLevel), capsListed))
+    end
+    if crumbs then
+        io.stderr:write(("-- breadcrumbs: %d listed, %d with a start point here, %d quest(s) no longer gated on one (any-of list voided: %s; all-of entry dropped: %s; read as where it leads: %s)\n")
+            :format(crumbs.listed, countTbl(leads), #crumbs.voided + #crumbs.dropped + #crumbs.through,
+                    #crumbs.voided > 0 and table.concat(crumbs.voided, " ") or "none",
+                    #crumbs.dropped > 0 and table.concat(crumbs.dropped, " ") or "none",
+                    #crumbs.through > 0 and table.concat(crumbs.through, " ") or "none"))
     end
     if ownStarts then
         io.stderr:write(("-- own starts: %d quest(s) with their own evidence, %d giver spot(s) kept, %d dropped, %d added\n")

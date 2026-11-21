@@ -36,6 +36,8 @@ L["Auto-accept quests"] = true
 L["Auto-turn-in quests"] = true
 L["Join group quests automatically"] = true
 L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."] = true
+L["Warn when you skip a breadcrumb quest"] = true
+L["A breadcrumb quest sends you to another quest giver, and the game stops offering it once you take the quest it leads to. If you take that quest while you could still have done the breadcrumb, a line in chat names the breadcrumb you skipped."] = true
 L["Show minimap button"] = true
 L["Options Window Scale"] = true
 L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."] = true
@@ -406,6 +408,9 @@ L["Quest history for %s was missing; restored a backup from %s (%d entries)."] =
 L["Cursor"] = true
 L["Player"] = true
 
+-- ─── Modules/MapPOI/Available.lua ───
+L["|cffEBB706EQ|r: by accepting %s, you skipped its breadcrumb quest %s, which is no longer offered."] = true
+
 -- ─── Modules/MapPOI/Pin.lua ───
 L["Dungeon entrance"] = true
 L["Available quest"] = true
@@ -428,6 +433,8 @@ L["You are past the highest level this quest is offered at."] = true
 L["Too far below your level to be worth showing. Turn off the low level filter to see it."] = true
 L["The game colors this quest red for you, so it is out of reach for now. Turn off the high level filter to see it."] = true
 L["An earlier quest has to be finished first."] = true
+L["A breadcrumb quest in your log sends you here. Hand it in first."] = true
+L["A quest this breadcrumb leads to is already done or in your log."] = true
 L["A later step of this chain is already done or in your log."] = true
 L["You took a different branch of this quest line."] = true
 L["Your reputation standing does not allow it."] = true
@@ -453,6 +460,7 @@ L["%d quests (showing the first %d)"] = true
 L["%d locations"] = true
 L["Failed, so you can take it again."] = true
 L["Not available to you right now."] = true
+L["Breadcrumb"] = true
 L["Races: %s"] = true
 L["Classes: %s"] = true
 L["Requires %s"] = true
@@ -467,6 +475,7 @@ L["Finish all of these first"] = true
 L["Finish one of these first"] = true
 L["Part of"] = true
 L["Leads to"] = true
+L["Breadcrumb quests that lead here"] = true
 L["Instead of"] = true
 
 -- ─── Modules/TrackerBridge.lua ───

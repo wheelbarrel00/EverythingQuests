@@ -85,6 +85,15 @@ local function generalCard(self, content, stack)
                 .. " " .. L["Hold Alt to pause."]))
     end
 
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    if Avail and ns.CLASSIC_QUEST_AVAILABLE and ns.CLASSIC_QUEST_AVAILABLE.leads then
+        local warnGet, warnSet = generalSetting("warnSkippedBreadcrumbs")
+        card:Add(self:CreateCheckbox(content, L["Warn when you skip a breadcrumb quest"],
+            function() return warnGet() ~= false end,
+            function(v) warnSet(v and true or false) end,
+            L["A breadcrumb quest sends you to another quest giver, and the game stops offering it once you take the quest it leads to. If you take that quest while you could still have done the breadcrumb, a line in chat names the breadcrumb you skipped."]))
+    end
+
     if ns:GetSubsystem("Minimap") then
         card:Add(self:CreateCheckbox(content, L["Show minimap button"],
             function()

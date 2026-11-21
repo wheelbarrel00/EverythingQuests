@@ -34,6 +34,8 @@ L["Auto-accept quests"] = "퀘스트 자동 수락"
 L["Auto-turn-in quests"] = "퀘스트 자동 완료"
 L["Join group quests automatically"] = "파티 퀘스트 자동 참여"
 L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."] = "파티원이 호위 퀘스트나 게임이 참여 여부를 묻는 다른 퀘스트를 시작하면 EQ가 대신 수락합니다. 실제로 같은 파티에 있는 사람에게만 해당하며, 옆에서 모르는 사람이 시작한 퀘스트는 그대로 둡니다."
+L["Warn when you skip a breadcrumb quest"] = "안내 퀘스트를 건너뛰면 알림"
+L["A breadcrumb quest sends you to another quest giver, and the game stops offering it once you take the quest it leads to. If you take that quest while you could still have done the breadcrumb, a line in chat names the breadcrumb you skipped."] = "안내 퀘스트는 다른 퀘스트 제공자에게 보내 주며, 안내하는 퀘스트를 받으면 게임에서 더 이상 제공하지 않습니다. 안내 퀘스트를 아직 할 수 있을 때 그 퀘스트를 받으면, 건너뛴 안내 퀘스트를 채팅에 알려 줍니다."
 L["Show minimap button"] = "미니맵 버튼 표시"
 L["Options Window Scale"] = "설정 창 배율"
 L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."] = "이 Everything Quests 설정 창의 크기만 조절합니다. 퀘스트 추적기나 게임 화면에 표시되는 것은 바뀌지 않습니다. 슬라이더에서 손을 떼면 새 크기가 적용됩니다."
@@ -404,6 +406,9 @@ L["Quest history for %s was missing; restored a backup from %s (%d entries)."] =
 L["Cursor"] = "커서"
 L["Player"] = "플레이어"
 
+-- ─── Modules/MapPOI/Available.lua ───
+L["|cffEBB706EQ|r: by accepting %s, you skipped its breadcrumb quest %s, which is no longer offered."] = "|cffEBB706EQ|r: %s 퀘스트를 수락하여 안내 퀘스트 %s을(를) 건너뛰었으며, 더 이상 받을 수 없습니다."
+
 -- ─── Modules/MapPOI/Pin.lua ───
 L["Dungeon entrance"] = "던전 입구"
 L["Available quest"] = "수락 가능한 퀘스트"
@@ -426,6 +431,8 @@ L["You are past the highest level this quest is offered at."] = "이 퀘스트�
 L["Too far below your level to be worth showing. Turn off the low level filter to see it."] = "내 레벨보다 너무 낮아 표시할 가치가 없습니다. 낮은 레벨 필터를 끄면 보입니다."
 L["The game colors this quest red for you, so it is out of reach for now. Turn off the high level filter to see it."] = "게임이 이 퀘스트를 빨간색으로 표시하므로 지금은 도전하기 어렵습니다. 높은 레벨 필터를 끄면 볼 수 있습니다."
 L["An earlier quest has to be finished first."] = "선행 퀘스트를 먼저 완료해야 합니다."
+L["A breadcrumb quest in your log sends you here. Hand it in first."] = "퀘스트 일지에 있는 안내 퀘스트가 이곳으로 안내합니다. 먼저 완료하세요."
+L["A quest this breadcrumb leads to is already done or in your log."] = "이 안내 퀘스트가 안내하는 퀘스트를 이미 완료했거나 퀘스트 일지에 가지고 있습니다."
 L["A later step of this chain is already done or in your log."] = "이 연계의 이후 단계를 이미 완료했거나 퀘스트 일지에 가지고 있습니다."
 L["You took a different branch of this quest line."] = "이 퀘스트 계열에서 다른 갈래를 선택했습니다."
 L["Your reputation standing does not allow it."] = "평판 등급이 조건에 맞지 않습니다."
@@ -451,6 +458,7 @@ L["%d quests (showing the first %d)"] = "퀘스트 %d개 (처음 %d개 표시)"
 L["%d locations"] = "위치 %d곳"
 L["Failed, so you can take it again."] = "실패하여 다시 수락할 수 있습니다."
 L["Not available to you right now."] = "지금은 수락할 수 없습니다."
+L["Breadcrumb"] = "안내 퀘스트"
 L["Races: %s"] = "종족: %s"
 L["Classes: %s"] = "직업: %s"
 L["Requires %s"] = "%s 필요"
@@ -465,6 +473,7 @@ L["Finish all of these first"] = "아래를 모두 먼저 완료"
 L["Finish one of these first"] = "아래 중 하나를 먼저 완료"
 L["Part of"] = "소속"
 L["Leads to"] = "다음 퀘스트"
+L["Breadcrumb quests that lead here"] = "이곳으로 이어지는 안내 퀘스트"
 L["Instead of"] = "대신 선택 가능"
 
 -- ─── Modules/TrackerBridge.lua ───

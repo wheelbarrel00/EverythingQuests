@@ -445,7 +445,15 @@ function QB:Record(questID)
     r.excl = questRefs(D.excl[questID], A, {})
 
     local nextID = D.chain[questID]
-    if nextID then r.chain = { id = nextID, name = A:Title(nextID), done = A:IsCompleted(nextID) } end
+    local leads = A:LeadsTo(questID)
+    r.isBreadcrumb = leads ~= nil
+    -- A breadcrumb's chain link usually names one of its follow-ups, so each quest is listed once
+    local ids = { nextID }
+    for _, id in ipairs(leads or {}) do
+        if id ~= nextID then ids[#ids + 1] = id end
+    end
+    if #ids > 0 then r.leadsTo = questRefs(ids, A, {}) end
+    r.breadcrumbs = questRefs(A:LedBy(questID), A, {})
     local parentID = D.parent[questID]
     if parentID then r.parent = { id = parentID, name = A:Title(parentID), done = A:IsCompleted(parentID) } end
 

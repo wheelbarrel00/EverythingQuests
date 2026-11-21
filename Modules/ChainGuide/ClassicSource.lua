@@ -62,6 +62,10 @@ local function edges(D)
     end
     for q, nextID in pairs(D.chain) do link(kids, pars, q, nextID) end
     for q, parentID in pairs(D.parent) do link(kids, pars, parentID, q) end
+    -- The generator takes breadcrumbs out of prerequisite lists, so this joins one with no chain link to its follow-ups
+    for q, list in pairs(D.leads or {}) do
+        for i = 1, #list do link(kids, pars, q, list[i]) end
+    end
     return kids, pars
 end
 
@@ -429,6 +433,27 @@ local function homeMap(D, roots, items)
     return nil
 end
 
+-- A breadcrumb starts away from the quests it leads to, so a chain is filed where its first quest that is not one starts
+local function homeRoots(D, items, roots, pars, rank)
+    if not D.leads then return roots end
+    local inChain = {}
+    for k = 1, #items do inChain[items[k].id] = true end
+    local out = {}
+    for k = 1, #items do
+        local q = items[k].id
+        if not D.leads[q] then
+            local led = false
+            for p in pairs(pars[q] or {}) do
+                if inChain[p] and not D.leads[p] then led = true break end
+            end
+            if not led then out[#out + 1] = q end
+        end
+    end
+    if #out == 0 then return roots end
+    table.sort(out, rank)
+    return out
+end
+
 local function zoneName(mapID)
     local QBD = ns:GetSubsystem("QuestBrowserData")
     local name = QBD and QBD.ZoneName and QBD:ZoneName(mapID)
@@ -481,8 +506,12 @@ function CS:Ensure()
     local nChains, nQuests, unplaced, widest = 0, 0, 0, 0
     for i = 1, #comps do
         local items, roots, width = layout(comps[i], kids, pars, rank)
+        -- The flag the retail overlays set, which the view, the map pins, the waypoints and the chain's end already read
+        for k = 1, #items do
+            if D.leads and D.leads[items[k].id] then items[k].breadcrumb = true end
+        end
         table.sort(roots, rank)
-        local mapID = homeMap(D, roots, items)
+        local mapID = homeMap(D, homeRoots(D, items, roots, pars, rank), items)
         if mapID then
             local lo, hi
             for k = 1, #items do
@@ -627,6 +656,7 @@ end
 
 -- Explain's refusal keys, compared as the Quest Browser compares them
 local REASON_LATER_STEP = "later step done"
+local REASON_FOLLOW_UP  = "follow-up taken"
 local REASON_BRANCH     = "took another branch"
 local REASON_MAX_LEVEL  = "above level range"
 
@@ -643,8 +673,8 @@ local function ownStatus(questID)
     end
     local ok, why = A:Explain(questID, true)
     if ok then return "available" end
-    local gone = (why == REASON_LATER_STEP or why == REASON_BRANCH) and why or A:RuledOut(questID)
-    if gone == REASON_LATER_STEP then return "passed", gone end
+    local gone = (why == REASON_LATER_STEP or why == REASON_FOLLOW_UP or why == REASON_BRANCH) and why or A:RuledOut(questID)
+    if gone == REASON_LATER_STEP or gone == REASON_FOLLOW_UP then return "passed", gone end
     if gone == REASON_BRANCH then return "branch", gone end
     if why == REASON_MAX_LEVEL then return "outleveled", why end
     return "pending", why
@@ -717,7 +747,7 @@ function CS:Progress(chain)
     fresh()
     local done, active, total = 0, 0, 0
     for i = 1, #items do
-        done, active, total = tally(statusOf(items[i].id), done, active, total)
+        if not items[i].breadcrumb then done, active, total = tally(statusOf(items[i].id), done, active, total) end
     end
     return done, active, total
 end
@@ -838,7 +868,7 @@ local function zoneSet(mapID)
     return out
 end
 
--- For EQ Objective Tracker's zone bar: done is handed in, and the total moves as Progress's does. Nil where no quest of the map counts or the character cannot be read yet
+-- For EQ Objective Tracker's zone bar: done is handed in, and a closed quest leaves the total as in Progress, but a breadcrumb counts. Nil where no quest of the map counts or the character cannot be read yet
 function CS:ZoneCount(mapID)
     local set = type(mapID) == "number" and zoneSet(mapID)
     if not set or #set == 0 then return nil end
@@ -890,7 +920,8 @@ function CS:NextStep(chain)
         local it = items[i]
         local s = statusOf(it.id)
         if s == "active" or s == "turnin" then return it end
-        local rank = (s == "available" and 1) or (s == "pending" and 2) or nil
+        -- A breadcrumb you are on is still your next step, but one not taken is optional and never pointed at
+        local rank = not it.breadcrumb and ((s == "available" and 1) or (s == "pending" and 2)) or nil
         if rank then
             if D and foreign(busiestMap(D.start[it.id])) then rank = rank + 2 end
             if not bestRank or rank < bestRank then best, bestRank = it, rank end

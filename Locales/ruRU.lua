@@ -34,6 +34,8 @@ L["Auto-accept quests"] = "Авто-принятие заданий"
 L["Auto-turn-in quests"] = "Авто-сдача заданий"
 L["Join group quests automatically"] = "Авто-присоединение к групповым заданиям"
 L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."] = "Когда кто-то из вашей группы начинает сопровождение или другое задание, к которому игра предлагает присоединиться, EQ отвечает «да» за вас. Только для тех, кто действительно состоит в вашей группе - если незнакомец начнёт такое задание рядом с вами, оно будет проигнорировано."
+L["Warn when you skip a breadcrumb quest"] = "Предупреждать о пропущенном вводном задании"
+L["A breadcrumb quest sends you to another quest giver, and the game stops offering it once you take the quest it leads to. If you take that quest while you could still have done the breadcrumb, a line in chat names the breadcrumb you skipped."] = "Вводное задание отправляет вас к другому персонажу, и игра перестаёт его предлагать, как только вы берёте задание, к которому оно ведёт. Если вы берёте это задание, пока ещё могли выполнить вводное, строка в чате назовёт пропущенное вводное задание."
 L["Show minimap button"] = "Показывать кнопку у миникарты"
 L["Options Window Scale"] = "Масштаб окна настроек"
 L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."] = "Изменяет размер только этого окна настроек Everything Quests. Это не влияет на трекер заданий и ни на что, отображаемое в игровом мире. Новый размер применяется, когда вы отпускаете ползунок."
@@ -404,6 +406,9 @@ L["Quest history for %s was missing; restored a backup from %s (%d entries)."] =
 L["Cursor"] = "Курсор"
 L["Player"] = "Игрок"
 
+-- ─── Modules/MapPOI/Available.lua ───
+L["|cffEBB706EQ|r: by accepting %s, you skipped its breadcrumb quest %s, which is no longer offered."] = "|cffEBB706EQ|r: приняв %s, вы пропустили вводное задание %s, и оно больше не предлагается."
+
 -- ─── Modules/MapPOI/Pin.lua ───
 L["Dungeon entrance"] = "Вход в подземелье"
 L["Available quest"] = "Доступное задание"
@@ -426,6 +431,8 @@ L["You are past the highest level this quest is offered at."] = "Вы уже п�
 L["Too far below your level to be worth showing. Turn off the low level filter to see it."] = "Слишком низкого уровня, чтобы его показывать. Отключите фильтр заданий низкого уровня, чтобы увидеть его."
 L["The game colors this quest red for you, so it is out of reach for now. Turn off the high level filter to see it."] = "Игра отмечает это задание красным, поэтому пока оно недоступно. Отключите фильтр заданий высокого уровня, чтобы увидеть его."
 L["An earlier quest has to be finished first."] = "Сначала нужно выполнить предыдущее задание."
+L["A breadcrumb quest in your log sends you here. Hand it in first."] = "Вводное задание в вашем журнале ведёт сюда. Сначала сдайте его."
+L["A quest this breadcrumb leads to is already done or in your log."] = "Задание, к которому ведёт это вводное задание, уже выполнено или находится в вашем журнале."
 L["A later step of this chain is already done or in your log."] = "Более поздний этап этой цепочки уже выполнен или находится в вашем журнале."
 L["You took a different branch of this quest line."] = "Вы выбрали другую ветку этой цепочки заданий."
 L["Your reputation standing does not allow it."] = "Ваш уровень репутации не позволяет этого."
@@ -451,6 +458,7 @@ L["%d quests (showing the first %d)"] = "%d заданий (показаны п�
 L["%d locations"] = "%d мест"
 L["Failed, so you can take it again."] = "Провалено, поэтому его можно взять снова."
 L["Not available to you right now."] = "Сейчас вам недоступно."
+L["Breadcrumb"] = "Вводное задание"
 L["Races: %s"] = "Расы: %s"
 L["Classes: %s"] = "Классы: %s"
 L["Requires %s"] = "Требуется навык «%s»"
@@ -465,6 +473,7 @@ L["Finish all of these first"] = "Сначала выполните все эт�
 L["Finish one of these first"] = "Сначала выполните одно из этих"
 L["Part of"] = "Часть задания"
 L["Leads to"] = "Ведёт к"
+L["Breadcrumb quests that lead here"] = "Вводные задания, ведущие сюда"
 L["Instead of"] = "Вместо"
 
 -- ─── Modules/TrackerBridge.lua ───

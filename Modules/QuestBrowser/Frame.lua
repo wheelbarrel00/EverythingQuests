@@ -47,6 +47,8 @@ local function reasonText(reason)
     if reason == "low level"            then return L["Too far below your level to be worth showing. Turn off the low level filter to see it."] end
     if reason == "high level"           then return L["The game colors this quest red for you, so it is out of reach for now. Turn off the high level filter to see it."] end
     if reason == "prerequisite"         then return L["An earlier quest has to be finished first."] end
+    if reason == "breadcrumb in your log" then return L["A breadcrumb quest in your log sends you here. Hand it in first."] end
+    if reason == "follow-up taken"      then return L["A quest this breadcrumb leads to is already done or in your log."] end
     if reason == "later step done"      then return L["A later step of this chain is already done or in your log."] end
     if reason == "took another branch"  then return L["You took a different branch of this quest line."] end
     if reason == "reputation"           then return L["Your reputation standing does not allow it."] end
@@ -501,6 +503,7 @@ function QB:RenderDetails()
     if record.isEvent      then tags[#tags + 1] = L["World event"] end
     if record.isClassQuest then tags[#tags + 1] = L["Class quest"] end
     if record.isProfession then tags[#tags + 1] = L["Profession"] end
+    if record.isBreadcrumb then tags[#tags + 1] = L["Breadcrumb"] end
     if #tags > 0 then
         _y = _y + TAG_GAP
         local prev
@@ -562,7 +565,10 @@ function QB:RenderDetails()
         return { id = ref.id, name = ref.name, done = ref.done, known = AD ~= nil and AD.gates[ref.id] ~= nil }
     end
     if record.parent then group(ctx, L["Part of"], function(card) return refRows(ctx, card, { known(record.parent) }) end) end
-    if record.chain then group(ctx, L["Leads to"], function(card) return refRows(ctx, card, { known(record.chain) }) end) end
+    if record.leadsTo and #record.leadsTo > 0 then group(ctx, L["Leads to"], function(card) return refRows(ctx, card, record.leadsTo) end) end
+    if record.breadcrumbs and #record.breadcrumbs > 0 then
+        group(ctx, L["Breadcrumb quests that lead here"], function(card) return refRows(ctx, card, record.breadcrumbs) end)
+    end
     if record.excl and #record.excl > 0 then group(ctx, L["Instead of"], function(card) return refRows(ctx, card, record.excl) end) end
 
     local chainID = CS and CS:ChainForQuest(record.id)

@@ -2417,9 +2417,9 @@ function Probe:Available()
     end
     -- countKeys answers the string "n/a" for a non-table, so these are %s rather than %d
     line("  quests with a start point=%s  with names=%s", countKeys(D.start), countKeys(D.names))
-    line("  gate rows: pre=%s preAll=%s excl=%s chain=%s parent=%s minRep=%s maxLevel=%s",
+    line("  gate rows: pre=%s preAll=%s excl=%s chain=%s parent=%s leads=%s minRep=%s maxLevel=%s",
          countKeys(D.pre), countKeys(D.preAll), countKeys(D.excl),
-         countKeys(D.chain), countKeys(D.parent), countKeys(D.minRep), countKeys(D.maxLevel))
+         countKeys(D.chain), countKeys(D.parent), countKeys(D.leads), countKeys(D.minRep), countKeys(D.maxLevel))
 
     line("2. this character, as the gates read it:")
     -- The same client calls the module makes, so a wrong reading here is the one the pins get

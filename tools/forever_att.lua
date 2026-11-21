@@ -1,4 +1,4 @@
--- Reads the quests in AllTheThings' compiled WoW Forever database (its MIT licensed db/Camelot folder).
+-- Reads the quests in one of AllTheThings' compiled databases (MIT licensed): db/Camelot for WoW Forever, db/Vanilla and db/TBC for breadcrumbs.
 
 local function readAll(path)
     local f = assert(io.open(path, "rb"), "cannot open " .. path)
@@ -77,6 +77,7 @@ local function normalize(id, t, ctx)
     q.maxRep = pair(t.maxReputation)
     q.repeatable = t.repeatable and true or nil
     q.breadcrumb = t.isBreadcrumb and true or nil
+    q.next = numbers(t.nextQuests)
     q.variants = (t.aqd or t.hqd) and true or nil
     q.unobtainable = type(ctx.u) == "number" and ctx.u or nil
     q.addedIn = type(ctx.awp) == "number" and ctx.awp or nil
@@ -88,7 +89,8 @@ local DETAIL = {
     { "reqLevel", "maxLevel", label = "level range" }, { "faction", label = "faction" }, { "races", label = "races", set = true },
     { "classes", label = "classes", set = true }, { "pre", "preCount", label = "prerequisites", set = true },
     { "excl", label = "exclusive quests", set = true }, { "skill", label = "skill" }, { "minRep", label = "reputation floor" },
-    { "maxRep", label = "reputation ceiling" }, { "repeatable", label = "repeatable" }, { "breadcrumb", label = "breadcrumb" },
+    { "maxRep", label = "reputation ceiling" }, { "repeatable", label = "repeatable" },
+    { "breadcrumb", "next", label = "breadcrumb", set = true },
 }
 local AVAILABILITY = { { "unobtainable", "unobtainable" }, { "addedIn", "added patch" }, { "removedIn", "removed patch" },
                        { "variants", "faction split" } }
@@ -179,6 +181,8 @@ return function(dir)
     -- ATT keeps a quest's Alliance and Horde halves apart until it knows the player, so the reader takes neither half.
     att.ResolveQuestData = function(t) return t end
     att.L = inert
+    -- TBC's holiday data compares an item count with a number while it builds.
+    att.WOWAPI = setmetatable({}, { __index = function() return function() return 0 end end })
 
     local files = scriptFiles(dir)
     for _, file in ipairs(files) do

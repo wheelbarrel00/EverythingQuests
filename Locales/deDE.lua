@@ -24,6 +24,8 @@ L["Auto-accept quests"] = "Quests automatisch annehmen"
 L["Auto-turn-in quests"] = "Quests automatisch abgeben"
 L["Join group quests automatically"] = "Gruppenquests automatisch beitreten"
 L["When someone in your group starts an escort or another quest the game asks you to join, EQ answers yes for you. Only for people actually in your group - a stranger starting one beside you is left alone."] = "Wenn jemand in deiner Gruppe eine Eskorte oder eine andere Quest startet, bei der das Spiel fragt, ob du mitmachen möchtest, antwortet EQ für dich mit Ja. Nur bei Leuten, die wirklich in deiner Gruppe sind - startet ein Fremder neben dir eine, bleibt sie unbeachtet."
+L["Warn when you skip a breadcrumb quest"] = "Warnen, wenn du eine Brotkrumenquest überspringst"
+L["A breadcrumb quest sends you to another quest giver, and the game stops offering it once you take the quest it leads to. If you take that quest while you could still have done the breadcrumb, a line in chat names the breadcrumb you skipped."] = "Eine Brotkrumenquest schickt dich zu einem anderen Questgeber, und das Spiel bietet sie nicht mehr an, sobald du die Quest annimmst, zu der sie führt. Nimmst du diese Quest an, während du die Brotkrumenquest noch hättest erledigen können, nennt eine Zeile im Chat die übersprungene Brotkrumenquest."
 L["Show minimap button"] = "Minikartenschaltfläche anzeigen"
 L["Options Window Scale"] = "Skalierung des Optionsfensters"
 L["Resizes this Everything Quests options window only. It does not change the quest tracker or anything shown in the game world. The new size applies when you let go of the slider."] = "Ändert ausschließlich die Größe dieses Everything-Quests-Optionsfensters. Der Questtracker und alles in der Spielwelt bleiben unverändert. Die neue Größe wird übernommen, sobald du den Regler loslässt."
@@ -394,6 +396,9 @@ L["Quest history for %s was missing; restored a backup from %s (%d entries)."] =
 L["Cursor"] = "Cursor"
 L["Player"] = "Spieler"
 
+-- ─── Modules/MapPOI/Available.lua ───
+L["|cffEBB706EQ|r: by accepting %s, you skipped its breadcrumb quest %s, which is no longer offered."] = "|cffEBB706EQ|r: Mit der Annahme von %s hast du die Brotkrumenquest %s übersprungen, die nicht mehr angeboten wird."
+
 -- ─── Modules/MapPOI/Pin.lua ───
 L["Dungeon entrance"] = "Dungeoneingang"
 L["Available quest"] = "Verfügbare Quest"
@@ -416,6 +421,8 @@ L["You are past the highest level this quest is offered at."] = "Du hast die hö
 L["Too far below your level to be worth showing. Turn off the low level filter to see it."] = "Liegt zu weit unter deiner Stufe, um angezeigt zu werden. Schalte den Filter für niedrige Stufen aus, um sie zu sehen."
 L["The game colors this quest red for you, so it is out of reach for now. Turn off the high level filter to see it."] = "Das Spiel färbt diese Quest für dich rot, sie ist also vorerst außer Reichweite. Schalte den Filter für hohe Stufen aus, um sie zu sehen."
 L["An earlier quest has to be finished first."] = "Eine frühere Quest muss zuerst abgeschlossen werden."
+L["A breadcrumb quest in your log sends you here. Hand it in first."] = "Eine Brotkrumenquest in deinem Questlog schickt dich hierher. Gib sie zuerst ab."
+L["A quest this breadcrumb leads to is already done or in your log."] = "Eine Quest, zu der diese Brotkrumenquest führt, ist bereits erledigt oder in deinem Questlog."
 L["A later step of this chain is already done or in your log."] = "Ein späterer Schritt dieser Reihe ist bereits erledigt oder in deinem Questlog."
 L["You took a different branch of this quest line."] = "Du hast einen anderen Zweig dieser Questreihe gewählt."
 L["Your reputation standing does not allow it."] = "Dein Rufstand lässt das nicht zu."
@@ -441,6 +448,7 @@ L["%d quests (showing the first %d)"] = "%d Quests (zeige die ersten %d)"
 L["%d locations"] = "%d Orte"
 L["Failed, so you can take it again."] = "Fehlgeschlagen, du kannst sie erneut annehmen."
 L["Not available to you right now."] = "Derzeit für dich nicht verfügbar."
+L["Breadcrumb"] = "Brotkrumenquest"
 L["Races: %s"] = "Völker: %s"
 L["Classes: %s"] = "Klassen: %s"
 L["Requires %s"] = "Erfordert %s"
@@ -455,6 +463,7 @@ L["Finish all of these first"] = "Schließe zuerst all diese ab"
 L["Finish one of these first"] = "Schließe zuerst eine davon ab"
 L["Part of"] = "Teil von"
 L["Leads to"] = "Führt zu"
+L["Breadcrumb quests that lead here"] = "Brotkrumenquests, die hierher führen"
 L["Instead of"] = "Anstelle von"
 
 -- ─── Modules/TrackerBridge.lua ───

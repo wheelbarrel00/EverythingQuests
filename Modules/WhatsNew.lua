@@ -5,6 +5,9 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.16.0", sections = {
+        { "Breadcrumb quests", "A quest you can pick up without its breadcrumb quest is now marked for you, a breadcrumb's \"!\" goes once you take the quest it leads to, and a line in chat names a breadcrumb you skip. You can turn the line off in the General tab: \"Warn when you skip a breadcrumb quest\".", classic = true },
+    } },
     { version = "2.15.0", sections = {
         { "Hover an NPC to see its quests", "An NPC's tooltip now lists the quests in your log that you hand in to it, then the quests it offers you, each with its level, ready quests first. You can turn it off in the Tooltips card of the Map tab: \"Show an NPC's quests on its tooltip\".", classic = true },
         { "281 more quests on WoW Forever", "Everything Quests now knows 1,283 quests new to WoW Forever, up from 1,002, most of the new ones for characters from level 51 to 60, among them 141 in Mount Hyjal, and 32 more in Azshara.", classic = true, sub = "ChainGuide" },
