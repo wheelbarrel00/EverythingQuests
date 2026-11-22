@@ -17,10 +17,24 @@ local EQ_TAB_ICONS = {
     questBrowser = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\icon-browser",
 }
 
+-- Left edge, because EQ Objective Tracker's options window is the same size and centers
+local LEFT_GAP = 16
+
+-- Where a drag left the window, kept for the session alone, so a reload opens it at the left edge again
+local dragged
+
+-- The library keeps a position as an offset from the screen's center in UIParent's units
+local function leftEdgeOffset()
+    local f = Options.frame
+    if not f then return nil end
+    local k = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    return LEFT_GAP + f:GetWidth() * k / 2 - UIParent:GetWidth() / 2, 0
+end
+
 local ui = EUI:NewContext({
     id      = "EQ",
     title   = "Everything Quests",
-    version = ns.VERSION or "2.16.0",
+    version = ns.VERSION or "2.17.0",
     accent  = EUI.tokens.accents.EQ.accent,
     L       = L,
     tooltip = ns.Util.PinTooltip,
@@ -50,6 +64,12 @@ local ui = EUI:NewContext({
         local DB = ns:GetSubsystem("DB")
         if DB and DB.db and DB.db.global then DB.db.global.optionsWindowScale = v end
     end,
+    -- Passing the pair is what lets the window hang partly off the left, right and bottom edges
+    getWindowPosition = function()
+        if dragged then return dragged[1], dragged[2] end
+        return leftEdgeOffset()
+    end,
+    setWindowPosition = function(x, y) dragged = { x, y } end,
 })
 Options.ui = ui
 
@@ -97,9 +117,8 @@ end
 function Options:Build()
     if self.frame then return end
     local f = ui:BuildSettings("EQOptionsFrame")
-    -- Left edge, because EQ Objective Tracker's options window is the same size and centers
     f:ClearAllPoints()
-    f:SetPoint("LEFT", UIParent, "LEFT", 16, 0)
+    f:SetPoint("LEFT", UIParent, "LEFT", LEFT_GAP, 0)
     self.frame = f
 end
 

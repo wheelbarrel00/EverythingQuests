@@ -239,7 +239,7 @@ local function gap(e)
     return math.abs(e.level - _playerLevel)
 end
 
--- Nearest your level first, so at the level cap a battlemaster's own quests lead the old brackets Era's and TBC's data leave uncapped
+-- Nearest your level first, so a battleground quest giver's own quests lead any older bracket the data leaves uncapped, as TBC's level 50 The Battle for Arathi Basin!
 local function giverOrder(a, b)
     if a.rank ~= b.rank then return a.rank < b.rank end
     local ga, gb = gap(a), gap(b)

@@ -442,6 +442,10 @@ L["You do not have the skill this quest needs yet, or not at a high enough rank.
 L["Hidden by your dungeon and raid filter."] = true
 L["Hidden by your repeatable quest filter."] = true
 L["Hidden by your profession quest filter."] = true
+L["This quest is no longer in the game, or never was."] = true
+L["Part of a one-time world event that is not running here."] = true
+L["Part of content that is not released on this version of the game yet."] = true
+L["You have done this daily quest today. It is offered again after the daily reset."] = true
 L["A character here offers it"] = true
 L["An object here offers it"] = true
 L["An item that starts it drops here"] = true

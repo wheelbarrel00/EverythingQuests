@@ -88,6 +88,8 @@ local Q_REQSKILL, Q_MINREP, Q_MAXREP = 18, 19, 20
 -- mislabel 983 quests on Era.
 local Q_ZONEORSORT = 17
 local Q_NEXTINCHAIN, Q_SPECIALFLAGS, Q_PARENT = 22, 24, 25
+-- The client's own quest flags, of which only the daily bit is read.
+local Q_FLAGS, DAILY_FLAG = 23, 4096
 
 local function loadBlock(spec)
     local path = dir .. "/" .. spec.file
@@ -212,6 +214,32 @@ for name, baseFlavor in pairs(OVERLAYS) do
     end
 end
 
+-- Upstream rows that contradict AllTheThings and their givers' factions, fixed in every mode. One that no longer matches is reported and left alone.
+-- 8228 is the Horde flier at Grinkle in Orgrimmar, 8229 the Alliance one at Barrus in Ironforge. 3645 is the Horde card renewal at Oglethorpe after 3643, 3647 the Alliance one at Tinkmaster after 3641.
+local CORRECTIONS = {
+    { id = 8228, from = 15119, to = 15116 }, { id = 8229, from = 15116, to = 15119 },
+    { id = 3645, from = 7944, to = 7406, pre = { 3641, 3643 } }, { id = 3647, from = 7406, to = 7944, pre = { 3643, 3641 } },
+}
+for _, c in ipairs(CORRECTIONS) do
+    local q = quests[c.id]
+    local sb, fb = q and q[Q_STARTEDBY], q and q[Q_FINISHEDBY]
+    local function only(by, v) return type(by) == "table" and type(by[1]) == "table" and #by[1] == 1 and by[1][1] == v end
+    local pre = q and q[Q_PRESINGLE]
+    local preOK = not c.pre or (type(pre) == "table" and #pre == 1 and pre[1] == c.pre[1])
+    if only(sb, c.from) and only(fb, c.from) and preOK then
+        sb[1] = { c.to }
+        fb[1] = { c.to }
+        if c.pre then q[Q_PRESINGLE] = { c.pre[2] } end
+        io.stderr:write(("-- correction: quest %d is given and handed in at %d, not %d%s\n"):format(c.id, c.to, c.from,
+            c.pre and (", after %d, not %d"):format(c.pre[2], c.pre[1]) or ""))
+    elseif q then
+        local part = (only(sb, c.from) and only(fb, c.from)) and "prerequisite" or "giver or finisher"
+        io.stderr:write(("-- correction no longer needed: quest %d, its %s no longer matches\n"):format(c.id, part))
+    else
+        io.stderr:write(("-- correction not applied, quest %d is not in the data\n"):format(c.id))
+    end
+end
+
 -- foreverStarts.lua holds { [questID] = { {areaId, x, y[, 1 for an ATT point]}, ... } }, where that quest is offered on Forever.
 local ownStarts
 do
@@ -265,6 +293,20 @@ local ambiguousMonster, monsterCount
 local N_FACTION = 13
 local RACES_ALLIANCE, RACES_HORDE = 1 + 4 + 8 + 64 + 1024, 2 + 16 + 32 + 128 + 512
 local questFaction
+
+-- Upstream creatures tagged with one faction that both factions talk to. The Earthen Ring Elder stands in the capitals.
+local NPC_CORRECTIONS = { { id = 26221, prefix = "tbc", from = "A", to = "AH" } }
+for _, c in ipairs(NPC_CORRECTIONS) do
+    if c.prefix == PREFIX then
+        local n = npcs[c.id]
+        if n and n[N_FACTION] == c.from then
+            n[N_FACTION] = c.to
+            io.stderr:write(("-- correction: creature %d is friendly to %s, not %s\n"):format(c.id, c.to, c.from))
+        else
+            io.stderr:write(("-- correction no longer needed: creature %d\n"):format(c.id))
+        end
+    end
+end
 
 local function factionOfRaces(mask)
     if type(mask) ~= "number" or mask <= 0 then return nil end
@@ -994,13 +1036,80 @@ if mode == "npcs" then
 end
 
 if mode == "available" then
+    -- attRules.lua, from build_att_rules.lua or build_forever_supplement.lua --att: AllTheThings' level ranges, ended quests, dailies and factions.
+    local rules
+    do
+        local path = dir .. "/attRules.lua"
+        local f = io.open(path, "rb")
+        if f then
+            f:close()
+            rules = assert(loadfile(path))()
+            for _, part in ipairs({ "caps", "ended", "daily", "faction" }) do
+                assert(type(rules[part]) == "table", path .. ": no " .. part .. " table")
+            end
+        end
+    end
+
+    local FACTION_MASK = PREFIX == "tbc" and { A = RACES_ALLIANCE, H = RACES_HORDE } or { A = 77, H = 178 }
+    local ATT_SIDE = { [1] = "H", [2] = "A" }
+    local factionStats = { narrowed = {}, corrected = {}, disputed = {}, contradicted = {}, changed = {} }
+
+    local function maskAnd(a, b)
+        local out = 0
+        for bit = 0, 10 do
+            local v = 2 ^ bit
+            if a % (v + v) >= v and b % (v + v) >= v then out = out + v end
+        end
+        return out
+    end
+
+    -- "A" or "H" when every way in is a creature friendly to that faction alone, which no player of the other can talk to.
+    local function giversSide(q)
+        local sb = q[Q_STARTEDBY]
+        if type(sb) ~= "table" or type(sb[1]) ~= "table" or #sb[1] == 0 then return nil end
+        if (type(sb[2]) == "table" and #sb[2] > 0) or (type(sb[3]) == "table" and #sb[3] > 0) then return nil end
+        local side
+        for _, c in ipairs(sb[1]) do
+            local f = npcs[c] and npcs[c][N_FACTION]
+            if (f ~= "A" and f ~= "H") or (side and side ~= f) then return nil end
+            side = f
+        end
+        return side
+    end
+
+    -- Forever's own quests took their faction in the supplement, from the collector, AllTheThings and their givers, so only upstream rows are judged here.
+    local function ruleRaces(id, q)
+        local races = tonumber(q[Q_RACES]) or 0
+        if overlaid[quests] and overlaid[quests][id] then return races end
+        local side = giversSide(q)
+        local qf = factionOfRaces(races)
+        if not side or qf == side then return races end
+        local att = ATT_SIDE[rules.faction[id]]
+        if not qf then
+            if att and att ~= side then
+                factionStats.disputed[#factionStats.disputed + 1] = id
+                return races
+            end
+            factionStats.narrowed[#factionStats.narrowed + 1] = id
+            factionStats.changed[id] = races == 0 and FACTION_MASK[side] or maskAnd(races, FACTION_MASK[side])
+            return factionStats.changed[id]
+        end
+        if att == side then
+            factionStats.corrected[#factionStats.corrected + 1] = id
+            factionStats.changed[id] = FACTION_MASK[side]
+            return FACTION_MASK[side]
+        end
+        factionStats.contradicted[#factionStats.contradicted + 1] = id
+        return races
+    end
+
     -- Two digits of required level, two of quest level, one of flags, four of each bitmask.
     -- Thirteen digits sits well inside a double's exact integer range, and packing by decimal
     -- rather than by bits keeps this working on an interpreter with no bit library.
     local function packGates(id, q)
         local lvl   = math.max(0, math.min(99, tonumber(q[Q_REQLEVEL]) or 0))
         local qlvl  = math.max(0, math.min(99, tonumber(q[Q_QUESTLEVEL]) or 0))
-        local races = tonumber(q[Q_RACES]) or 0
+        local races = rules and ruleRaces(id, q) or tonumber(q[Q_RACES]) or 0
         local class = tonumber(q[Q_CLASSES]) or 0
         -- Only the low three: repeatable, completed by exploring or by a script, monthly reset
         local flags = (tonumber(q[Q_SPECIALFLAGS]) or 0) % 8
@@ -1073,19 +1182,53 @@ if mode == "available" then
         end
     end
 
-    -- foreverMaxLevels.lua, from build_forever_supplement.lua, holds the top of each AllTheThings level range it kept.
-    local maxLevel, capsPath, capsListed = {}, dir .. "/foreverMaxLevels.lua", 0
+    -- foreverMaxLevels.lua, from build_forever_supplement.lua, holds the top of each AllTheThings level range it kept, and
+    -- attRules.lua each whole range. A cap at the highest level a character reaches turns no one away, so it is left out.
+    local MAX_PLAYER_LEVEL = PREFIX == "tbc" and 70 or 60
+    local maxLevel, capsPath, capsListed, capsAtMax, capsLeft = {}, dir .. "/foreverMaxLevels.lua", 0, {}, {}
     local capsFile = io.open(capsPath, "rb")
+    local function keepCap(id, low, cap)
+        capsListed = capsListed + 1
+        if not start[id] then return end
+        local req = math.floor(gates[id] / 100000000000)
+        if low and (low ~= req or cap < req) then
+            capsLeft[#capsLeft + 1] = ("%d (ATT %d to %d, required level %d)"):format(id, low, cap, req)
+            return
+        end
+        assert(type(cap) == "number" and cap >= req and cap <= 99,
+               ("quest %d: level cap %s does not fit its required level %d"):format(id, tostring(cap), req))
+        if cap >= MAX_PLAYER_LEVEL then capsAtMax[#capsAtMax + 1] = id else maxLevel[id] = cap end
+    end
     if capsFile then
         capsFile:close()
         assert(PREFIX == "classic", "Forever level caps cannot be applied to " .. PREFIX .. " data")
-        for id, cap in pairs(assert(loadfile(capsPath))()) do
-            capsListed = capsListed + 1
-            if start[id] then
-                local req = math.floor(gates[id] / 100000000000)
-                assert(type(cap) == "number" and cap >= req and cap <= 99,
-                       ("quest %d: level cap %s does not fit its required level %d"):format(id, tostring(cap), req))
-                maxLevel[id] = cap
+        for id, cap in pairs(assert(loadfile(capsPath))()) do keepCap(id, nil, cap) end
+    end
+    if rules then
+        assert(not (capsFile and next(rules.caps)), "level caps in both foreverMaxLevels.lua and attRules.lua")
+        for id, range in pairs(rules.caps) do keepCap(id, range[1], range[2]) end
+        capsFile = capsFile or true
+    end
+    table.sort(capsAtMax)
+    table.sort(capsLeft)
+
+    local ended, daily, giverSide, sideQuests = {}, {}, {}, 0
+    if rules then
+        for id in pairs(start) do
+            ended[id] = rules.ended[id]
+            local flags = tonumber(quests[id][Q_FLAGS]) or 0
+            if rules.daily[id] or flags % (DAILY_FLAG + DAILY_FLAG) >= DAILY_FLAG then daily[id] = 1 end
+            -- A giver friendly to one faction alone offers a quest both can take only to its own side.
+            if not factionOfRaces(math.floor(gates[id] % 100000000 / 10000)) then
+                local sb, sided = quests[id][Q_STARTEDBY], false
+                for _, c in ipairs(type(sb) == "table" and type(sb[1]) == "table" and sb[1] or {}) do
+                    local f = npcs[c] and npcs[c][N_FACTION]
+                    if f == "A" or f == "H" then
+                        giverSide[c] = f == "A" and 2 or 1
+                        sided = true
+                    end
+                end
+                if sided then sideQuests = sideQuests + 1 end
             end
         end
     end
@@ -1187,6 +1330,13 @@ if mode == "available" then
     if capsFile then
         table.insert(parts, #parts - 1, "-- maxLevel [questID] = the highest level it is still offered at\n")
     end
+    if rules then
+        table.insert(parts, #parts - 1, "-- ended  [questID] = why no character is offered it today: 1 not in the game, 2 a world\n")
+        table.insert(parts, #parts - 1, "--        event that is not running, 3 the Scourge Invasion (open on Season of Discovery),\n")
+        table.insert(parts, #parts - 1, "--        4 content not released here\n")
+        table.insert(parts, #parts - 1, "-- daily  [questID] = 1, offered again after the daily reset\n")
+        table.insert(parts, #parts - 1, "-- giverSide [creatureID] = 1 Horde, 2 Alliance: the one faction that creature offers quests to\n")
+    end
 
     local expect = {}
     for i = 1, #sortedIds do
@@ -1271,6 +1421,15 @@ if mode == "available" then
     emitScalar("minRep", minRep)
     emitScalar("maxRep", maxRep)
     if capsFile then emitScalar("maxLevel", maxLevel) end
+    if rules then
+        emitScalar("ended", ended)
+        emitScalar("daily", daily)
+        parts[#parts + 1] = "},\ngiverSide = {\n"
+        local creatures = {}
+        for c in pairs(giverSide) do creatures[#creatures + 1] = c end
+        table.sort(creatures)
+        for _, c in ipairs(creatures) do parts[#parts + 1] = ("\t[%d]=%d,\n"):format(c, giverSide[c]) end
+    end
     parts[#parts + 1] = "},\n}\n"
 
     local text = table.concat(parts)
@@ -1326,7 +1485,8 @@ if mode == "available" then
                    ("quest %d questLevel changed on reload"):format(id))
             assert(math.floor(v % 1000000000 / 100000000) == (tonumber(q[Q_SPECIALFLAGS]) or 0) % 8,
                    ("quest %d specialFlags changed on reload"):format(id))
-            assert(math.floor(v % 100000000 / 10000) == (tonumber(q[Q_RACES]) or 0),
+            local races = math.floor(v % 100000000 / 10000)
+            assert(races == (factionStats.changed[id] or tonumber(q[Q_RACES]) or 0),
                    ("quest %d requiredRaces changed on reload"):format(id))
             assert(v % 10000 == (tonumber(q[Q_CLASSES]) or 0),
                    ("quest %d requiredClasses changed on reload"):format(id))
@@ -1360,7 +1520,17 @@ if mode == "available" then
         for i = 1, #sortedIds do
             local id = sortedIds[i]
             assert((got.maxLevel and got.maxLevel[id]) == maxLevel[id], ("quest %d level cap changed on reload"):format(id))
+            assert((got.ended and got.ended[id]) == ended[id], ("quest %d ended reason changed on reload"):format(id))
+            assert((got.daily and got.daily[id]) == daily[id], ("quest %d daily flag changed on reload"):format(id))
         end
+        local sides, want = 0, 0
+        for c, side in pairs(got.giverSide or {}) do
+            sides = sides + 1
+            assert(giverSide[c] == side, ("creature %d giver side changed on reload"):format(c))
+        end
+        for _ in pairs(giverSide) do want = want + 1 end
+        assert(sides == want, "giver side row count changed on reload")
+        assert(rules or (got.ended == nil and got.daily == nil and got.giverSide == nil), "rule tables emitted with no rules file")
 
         io.stderr:write(("-- verified %d start point(s) and %d gate row(s) by reload, max drift %.6f\n")
             :format(seen, gseen, worst))
@@ -1389,6 +1559,22 @@ if mode == "available" then
                 countTbl(parent), countTbl(skill), countTbl(minRep), countTbl(maxRep), countTbl(names)))
     if capsFile then
         io.stderr:write(("-- level caps: %d quest(s), of %d in the caps file\n"):format(countTbl(maxLevel), capsListed))
+        if #capsAtMax > 0 then
+            io.stderr:write(("-- level cap left out at or above level %d, it turns no one away: %s\n"):format(MAX_PLAYER_LEVEL, table.concat(capsAtMax, " ")))
+        end
+        if #capsLeft > 0 then
+            io.stderr:write("-- level cap left out, the range does not start at the required level: " .. table.concat(capsLeft, ", ") .. "\n")
+        end
+    end
+    if rules then
+        local byCode = {}
+        for _, code in pairs(ended) do byCode[code] = (byCode[code] or 0) + 1 end
+        io.stderr:write(("-- att rules: ended %d not in the game, %d world event, %d Scourge Invasion, %d not released; %d daily; giver side for %d creature(s) in %d quest(s)\n")
+            :format(byCode[1] or 0, byCode[2] or 0, byCode[3] or 0, byCode[4] or 0, countTbl(daily), countTbl(giverSide), sideQuests))
+        local function listed(t) table.sort(t); return #t > 0 and table.concat(t, " ") or "none" end
+        io.stderr:write(("-- att faction: %d narrowed to their givers' faction, %d race mask(s) turned to their givers' (%s), %d left open as ATT names the other faction (%s), %d kept against their givers (%s)\n")
+            :format(#factionStats.narrowed, #factionStats.corrected, listed(factionStats.corrected), #factionStats.disputed,
+                    listed(factionStats.disputed), #factionStats.contradicted, listed(factionStats.contradicted)))
     end
     if crumbs then
         io.stderr:write(("-- breadcrumbs: %d listed, %d with a start point here, %d quest(s) no longer gated on one (any-of list voided: %s; all-of entry dropped: %s; read as where it leads: %s)\n")

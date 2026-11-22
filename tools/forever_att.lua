@@ -82,6 +82,8 @@ local function normalize(id, t, ctx)
     q.unobtainable = type(ctx.u) == "number" and ctx.u or nil
     q.addedIn = type(ctx.awp) == "number" and ctx.awp or nil
     q.removedIn = type(ctx.rwp) == "number" and ctx.rwp or nil
+    q.phase = type(ctx.phase) == "number" and ctx.phase or nil
+    q.daily = t.isDaily and true or nil
     return q
 end
 
@@ -128,6 +130,7 @@ local function join(q, d, note)
         alt[f[1]] = d[f[1]]
         if not same(q[f[1]], d[f[1]]) then note.opened[#note.opened + 1] = f[2] end
     end
+    alt.phase = d.phase
     q.alts = q.alts or {}
     q.alts[#q.alts + 1] = alt
     for _, group in ipairs(DETAIL) do
@@ -206,9 +209,9 @@ return function(dir)
             return
         end
         local t = node.t
-        -- ATT sets these three on a group for every quest below it.
+        -- ATT sets these four on a group for every quest below it.
         ctx = { map = ctx.map, inst = ctx.inst, u = ctx.forced or t.u or ctx.u, forced = ctx.forced, awp = t.awp or ctx.awp,
-                rwp = t.rwp or ctx.rwp }
+                rwp = t.rwp or ctx.rwp, phase = t.phase or ctx.phase }
         if kind == "CreateMap" then ctx.map = node.id
         elseif kind == "CreateInstance" then ctx.inst = node.id end
         if kind == "CreateQuest" and type(node.id) == "number" then

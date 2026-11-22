@@ -2420,6 +2420,7 @@ function Probe:Available()
     line("  gate rows: pre=%s preAll=%s excl=%s chain=%s parent=%s leads=%s minRep=%s maxLevel=%s",
          countKeys(D.pre), countKeys(D.preAll), countKeys(D.excl),
          countKeys(D.chain), countKeys(D.parent), countKeys(D.leads), countKeys(D.minRep), countKeys(D.maxLevel))
+    line("  rule rows: ended=%s daily=%s giverSide=%s", countKeys(D.ended), countKeys(D.daily), countKeys(D.giverSide))
 
     line("2. this character, as the gates read it:")
     -- The same client calls the module makes, so a wrong reading here is the one the pins get
@@ -2463,6 +2464,11 @@ function Probe:Available()
          (C_Reputation and type(C_Reputation.GetFactionDataByID) == "function") and "present" or "absent",
          repByID and "present" or "absent")
     line("  A reputation gate that cannot be read shows the quest rather than hiding it.")
+    if A.DailyState then
+        local held, resetIn, invasion = A:DailyState()
+        line("  dailies held back until the reset=%s  GetQuestResetTime=%s (nil past a day)  season runs the Scourge Invasion=%s",
+             tostring(held), tostring(resetIn), tostring(invasion))
+    end
 
     -- A lunar table that ran out shows its quests like a running event, so coverage is printed
     local H = ns:GetSubsystem("QuestHolidays")

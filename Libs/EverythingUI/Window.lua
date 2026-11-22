@@ -574,6 +574,41 @@ local function checkGroups(ctx, level)
     end
 end
 
+local KEEP_ON_SCREEN = 150
+
+-- An offset from UIParent's center in UIParent's units, so a saved position reads the same at any window scale.
+local function readOffset(f)
+    local cx, cy = f:GetCenter()
+    if not (cx and cy) then return nil end
+    local k = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    return cx * k - UIParent:GetWidth() / 2, cy * k - UIParent:GetHeight() / 2
+end
+
+-- The title bar stays reachable: its top under the screen's top, its bottom over the screen's bottom, and
+-- KEEP_ON_SCREEN of its width in from either side.
+local function keepOnScreen(f, x, y)
+    local k = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    local w, h = f:GetWidth() * k, f:GetHeight() * k
+    local head = lib.tokens.spacing.headerHeight * k
+    local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
+    local keep = KEEP_ON_SCREEN
+    x = math.max(keep - (sw + w) / 2, math.min((sw + w) / 2 - keep, x))
+    y = math.max(head - (sh + h) / 2, math.min((sh - h) / 2, y))
+    return x, y
+end
+
+local function placeAt(f, x, y)
+    local k = UIParent:GetEffectiveScale() / f:GetEffectiveScale()
+    f:ClearAllPoints()
+    f:SetPoint("CENTER", UIParent, "CENTER", x * k, y * k)
+end
+
+local function savedOffset(ctx)
+    local x, y = ctx.opts.getWindowPosition()
+    if type(x) == "number" and type(y) == "number" then return x, y end
+    return 0, 0
+end
+
 function Context:BuildSettings(name)
     if self._window then return self._window end
     checkGroups(self, 2)
@@ -593,6 +628,18 @@ function Context:BuildSettings(name)
     -- This frame persists no position, so a window dragged off screen would stay there for
     -- every later show.
     f:SetClampedToScreen(true)
+    -- A host that keeps the position lets it hang off the screen, pulled back on release so the title bar stays reachable.
+    if self.opts.getWindowPosition then
+        f:SetClampedToScreen(false)
+        f:SetScript("OnDragStop", function()
+            f:StopMovingOrSizing()
+            local x, y = readOffset(f)
+            if not x then return end
+            x, y = keepOnScreen(f, x, y)
+            placeAt(f, x, y)
+            self.opts.setWindowPosition(x, y)
+        end)
+    end
     f:Hide()
     kit.CloseOnEscape(f)
 
@@ -743,8 +790,9 @@ function Context:SelectTab(id)
     layoutNav(self)
 end
 
--- The UIParent-units idiom a tracker uses does not apply here: this frame persists no
--- position, so there is nothing stored to be in the wrong units.
+-- Without the position pair the UIParent-units idiom a tracker uses does not apply here: this frame
+-- then persists no position, so there is nothing stored to be in the wrong units. With the pair the
+-- position is stored in UIParent's units (readOffset), so a scale change cannot move it.
 function Context:ApplyWindowScale()
     local f = self._window
     if not f then return end
@@ -776,7 +824,9 @@ function Context:ApplyWindowScale()
     local cx, cy = f:GetCenter()
     local oldEff = f:GetEffectiveScale()
     f:SetScale(s)
-    if cx and cy and oldEff then
+    if self.opts.getWindowPosition then
+        placeAt(f, keepOnScreen(f, savedOffset(self)))
+    elseif cx and cy and oldEff then
         local newEff = f:GetEffectiveScale()
         f:ClearAllPoints()
         f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx * oldEff / newEff, cy * oldEff / newEff)

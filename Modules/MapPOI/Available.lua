@@ -28,7 +28,7 @@ local CLASS_BIT = {
 local ALLIANCE_ERA_RACES = { 1, 4, 8, 64 }
 local HORDE_ERA_RACES    = { 2, 16, 32, 128 }
 
-local _level, _raceBit, _classBit, _raceEveryOf
+local _level, _raceBit, _classBit, _raceEveryOf, _side, _sideRead
 
 local function readLevel()
     _level = UnitLevel and UnitLevel("player") or 0
@@ -54,8 +54,11 @@ local function readPlayer()
     else
         _raceBit = RACE_BIT[raceToken or ""]
     end
+    local faction = UnitFactionGroup and UnitFactionGroup("player")
+    -- The generator's giverSide numbering: 1 Horde, 2 Alliance
+    _side = (faction == "Alliance" and 2) or (faction == "Horde" and 1) or nil
+    _sideRead = true
     if not _raceBit then
-        local faction = UnitFactionGroup and UnitFactionGroup("player")
         _raceEveryOf = (faction == "Alliance" and ALLIANCE_ERA_RACES)
                     or (faction == "Horde" and HORDE_ERA_RACES)
                     or nil
@@ -293,6 +296,54 @@ local REASON_LATER_STEP  = "later step done"
 local REASON_BRANCH      = "took another branch"
 local REASON_REPUTATION  = "reputation"
 local REASON_PROFESSION  = "profession"
+local REASON_NOT_IN_GAME = "not in the game"
+local REASON_EVENT       = "event not running"
+local REASON_UNRELEASED  = "not released"
+local REASON_DAILY_DONE  = "daily done today"
+
+-- The ended codes tools/build_att_rules.lua writes. An unknown code still refuses, so the reasons keep summing to the total
+local ENDED_REASON = { [1] = REASON_NOT_IN_GAME, [2] = REASON_EVENT, [3] = REASON_EVENT, [4] = REASON_UNRELEASED }
+local ENDED_INVASION = 3
+
+-- Season of Discovery runs the Scourge Invasion for good on the Era client. 2 is its season id where the enum is missing
+local function invasionRunning()
+    local S = _G.C_Seasons
+    if not (S and S.GetActiveSeason) then return false end
+    local ok, season = pcall(S.GetActiveSeason)
+    local sod = _G.Enum and _G.Enum.SeasonID and _G.Enum.SeasonID.SeasonOfDiscovery or 2
+    return ok and season == sod
+end
+
+-- Seconds to the daily reset, nil past a day: the client can answer epoch time on a login's first load
+local function secondsToReset()
+    local f = _G.GetQuestResetTime
+    if type(f) ~= "function" then return nil end
+    local ok, s = pcall(f)
+    if ok and type(s) == "number" and s > 0 and s <= 86400 then return s end
+    return nil
+end
+
+local function serverNow()
+    local f = _G.GetServerTime or _G.time
+    if type(f) == "function" then return f() end
+    return nil
+end
+
+-- [questID] = the server time of the reset after this character handed it in, as the completed set is unmeasured for dailies on TBC
+local function dailyStore()
+    local DB = ns:GetSubsystem("DB")
+    local char = DB and DB.char
+    if not char then return nil end
+    char.dailyDone = char.dailyDone or {}
+    return char.dailyDone
+end
+
+local _dailyDone, _now, _invasionOn
+
+-- preparePass drops every record whose reset has passed, so one still held is from today
+local function doneToday(questID)
+    return _dailyDone ~= nil and _dailyDone[questID] ~= nil
+end
 
 -- The Data/QuestCategory bits. The event bit (4) stays unread, as it comes from SF_EXPLORE, not holidays
 local CAT_INSTANCE, CAT_REPEATABLE, CAT_PROFESSION = 1, 2, 16
@@ -405,11 +456,20 @@ local function isAvailable(questID, D, hideLowLevel, floor, unfiltered)
 
     local flags = math.floor(gates % 1e9 / 1e8)
     local repeatable = (flags % (SF_REPEATABLE + SF_REPEATABLE)) >= SF_REPEATABLE
+    local daily = D.daily and D.daily[questID]
 
-    if isCompleted(questID) and not repeatable then return false, REASON_COMPLETED end
+    -- A daily is judged by the record alone, as one TBC daily lacks the repeatable flag
+    if isCompleted(questID) and not (repeatable or daily) then return false, REASON_COMPLETED end
+    if daily and doneToday(questID) then return false, REASON_DAILY_DONE end
 
     local inLog, failed = logState(questID)
     if inLog and not failed then return false, REASON_IN_LOG end
+
+    -- Ahead of race, class and level, as no character is offered it and the reason should say so
+    local ended = D.ended and D.ended[questID]
+    if ended and not (ended == ENDED_INVASION and _invasionOn) then
+        return false, ENDED_REASON[ended] or REASON_NOT_IN_GAME
+    end
 
     local races = math.floor(gates % 1e8 / 1e4)
     if not raceAllows(races) then
@@ -502,6 +562,16 @@ local function preparePass()
     if not ((_raceBit or _raceEveryOf) and _classBit) then return false end
     readCompleted()
     readSkills()
+    _invasionOn = invasionRunning()
+    -- Only TBC's daily table has rows, so the other clients never read a clock or the record
+    local D = data()
+    _now = D and D.daily and next(D.daily) and serverNow() or nil
+    _dailyDone = _now and dailyStore() or nil
+    if _dailyDone then
+        for questID, at in pairs(_dailyDone) do
+            if at <= _now then _dailyDone[questID] = nil end
+        end
+    end
     -- Set once the masks are readable, so it holds even on a pass that rejects every quest.
     M._gatesRun.raceClass = true
 
@@ -661,7 +731,18 @@ local function decodeStart(v)
            math.floor(v / 1e9)
 end
 
--- Every start of one quest on every map, where PointsFor answers what to draw on one map
+-- The start table's kind for a creature giver, the only kind whose source id is a unit you can hover
+local START_NPC = 1
+
+-- A creature friendly to one faction alone offers the other nothing, whatever the quest's own races say. An unread faction hides none
+local function hostileGiver(D, kind, src)
+    local side = kind == START_NPC and D.giverSide and D.giverSide[src]
+    if not side then return false end
+    if not _sideRead then readPlayer() end
+    return _side ~= nil and side ~= _side
+end
+
+-- Every start of one quest on every map, less givers hostile to you, where PointsFor answers what to draw on one map
 function M:StartsFor(questID, out)
     local D = data()
     local byMap = D and D.start[questID]
@@ -670,16 +751,40 @@ function M:StartsFor(questID, out)
     for mapID, list in pairs(byMap) do
         for i = 1, #list do
             local kind, x, y, _, src = decodeStart(list[i])
-            n = n + 1
-            out[n] = { mapID = mapID, x = x, y = y, kind = kind,
-                       name = ns.Compat.SourceName(kind, src) }
+            if not hostileGiver(D, kind, src) then
+                n = n + 1
+                out[n] = { mapID = mapID, x = x, y = y, kind = kind,
+                           name = ns.Compat.SourceName(kind, src) }
+            end
         end
     end
     return n
 end
 
--- The start table's kind for a creature giver, the only kind whose source id is a unit you can hover
-local START_NPC = 1
+function M:HostileGiver(kind, src)
+    local D = data()
+    return D ~= nil and hostileGiver(D, kind, src)
+end
+
+-- Whether a giver who will talk to you offers the quest on this map
+function M:StartsOnMap(questID, mapID)
+    local D = data()
+    local list = D and D.start[questID] and D.start[questID][mapID]
+    if not list then return false end
+    for i = 1, #list do
+        local kind, _, _, _, src = decodeStart(list[i])
+        if not hostileGiver(D, kind, src) then return true end
+    end
+    return false
+end
+
+-- The ended code no character is offered the quest for, with Season of Discovery's invasion left open as the gate leaves it
+function M:Ended(questID)
+    local D = data()
+    local code = D and D.ended and questID and D.ended[questID]
+    if not code or (code == ENDED_INVASION and invasionRunning()) then return nil end
+    return code
+end
 
 -- [creatureID] = { questID, ... }, built on the first tooltip that asks and kept, as the data never changes
 local _byGiver
@@ -703,6 +808,7 @@ function M:QuestsStartedBy(npcID)
             end
         end
     end
+    if hostileGiver(D, START_NPC, npcID) then return nil end
     return _byGiver[npcID]
 end
 
@@ -859,18 +965,20 @@ function M:PointsFor(mapID)
             for i = 1, #list do
                 if taken >= MAX_PER_QUEST then break end
                 local kind, x, y, key, src = decodeStart(list[i])
-                local slot = _byCoord[key]
-                if not slot then
-                    slot = { x = x, y = y, kind = kind, src = src, quests = {}, kinds = {} }
-                    _byCoord[key] = slot
-                    _order[#_order + 1] = key
-                elseif kind < slot.kind or (kind == slot.kind and src < slot.src) then
-                    -- The lower kind wins, then the lower source. They move together, as the kind picks the id space
-                    slot.kind, slot.src = kind, src
+                if not hostileGiver(D, kind, src) then
+                    local slot = _byCoord[key]
+                    if not slot then
+                        slot = { x = x, y = y, kind = kind, src = src, quests = {}, kinds = {} }
+                        _byCoord[key] = slot
+                        _order[#_order + 1] = key
+                    elseif kind < slot.kind or (kind == slot.kind and src < slot.src) then
+                        -- The lower kind wins, then the lower source. They move together, as the kind picks the id space
+                        slot.kind, slot.src = kind, src
+                    end
+                    local q = #slot.quests + 1
+                    slot.quests[q], slot.kinds[q] = questID, kind
+                    taken = taken + 1
                 end
-                local q = #slot.quests + 1
-                slot.quests[q], slot.kinds[q] = questID, kind
-                taken = taken + 1
             end
         end
     end
@@ -890,8 +998,54 @@ function M:PointsFor(mapID)
     return n
 end
 
+local _resetTimer
+
+local function repaint()
+    local P = ns:GetSubsystem("MapPOIProvider")
+    if P and P.provider and P.provider.RefreshAllData then P.provider:RefreshAllData() end
+    local MM = ns:GetSubsystem("MinimapQuestPins")
+    if MM and MM.Rebuild then MM:Rebuild() end
+end
+
+-- One timer, at the soonest reset a recorded daily waits for, so its "!" comes back without a reload
+local function scheduleReset()
+    if _resetTimer then _resetTimer:Cancel(); _resetTimer = nil end
+    local store, now, soonest = dailyStore(), serverNow(), nil
+    if not (store and now and C_Timer and C_Timer.NewTimer) then return end
+    for _, at in pairs(store) do
+        if at > now and (not soonest or at < soonest) then soonest = at end
+    end
+    if not soonest then return end
+    _resetTimer = C_Timer.NewTimer(soonest - now + 1, function()
+        _resetTimer = nil
+        M:Invalidate()
+        repaint()
+        scheduleReset()
+    end)
+end
+
+function M:RecordDaily(questID)
+    local D = data()
+    if not (D and D.daily and questID and D.daily[questID]) then return false end
+    local s, store, now = secondsToReset(), dailyStore(), serverNow()
+    if not (s and store and now) then return false end
+    store[questID] = now + s
+    scheduleReset()
+    return true
+end
+
+-- For /eqsprobe available: the dailies held back now, the client's reset answer and the season's invasion
+function M:DailyState()
+    local store, now, n = dailyStore(), serverNow(), 0
+    for _, at in pairs(now and store or {}) do
+        if at > now then n = n + 1 end
+    end
+    return n, secondsToReset(), invasionRunning()
+end
+
 function M:OnEnable()
-    if not data() then return end
+    local D = data()
+    if not D then return end
     local Events = ns:GetSubsystem("Events")
 
     local function invalidate() M:Invalidate() end
@@ -904,11 +1058,15 @@ function M:OnEnable()
         C_Timer.After(0.5, function() M:WarnSkipped(questID) end)
     end)
     Events:On("QUEST_REMOVED",        invalidate)
-    Events:On("QUEST_TURNED_IN",      invalidate)
+    Events:On("QUEST_TURNED_IN", function(_, questID)
+        M:RecordDaily(questID)
+        invalidate()
+    end)
     Events:On("PLAYER_LEVEL_UP",      invalidate)
     -- In case UnitLevel still reads the old level while PLAYER_LEVEL_UP is handled
     Events:On("PLAYER_LEVEL_CHANGED", invalidate)
     Events:On("PLAYER_ENTERING_WORLD", invalidate)
     Events:On("SKILL_LINES_CHANGED",  invalidate)
     Events:On("UPDATE_FACTION",       invalidate)
+    if D.daily and next(D.daily) then scheduleReset() end
 end

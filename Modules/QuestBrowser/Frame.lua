@@ -56,6 +56,10 @@ local function reasonText(reason)
     if reason == "dungeon or raid quest" then return L["Hidden by your dungeon and raid filter."] end
     if reason == "repeatable quest"     then return L["Hidden by your repeatable quest filter."] end
     if reason == "profession quest"     then return L["Hidden by your profession quest filter."] end
+    if reason == "not in the game"      then return L["This quest is no longer in the game, or never was."] end
+    if reason == "event not running"    then return L["Part of a one-time world event that is not running here."] end
+    if reason == "not released"         then return L["Part of content that is not released on this version of the game yet."] end
+    if reason == "daily done today"     then return L["You have done this daily quest today. It is offered again after the daily reset."] end
     return nil
 end
 

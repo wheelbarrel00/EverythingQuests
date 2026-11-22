@@ -73,7 +73,7 @@ end
 local function keptQuests(D, A, kids, pars)
     local keep = {}
     local function consider(q)
-        if keep[q] == nil and D.gates[q] then keep[q] = A:CanEverTake(q) ~= false end
+        if keep[q] == nil and D.gates[q] then keep[q] = A:CanEverTake(q) ~= false and not A:Ended(q) end
     end
     for q in pairs(kids) do consider(q) end
     for q in pairs(pars) do consider(q) end
@@ -396,13 +396,18 @@ local function beats(mapID, n, best, bestN)
     return n > bestN or (n == bestN and mapID < best)
 end
 
--- The best of a quest's start maps as beats ranks them, so the answer never depends on pairs order
+-- The best of a quest's start maps as beats ranks them, so the answer never depends on pairs order. A giver hostile to you is no way in
 local function busiestMap(byMap)
     if not byMap then return nil end
+    local A = avail()
     local best, bestN
     for mapID, list in pairs(byMap) do
-        local n = #list
-        if beats(mapID, n, best, bestN) then best, bestN = mapID, n end
+        local n = 0
+        for i = 1, #list do
+            local v = list[i]
+            if not (A and A:HostileGiver(math.floor(v / 1e8) % 10, math.floor(v / 1e9))) then n = n + 1 end
+        end
+        if n > 0 and beats(mapID, n, best, bestN) then best, bestN = mapID, n end
     end
     return best
 end
@@ -673,6 +678,7 @@ local function ownStatus(questID)
     end
     local ok, why = A:Explain(questID, true)
     if ok then return "available" end
+    if A:Ended(questID) then return "ended", why end
     local gone = (why == REASON_LATER_STEP or why == REASON_FOLLOW_UP or why == REASON_BRANCH) and why or A:RuledOut(questID)
     if gone == REASON_LATER_STEP or gone == REASON_FOLLOW_UP then return "passed", gone end
     if gone == REASON_BRANCH then return "branch", gone end
@@ -680,7 +686,7 @@ local function ownStatus(questID)
     return "pending", why
 end
 
-local function isClosed(s) return s == "passed" or s == "branch" or s == "outleveled" end
+local function isClosed(s) return s == "passed" or s == "branch" or s == "outleveled" or s == "ended" end
 
 local _status, _why, _visiting = {}, {}, {}
 
@@ -755,14 +761,8 @@ end
 -- Instance, repeatable and profession quests are not a zone's to finish. Bits 4 (explored or scripted) and 8 (class) count
 local CAT_INSTANCE, CAT_REPEATABLE, CAT_PROFESSION = 1, 2, 16
 
--- The Ahn'Qiraj war effort's quests that are not repeatable, left out as Forever may never run the event
-local WAR_EFFORT = {}
-for _, q in ipairs({ 8492, 8494, 8499, 8503, 8505, 8509, 8511, 8513, 8515, 8517, 8520, 8522, 8524, 8526, 8528,
-                     8532, 8542, 8545, 8549, 8580, 8582, 8588, 8590, 8600, 8604, 8607, 8609, 8611, 8613, 8615 }) do
-    WAR_EFFORT[q] = true
-end
-for q = 8792, 8797 do WAR_EFFORT[q] = true end
-for q = 8846, 8855 do WAR_EFFORT[q] = true end
+-- The data's ended code for a world event, which on Forever's Era data is only ever the Ahn'Qiraj war effort
+local ENDED_EVENT = 2
 
 local function hasCategory(mask, flag)
     return math.floor(mask / flag) % 2 == 1
@@ -806,7 +806,9 @@ end
 -- Why the zone bar leaves a quest out, or nil when it counts. The second answer says the character cannot be read yet
 local function zoneReason(A, D, questID)
     if not D.gates[questID] then return "unknown" end
-    if WAR_EFFORT[questID] then return "warEffort" end
+    -- Only the war effort keeps a zone bar line of its own
+    local ended = A:Ended(questID)
+    if ended then return ended == ENDED_EVENT and "warEffort" or "ended" end
     local mask = ns.CLASSIC_QUEST_CATEGORY and ns.CLASSIC_QUEST_CATEGORY[questID]
     if mask then
         if hasCategory(mask, CAT_INSTANCE) then return "instance" end
@@ -850,7 +852,7 @@ local function zoneSet(mapID)
         end
     end
     for q, byMap in pairs(D.start) do
-        if byMap[mapID] then st.starts = st.starts + 1; add(q) end
+        if byMap[mapID] and A:StartsOnMap(q, mapID) then st.starts = st.starts + 1; add(q) end
     end
     for _, chain in pairs(Database.chains) do
         if chain._generated and chain.category == mapID then

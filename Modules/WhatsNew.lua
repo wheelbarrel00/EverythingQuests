@@ -5,6 +5,10 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.17.0", sections = {
+        { "Quests you cannot take, left off the map", "Quests from world events that have ended, quests removed from the game and quests only the other faction's quest givers offer are no longer marked, and on Classic Era and Burning Crusade Classic neither are quests past the top of their level range. On WoW Forever, the later raids it has not opened, such as Ahn'Qiraj and Naxxramas, are left out too, and on Burning Crusade Classic a daily quest you hand in waits for the daily reset.", classic = true },
+        { "Drag the options window partly off the screen", "You can now drag the /eqs options window past the left, right and bottom edges of the screen, so it covers less of the game while you change settings. Its title bar always stays in reach, and the window opens at the left edge again after a reload." },
+    } },
     { version = "2.16.0", sections = {
         { "Breadcrumb quests", "A quest you can pick up without its breadcrumb quest is now marked for you, a breadcrumb's \"!\" goes once you take the quest it leads to, and a line in chat names a breadcrumb you skip. You can turn the line off in the General tab: \"Warn when you skip a breadcrumb quest\".", classic = true },
     } },

@@ -266,10 +266,7 @@ function QB:Query(opts)
     for questID, stored in pairs(D.names) do
         local keep = true
 
-        if mapID then
-            local byMap = D.start[questID]
-            keep = (byMap and byMap[mapID]) ~= nil
-        end
+        if mapID then keep = A:StartsOnMap(questID, mapID) end
 
         if keep and needle then
             if exact then

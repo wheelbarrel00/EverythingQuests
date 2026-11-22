@@ -116,6 +116,7 @@ DB.defaults = {
         trackedChainID = nil,
         minimap = { hide = false, minimapPos = 220 },
         lastOptionsTab = "general",
+        dailyDone = {},
     },
 }
 

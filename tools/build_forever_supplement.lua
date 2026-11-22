@@ -78,9 +78,10 @@ do
     os.remove(marker)
     assert(not same, "<outDir> must not be <eraDir>, or the next Era build would carry Forever rows")
 end
--- A run without --att, or one that stops before the caps are written, must not leave the last run's caps or breadcrumbs for the generator.
+-- A run without --att, or one that stops before the caps are written, must not leave the last run's caps, breadcrumbs or rules for the generator.
 os.remove(outDir .. "/" .. OVERLAY_PREFIX .. "MaxLevels.lua")
 os.remove(outDir .. "/breadcrumbs.lua")
+os.remove(outDir .. "/attRules.lua")
 
 local function parseBlock(src, marker, label)
     local at = assert(src:find(marker, 1, true), "marker not found in " .. label)
@@ -1714,6 +1715,12 @@ if att then
             io.stderr:write("-- att breadcrumb left out, the collector saw the quest offered while it was in the log: "
                 .. table.concat(together, ", ") .. "\n")
         end
+    end
+    do
+        local eraAtt = attDir:gsub("[/\\]+$", "") .. "/../Vanilla"
+        assert(exists(eraAtt .. "/Categories/Zones.lua"), "--att needs AllTheThings' Era data beside it, at " .. eraAtt)
+        local writeRules = dofile((debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "tools/") .. "build_att_rules.lua")
+        for _, line in ipairs(select(2, writeRules(att.quests, eraAtt, outDir, attDir))) do io.stderr:write(line .. "\n") end
     end
     for _, why in ipairs(sortedKeys(attSkipped)) do
         io.stderr:write(("-- att skipped, %s: %s\n"):format(why, table.concat(attSkipped[why], " ")))
