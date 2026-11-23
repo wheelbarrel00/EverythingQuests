@@ -568,6 +568,37 @@ local function addBrowserHint(tip)
     if QB and QB.Available and QB:Available() then
         tip:AddLine(L["Right-click for quest details"], 0.5, 0.75, 1.0)
     end
+    -- With a chat box open a Shift-click shares the quest instead, and the hover is read before Shift is held
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    local QLink = ns:GetSubsystem("QuestLink")
+    if Avail and Avail.SetHidden and not (QLink and QLink.ChatBoxOpen and QLink:ChatBoxOpen()) then
+        tip:AddLine(L["Shift-click to pick quests to hide"], 0.5, 0.75, 1.0)
+    end
+end
+
+-- One spot can hold many quests, so the player picks which, and each check applies at once
+local function showHideMenu(pin)
+    local Avail = ns:GetSubsystem("AvailableQuests")
+    local Options = ns:GetSubsystem("Options")
+    local quests = pin.avail
+    if not (Avail and Avail.SetHidden and Options and Options.ui and quests and #quests > 0) then return false end
+    local items = { { kind = "title", text = L["Hide from the map"] } }
+    for i = 1, #quests do
+        local qid = quests[i]
+        local level = Avail:QuestLevel(qid)
+        local title = Avail:Title(qid)
+        items[#items + 1] = {
+            kind = "check",
+            text = level and ("[" .. level .. "] " .. title) or title,
+            checked = Avail:IsHidden(qid),
+            onClick = function(on) Avail:SetHidden(qid, on) end,
+        }
+    end
+    items[#items + 1] = { kind = "divider" }
+    items[#items + 1] = { text = L["Close"] }
+    ns.Util.PinTooltip():Hide()
+    Options.ui:ShowMenu(items, _G.WorldMapFrame)
+    return true
 end
 
 function Pin:OnMouseEnter()
@@ -637,6 +668,7 @@ function Pin:OnClick(button)
     if button ~= "RightButton" then
         local QLink = ns:GetSubsystem("QuestLink")
         if QLink and QLink:WantsShare() and QLink:Share(self.questID) then return end
+        if self.avail and IsShiftKeyDown and IsShiftKeyDown() and showHideMenu(self) then return end
     end
     if button == "RightButton" then
         -- A quest you have not accepted has no log entry, so the browser takes the click

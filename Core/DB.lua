@@ -8,6 +8,13 @@ DB.defaults = {
             autoAcceptQuests = false,
             autoTurnInQuests = false,
             autoConfirmGroupQuests = false,
+            autoAcceptSkipGroup      = true,
+            autoAcceptSkipTrivial    = true,
+            autoAcceptSkipRepeatable = false,
+            autoAcceptSkipPvP        = false,
+            declineBattlegroundShares = false,
+            autoTurnInSkipRepeatable = true,
+            autoQuestPauseKey        = "alt",
             -- EQ Objective Tracker draws these icons, and TrackerBridge adds or removes them by these keys
             showChainGuideIcon = true,
             showEQIcon = true,
@@ -117,6 +124,7 @@ DB.defaults = {
         minimap = { hide = false, minimapPos = 220 },
         lastOptionsTab = "general",
         dailyDone = {},
+        hiddenQuests = {},
     },
 }
 

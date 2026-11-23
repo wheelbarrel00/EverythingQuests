@@ -60,6 +60,7 @@ local function reasonText(reason)
     if reason == "event not running"    then return L["Part of a one-time world event that is not running here."] end
     if reason == "not released"         then return L["Part of content that is not released on this version of the game yet."] end
     if reason == "daily done today"     then return L["You have done this daily quest today. It is offered again after the daily reset."] end
+    if reason == "hidden by you"        then return L["You can pick this up now, but you took it off your map. Uncheck \"Hide from the map\" to show it again."] end
     return nil
 end
 
@@ -82,6 +83,7 @@ local function scopeOptions()
         { value = "available", label = L["Available to you"] },
         { value = "log",       label = L["In your quest log"] },
         { value = "completed", label = L["Completed"] },
+        { value = "hidden",    label = L["Hidden by you"] },
     }
 end
 
@@ -263,6 +265,24 @@ function QB:Build()
     f._status:SetWordWrap(true)
     f._zoneNote = ctx:CreateText(content, "", "hint")
     f._zoneNote:SetWordWrap(true)
+    f._hide = ctx:CreateCheckbox(content, L["Hide from the map"],
+        function()
+            local A = avail()
+            return A and A.IsHidden and A:IsHidden(QB._selected)
+        end,
+        function(v)
+            local A = avail()
+            if A and A.SetHidden and QB._selected then A:SetHidden(QB._selected, v) end
+        end,
+        nil)
+    f._hide:HookScript("OnEnter", function()
+        local tip = L["Takes this quest's gold quest marker off your world map and minimap, and out of the \"Available to you\" list, for this character only. You can also Shift-click a gold quest marker on the world map, with no chat box open, to pick which of its quests to hide. Pick \"Hidden by you\" in the menu above the quest list to see the quests you hid."]
+        if ns.HAS_CLASSIC_SPAWNS and C_SuperTrack then
+            tip = tip .. " " .. L["WoW Forever itself still marks the quest giver when you are near, and a chain you track in the Chain Guide still marks its next step."]
+        end
+        ctx:ShowTooltip(f._hide, L["Hide from the map"], tip)
+    end)
+    f._hide:HookScript("OnLeave", function() ctx:HideTooltip() end)
     f._directions = ctx:CreateButton(content, L["Get Directions"], nil, function() QB:GetDirections() end)
     f._empty = ctx:CreateEmptyState(f.body, L["Pick a quest on the left."])
     f._empty:SetPoint("TOP", f.body, "CENTER", 0, 8)
@@ -307,7 +327,7 @@ function QB:RenderList()
         f._count:SetText((L["%d quests"]):format(matched))
     end
 
-    -- Quests you can neither take now nor have in your log are dimmed, and done ones carry a check
+    -- A quest the map would not mark now, by its rules, its filters or a hide, is dimmed unless it is in your log, and done ones carry a check
     local A = avail()
     for i = #_listRows, shown + 1, -1 do _listRows[i] = nil end
     for i = 1, shown do
@@ -432,6 +452,16 @@ local function statusOf(record)
     return text, nil
 end
 
+-- Only for a quest that can still get a gold quest marker, and always for one already hidden so it can be shown again
+local function hideOffered(A, record)
+    if not (A and A.SetHidden) then return false end
+    if A:IsHidden(record.id) then return true end
+    if not record.starts or (record.completed and not record.isRepeatable) then return false end
+    if record.maxLevel and UnitLevel and (UnitLevel("player") or 0) > record.maxLevel then return false end
+    if A.RuledOut and A:RuledOut(record.id) then return false end
+    return A:CanEverTake(record.id) ~= false and not A:Ended(record.id)
+end
+
 function QB:RenderDetails()
     local f = self.frame
     if not f then return end
@@ -447,6 +477,7 @@ function QB:RenderDetails()
     if not record then
         for _, p in ipairs(parts) do p:Hide() end
         f._zoneNote:Hide()
+        f._hide:Hide()
         f._empty:Show()
         f._area:SetContentSize(_width, 1)
         return
@@ -531,6 +562,16 @@ function QB:RenderDetails()
         f._zoneNote:SetWidth(_width - PAD_SIDE * 2)
         f._zoneNote:SetText(note)
         _y = _y + (f._zoneNote:GetStringHeight() or 12)
+    end
+
+    local canHide = hideOffered(avail(), record)
+    f._hide:SetShown(canHide)
+    if canHide then
+        _y = _y + TAG_GAP
+        f._hide:ClearAllPoints()
+        f._hide:SetPoint("TOPLEFT", content, "TOPLEFT", PAD_SIDE, -_y)
+        f._hide:Refresh()
+        _y = _y + f._hide:GetHeight()
     end
 
     local reqs = {}
@@ -652,6 +693,14 @@ function QB:Open(questID)
         self:RenderList()
         self:RenderDetails()
     end
+end
+
+-- After a quest is hidden or shown again, so the list and the page agree with it
+function QB:Refresh()
+    local f = self.frame
+    if not (f and f:IsShown()) then return end
+    self:RenderList()
+    self:RenderDetails()
 end
 
 function QB:Toggle()

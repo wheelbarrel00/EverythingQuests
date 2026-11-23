@@ -336,7 +336,6 @@ function Probe:Quest()
         "C_NamePlate.GetNamePlates", "C_TooltipInfo.GetUnit", "issecretvalue",
     })
 
-    -- QuestAuto guards on GetNumActiveQuests and then calls GetActiveTitle and SelectActiveQuest
     line("QuestAuto - Modules/QuestAuto.lua:")
     present({
         "C_GossipInfo.GetActiveQuests", "C_GossipInfo.GetAvailableQuests",
@@ -344,8 +343,15 @@ function Probe:Quest()
         "AcceptQuest", "CompleteQuest", "GetQuestReward", "GetNumQuestChoices",
         "GetNumAvailableQuests", "SelectAvailableQuest", "GetActiveTitle",
         "GetNumActiveQuests", "SelectActiveQuest", "IsQuestCompletable", "DeclineQuest",
-        "IsAltKeyDown", "hooksecurefunc", "SetItemRef",
+        "IsAltKeyDown", "IsShiftKeyDown", "IsControlKeyDown", "hooksecurefunc", "SetItemRef",
+        "GetQuestID", "GetTitleText", "GetQuestTagInfo", "C_QuestLog.GetQuestTagInfo",
+        "C_QuestLog.IsQuestTrivial", "C_QuestLog.IsRepeatableQuest", "UnitInBattleground", "UnitIsPlayer",
+        "UnitGUID", "GetActiveQuestID", "GetAvailableQuestInfo", "GetAvailableTitle", "QuestFlagsPVP",
+        "ClassicExpansionAtLeast",
+        "C_QuestInfoSystem.GetQuestClassification",
     })
+    local QA = ns:GetSubsystem("QuestAuto")
+    if QA and QA.PauseKey then line("  pause key=%s", QA:PauseKey()) end
 
     line("The retail Chain Guide sources and World Quests APIs - neither module is listed on Era, TBC or Forever:")
     present({
@@ -2493,6 +2499,9 @@ function Probe:Available()
     for why, n in pairs(A._reason) do reasons[#reasons + 1] = ("%s=%d"):format(why, n) end
     table.sort(reasons)
     line("  ruled out by: %s", #reasons > 0 and table.concat(reasons, "  ") or "nothing")
+    if A.HiddenCount then
+        line("  quests this character hid from the map=%d", A:HiddenCount())
+    end
 
     line("5. on the map the player is standing in:")
     local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")

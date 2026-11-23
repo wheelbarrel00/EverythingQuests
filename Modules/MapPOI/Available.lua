@@ -300,6 +300,7 @@ local REASON_NOT_IN_GAME = "not in the game"
 local REASON_EVENT       = "event not running"
 local REASON_UNRELEASED  = "not released"
 local REASON_DAILY_DONE  = "daily done today"
+local REASON_HIDDEN      = "hidden by you"
 
 -- The ended codes tools/build_att_rules.lua writes. An unknown code still refuses, so the reasons keep summing to the total
 local ENDED_REASON = { [1] = REASON_NOT_IN_GAME, [2] = REASON_EVENT, [3] = REASON_EVENT, [4] = REASON_UNRELEASED }
@@ -338,7 +339,16 @@ local function dailyStore()
     return char.dailyDone
 end
 
-local _dailyDone, _now, _invasionOn
+-- [questID] = true for a quest this character took off the map by hand
+local function hiddenStore()
+    local DB = ns:GetSubsystem("DB")
+    local char = DB and DB.char
+    if not char then return nil end
+    char.hiddenQuests = char.hiddenQuests or {}
+    return char.hiddenQuests
+end
+
+local _dailyDone, _now, _invasionOn, _hidden
 
 -- preparePass drops every record whose reset has passed, so one still held is from today
 local function doneToday(questID)
@@ -535,6 +545,9 @@ local function isAvailable(questID, D, hideLowLevel, floor, unfiltered)
 
     if skillFails(D.skill[questID]) then return false, REASON_PROFESSION end
 
+    -- Last, so it counts only quests every other gate passes, and never in an unfiltered answer, which asks what the game offers
+    if not unfiltered and _hidden and _hidden[questID] then return false, REASON_HIDDEN end
+
     return true
 end
 
@@ -563,6 +576,7 @@ local function preparePass()
     readCompleted()
     readSkills()
     _invasionOn = invasionRunning()
+    _hidden = hiddenStore()
     -- Only TBC's daily table has rows, so the other clients never read a clock or the record
     local D = data()
     _now = D and D.daily and next(D.daily) and serverNow() or nil
@@ -785,6 +799,18 @@ function M:Ended(questID)
     if not code or (code == ENDED_INVASION and invasionRunning()) then return nil end
     return code
 end
+
+-- accept [questID]: bit 1 the game offers it to the whole group as one player takes it, escorts among them, bit 2 a PvP quest
+local ACCEPT_GROUP, ACCEPT_PVP = 1, 2
+
+local function acceptBit(questID, bit)
+    local D = data()
+    local v = D and D.accept and questID and D.accept[questID]
+    return v ~= nil and v % (bit + bit) >= bit
+end
+
+function M:StartsForGroup(questID) return acceptBit(questID, ACCEPT_GROUP) end
+function M:IsPvPQuest(questID) return acceptBit(questID, ACCEPT_PVP) end
 
 -- [creatureID] = { questID, ... }, built on the first tooltip that asks and kept, as the data never changes
 local _byGiver
@@ -1032,6 +1058,28 @@ function M:RecordDaily(questID)
     store[questID] = now + s
     scheduleReset()
     return true
+end
+
+function M:IsHidden(questID)
+    local store = hiddenStore()
+    return store ~= nil and questID ~= nil and store[questID] == true
+end
+
+function M:SetHidden(questID, on)
+    local store = hiddenStore()
+    if not (store and type(questID) == "number") then return false end
+    store[questID] = on and true or nil
+    M:Invalidate()
+    repaint()
+    local QB = ns:GetSubsystem("QuestBrowser")
+    if QB and QB.Refresh then QB:Refresh() end
+    return true
+end
+
+function M:HiddenCount()
+    local n = 0
+    for _ in pairs(hiddenStore() or {}) do n = n + 1 end
+    return n
 end
 
 -- For /eqsprobe available: the dailies held back now, the client's reset answer and the season's invasion

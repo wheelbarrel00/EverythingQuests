@@ -96,7 +96,8 @@ read_globals = {
     "debugstack", "geterrorhandler", "securecall", "GetBuildInfo",
     -- additional API surfaced by luacheck across the full codebase
     "debugprofilestop", "UpdateAddOnMemoryUsage", "GetAddOnMemoryUsage",
-    "GetServerTime", "IsInInstance", "IsShiftKeyDown", "IsMouseButtonDown", "SetCursor",
+    "GetServerTime", "IsInInstance", "IsShiftKeyDown", "IsControlKeyDown", "IsMouseButtonDown", "SetCursor",
+    "ALT_KEY", "SHIFT_KEY", "CTRL_KEY", "NONE_KEY",
     "UnitIsPlayer", "UnitCanAttack", "UnitExists", "C_NamePlate", "C_TooltipInfo", "C_ContentTracking",
     "GetInventorySlotInfo", "GetInventoryItemLink", "GetItemInfoInstant",
     "GetQuestLogItemLink", "GetQuestLogChoiceInfo", "GetNumQuestLogChoices",

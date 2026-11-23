@@ -286,6 +286,8 @@ function QB:Query(opts)
                 keep = A:IsCompleted(questID)
             elseif scope == "log" then
                 keep = A:InLog(questID)
+            elseif scope == "hidden" then
+                keep = A:IsHidden(questID)
             end
         end
 

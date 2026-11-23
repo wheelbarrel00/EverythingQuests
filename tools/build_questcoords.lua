@@ -88,8 +88,16 @@ local Q_REQSKILL, Q_MINREP, Q_MAXREP = 18, 19, 20
 -- mislabel 983 quests on Era.
 local Q_ZONEORSORT = 17
 local Q_NEXTINCHAIN, Q_SPECIALFLAGS, Q_PARENT = 22, 24, 25
--- The client's own quest flags, of which only the daily bit is read.
-local Q_FLAGS, DAILY_FLAG = 23, 4096
+-- The client's own quest flags: daily, and offered to the whole group as one player takes it (escorts). 64 is raid, not PvP
+local Q_FLAGS, DAILY_FLAG, PARTY_ACCEPT_FLAG = 23, 4096, 2
+-- The dump sets no PvP flag, so a battleground quest is known by its battleground's areas or TBC's Battlegrounds sort, -25
+local BATTLEGROUND_AREAS = { [2597] = true, [2839] = true, [3277] = true, [3358] = true, [3820] = true, [-25] = true }
+-- PvP quests filed elsewhere: battleground quests under the capitals and Ashenvale, Forever's Darkspear Islands, TBC's world PvP
+local PVP_QUESTS = {}
+for _, id in ipairs({ 7863, 7864, 7865, 7866, 7867, 7868, 8367, 8371, 8385, 8388, 98887, 98889, 98891, 98893, 98895, 98897,
+                      98899, 98901, 98903, 98904, 98905, 98906, 98907, 98908, 10106, 10110, 11502, 11503, 11505, 11506 }) do
+    PVP_QUESTS[id] = true
+end
 
 local function loadBlock(spec)
     local path = dir .. "/" .. spec.file
@@ -1233,6 +1241,16 @@ if mode == "available" then
         end
     end
 
+    -- For auto-accept: 1 offered to the whole group as one player takes it, 2 a PvP quest. Every quest, as one given inside a dungeon has no start point
+    local accept, acceptIds = {}, {}
+    for id, q in pairs(quests) do
+        local flags, v = tonumber(q[Q_FLAGS]) or 0, 0
+        if flags % (PARTY_ACCEPT_FLAG + PARTY_ACCEPT_FLAG) >= PARTY_ACCEPT_FLAG then v = v + 1 end
+        if BATTLEGROUND_AREAS[q[Q_ZONEORSORT]] or PVP_QUESTS[id] then v = v + 2 end
+        if v > 0 then accept[id] = v; acceptIds[#acceptIds + 1] = id end
+    end
+    table.sort(acceptIds)
+
     -- breadcrumbs.lua, from build_breadcrumbs.lua: a breadcrumb is no gate itself, as AllTheThings counts none missing, and one of its follow-ups taken closes it.
     local leads, crumbsPath = {}, dir .. "/breadcrumbs.lua"
     local crumbsFile, crumbs = io.open(crumbsPath, "rb"), nil
@@ -1337,6 +1355,8 @@ if mode == "available" then
         table.insert(parts, #parts - 1, "-- daily  [questID] = 1, offered again after the daily reset\n")
         table.insert(parts, #parts - 1, "-- giverSide [creatureID] = 1 Horde, 2 Alliance: the one faction that creature offers quests to\n")
     end
+    table.insert(parts, #parts - 1, "-- accept [questID] = 1 offered to the whole group as one player takes it, such as an escort,\n")
+    table.insert(parts, #parts - 1, "--        2 a PvP quest, a battleground's or a world PvP quest, 3 both\n")
 
     local expect = {}
     for i = 1, #sortedIds do
@@ -1430,6 +1450,8 @@ if mode == "available" then
         table.sort(creatures)
         for _, c in ipairs(creatures) do parts[#parts + 1] = ("\t[%d]=%d,\n"):format(c, giverSide[c]) end
     end
+    parts[#parts + 1] = "},\naccept = {\n"
+    for i = 1, #acceptIds do parts[#parts + 1] = ("\t[%d]=%.0f,\n"):format(acceptIds[i], accept[acceptIds[i]]) end
     parts[#parts + 1] = "},\n}\n"
 
     local text = table.concat(parts)
@@ -1523,6 +1545,12 @@ if mode == "available" then
             assert((got.ended and got.ended[id]) == ended[id], ("quest %d ended reason changed on reload"):format(id))
             assert((got.daily and got.daily[id]) == daily[id], ("quest %d daily flag changed on reload"):format(id))
         end
+        local accepted = 0
+        for id, v in pairs(got.accept) do
+            accepted = accepted + 1
+            assert(accept[id] == v, ("quest %d accept flags changed on reload"):format(id))
+        end
+        assert(accepted == #acceptIds, "accept row count changed on reload")
         local sides, want = 0, 0
         for c, side in pairs(got.giverSide or {}) do
             sides = sides + 1
@@ -1557,6 +1585,14 @@ if mode == "available" then
     io.stderr:write(("-- gate rows: pre=%d preAll=%d excl=%d chain=%d parent=%d skill=%d minRep=%d maxRep=%d names=%d\n")
         :format(countTbl(pre), countTbl(preAll), countTbl(excl), countTbl(chain),
                 countTbl(parent), countTbl(skill), countTbl(minRep), countTbl(maxRep), countTbl(names)))
+    do
+        local group, pvp = 0, 0
+        for _, v in pairs(accept) do
+            if v % 2 == 1 then group = group + 1 end
+            if v >= 2 then pvp = pvp + 1 end
+        end
+        io.stderr:write(("-- accept flags: %d offered to the whole group, %d PvP\n"):format(group, pvp))
+    end
     if capsFile then
         io.stderr:write(("-- level caps: %d quest(s), of %d in the caps file\n"):format(countTbl(maxLevel), capsListed))
         if #capsAtMax > 0 then

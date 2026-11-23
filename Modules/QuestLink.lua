@@ -162,10 +162,14 @@ function QL:Share(questID)
     return false
 end
 
-function QL:WantsShare()
-    if not IsModifiedClick or not IsModifiedClick("CHATLINK") then return false end
+function QL:ChatBoxOpen()
     local active = _G["ChatEdit_GetActiveWindow"]
     return (type(active) == "function" and active()) and true or false
+end
+
+function QL:WantsShare()
+    if not IsModifiedClick or not IsModifiedClick("CHATLINK") then return false end
+    return self:ChatBoxOpen()
 end
 
 local function onRef(link)

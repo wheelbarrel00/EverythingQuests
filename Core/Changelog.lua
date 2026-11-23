@@ -2,6 +2,28 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.18.0", date = "2026-11-22",
+        sections = {
+            { head = "New Features", items = {
+                { "Hide a quest from your map. On the world map, Shift-click a gold \"!\" with no chat box open to pick which of the quests waiting there to hide, or tick \"Hide from the map\" on a quest's page in the Quest Browser. A hidden quest leaves the world map, the minimap and the Quest Browser's \"Available to you\" list, for that character only. NPC tooltips still list it, and the Quest Browser still finds it. To bring a quest back, pick \"Hidden by you\" in the menu above the Quest Browser's list, open the quest and untick \"Hide from the map\".", classic = true },
+                "Choose which quests are accepted for you. Auto-accept and auto-turn-in now have their own Auto-questing card under /eqs > General, and auto-accept has four new boxes. Skip escort quests and Skip gray quests are on, and Skip repeatable quests and Skip PvP quests are off. Each one leaves those quests for you to accept by hand. With Skip gray quests on, a gray quest is no longer accepted even when it is the only one on offer. On Classic Era and Burning Crusade Classic, and on WoW Forever for the quests it shares with Classic Era, Skip escort quests covers every quest the game also offers to the rest of your group when you take it. Besides escorts, these include a hunter's Taming the Beast, some class, holiday, dungeon and battleground quests and, on Burning Crusade Classic, some daily quests, such as the Call to Arms battleground dailies and Blast the Gateway. Untick it to have those accepted for you again. If a quest is accepted for you that should have been left for you, or left for you when it should have been accepted, please let me know on Discord or in the CurseForge comments.",
+                "Decline quests shared in battlegrounds. A new box, off by default. While you are in a battleground, a quest another player shares with you is declined, and a line in your chat names it.",
+                "Pick the key that pauses auto-questing. Alt still pauses auto-accept, auto-turn-in and joining group quests, as well as the new battleground decline, and a new Pause key menu sets Shift, Ctrl or no key instead. Holding the key as you start talking to someone now keeps that whole conversation in your hands until its windows close, not only the window that was open when you pressed it.",
+            } },
+            { head = "Improvements", items = {
+                "Repeatable quests are no longer handed in for you. A new box under auto-turn-in, Skip repeatable turn-ins, is on, so repeatable, daily and weekly quests are left for you to hand in, and a stack of cloth meant for reputation is not handed in one quest after another. Untick it to have them handed in for you as before.",
+            } },
+            { head = "Bug Fixes", items = {
+                { "The game's PvP warning is no longer skipped. On retail and WoW Forever, auto-accept took quests that flag you for PvP without the warning the game shows first. Such a quest is now always left for you to accept, whatever Skip PvP quests says, so the game can ask you to confirm it.", sub = "ChainGuide" },
+                "A tooltip that was no longer true. The tooltip of the General tab's \"After an update\" setting said new features always ship switched off, which stopped being true when some started shipping on.",
+            } },
+            { head = "Known Issues", items = {
+                { "WoW Forever's own escorts can still be accepted for you. On WoW Forever, Skip escort quests knows the quests WoW Forever shares with Classic Era, not the ones new to it, so its own new escorts and Taming the Beast quests may still be accepted for you.", classic = true, sub = "ChainGuide" },
+                { "A hidden quest can still show on WoW Forever. WoW Forever marks a quest giver itself when you are near, and a chain you track in the Chain Guide still marks its next step, even for a quest you hid.", classic = true, sub = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.17.0", date = "2026-11-21",
         sections = {
             { head = "New Features", items = {

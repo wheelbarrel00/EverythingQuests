@@ -5,6 +5,10 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.18.0", sections = {
+        { "Hide a quest from your map", "Shift-click a gold \"!\" on the world map, with no chat box open, to pick which of its quests to hide, or tick \"Hide from the map\" on a quest's page in the Quest Browser. A hidden quest leaves your world map and minimap for that character, and \"Hidden by you\" in the Quest Browser lists what you hid, so you can bring it back.", classic = true },
+        { "Choose which quests are accepted for you", "Auto-accept and auto-turn-in now have their own card under /eqs > General, with boxes to leave escort, gray, repeatable or PvP quests for you, to stop handing in repeatable quests, to decline quests shared in battlegrounds, and to pick the key that pauses them. Escort and gray quests and repeatable hand-ins are now left for you by default, and unticking their boxes brings back the old behavior. If a quest is accepted or left for you when it should not be, please let me know on Discord or in the CurseForge comments." },
+    } },
     { version = "2.17.0", sections = {
         { "Quests you cannot take, left off the map", "Quests from world events that have ended, quests removed from the game and quests only the other faction's quest givers offer are no longer marked, and on Classic Era and Burning Crusade Classic neither are quests past the top of their level range. On WoW Forever, the later raids it has not opened, such as Ahn'Qiraj and Naxxramas, are left out too, and on Burning Crusade Classic a daily quest you hand in waits for the daily reset.", classic = true },
         { "Drag the options window partly off the screen", "You can now drag the /eqs options window past the left, right and bottom edges of the screen, so it covers less of the game while you change settings. Its title bar always stays in reach, and the window opens at the left edge again after a reload." },
