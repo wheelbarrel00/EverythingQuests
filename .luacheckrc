@@ -99,6 +99,7 @@ read_globals = {
     "GetServerTime", "IsInInstance", "IsShiftKeyDown", "IsControlKeyDown", "IsMouseButtonDown", "SetCursor",
     "ALT_KEY", "SHIFT_KEY", "CTRL_KEY", "NONE_KEY",
     "UnitIsPlayer", "UnitCanAttack", "UnitExists", "C_NamePlate", "C_TooltipInfo", "C_ContentTracking",
+    "UnitClassification", "UnitIsBossMob",
     "GetInventorySlotInfo", "GetInventoryItemLink", "GetItemInfoInstant",
     "GetQuestLogItemLink", "GetQuestLogChoiceInfo", "GetNumQuestLogChoices",
     "GetQuestLogSpecialItemInfo", "GetQuestLogSpecialItemCooldown", "IsQuestLogSpecialItemInRange",

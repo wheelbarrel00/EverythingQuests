@@ -5,6 +5,10 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.19.0", sections = {
+        { "Pick your nameplate icons", "Under /eqs > Map, the Nameplate Quest Icons card now lets you pick the kill icon and the loot icon on quest mobs' nameplates, and marks elites and bosses with a crown, a gold ring or a boss skull, or not at all. A Preview row shows your picks. A friendly NPC one of your quests needs now gets a chat bubble whatever language your game is in, though the game hides friendly nameplates unless you turn them on in its options." },
+        { "EllesmereUI's nameplates", "With EllesmereUI's nameplates, Everything Quests' icons now sit beside EllesmereUI's own health bar. Unless you have switched Everything Quests' nameplate icons on or off yourself, they start off while EllesmereUI's nameplates are loaded, and a question at login asks which addon's quest icons you want.", sub = "ChainGuide" },
+    } },
     { version = "2.18.0", sections = {
         { "Hide a quest from your map", "Shift-click a gold \"!\" on the world map, with no chat box open, to pick which of its quests to hide, or tick \"Hide from the map\" on a quest's page in the Quest Browser. A hidden quest leaves your world map and minimap for that character, and \"Hidden by you\" in the Quest Browser lists what you hid, so you can bring it back.", classic = true },
         { "Choose which quests are accepted for you", "Auto-accept and auto-turn-in now have their own card under /eqs > General, with boxes to leave escort, gray, repeatable or PvP quests for you, to stop handing in repeatable quests, to decline quests shared in battlegrounds, and to pick the key that pauses them. Escort and gray quests and repeatable hand-ins are now left for you by default, and unticking their boxes brings back the old behavior. If a quest is accepted or left for you when it should not be, please let me know on Discord or in the CurseForge comments." },

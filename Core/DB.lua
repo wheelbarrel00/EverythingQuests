@@ -15,14 +15,18 @@ DB.defaults = {
             declineBattlegroundShares = false,
             autoTurnInSkipRepeatable = true,
             autoQuestPauseKey        = "alt",
-            -- EQ Objective Tracker draws these icons, and TrackerBridge adds or removes them by these keys
+            -- The two EQ Objective Tracker header icons, which TrackerBridge adds or removes by these keys
             showChainGuideIcon = true,
             showEQIcon = true,
+            -- questNameplateIcons stays unset, as its nil is what starts EQ's icons off beside ElvUI or EllesmereUI and asks once
             npIconPlacement = "RIGHT",
             npIconSize      = 24,
             npIconTextSize  = 13,
             npIconOffsetX   = 0,
             npIconOffsetY   = 0,
+            npKillIcon      = "skull",
+            npLootIcon      = "logo",
+            npEliteLook     = "crown",
             questTooltips   = true,
             npcQuestTooltips = true,
             focusArrow      = true,
@@ -65,9 +69,7 @@ DB.defaults = {
             pinCap           = 50,
             showAvailableQuests = true,
             hideLowLevelQuests  = true,
-            -- showPinRing is deliberately absent. AceDB answers the default for an unset key, so
-            -- listing one here would hide the nil that Modules/MapPOI/Pin.lua needs to tell
-            -- "never chosen" apart from "switched off", and retail would lose its ring.
+            -- showPinRing stays unset, since Pin.lua reads nil as on for retail and off for Classic
             showAvailableRing   = false,
             hideOutOfSeasonQuests = true,
             hideHighLevelQuests  = false,

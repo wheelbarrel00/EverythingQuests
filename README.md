@@ -123,13 +123,13 @@ If the tracker is missing, check that EQ Objective Tracker is enabled in your Ad
 ## Features
 
 ### Nameplate Quest Icons
-Quest-objective enemies show EQ's logo (kill objectives get a skull, talk-to objectives a chat bubble, use-item objectives the quest's item icon) right on their nameplate, along with the remaining count or percent.
+The mobs and NPCs your quests need show an icon right on their nameplate, along with the remaining count or percent: your kill icon on mobs to kill (a green skull, a red skull badge or crossed swords), your loot icon on mobs that drop a quest item (EQ's logo, an orange sack badge or a backpack), the quest's own item icon for use-item objectives, and a chat bubble on friendly NPCs your quests need, whatever language your game is in. Elites and bosses get the marker you pick: a gold crown by default, a gold ring, a boss skull, or none. Inside an instance only bosses are marked.
 
 - **Detection on retail** — Two-source join: an `activeQuests` cache built from `C_QuestLog.GetQuestObjectives` (objectives keyed by display text -> `{value, type, isPercent, itemTexture}`, where `value` is the *remaining* amount) joined to each nameplate via a `C_TooltipInfo.GetUnit` line-type scan (`QuestTitle` + `QuestObjective` lines matched against the cache, with matched objectives de-duplicated by entry so a party-mate's identical line can't double-count one of yours). WoW Forever's client has the same tooltip API, so it takes this route too
 - **Detection on Classic Era and TBC** — the tooltip route does not exist there, so the creature ID is read from the unit GUID and matched against a generated `questID -> creatures` table, inverted at runtime over the quest log only
 - **Cached per GUID** — Tooltip scans only run when a new mob appears on a plate or quest log changes, never per frame
 - **Midnight-safe** — Guards all game-returned strings/GUIDs with `issecretvalue` so restricted values can't throw
-- **ElvUI-aware** — Default is ON unless ElvUI is loaded (which has its own version). A one-time custom dialog asks ElvUI users which to use so duplicates don't appear; preference is remembered
+- **ElvUI- and EllesmereUI-aware** — Default is ON unless ElvUI or EllesmereUI's nameplates are loaded (both have quest icons of their own). A one-time custom dialog asks which to use so duplicates don't appear; preference is remembered. With EllesmereUI, the Left and Right positions sit beside its own health bar, clear of the border or level box it draws there
 - **Pure visual frames** — No secure-template descendants, so nameplates stay taint-free
 
 ### World Quest Pins
@@ -325,7 +325,7 @@ The options window shares EQ Objective Tracker's look: a sidebar of tabs, settin
 | Tab | Settings |
 |---|---|
 | **General** | Auto-accept / auto-turn-in / join group quests, which quests they leave to you, declining quests shared in battlegrounds and the pause key, the Immersion hand-off (when Immersion is installed), a warning when you skip a breadcrumb quest (Classic), show / hide minimap button, options window scale, update notice style, **quest announcements**, **party quest progress**, Use Blizzard's quest tracker, Open Tracker Settings, the TomTom arrow for the focused quest (WoW Forever) and the tracker icons, profile management, reset to defaults |
-| **Map** | World-map quest pins, pin scale, objective pins per quest, pin rings, markers for tracked quests only, fading markers under your position, minimap objective pins with their edge markers and pin scale (Classic), quests you can pick up with their level and holiday filters (Classic), dungeon / repeatable / profession quest filters (Classic), **coordinates**, quest progress on tooltips, an NPC's quests on its tooltip (Classic), **quest icons on nameplates** with their position, size and offsets |
+| **Map** | World-map quest pins, pin scale, objective pins per quest, pin rings, markers for tracked quests only, fading markers under your position, minimap objective pins with their edge markers and pin scale (Classic), quests you can pick up with their level and holiday filters (Classic), dungeon / repeatable / profession quest filters (Classic), **coordinates**, quest progress on tooltips, an NPC's quests on its tooltip (Classic), **quest icons on nameplates** with their kill and loot icons, elite and boss marker, position, size and offsets |
 | **World Quests** | Master switch, world map pins, zone quest list and its sort order, per-reward filters (each icon inside its colored ring), per-faction filters by expansion, pin scale |
 | **Chain Guide** | Open on login, window scale, unrouted questlines (retail), the tracked chain on the world map, cross-character chain cache stats and reset, prune stale entries |
 | **Quest Browser** | Open Quest Browser (Classic Era, TBC and WoW Forever) |
@@ -366,6 +366,7 @@ Each version of the game lists only the tabs it loads, so on Classic Era and Bur
 - **[TomTom](https://www.curseforge.com/wow/addons/tomtom)** — recommended on retail and WoW Forever for the Chain Guide, and effectively required on Classic Era and Burning Crusade Classic: clicking a quest or an objective marker uses TomTom's on-screen arrow, and those clients have no built-in waypoint system to fall back on. On WoW Forever a marker click uses the game's own super-tracking, and with TomTom installed the quest you focus also gets TomTom's arrow (with EQ Objective Tracker 1.27.0 or later), unless you switch that off under `/eqs` > General. TomTom also serves the Quest Browser's location links there
 - [TitanClassic](https://www.curseforge.com/wow/addons/titan-panel-classic), Arcana (formerly ChocolateBar), or [ElvUI](https://www.tukui.org/) — display the minimap button on a data-broker bar instead of around the minimap
 - **[ElvUI](https://www.tukui.org/)** — ElvUI ships its own nameplate quest icons. When detected, EQ's version defaults off and a one-time dialog asks which to use; choose either, and your pick is remembered. No conflict either way
+- **EllesmereUI** (retail and WoW Forever) — its nameplates show quest icons of their own, so EQ's version defaults off while they are loaded and the same one-time dialog asks which to use. With EQ's icons on, they sit beside EllesmereUI's own health bar
 
 ### Bundled Libraries
 

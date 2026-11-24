@@ -440,6 +440,9 @@ L["Starts from an item that drops here"] = true
 L["Shift-click to pick quests to hide"] = true
 L["Hide from the map"] = true
 
+-- ─── Modules/Nameplates/QuestIcons.lua ───
+L["Everything Quests can show quest icons on nameplates, with how many of each you still need.\n\n%s is installed and shows quest icons of its own, so the Everything Quests icons are off for now, to avoid showing two of each. Which would you like to use?"] = true
+
 -- ─── Modules/QuestAuto.lua ───
 L["|cffEBB706EQ|r: declined %s, which another player shared with you in a battleground."] = true
 L["Immersion is installed. It replaces the quest and gossip windows so you can read them, and EQ's auto-accept and auto-turn-in would click straight past it. Which would you like?"] = true
@@ -639,13 +642,34 @@ L["Show an NPC's quests on its tooltip"] = true
 L["Hovering an NPC lists the quests in your log that you hand in to it, then the quests it offers you, even ones your map's filters hide. Holiday quests are shown only while their world event is running. Up to five are listed."] = true
 L["Nameplate Quest Icons"] = true
 L["Quest icons on nameplates"] = true
-L["Shows the \"!\" + count on objective mobs."] = true
+L["Shows an icon on the nameplate of each mob or NPC your quests need, and how many are left when more than one: your kill icon, your loot icon on mobs that drop a quest item, a quest's own item to use, or a chat bubble on someone to talk to. The game hides friendly nameplates unless you turn them on in its options."] = true
 L["Left"] = true
 L["Right"] = true
 L["Above"] = true
 L["Below"] = true
 L["Position"] = true
 L["Where the quest icon + count sits relative to the enemy nameplate. Move it closer to the health bar to taste."] = true
+L["Kill icon"] = true
+L["Green skull"] = true
+L["Red skull badge"] = true
+L["Crossed swords"] = true
+L["The icon on mobs you need to kill."] = true
+L["Loot icon"] = true
+L["Everything Quests logo"] = true
+L["Orange sack badge"] = true
+L["Backpack"] = true
+L["The icon on mobs that drop an item one of your quests needs."] = true
+L["Elite and boss marker"] = true
+L["Crown"] = true
+L["The icon on an elite or boss wears a gold crown."] = true
+L["Gold ring"] = true
+L["A gold ring around the icon on an elite or boss."] = true
+L["Boss skull"] = true
+L["The kill icon becomes a boss skull, and any other icon gets the gold ring."] = true
+L["Elites and bosses look like any other quest mob."] = true
+L["Marks a quest mob that is an elite or a boss. Inside a dungeon, raid or other instance only mobs the game reports as bosses are marked, since nearly every mob there is elite."] = true
+L["Preview"] = true
+L["Your kill icon and your loot icon, then your kill icon on an elite or a boss unless the marker is None."] = true
 L["Icon size"] = true
 L["Count text size"] = true
 L["X offset"] = true

@@ -2,6 +2,27 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.19.0", date = "2026-11-24",
+        sections = {
+            { head = "New Features", items = {
+                "Pick your nameplate icons. The Nameplate Quest Icons card in the Map tab has two new menus. Kill icon sets the icon on mobs you need to kill: the green skull as before, a red skull badge or crossed swords. Loot icon sets the icon on mobs that drop an item one of your quests needs: the Everything Quests logo as before, an orange sack badge or a backpack. A Preview row under them shows your picks.",
+                "Elites and bosses stand out. A quest mob you can attack that is an elite, a rare elite or a boss now gets a marker on its nameplate icons, on by default: they wear a gold crown. The new Elite and boss marker menu also offers a gold ring around the icons, a boss skull in place of the kill icon with a gold ring around any other icon, or None. The marker goes on kill icons, loot icons and a quest's own item alike, and a quest's own item inside the gold ring is cropped round. Inside a dungeon, raid or other instance only mobs the game reports as bosses are marked, since nearly every mob there is elite.",
+                { "EllesmereUI's nameplates. With EllesmereUI's nameplates, Everything Quests' icons now sit beside EllesmereUI's own health bar for the Left and Right positions, clear of the border or level box it draws there, and move with it when it grows or shrinks. As with ElvUI, if you have never switched Everything Quests' nameplate icons on or off yourself, they start off while EllesmereUI's nameplates are loaded, and a question at login asks which addon's quest icons you want. If you moved Everything Quests' icons with the X offset to line them up with EllesmereUI's bar, you may want to set it back to 0.", sub = "ChainGuide" },
+            } },
+            { head = "Improvements", items = {
+                "A chat bubble on friendly NPCs your quests need. A friendly NPC one of your quests needs now gets a chat bubble on its nameplate whatever language your game is in, with how many are left when more than one. Before, the bubble needed an objective written in English with \"speak\" or \"talk\" in it, and other friendly NPCs showed the Everything Quests logo or a skull. Objectives to loot an item and a quest's own item keep their icons. The game hides friendly nameplates unless you turn them on in its options.",
+            } },
+            { head = "Bug Fixes", items = {
+                "Icons that change with a mob's side. When a quest NPC turns from friendly to hostile, or back, while its nameplate is showing, its icon now changes right away instead of at the next quest update.",
+                "Texts that promised a \"!\". The tooltip of the \"Quest icons on nameplates\" box and the ElvUI question at login described a \"!\" that Everything Quests never draws on nameplates. The tooltip now names the icons it does draw, the login question no longer mentions a \"!\", and the question is now translated.",
+            } },
+            { head = "Known Issues", items = {
+                { "Dungeon bosses may not be marked on Classic Era, Burning Crusade Classic and WoW Forever. Inside an instance only mobs the game reports as bosses are marked, and it is not yet checked which bosses these versions report that way, so a dungeon boss may go unmarked there.", classic = true },
+                { "EllesmereUI's crowd control icons and Everything Quests' icons can overlap. EllesmereUI shows a mob's crowd control effects just right of its health bar by default, where Everything Quests' icons now sit with the default Right position. Moving EllesmereUI's crowd control icons elsewhere in its options keeps them apart.", sub = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.18.0", date = "2026-11-22",
         sections = {
             { head = "New Features", items = {

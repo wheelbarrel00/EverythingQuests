@@ -278,6 +278,8 @@ local function tooltipsCard(self, content, stack)
         L["Hovering an NPC lists the quests in your log that you hand in to it, then the quests it offers you, even ones your map's filters hide. Holiday quests are shown only while their world event is running. Up to five are listed."]))
 end
 
+local NP_PREVIEW_ICON = 24
+
 local function nameplateCard(self, content, stack, w)
     if not ns:GetSubsystem("NameplateQuestIcons") then return end
     local card = stack(self:CreateGroup(content, L["Nameplate Quest Icons"]))
@@ -308,7 +310,7 @@ local function nameplateCard(self, content, stack, w)
             if QI and QI.ApplyEnabled then QI:ApplyEnabled() end
             w.sync()
         end,
-        L["Shows the \"!\" + count on objective mobs."]))
+        L["Shows an icon on the nameplate of each mob or NPC your quests need, and how many are left when more than one: your kill icon, your loot icon on mobs that drop a quest item, a quest's own item to use, or a chat bubble on someone to talk to. The game hides friendly nameplates unless you turn them on in its options."]))
     w.npOn = npGet
 
     local function dependent(control)
@@ -325,6 +327,49 @@ local function nameplateCard(self, content, stack, w)
     dependent(self:CreateRadioGroup(content, L["Position"], NP_PLACEMENT, placeGet, placeSet, nil, nil,
         L["Position"],
         L["Where the quest icon + count sits relative to the enemy nameplate. Move it closer to the health bar to taste."]))
+
+    local function pick(key, label, options, tooltip)
+        dependent(self:CreateDropdown(content, label, options,
+            function()
+                local QI = ns:GetSubsystem("NameplateQuestIcons")
+                return QI and QI.Picked and QI:Picked(key)
+            end,
+            function(value)
+                local DB = ns:GetSubsystem("DB")
+                if DB then DB.db.profile.general[key] = value end
+                local QI = ns:GetSubsystem("NameplateQuestIcons")
+                if QI and QI.ApplyLayout then QI:ApplyLayout() end
+                if w.npPaint then w.npPaint() end
+            end,
+            tooltip))
+    end
+    pick("npKillIcon", L["Kill icon"], {
+        { value = "skull",  label = L["Green skull"] },
+        { value = "badge",  label = L["Red skull badge"] },
+        { value = "swords", label = L["Crossed swords"] },
+    }, L["The icon on mobs you need to kill."])
+    pick("npLootIcon", L["Loot icon"], {
+        { value = "logo",  label = L["Everything Quests logo"] },
+        { value = "badge", label = L["Orange sack badge"] },
+        { value = "pack",  label = L["Backpack"] },
+    }, L["The icon on mobs that drop an item one of your quests needs."])
+    pick("npEliteLook", L["Elite and boss marker"], {
+        { value = "crown", label = L["Crown"], tip = L["The icon on an elite or boss wears a gold crown."] },
+        { value = "ring",  label = L["Gold ring"], tip = L["A gold ring around the icon on an elite or boss."] },
+        { value = "boss",  label = L["Boss skull"], tip = L["The kill icon becomes a boss skull, and any other icon gets the gold ring."] },
+        { value = "none",  label = L["None"], tip = L["Elites and bosses look like any other quest mob."] },
+    }, L["Marks a quest mob that is an elite or a boss. Inside a dungeon, raid or other instance only mobs the game reports as bosses are marked, since nearly every mob there is elite."])
+
+    local preview = self:CreateTextRow(content, L["Preview"], "")
+    local strip = CreateFrame("Frame", nil, preview)
+    strip:SetSize(1, NP_PREVIEW_ICON)
+    strip:SetPoint("LEFT", preview.text, "LEFT")
+    w.npPaint = function()
+        local QI = ns:GetSubsystem("NameplateQuestIcons")
+        if QI and QI.PaintSample then strip:SetWidth(math.max(1, QI:PaintSample(strip, NP_PREVIEW_ICON))) end
+    end
+    self:AttachTooltip(preview, L["Preview"], L["Your kill icon and your loot icon, then your kill icon on an elite or a boss unless the marker is None."])
+    dependent(preview)
 
     local szGet, szSet = npLayoutSetting("npIconSize")
     dependent(self:CreateSlider(content, L["Icon size"], 12, 48, 0.5, szGet, szSet))
@@ -353,6 +398,7 @@ Options:RegisterTab({
             if w.prec then self:SetDependent(w.prec, w.coordOn() and true or false) end
             local npOn = w.npOn and w.npOn() and true or false
             for _, c in ipairs(w.np) do self:SetDependent(c, npOn) end
+            if w.npPaint then w.npPaint() end
         end
         content._sync = w.sync
 

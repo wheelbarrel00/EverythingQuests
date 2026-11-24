@@ -1607,6 +1607,10 @@ local function tooltipWriteRoute()
         if indexed == 0 then
             line("  0 with the cache held means no quest in your log wants an item.")
         end
+        local exists = resolve("UnitExists")
+        if QI.DescribeUnit and type(exists) == "function" and exists("target") then
+            line("nameplate icons, your target: %s", QI:DescribeUnit("target"))
+        end
     else
         line("shared objective cache: NameplateQuestIcons not loaded, so both halves are inert")
     end
@@ -2034,7 +2038,8 @@ local EVENTS = {
     "QUEST_GREETING", "GOSSIP_SHOW", "QUEST_WATCH_LIST_CHANGED",
     "QUEST_DATA_LOAD_RESULT", "QUESTLINE_UPDATE", "SUPER_TRACKING_CHANGED",
     "TASK_PROGRESS_UPDATE", "WORLD_QUEST_COMPLETED_BY_SPELL",
-    "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED",
+    "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "UNIT_FACTION", "UNIT_FLAGS", "UNIT_NAME_UPDATE",
+    "GOSSIP_CLOSED", "QUEST_FINISHED",
     "PLAYER_LEVEL_UP", "PLAYER_LEVEL_CHANGED", "SKILL_LINES_CHANGED", "UPDATE_FACTION", "ZONE_CHANGED_NEW_AREA",
     "QUEST_ACCEPT_CONFIRM", "GROUP_JOINED", "GROUP_LEFT", "GROUP_ROSTER_UPDATE",
     "CVAR_UPDATE", "MINIMAP_UPDATE_TRACKING", "QUEST_POI_UPDATE",
