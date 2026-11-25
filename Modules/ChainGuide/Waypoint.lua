@@ -190,9 +190,10 @@ end
 local function liveWaypoint(questID)
     local Arrow = ns:GetSubsystem("QuestArrow")
     if not Arrow then return nil end
+    -- On Forever PointFor already asks the game's own marker where EQ has no spot
     if classicSource() then
         local m, x, y = Arrow:PointFor(questID)
-        if m and x and y then return m, x, y end
+        return m, x, y
     end
     return Arrow:GamePoint(questID)
 end
@@ -203,6 +204,8 @@ function W:ResolveForPin(questID, chain, viewMapID)
     if onQuest then
         local m, x, y = liveWaypoint(questID)
         if m and x and y then return m, x, y, true end
+        -- A quest in your log with no spot known for what is left gets no pin, not its giver's
+        if classicSource() then return nil end
     end
     local m, x, y = self:Resolve(questID, chain)
     -- A step not in the log takes its start point on the viewed map, where the stored answer may not lie

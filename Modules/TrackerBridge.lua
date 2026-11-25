@@ -163,11 +163,13 @@ function Bridge:ApplyFocusArrow()
                 Arrow:ClearLeftovers()
                 return
             end
-            -- EQOT sends no clear between two follows, so a quest nothing can place takes the old arrow down.
-            -- On Forever the game's point stands in where EQ's tables have none, and an arrow held for this quest stays when the game has none
-            if not (entryID and (Arrow:PointAtQuest(entryID) or Arrow:Refresh(entryID)
-                                 or Arrow:PointAtGame(entryID))) then
+            if not entryID then
                 Arrow:Clear()
+                return
+            end
+            -- An arrow already held for this quest stays. A quest nothing can place yet stays followed with no waypoint, so its arrow comes once a spot is known
+            if not (Arrow:PointAtQuest(entryID) or Arrow:Holds(entryID)) then
+                Arrow:Follow(entryID, true)
             end
         end,
     }

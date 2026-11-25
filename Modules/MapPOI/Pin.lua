@@ -121,7 +121,8 @@ local function tomtomFocus(pin)
         local Avail = ns:GetSubsystem("AvailableQuests")
         title = Avail and Avail:Title(pin.questID)
     end
-    return Arrow:Set(pin.mapID, pin.mapX, pin.mapY, title)
+    -- A quest in your log is followed, so the arrow moves on once this spot no longer serves it. A "!", a failed quest's too, stays where it was clicked
+    return Arrow:Set(pin.mapID, pin.mapX, pin.mapY, title, (q and not pin.avail) and pin.questID or nil)
 end
 
 -- Era lacks QUEST_PING and answers 2000 for it, under its own map layers, so the level is resolved per client

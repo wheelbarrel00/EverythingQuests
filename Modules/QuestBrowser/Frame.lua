@@ -649,9 +649,10 @@ local function showMap(mapID)
     end
 end
 
-function QB:GoTo(mapID, x, y, title)
+-- questID only for a quest in your log, whose arrow then follows its objectives
+function QB:GoTo(mapID, x, y, title, questID)
     local Arrow = ns:GetSubsystem("QuestArrow")
-    if Arrow and Arrow.Set then Arrow:Set(mapID, x, y, title) end
+    if Arrow and Arrow.Set then Arrow:Set(mapID, x, y, title, questID) end
     -- Held until combat ends, as the Chain Guide's is: Forever's map pins call the protected SetPassThroughButtons as they appear
     if InCombatLockdown() then
         local Events = ns:GetSubsystem("Events")
@@ -669,7 +670,7 @@ function QB:GetDirections()
     local record = self._record
     if not (D and record) then return end
     local kind, mapID, x, y = D:Waypoint(record)
-    if kind then self:GoTo(mapID, x, y, record.name) end
+    if kind then self:GoTo(mapID, x, y, record.name, kind == "quest" and record.id or nil) end
 end
 
 -- Over the world map, which Era and TBC draw at FULLSCREEN when it is large, and otherwise beside the other windows

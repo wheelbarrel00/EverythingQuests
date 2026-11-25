@@ -495,6 +495,8 @@ function QB:Waypoint(record)
         if Arrow and Arrow.PointFor then
             local m, x, y = Arrow:PointFor(record.id)
             if m then return "quest", m, x, y end
+            -- A quest in your log with no spot known for what is left gets no directions, not its giver's
+            return nil
         end
     end
     local first = nearest(record.starts)

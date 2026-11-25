@@ -2,6 +2,19 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.19.1", date = "2026-11-24",
+        sections = {
+            { head = "Bug Fixes", items = {
+                { "The TomTom arrow pointed at the wrong place for many quests. When you focused a quest in EQ Objective Tracker (on WoW Forever, the quest the game follows) or picked Get Directions for it in the Quest Browser, Everything Quests pointed TomTom's arrow at one place it had picked for the whole quest and never moved it. For many quests that place was where you hand the quest in, even before you had done anything, and for others it stayed on an objective you had already finished. An arrow set by clicking a quest's marker on the world map on Classic Era and Burning Crusade Classic also stayed on that marker after its objective was done. The arrow now points at the nearest place on your continent of an objective you still need, or at the marker you clicked, and stays there while that place still serves the quest, so it does not jump about as you walk. Once that place serves no objective you still need, it moves on a moment later to the nearest place that does, and once every objective is done it points at where you hand the quest in. If TomTom takes the arrow down when you arrive, it comes back the next time you finish an objective, unless you are still near that place and it is still the nearest one you need. When you focus a quest and Everything Quests knows no place for what is left of it, such as Murkdeep himself for the Darkshore quest WANTED: Murkdeep!, there is now no arrow rather than a wrong one. On WoW Forever the game's own map marker for the quest is used when there is one. The arrow comes once finishing an objective gives it a place, such as when the quest is ready to hand in. The Quest Browser no longer offers Get Directions for a quest in your log whose next place is unknown, where it used to send you to the quest's giver or its hand-in. Thanks to wanderer361 for the report.", classic = true },
+                { "The Chain Guide's directions on WoW Forever follow the same places. For a quest in your log, clicking its card, Continue and Get Directions on the tracker's right-click menu now point the arrow at the nearest place of an objective you still need, or at the hand-in once the quest is ready, and the arrow then follows the quest as above. In a chain you track, the quest's pin on the world map sits at the nearest such place, and a quest in your log with no place known gets no pin rather than one at its quest giver or its hand-in.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Known Issues", items = {
+                { "The arrow for quests done by exploring or an event still points at the hand-in. On Classic Era and Burning Crusade Classic, the arrow for a quest done by exploring a place, an escort or another scripted event, such as The Fargodeep Mine in Elwynn Forest, still points at where you hand it in before you have done it, as Everything Quests knows no place for those objectives yet.", classic = true, without = "ChainGuide" },
+                { "The arrow stops following its quest after a reload. After a reload or at your next login, an arrow Everything Quests set no longer moves on as you finish objectives until you focus the quest or set its arrow again. TomTom may also bring back the old arrow, even after you hand the quest in, until Everything Quests next sets or clears its arrow. On WoW Forever the quest the game follows is picked up again, so its arrow follows it again, while on Classic Era and Burning Crusade Classic EQ Objective Tracker starts each login and reload with no quest focused.", classic = true },
+            } },
+        },
+    },
+    {
         version = "2.19.0", date = "2026-11-24",
         sections = {
             { head = "New Features", items = {
