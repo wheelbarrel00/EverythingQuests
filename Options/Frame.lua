@@ -34,7 +34,7 @@ end
 local ui = EUI:NewContext({
     id      = "EQ",
     title   = "Everything Quests",
-    version = ns.VERSION or "2.19.1",
+    version = ns.VERSION or "2.20.0",
     accent  = EUI.tokens.accents.EQ.accent,
     L       = L,
     tooltip = ns.Util.PinTooltip,

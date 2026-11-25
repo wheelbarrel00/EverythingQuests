@@ -5,6 +5,10 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.20.0", sections = {
+        { "More places to go", "Everything Quests now places many more quest objectives on the map from AllTheThings and, on Classic Era and WoW Forever, QuestieDB, and a new purple flag marks places to explore and where escorts end. The TomTom arrow follows them as you go.", classic = true },
+        { "Hand-ins on WoW Forever", "Nearly every quest new to WoW Forever now has a marker where you hand it in, from QuestieDB's WoW Forever player traces.", classic = true, sub = "ChainGuide" },
+    } },
     { version = "2.19.0", sections = {
         { "Pick your nameplate icons", "Under /eqs > Map, the Nameplate Quest Icons card now lets you pick the kill icon and the loot icon on quest mobs' nameplates, and marks elites and bosses with a crown, a gold ring or a boss skull, or not at all. A Preview row shows your picks. A friendly NPC one of your quests needs now gets a chat bubble whatever language your game is in, though the game hides friendly nameplates unless you turn them on in its options." },
         { "EllesmereUI's nameplates", "With EllesmereUI's nameplates, Everything Quests' icons now sit beside EllesmereUI's own health bar. Unless you have switched Everything Quests' nameplate icons on or off yourself, they start off while EllesmereUI's nameplates are loaded, and a question at login asks which addon's quest icons you want.", sub = "ChainGuide" },

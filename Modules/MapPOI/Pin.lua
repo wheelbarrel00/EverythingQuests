@@ -16,6 +16,7 @@ local KIND_ICON = {
     [1] = MEDIA .. "slay.tga",
     [2] = MEDIA .. "object.tga",
     [3] = MEDIA .. "loot.tga",
+    [4] = MEDIA .. "explore.tga",
 }
 local ICON_ENTRANCE = MEDIA .. "entrance.tga"
 

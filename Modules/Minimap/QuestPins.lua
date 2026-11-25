@@ -170,11 +170,12 @@ end
 -- Read by /eqsprobe minimap, where 0 registered and 200 refused by HereBeDragons look alike on the minimap
 M._registered, M._rejected, M._mapID, M._stage = 0, 0, nil, "never ran"
 M._yielded = 0
-M._blizzardMarks = {}
+M._blizzardMarks, M._blizzardMarkAt = {}, {}
 
 -- No Lua call lists the engine's own markers, so yield only for the narrowest set seen in game
 local function readBlizzardMarks(mapID)
     local marks = M._blizzardMarks
+    for _, at in pairs(M._blizzardMarkAt) do wipe(at) end
     local filters = Enum and Enum.MinimapTrackingFilter
     local filteredOut = C_Minimap and C_Minimap.IsFilteredOut
     if not (filters and filters.QuestPOIs and filteredOut) or filteredOut(filters.QuestPOIs) then
@@ -185,7 +186,15 @@ local function readBlizzardMarks(mapID)
     if type(rows) ~= "table" then return marks end
     for i = 1, #rows do
         local qid = rows[i] and rows[i].questID
-        if qid and ns.Compat and ns.Compat.IsQuestWatched(qid) == true then marks[qid] = true end
+        if qid and ns.Compat and ns.Compat.IsQuestWatched(qid) == true then
+            marks[qid] = true
+            local x, y = rows[i].x, rows[i].y
+            if type(x) == "number" and type(y) == "number" then
+                local at = M._blizzardMarkAt[qid] or {}
+                M._blizzardMarkAt[qid] = at
+                at[#at + 1], at[#at + 2] = x, y
+            end
+        end
     end
     return marks
 end
@@ -530,26 +539,34 @@ function M:Rebuild()
             M._yielded = M._yielded + 1
             n = 0
         end
+        local flagYield = false
         for i = 1, n do
-            local x, y = Provider._ptX[i], Provider._ptY[i]
-            local f = acquire(size)
-            f.questID, f.kind, f.objMask = qid, Provider._ptKind[i], Provider._ptMask[i]
-            f.srcID = Provider._ptSrc[i]
-            f.fadeKey = qid .. ":" .. x .. ":" .. y
-            f.texture:SetTexture(ns.QuestPinTexture(q.isComplete, f.kind))
-            f.texture:SetVertexColor(ns.QuestPinTint(f.kind, q.isComplete))
-            -- Answers false, not an error, when HereBeDragons has no world size for the map
-            if HBDP:AddMinimapIconMap(REF, f, mapID, x, y, false, false) then
-                M._registered = M._registered + 1
-                -- The engine puts its own "?" over a creature finisher it has loaded, tracked or not
-                if engine and source == "turnin" and f.kind == 1 then
-                    M._givers[#M._givers + 1] = f
-                end
+            -- A flag Blizzard's own marker for the quest sits on yields to it, as the turn-in does
+            if marked[qid] and ns.QuestRealKind(Provider._ptKind[i]) == 4
+               and ns.QuestFlagAtMark(M._blizzardMarkAt[qid], Provider._ptX[i], Provider._ptY[i]) then
+                flagYield = true
             else
-                M._rejected = M._rejected + 1
-                f:Hide()
+                local x, y = Provider._ptX[i], Provider._ptY[i]
+                local f = acquire(size)
+                f.questID, f.kind, f.objMask = qid, Provider._ptKind[i], Provider._ptMask[i]
+                f.srcID = Provider._ptSrc[i]
+                f.fadeKey = qid .. ":" .. x .. ":" .. y
+                f.texture:SetTexture(ns.QuestPinTexture(q.isComplete, f.kind))
+                f.texture:SetVertexColor(ns.QuestPinTint(f.kind, q.isComplete))
+                -- Answers false, not an error, when HereBeDragons has no world size for the map
+                if HBDP:AddMinimapIconMap(REF, f, mapID, x, y, false, false) then
+                    M._registered = M._registered + 1
+                    -- The engine puts its own "?" over a creature finisher it has loaded, tracked or not
+                    if engine and source == "turnin" and f.kind == 1 then
+                        M._givers[#M._givers + 1] = f
+                    end
+                else
+                    M._rejected = M._rejected + 1
+                    f:Hide()
+                end
             end
         end
+        if flagYield then M._yielded = M._yielded + 1 end
         -- After the pins above, since collecting overwrites the provider's scratch
         if HBD and pinst and collect(HBD, Provider, qid, q, mapID, pinst) > 0 then
             local f = acquire(size)

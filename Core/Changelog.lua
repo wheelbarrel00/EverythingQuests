@@ -2,6 +2,28 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.20.0", date = "2026-11-25",
+        sections = {
+            { head = "New Features", items = {
+                { "A flag for places to reach. A quest done by exploring a place or by bringing an escort to the end of its road now shows a purple flag on the world map and the minimap where that happens, such as the Fargodeep Mine for the Elwynn Forest quest of that name, and the TomTom arrow points there until the quest is done. Most of these places had no Everything Quests marker before. 117 Classic Era quests, 48 Burning Crusade Classic quests and 138 WoW Forever quests have one, and on Classic Era and WoW Forever five more whose place is inside a dungeon are marked at the dungeon entrance. On WoW Forever, where the game's own marker for a quest in your log sits at the place to explore, it stands in for the flag.", classic = true },
+                { "Many more objective markers. Everything Quests now takes the places of objectives its own data had none for from AllTheThings and, on Classic Era and WoW Forever, QuestieDB, so more quests get objective markers and a TomTom arrow that follows them: 2,170 Classic Era quests have objective markers (1,777 before), 2,912 on Burning Crusade Classic (2,736 before) and 2,895 on WoW Forever (1,875 before). This gives the Darkshore quests WANTED: Murkdeep! and The Blackwood Corrupted their places, so their arrow points at Murkdeep's camp and at the bonfire where you summon the satyr. Thanks to wanderer361 for the report.", classic = true },
+                { "Hand-ins for WoW Forever's own quests. Of the 1,358 quests new to WoW Forever that Everything Quests now marks with AllTheThings 5.4.18 (1,251 before), 1,329 now have a marker where you hand them in (173 before) and 692 have objective markers (97 before). The new hand-ins come from QuestieDB's WoW Forever player traces, so the \"?\" and the arrow can take you there, and the creatures and objects that give or take quests new to WoW Forever now have names from QuestieDB too (295 had none before, 2 still have none).", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Improvements", items = {
+                { "Quest data corrected from QuestieDB. On Classic Era and WoW Forever, where QuestieDB's corrected data differs from Everything Quests' own, Everything Quests now follows it: who gives and takes a quest, required levels, races and classes, prerequisites, and where creatures and objects stand. QuestieDB's corrections are not applied on Burning Crusade Classic.", classic = true },
+                { "No markers on every creature for items that drop anywhere. On Classic Era and WoW Forever, items that drop at random from many creatures, such as the gems Star Ruby and Jade, and cloth, leather and fish from fishing pools no longer put objective markers on every creature or pool they come from. Herbs keep their herb nodes.", classic = true },
+                { "No arrow to the hand-in before you explore. On Classic Era and WoW Forever, a quest done by exploring a place, an escort or another scripted event whose place Everything Quests does not know now gets no TomTom arrow until it is done, rather than one pointing at where you hand it in. On WoW Forever the game's own marker for the quest is used first when there is one.", classic = true },
+            } },
+            { head = "Bug Fixes", items = {
+                { "The two A Lesson to Learn druid quests. On Classic Era and WoW Forever, the Tauren and Night Elf versions had each other's quest numbers, so a druid's \"!\" for it could stay on the map after the quest was done. Each now has its own.", classic = true },
+                { "Liquid Stone and A New Plague. On Classic Era and WoW Forever, Liquid Stone in the Badlands no longer asks for Alchemy, and three of the A New Plague quests in Tirisfal Glades are now marked for every Horde race, not only the Undead.", classic = true },
+            } },
+            { head = "Known Issues", items = {
+                { "Some places are still unknown. A quest done by exploring or a scripted event whose place neither Everything Quests' data nor AllTheThings or QuestieDB knows still shows no flag. On Classic Era it gets no arrow until it is done, and on WoW Forever none unless the game marks it. On Burning Crusade Classic its arrow still points where you hand it in.", classic = true },
+            } },
+        },
+    },
+    {
         version = "2.19.1", date = "2026-11-24",
         sections = {
             { head = "Bug Fixes", items = {

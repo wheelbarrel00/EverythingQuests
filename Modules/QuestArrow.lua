@@ -287,6 +287,9 @@ local function place(self, questID, q, km, kx, ky)
     end
     -- A done quest with no hand-in known, or an open objective with no point known, gets no point rather than a wrong one
     if (q and ns.QuestIsDone and ns.QuestIsDone(q)) or needsSpot(q) then return nil end
+    -- Where the data's explore places were filled from a second source, an open exploration, escort or scripted quest with none gets no point rather than the hand-in
+    local Avail = ns.CLASSIC_EXPLORE_PLACES_FILLED and q and ns:GetSubsystem("AvailableQuests")
+    if Avail and Avail.IsExplorationOrScripted and Avail:IsExplorationOrScripted(questID) then return nil end
     local packed = ns.CLASSIC_QUEST_COORDS and ns.CLASSIC_QUEST_COORDS[questID]
     if not packed then return nil end
     m = math.floor(packed / 1e8)

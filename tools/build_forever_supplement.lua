@@ -82,6 +82,10 @@ end
 os.remove(outDir .. "/" .. OVERLAY_PREFIX .. "MaxLevels.lua")
 os.remove(outDir .. "/breadcrumbs.lua")
 os.remove(outDir .. "/attRules.lua")
+os.remove(outDir .. "/attObjectives.lua")
+os.remove(outDir .. "/foreverClientObjectives.lua")
+-- The peer's Forever rows read the area table this run rewrites, so build_peer_forever.lua writes them again after it.
+os.remove(outDir .. "/peerForeverRows.lua")
 
 local function parseBlock(src, marker, label)
     local at = assert(src:find(marker, 1, true), "marker not found in " .. label)
@@ -218,7 +222,10 @@ for _, key in ipairs(sortedKeys(sessions)) do
         end
     end
     for id, r in pairs(S.titles or {}) do
-        if type(id) == "number" and type(r) == "table" and type(r.n) == "string" then titles[id] = titles[id] or r end
+        if type(id) == "number" and type(r) == "table" and type(r.n) == "string" then
+            -- The first name read stands, and a later harvest that also read the objectives adds them.
+            if not titles[id] then titles[id] = r elseif r.obj and not titles[id].obj then titles[id].obj = r.obj end
+        end
     end
     for id, why in pairs(S.titleMisses or {}) do
         if type(id) == "number" and why == "refused" then refusedByServer[id] = true end
@@ -1138,9 +1145,15 @@ end
 do
     -- Values the rules above leave wrong that ATT's own data or the client's completion flags settle, applied last so they are final
     local CORRECTIONS = {
-        [79939] = { classes = 2, preAll = { 96438 }, why = "its only prerequisite, Battle at the Mannoroc Coven, is for paladins" },
         [92842] = { races = RACES_ALLIANCE, why = "97319, which shares its completion flag, is the Horde version" },
         [97411] = { classes = 2, why = "ATT's rewards are for paladins, and the Era quests sharing its completion flag cover the other Horde classes" },
+        [97412] = { classes = 2, why = "ATT's rewards are for paladins, as for 97411 before it" },
+        [97413] = { classes = 2, why = "ATT's rewards are for paladins, as for 97411 before it" },
+        [97414] = { classes = 2, why = "ATT's rewards are for paladins, as for 97411 before it" },
+        [97447] = { classes = 64, why = "ATT's rewards are for shamans, the Alliance's version of the paladins' 97411" },
+        [97448] = { classes = 64, why = "ATT's rewards are for shamans, as for 97447 before it" },
+        [97449] = { classes = 64, why = "ATT's rewards are for shamans, as for 97447 before it" },
+        [97450] = { classes = 64, why = "ATT's rewards are for shamans, as for 97447 before it" },
         [99194] = { races = RACES_ALLIANCE, why = "its giver's other donations are Alliance, and the Horde ones have a giver of their own" },
         [99435] = { preAll = { 6402 }, why = "Era 6403, which shares its completion flag, needs 6402" },
     }
@@ -1463,6 +1476,8 @@ for _, spec in pairs(BASE_FILES) do
     assert(readAll(outDir .. "/" .. spec.file) == raw[spec.file], "copy of " .. spec.file .. " differs")
 end
 if dungeonSrc then writeAll(outDir .. "/dungeonEntrances.lua", dungeonSrc) end
+-- The Era places a peer database fills, in Era space, which the generator converts with the rest of the dump.
+if exists(eraDir .. "/peerRows.lua") then writeAll(outDir .. "/peerRows.lua", readAll(eraDir .. "/peerRows.lua")) else os.remove(outDir .. "/peerRows.lua") end
 
 local areaRows = {}
 for a, ui in pairs(area2ui) do areaRows[a] = ui end
@@ -1721,6 +1736,38 @@ if att then
         assert(exists(eraAtt .. "/Categories/Zones.lua"), "--att needs AllTheThings' Era data beside it, at " .. eraAtt)
         local writeRules = dofile((debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "tools/") .. "build_att_rules.lua")
         for _, line in ipairs(select(2, writeRules(att.quests, eraAtt, outDir, attDir))) do io.stderr:write(line .. "\n") end
+        -- The objective types the game lists for a quest, in its own order, from the quest log or a server answer: ATT numbers its places by them.
+        local lists, parts, fromLog, fromServer = {}, {}, 0, 0
+        for id, r in pairs(Q) do
+            if type(r.obj) == "table" and #r.obj > 0 then lists[id] = r.obj; fromLog = fromLog + 1 end
+        end
+        local both, same = 0, 0
+        for id, r in pairs(titles) do
+            if type(r.obj) == "table" and #r.obj > 0 then
+                if not lists[id] then
+                    lists[id] = r.obj; fromServer = fromServer + 1
+                else
+                    -- A quest the log listed too grades the server's answer
+                    local agree = #lists[id] == #r.obj
+                    for i = 1, #r.obj do agree = agree and lists[id][i].ty == r.obj[i].ty end
+                    both = both + 1
+                    if agree then same = same + 1 end
+                end
+            end
+        end
+        io.stderr:write(("-- client objectives graded: the server's list matches the quest log's for %d of %d quest(s)\n"):format(same, both))
+        parts[1] = "-- Generated by tools/build_forever_supplement.lua: each quest's objective types as the game lists them, in its order.\nreturn {\n"
+        for _, id in ipairs(sortedKeys(lists)) do
+            local types = {}
+            for i, o in ipairs(lists[id]) do types[i] = ("%q"):format(type(o.ty) == "string" and o.ty or "?") end
+            parts[#parts + 1] = ("[%d]={%s},\n"):format(id, table.concat(types, ","))
+        end
+        parts[#parts + 1] = "}\n"
+        local f = assert(io.open(outDir .. "/foreverClientObjectives.lua", "wb"))
+        f:write(table.concat(parts))
+        f:close()
+        io.stderr:write(("-- client objectives: %d quest(s) from the quest log, %d from the server, written to %s/foreverClientObjectives.lua\n")
+            :format(fromLog, fromServer, outDir))
     end
     for _, why in ipairs(sortedKeys(attSkipped)) do
         io.stderr:write(("-- att skipped, %s: %s\n"):format(why, table.concat(attSkipped[why], " ")))

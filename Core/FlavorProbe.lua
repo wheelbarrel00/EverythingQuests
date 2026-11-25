@@ -934,7 +934,7 @@ function Probe:MapPOI()
     -- Zero with a high spawn count means the spread filter is not running
     line("  spawn points thinned by minimum separation=%s", tostring(MP._spawnThinned))
     -- A pin held back for Blizzard's own marker and a quest with no point here leave the same gap
-    line("  Blizzard's own markers: stage %q, quests it marks here=%s, EQ pins yielded to them=%s, owned ring=%s",
+    line("  Blizzard's own markers: stage %q, quests it marks here=%s, quests whose EQ pins yielded to them=%s, owned ring=%s",
          tostring(MP._blizzardStage), tostring(countKeys(MP._blizzardMarks)), tostring(MP._yielded),
          tostring(ns.QuestPinRingWanted and ns.QuestPinRingWanted(false)))
     -- Switched off, hiding nothing and no source answering all draw the same map. The rows below separate them
@@ -2367,7 +2367,7 @@ function Probe:Media()
     out("EQ's own texture files - do they resolve")
     local BASE = "Interface\\AddOns\\EverythingQuests\\Media\\Textures\\"
     local FILES = {
-        "skull.tga", "slay.tga", "loot.tga", "object.tga", "entrance.tga",
+        "skull.tga", "slay.tga", "loot.tga", "object.tga", "entrance.tga", "explore.tga",
         "eq-logo-v3.tga", "discord.tga", "headerbar-softmask.tga",
     }
 

@@ -72,6 +72,8 @@ local SOURCES = {
 -- Field indices, from the upstream schema.
 local NPC_SPAWNS, OBJ_SPAWNS = 7, 4
 local Q_FINISHEDBY, Q_OBJECTIVES = 3, 10
+-- { text, { [areaId] = { {x, y}, ... } } }: the place an exploration quest is explored, or an escort ends.
+local Q_TRIGGEREND = 9
 local I_NPCDROPS, I_OBJDROPS = 2, 3
 -- itemKeys.vendors. A quest item that is BOUGHT has neither of the two above, so without this
 -- the quest collects no points and falls back to the single-point table, which is the turn-in.
@@ -120,6 +122,32 @@ local items   = loadBlock(SOURCES.items)
 local area2ui  = loadBlock(SOURCES.areaMap)
 local entrances = loadBlock(SOURCES.dungeons)
 
+-- peerRows.lua, from build_peer_rows.lua: a peer database's values, false clearing one, in the dump's map space for the conversion.
+local placesFilled = false
+do
+    local path = dir .. "/peerRows.lua"
+    local f = io.open(path, "rb")
+    if f then
+        f:close()
+        local peer, n = assert(loadfile(path))(), 0
+        for name, into in pairs({ quests = quests, npcs = npcs, objects = objects, items = items }) do
+            for id, row in pairs(peer[name] or {}) do
+                local have = into[id]
+                if not have then
+                    into[id] = row
+                else
+                    for field, v in pairs(row) do
+                        if v == false then have[field] = nil else have[field] = v end
+                    end
+                end
+                n = n + 1
+            end
+        end
+        io.stderr:write(("-- peer rows: %d row(s) taken\n"):format(n))
+        placesFilled = true
+    end
+end
+
 -- foreverMaps.lua holds { [uiMapID] = { ax, bx, ay, by } } from both clients' map rectangles, b as a
 -- map fraction. The conversion runs BEFORE the overlay, whose rows were read on Forever already.
 local mapFix
@@ -167,6 +195,10 @@ local function applyMapConversion()
     end
     for _, rec in pairs(objects) do
         if type(rec[OBJ_SPAWNS]) == "table" then convert(rec[OBJ_SPAWNS]) end
+    end
+    for _, rec in pairs(quests) do
+        local te = rec[Q_TRIGGEREND]
+        if type(te) == "table" and type(te[2]) == "table" then convert(te[2]) end
     end
     if entrances then
         for _, row in pairs(entrances) do
@@ -222,29 +254,140 @@ for name, baseFlavor in pairs(OVERLAYS) do
     end
 end
 
+-- foreverClientObjectives.lua, from build_forever_supplement.lua: each quest's objective types as the game lists them.
+local clientObj
+do
+    local path = dir .. "/foreverClientObjectives.lua"
+    local f = io.open(path, "rb")
+    if f then
+        f:close()
+        clientObj = assert(loadfile(path))()
+    end
+end
+
+-- peerForeverRows.lua, from build_peer_forever.lua: a peer database's Forever traces and fixes, after the conversion, in order.
+do
+    local path = dir .. "/peerForeverRows.lua"
+    local f = io.open(path, "rb")
+    if f then
+        f:close()
+        assert(PREFIX == "classic", "Forever traces cannot be applied to " .. PREFIX .. " data")
+        local peer = assert(loadfile(path))()
+        -- Converted Era points are not round numbers, so a point the peer gives to two decimals matches within 0.01
+        local function near(p, q) return p == q or (type(p) == "number" and type(q) == "number" and math.abs(p - q) < 0.01) end
+        local function same(a, b)
+            if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+            return near(a[1], b[1]) and near(a[2], b[2])
+        end
+        local function fits(o, list)
+            if type(o) ~= "table" then return false end
+            local want = { monster = 0, object = 0, item = 0 }
+            for _, t in ipairs(list) do if want[t] then want[t] = want[t] + 1 end end
+            -- A stand-in for an unplaced objective counts, being the game's own list without a place, so a peer list of other kinds is refused
+            local function n(t) return type(t) == "table" and #t or 0 end
+            return n(o[1]) + n(o[5]) == want.monster and n(o[2]) == want.object and n(o[3]) == want.item
+        end
+        local function merge(list, v, drop)
+            local out = {}
+            for _, x in ipairs(type(list) == "table" and list or {}) do
+                local gone = false
+                if drop then for _, y in ipairs(v) do if same(x, y) then gone = true end end end
+                if not gone then out[#out + 1] = x end
+            end
+            if not drop then
+                for _, y in ipairs(v) do
+                    local have = false
+                    for _, x in ipairs(out) do if same(x, y) then have = true end end
+                    if not have then out[#out + 1] = y end
+                end
+            end
+            return out
+        end
+        -- {creatures, objects, items} and the objective slots merge slot by slot, places zone by zone, the rest as a list
+        local SLOTTED = { quests = { [2] = 3, [3] = 3, [10] = 6 } }
+        local ZONED = { npcs = { [7] = true }, objects = { [4] = true } }
+        local function change(name, row, field, op, v)
+            local old = row[field]
+            if op == "fill" then
+                if old == nil or old == "" then row[field] = v end
+            elseif op == "set" then
+                row[field] = v
+            elseif type(v) == "table" then
+                local drop = op == "remove"
+                local slots = SLOTTED[name] and SLOTTED[name][field]
+                if slots then
+                    old = type(old) == "table" and old or {}
+                    for s = 1, slots do if type(v[s]) == "table" then old[s] = merge(old[s], v[s], drop) end end
+                    row[field] = old
+                elseif ZONED[name] and ZONED[name][field] then
+                    old = type(old) == "table" and old or {}
+                    for zone, pts in pairs(v) do old[zone] = merge(old[zone], pts, drop) end
+                    row[field] = old
+                else
+                    row[field] = merge(old, v, drop)
+                end
+            end
+        end
+        local applied, skipped, kept = 0, 0, 0
+        for name, into in pairs({ quests = quests, npcs = npcs, objects = objects, items = items }) do
+            for id, ops in pairs(peer[name] or {}) do
+                local row = into[id]
+                if not row and name ~= "quests" then row = {}; into[id] = row end
+                if row then
+                    for _, o in ipairs(ops) do
+                        local list = name == "quests" and o[1] == 10 and o[2] == "set" and clientObj and clientObj[id]
+                        -- An objective list that already has the kinds the game lists is not swapped for one that does not
+                        if list and fits(row[10], list) and not fits(o[3], list) then
+                            kept = kept + 1
+                        else
+                            change(name, row, o[1], o[2], o[3])
+                            applied = applied + 1
+                        end
+                    end
+                else
+                    skipped = skipped + 1
+                end
+            end
+        end
+        io.stderr:write(("-- peer Forever rows: %d operation(s) applied, %d quest(s) the data does not hold left out, %d objective list(s) kept as the game lists them\n")
+            :format(applied, skipped, kept))
+    end
+end
+
 -- Upstream rows that contradict AllTheThings and their givers' factions, fixed in every mode. One that no longer matches is reported and left alone.
 -- 8228 is the Horde flier at Grinkle in Orgrimmar, 8229 the Alliance one at Barrus in Ironforge. 3645 is the Horde card renewal at Oglethorpe after 3643, 3647 the Alliance one at Tinkmaster after 3641.
 local CORRECTIONS = {
     { id = 8228, from = 15119, to = 15116 }, { id = 8229, from = 15116, to = 15119 },
     { id = 3645, from = 7944, to = 7406, pre = { 3641, 3643 } }, { id = 3647, from = 7406, to = 7944, pre = { 3643, 3641 } },
 }
+-- Each part is judged on its own against where it starts and where it should end, so one an upstream fix already made is reported.
 for _, c in ipairs(CORRECTIONS) do
     local q = quests[c.id]
-    local sb, fb = q and q[Q_STARTEDBY], q and q[Q_FINISHEDBY]
-    local function only(by, v) return type(by) == "table" and type(by[1]) == "table" and #by[1] == 1 and by[1][1] == v end
-    local pre = q and q[Q_PRESINGLE]
-    local preOK = not c.pre or (type(pre) == "table" and #pre == 1 and pre[1] == c.pre[1])
-    if only(sb, c.from) and only(fb, c.from) and preOK then
-        sb[1] = { c.to }
-        fb[1] = { c.to }
-        if c.pre then q[Q_PRESINGLE] = { c.pre[2] } end
-        io.stderr:write(("-- correction: quest %d is given and handed in at %d, not %d%s\n"):format(c.id, c.to, c.from,
-            c.pre and (", after %d, not %d"):format(c.pre[2], c.pre[1]) or ""))
-    elseif q then
-        local part = (only(sb, c.from) and only(fb, c.from)) and "prerequisite" or "giver or finisher"
-        io.stderr:write(("-- correction no longer needed: quest %d, its %s no longer matches\n"):format(c.id, part))
-    else
+    if not q then
         io.stderr:write(("-- correction not applied, quest %d is not in the data\n"):format(c.id))
+    else
+        local sb, fb = q[Q_STARTEDBY], q[Q_FINISHEDBY]
+        local function only(by, v) return type(by) == "table" and type(by[1]) == "table" and #by[1] == 1 and by[1][1] == v end
+        if only(sb, c.to) and only(fb, c.to) then
+            io.stderr:write(("-- correction no longer needed: quest %d is already given and handed in at %d\n"):format(c.id, c.to))
+        elseif only(sb, c.from) and only(fb, c.from) then
+            sb[1], fb[1] = { c.to }, { c.to }
+            io.stderr:write(("-- correction: quest %d is given and handed in at %d, not %d\n"):format(c.id, c.to, c.from))
+        else
+            io.stderr:write(("-- CORRECTION CONFLICT: quest %d's giver or finisher is neither %d nor %d, left alone\n"):format(c.id, c.from, c.to))
+        end
+        if c.pre then
+            local pre = q[Q_PRESINGLE]
+            local one = type(pre) == "table" and #pre == 1 and pre[1]
+            if one == c.pre[2] then
+                io.stderr:write(("-- correction no longer needed: quest %d already follows %d\n"):format(c.id, c.pre[2]))
+            elseif one == c.pre[1] then
+                q[Q_PRESINGLE] = { c.pre[2] }
+                io.stderr:write(("-- correction: quest %d follows %d, not %d\n"):format(c.id, c.pre[2], c.pre[1]))
+            else
+                io.stderr:write(("-- CORRECTION CONFLICT: quest %d's prerequisite is neither %d nor %d, left alone\n"):format(c.id, c.pre[1], c.pre[2]))
+            end
+        end
     end
 end
 
@@ -267,6 +410,8 @@ local KIND_SLAY, KIND_OBJECT, KIND_LOOT = 1, 2, 3
 -- An entrance point is the same kind plus this, so the reader recovers the real kind by
 -- subtracting and the objective index still means "the nth objective of that type".
 local KIND_ENTRANCE = 4
+-- A place to reach, quest field 9. No objective type matches it, so the map keeps its pin until the quest is done.
+local KIND_EXPLORE = 4
 
 -- Start and turn-in points carry the creature or object that produced them in a 1e9 slot.
 -- The bound guards the packing rather than recording a maximum: at 1e6 the worst packed value
@@ -440,8 +585,7 @@ local function collectItem(out, id, objIdx)
     if type(odrops) == "table" then
         for i = 1, #odrops do collectObj(out, odrops[i], KIND_LOOT, objIdx) end
     end
-    -- A bought item. Same KIND_LOOT because the player-facing fact is "get the item here", and
-    -- because kinds 1-3 are the only values the entrance offset of 4 leaves room for.
+    -- A bought item. Same KIND_LOOT because the player-facing fact is "get the item here".
     local vendors = it[I_VENDORS]
     if type(vendors) == "table" then
         -- Vendors reach 184 for one item on Era, so the same cutoff gates the mob list here too.
@@ -489,12 +633,180 @@ local function pick(points)
     return bestA, best.x, best.y
 end
 
+-- attObjectives.lua, from build_att_rules.lua or build_forever_supplement.lua --att: AllTheThings' place for each objective.
+local attObj, uiArea, attStats
+do
+    local path = dir .. "/attObjectives.lua"
+    local f = io.open(path, "rb")
+    if f then
+        f:close()
+        attObj = assert(loadfile(path))()
+        uiArea = {}
+        for areaId, ui in pairs(area2ui) do
+            if type(areaId) == "number" and areaId > 0 and (not uiArea[ui] or areaId < uiArea[ui]) then uiArea[ui] = areaId end
+        end
+        attStats = { quests = 0, objectives = 0, spots = 0, unmatched = 0, unmapped = 0, setAside = 0, graded = 0, near = 0,
+                     clientChecked = 0, clientAgree = 0 }
+    end
+end
+-- The world and continent maps, where a pin would sit in the middle of a continent.
+local NOT_A_ZONE = { [947] = true, [1414] = true, [1415] = true, [1945] = true }
+-- uiMapID -> the lowest dungeon area drawn on it, for a place ATT gives inside an instance.
+local dungeonOf = {}
+-- A battleground's own map is drawn, and the dump stands creatures on it, so it is no dungeon here
+local drawnInside = {}
+for _, n in pairs(npcs) do
+    local sp = n[NPC_SPAWNS]
+    if type(sp) == "table" then
+        for areaId, list in pairs(sp) do
+            if entranceFor[areaId] and type(list) == "table" and type(list[1]) == "table" and (list[1][1] or -1) >= 0 then
+                drawnInside[areaId] = true
+            end
+        end
+    end
+end
+do
+    local kept = {}
+    for areaId in pairs(drawnInside) do kept[#kept + 1] = areaId end
+    table.sort(kept)
+    if #kept > 0 then io.stderr:write(("-- instance areas the dump stands creatures in, kept off the entrance rule: %s\n"):format(table.concat(kept, ", "))) end
+end
+for areaId in pairs(entranceFor) do
+    local ui = not drawnInside[areaId] and area2ui[areaId]
+    if ui and (not dungeonOf[ui] or areaId < dungeonOf[ui]) then dungeonOf[ui] = areaId end
+end
+-- An ATT place this close to one of the dump's own places for the same objective agrees with it, in map units.
+local ATT_NEAR = 5
+
+local function attBuckets(o)
+    local list = {}
+    local function add(kind, idx, field, ids) list[#list + 1] = { kind = kind, idx = idx, field = field, ids = ids } end
+    local n1 = type(o[1]) == "table" and #o[1] or 0
+    for i = 1, n1 do local e = o[1][i]; if type(e) == "table" and e[1] then add(KIND_SLAY, i - 1, "npc", { e[1] }) end end
+    for i = 1, type(o[2]) == "table" and #o[2] or 0 do local e = o[2][i]; if type(e) == "table" and e[1] then add(KIND_OBJECT, i - 1, "obj", { e[1] }) end end
+    for i = 1, type(o[3]) == "table" and #o[3] or 0 do local e = o[3][i]; if type(e) == "table" and e[1] then add(KIND_LOOT, i - 1, "item", { e[1] }) end end
+    for i = 1, type(o[5]) == "table" and #o[5] or 0 do
+        local e = o[5][i]
+        if type(e) == "table" and type(e[1]) == "table" then add(KIND_SLAY, n1 + i - 1, "npc", e[1]) end
+    end
+    return list
+end
+
+-- An item names the objective most surely, then an object, then a creature, because ATT also names the creature that drops an item.
+local function attBucketFor(row, buckets)
+    for _, field in ipairs({ "item", "obj", "npc" }) do
+        local named = {}
+        for _, v in ipairs(row[field] or {}) do named[v] = true end
+        for _, b in ipairs(buckets) do
+            if b.field == field then
+                for _, v in ipairs(b.ids) do if named[v] then return b end end
+            end
+        end
+    end
+end
+
+local CLIENT_KIND = { monster = KIND_SLAY, object = KIND_OBJECT, item = KIND_LOOT }
+
+-- ATT's objective n in the game's list, as the masks number it. A log line gets none, as ATT puts it at the hand-in (A Rogue's Deal, 8).
+local function clientBucket(list, n)
+    local t = type(n) == "number" and list[n]
+    local kind = t and CLIENT_KIND[t]
+    if not kind then return nil end
+    local idx = 0
+    for i = 1, n - 1 do if list[i] == t then idx = idx + 1 end end
+    return { kind = kind, idx = idx }
+end
+
+local function attFill(pts, q, id)
+    local rows, o = attObj and attObj[id], q[Q_OBJECTIVES]
+    local list = clientObj and clientObj[id]
+    if not rows or (type(o) ~= "table" and not list) then return end
+    local buckets = type(o) == "table" and attBuckets(o) or {}
+    local have = {}
+    for _, p in ipairs(pts) do
+        local k = p.k > KIND_ENTRANCE and p.k - KIND_ENTRANCE or p.k
+        local key = k * 100 + p.oi
+        have[key] = have[key] or {}
+        have[key][#have[key] + 1] = p
+    end
+    local added = false
+    for _, row in ipairs(rows) do
+        local b = attBucketFor(row, buckets)
+        local c = list and clientBucket(list, row.n)
+        if b and c then
+            attStats.clientChecked = attStats.clientChecked + 1
+            if b.kind == c.kind and b.idx == c.idx then attStats.clientAgree = attStats.clientAgree + 1 end
+        end
+        b = b or c
+        if not b then
+            attStats.unmatched = attStats.unmatched + 1
+        else
+            local key, at, own, inside = b.kind * 100 + b.idx, row.at, {}, {}
+            for i = 1, #at, 3 do
+                local ui, x, y = at[i], at[i + 1], at[i + 2]
+                local t = mapFix and mapFix[ui]
+                if dungeonOf[ui] then
+                    -- Inside a dungeon, whose own map EQ never draws, so the way in stands for it as for the dump's own.
+                    inside[dungeonOf[ui]] = true
+                elseif NOT_A_ZONE[ui] or not uiArea[ui] then
+                    attStats.unmapped = attStats.unmapped + 1
+                elseif t and rows.fs then
+                    -- ATT's Forever data mixes Era and Forever space on the maps Forever redrew.
+                    attStats.setAside = attStats.setAside + 1
+                else
+                    if t then x, y = t[1] * x + t[2] * 100, t[3] * y + t[4] * 100 end
+                    if x > 0 and y > 0 and x < 100 and y < 100 then own[#own + 1] = { a = uiArea[ui], x = x, y = y, ui = ui } end
+                end
+            end
+            if have[key] then
+                for _, s in ipairs(own) do
+                    local best
+                    for _, p in ipairs(have[key]) do
+                        if area2ui[p.a] == s.ui then
+                            local d = math.sqrt((p.x - s.x) ^ 2 + (p.y - s.y) ^ 2)
+                            if not best or d < best then best = d end
+                        end
+                    end
+                    if best then
+                        attStats.graded = attStats.graded + 1
+                        if best <= ATT_NEAR then attStats.near = attStats.near + 1 end
+                    end
+                end
+            elseif #own > 0 or next(inside) then
+                local om, before = (b.kind == KIND_SLAY) and ambiguousMonster or nil, #pts
+                for _, s in ipairs(own) do
+                    pts[#pts + 1] = { a = s.a, x = s.x, y = s.y, k = b.kind, oi = b.idx, om = om }
+                    attStats.spots = attStats.spots + 1
+                end
+                local areas = {}
+                if mode == "spawns" then
+                    for areaId in pairs(inside) do areas[#areas + 1] = areaId end
+                end
+                table.sort(areas)
+                for _, areaId in ipairs(areas) do
+                    for _, way in ipairs(entranceFor[areaId]) do
+                        if way[2] > 0 and way[3] > 0 then
+                            pts[#pts + 1] = { a = way[1], x = way[2], y = way[3], k = b.kind + KIND_ENTRANCE, oi = b.idx, om = om }
+                            attStats.entrances = (attStats.entrances or 0) + 1
+                        end
+                    end
+                end
+                if #pts > before then
+                    attStats.objectives = attStats.objectives + 1
+                    added = true
+                end
+            end
+        end
+    end
+    if added then attStats.quests = attStats.quests + 1 end
+end
+
 -- Entrance points belong to the per-map tables only. The single point modes emit
 -- ns.CLASSIC_QUEST_COORDS, which carries no kind field, so an entrance there is indistinguishable
 -- from a real location.
 local WANT_ENTRANCES = (mode == "spawns" or mode == "turnin")
 
-local function objectivePoints(q)
+local function objectivePoints(q, id)
     local pts, o = {}, q[Q_OBJECTIVES]
     if WANT_ENTRANCES then realSeen, sentinelSeen = {}, {} end
     ambiguousMonster, monsterCount = nil, nil
@@ -513,7 +825,15 @@ local function objectivePoints(q)
             end
         end
     end
-    if type(o) ~= "table" then realSeen, sentinelSeen = nil, nil; return pts end
+    local te = q[Q_TRIGGEREND]
+    if type(te) == "table" then collect(pts, te, 2, KIND_EXPLORE, 0) end
+    if type(o) ~= "table" then
+        appendEntrances(pts)
+        -- A quest the data lists no objectives for can still take ATT's places through the game's own list.
+        if id and attObj then attFill(pts, q, id) end
+        realSeen, sentinelSeen = nil, nil
+        return pts
+    end
     -- o[1] and o[5] are ONE index space in the quest log - the client reports both as type
     -- "monster", numbered by quest template slot. The dump does not preserve that slot, so a
     -- quest carrying both cannot be numbered reliably. Those points take every monster bit and
@@ -547,6 +867,7 @@ local function objectivePoints(q)
         end
     end
     appendEntrances(pts)
+    if id and attObj then attFill(pts, q, id) end
     realSeen, sentinelSeen = nil, nil
     ambiguousMonster, monsterCount = nil, nil
     return pts
@@ -779,9 +1100,10 @@ if mode == "spawns" then
         "local _, ns = ...\n",
         "\n-- [questID] = { [uiMapID] = { packed, ... } }\n",
         "-- packed = objMask*1e9 + kind*1e8 + floor(x*1e4)*1e4 + floor(y*1e4)\n",
-        "-- kind 1=slay 2=object 3=loot, and the same +4 (5,6,7) for a DUNGEON ENTRANCE - the\n",
-        "-- objective is inside an instance whose interior coordinates nobody records, so the\n",
-        "-- pin marks the way in. Recover the real kind by subtracting 4.\n",
+        "-- kind 1=slay 2=object 3=loot 4=a place to reach (explore, an escort's end)\n",
+        "-- and the same +4 (5,6,7,8) for a DUNGEON ENTRANCE: the objective is inside an instance\n",
+        "-- whose interior coordinates nobody records, so the pin marks the way in. Recover the\n",
+        "-- real kind by subtracting 4.\n",
         "-- objMask is a BITMASK of the objectives this location serves - bit i means the ith\n",
         "-- objective OF THIS KIND'S TYPE, 0 based, the same numbering Data/QuestNPCs_Classic\n",
         "-- uses. One location commonly serves several, which is why it is not a single index.\n",
@@ -795,7 +1117,7 @@ if mode == "spawns" then
 
     for i = 1, #ids do
         local id = ids[i]
-        local byMap = clusterByMap(objectivePoints(quests[id]))
+        local byMap = clusterByMap(objectivePoints(quests[id], id))
 
         local maps = {}
         for m in pairs(byMap) do
@@ -954,6 +1276,13 @@ if mode == "spawns" then
     io.stderr:write(("-- %d point(s) serve MORE THAN ONE objective (%.1f%%) - each of those is a\n")
         :format(shared, shared / math.max(1, emitted) * 100))
     io.stderr:write("-- pin a single objective index would have mislabeled or hidden\n")
+    if attStats then
+        local s = attStats
+        io.stderr:write(("-- att objectives: %d spot(s) for %d objective(s) in %d quest(s) with no place of their own; %d not matched to an objective, %d on a map with no zone, %d set aside on a redrawn map; %d of %d checked against the dump's own places within %d map units\n")
+            :format(s.spots, s.objectives, s.quests, s.unmatched, s.unmapped, s.setAside, s.near, s.graded, ATT_NEAR))
+        io.stderr:write(("-- att objective numbers: the game's own list puts ATT's objective number on the objective its names match for %d of %d\n")
+            :format(s.clientAgree, s.clientChecked))
+    end
     return
 end
 
@@ -976,7 +1305,7 @@ if mode == "npcs" then
         local id = ids[i]
         for k in pairs(sink) do sink[k] = nil end
         npcSink = sink
-        objectivePoints(quests[id])
+        objectivePoints(quests[id], id)
         npcSink = nil
 
         local list = {}
@@ -1267,13 +1596,18 @@ if mode == "available" then
         for id in pairs(start) do
             if pre[id] then
                 local here, swapped, rest, seen = false, false, {}, {}
-                for _, p in ipairs(pre[id]) do
-                    for _, q in ipairs(isCrumb[p] or { p }) do
-                        if isCrumb[p] and q == id then here = true end
-                        if isCrumb[p] then swapped = true end
-                        if q ~= id and not seen[q] then seen[q] = true; rest[#rest + 1] = q end
+                -- A breadcrumb into a breadcrumb stands for where the last one leads (282 to 420 to 287 and 98322)
+                local function follow(p, depth)
+                    if not isCrumb[p] or depth > 8 then
+                        if p ~= id and not seen[p] then seen[p] = true; rest[#rest + 1] = p end
+                        return
+                    end
+                    swapped = true
+                    for _, q in ipairs(isCrumb[p]) do
+                        if q == id then here = true else follow(q, depth + 1) end
                     end
                 end
+                for _, p in ipairs(pre[id]) do follow(p, 0) end
                 if here then
                     -- The gate reads preAll only when there is no any-of list, so voiding one must not wake an all-of list.
                     assert(not preAll[id], ("quest %d: voiding its any-of list would start gating it on its all-of list"):format(id))
@@ -2013,7 +2347,7 @@ for i = 1, #ids do
     local q = quests[id]
     stats.total = stats.total + 1
 
-    local pts = objectivePoints(q)
+    local pts = objectivePoints(q, id)
     if #pts > 0 then
         stats.objective = stats.objective + 1
     elseif mode == "both" then
@@ -2053,12 +2387,17 @@ for i = 1, #rows do
     end
 end
 out[#out + 1] = "}\n"
+if placesFilled then
+    out[#out + 1] = "\n-- A second database filled in where quests are explored or end, so one with no such place gets no arrow to its hand-in.\n"
+    out[#out + 1] = "ns.CLASSIC_EXPLORE_PLACES_FILLED = true\n"
+end
 local body = table.concat(out)
 
 do
     local probe = {}
     assert(loadstring(body))("EQ", probe)
     local got = assert(probe.CLASSIC_QUEST_COORDS, "emitted file did not define the table")
+    assert((probe.CLASSIC_EXPLORE_PLACES_FILLED == true) == placesFilled, "the filled places mark changed on reload")
     local seen, worst = 0, 0
     for i = 1, #rows do
         local r = rows[i]

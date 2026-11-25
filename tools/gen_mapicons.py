@@ -2,7 +2,7 @@
 
     python tools/gen_mapicons.py
 
-Writes Media/Textures/slay.tga, loot.tga, object.tga and entrance.tga. Media/Textures/skull.tga
+Writes Media/Textures/slay.tga, loot.tga, object.tga, entrance.tga and explore.tga. Media/Textures/skull.tga
 is NOT touched: it is the nameplate kill marker and keeps its own art.
 
 The art is drawn at 18 units on the world map (Modules/MapPOI/Pin.xml) and 12 on the minimap
@@ -36,6 +36,7 @@ KINDS = {
     "loot":     {"top": (240, 160, 48), "bottom": (200, 116, 18), "deep": (128, 66, 8)},
     "object":   {"top": (64, 190, 150), "bottom": (30, 150, 116), "deep": (14, 88, 68)},
     "entrance": {"top": (92, 148, 232), "bottom": (48, 106, 202), "deep": (20, 54, 120)},
+    "explore":  {"top": (172, 116, 226), "bottom": (128, 72, 196), "deep": (66, 30, 112)},
 }
 
 
@@ -119,11 +120,28 @@ def entrance_holes(x, y):
     return _rect(x, y, 0.384, 0.512, 0.616, 0.744)
 
 
+# A place to reach: an area to explore, or where an escort ends.
+def explore(x, y):
+    if _rect(x, y, 0.330, 0.262, 0.382, 0.760):                    # pole
+        return True
+    if 0.270 <= y <= 0.560 and x >= 0.382:                         # swallowtail pennant
+        mid = 0.415
+        reach = 0.700 - abs(y - mid) * 0.55
+        notch = 0.585 + abs(y - mid) * 0.9
+        return x <= reach and not (x >= notch and abs(y - mid) < 0.05)
+    return _ellipse(x, y, 0.356, 0.760, 0.090, 0.030)              # foot
+
+
+def explore_holes(x, y):
+    return False
+
+
 SHAPES = {
     "slay": (slay, slay_holes),
     "loot": (loot, loot_holes),
     "object": (obj, obj_holes),
     "entrance": (entrance, entrance_holes),
+    "explore": (explore, explore_holes),
 }
 
 
@@ -191,7 +209,7 @@ def write_tga(path, pixels):
 
 
 def main():
-    for name in ("slay", "loot", "object", "entrance"):
+    for name in ("slay", "loot", "object", "entrance", "explore"):
         path = os.path.join(OUT_DIR, name + ".tga")
         size = write_tga(path, render(name))
         print("wrote %-38s %d bytes" % (path, size))

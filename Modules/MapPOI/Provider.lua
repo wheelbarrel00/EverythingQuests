@@ -107,6 +107,18 @@ ns.QUEST_KIND_TYPE = { [1] = "monster", [2] = "object", [3] = "item" }
 
 -- Added to a point's real kind inside an instance. The real kind survives, as the mask counts within it
 ns.QUEST_KIND_ENTRANCE = 4
+-- A place to reach, quest field 9, which no objective type names
+local FLAG_KIND = 4
+-- Blizzard's marker stands in for a flag only within 3 map units, since an escort's marker sits elsewhere, often at its hand-in
+local FLAG_NEAR = 0.03
+function ns.QuestFlagAtMark(at, x, y)
+    if type(at) ~= "table" then return false end
+    for i = 1, #at - 1, 2 do
+        if math.abs(at[i] - x) <= FLAG_NEAR and math.abs(at[i + 1] - y) <= FLAG_NEAR then return true end
+    end
+    return false
+end
+
 function ns.QuestRealKind(kind)
     if not kind then return nil end
     return kind > ns.QUEST_KIND_ENTRANCE and (kind - ns.QUEST_KIND_ENTRANCE) or kind
@@ -254,12 +266,13 @@ local function classicDraws(questID, mapID, q)
     return n > 0 and (source == "spawn" or source == "turnin")
 end
 
-M._blizzardMarks = {}
+M._blizzardMarks, M._blizzardMarkAt = {}, {}
 M._blizzardStage = "never ran"
 
 -- Mirrors QuestDataProvider:RefreshAllData around Blizzard's own gate by hand. Recheck when it changes
 local function readBlizzardMarks(mapID, rows)
     local marks = wipe(M._blizzardMarks)
+    for _, at in pairs(M._blizzardMarkAt) do wipe(at) end
     if not ns.HAS_CLASSIC_SPAWNS then M._blizzardStage = "not this flavor" return marks end
     local dp = _G["QuestDataProviderMixin"]
     local gate = type(dp) == "table" and dp.ShouldShowQuest
@@ -271,14 +284,21 @@ local function readBlizzardMarks(mapID, rows)
     local showsTask = C_TaskQuest and C_TaskQuest.DoesMapShowTaskQuestObjectives
                       and C_TaskQuest.DoesMapShowTaskQuestObjectives(mapID)
 
-    local function ask(questID, isIndicator)
+    local function ask(questID, isIndicator, x, y)
         local ok, shown = pcall(gate, dp, questID, mapType, showsTask, isIndicator)
-        if ok and shown then marks[questID] = true end
+        if ok and shown then
+            marks[questID] = true
+            if type(x) == "number" and type(y) == "number" then
+                local at = M._blizzardMarkAt[questID] or {}
+                M._blizzardMarkAt[questID] = at
+                at[#at + 1], at[#at + 2] = x, y
+            end
+        end
     end
     if rows then
         for i = 1, #rows do
             local row = rows[i]
-            if row and row.questID then ask(row.questID, row.isMapIndicatorQuest) end
+            if row and row.questID then ask(row.questID, row.isMapIndicatorQuest, row.x, row.y) end
         end
     end
     -- The routing pin Blizzard adds on top of the rows, for one quest only
@@ -287,7 +307,7 @@ local function readBlizzardMarks(mapID, rows)
                                and C_SuperTrack.GetSuperTrackedQuestID())
     if type(routed) == "number" and routed > 0 and C_QuestLog.GetNextWaypointForMap then
         local x, y = C_QuestLog.GetNextWaypointForMap(routed, mapID)
-        if x and y then ask(routed, false) end
+        if x and y then ask(routed, false, x, y) end
     end
     M._blizzardStage = "asked"
     return marks
@@ -384,18 +404,26 @@ function providerMixin:_DoRefresh()
                     n = 0
                 end
                 M._spawnThinned = M._spawnThinned + thinned
+                local flagYield = false
                 for i = 1, n do
-                    local x, y = M._ptX[i], M._ptY[i]
-                    map:AcquirePin(PIN_TEMPLATE, qid, x, y, q.isComplete, mapID,
-                                   M._ptKind[i], M._ptMask[i], nil, M._ptSrc[i])
-                    record(qid, x, y, M._ptKind[i], M._ptMask[i], nil, M._ptSrc[i])
-                    M._pins = M._pins + 1
-                    if source == "spawn" then
-                        M._spawnPins = M._spawnPins + 1
-                    elseif source == "turnin" then
-                        M._turnInPins = M._turnInPins + 1
+                    -- A flag Blizzard's own marker for the quest sits on yields to it, as a single point does
+                    if marked[qid] and yields and ns.QuestRealKind(M._ptKind[i]) == FLAG_KIND
+                       and ns.QuestFlagAtMark(M._blizzardMarkAt[qid], M._ptX[i], M._ptY[i]) then
+                        flagYield = true
+                    else
+                        local x, y = M._ptX[i], M._ptY[i]
+                        map:AcquirePin(PIN_TEMPLATE, qid, x, y, q.isComplete, mapID,
+                                       M._ptKind[i], M._ptMask[i], nil, M._ptSrc[i])
+                        record(qid, x, y, M._ptKind[i], M._ptMask[i], nil, M._ptSrc[i])
+                        M._pins = M._pins + 1
+                        if source == "spawn" then
+                            M._spawnPins = M._spawnPins + 1
+                        elseif source == "turnin" then
+                            M._turnInPins = M._turnInPins + 1
+                        end
                     end
                 end
+                if flagYield then M._yielded = M._yielded + 1 end
             end
         end
     end

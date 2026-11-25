@@ -33,11 +33,14 @@ local function pair(v)
     if type(v) == "table" and type(v[1]) == "number" and type(v[2]) == "number" then return { v[1], v[2] } end
 end
 
+-- The world and continent maps, where a pin would sit in the middle of a continent (84138 and 84213 start on Kalimdor's in 5.4.18).
+local NOT_A_ZONE = { [947] = true, [1414] = true, [1415] = true, [1945] = true }
+
 local function pointsOf(t)
     local out = {}
     if type(t.coords) == "table" then
         local maps = {}
-        for ui in pairs(t.coords) do if type(ui) == "number" then maps[#maps + 1] = ui end end
+        for ui in pairs(t.coords) do if type(ui) == "number" and not NOT_A_ZONE[ui] then maps[#maps + 1] = ui end end
         table.sort(maps)
         for _, ui in ipairs(maps) do
             for _, p in ipairs(t.coords[ui]) do
@@ -47,10 +50,26 @@ local function pointsOf(t)
             end
         end
     end
-    if type(t.coord) == "table" and type(t.coord[3]) == "number" then
+    if type(t.coord) == "table" and type(t.coord[3]) == "number" and not NOT_A_ZONE[t.coord[3]] then
         out[#out + 1] = { t.coord[3], t.coord[1], t.coord[2] }
     end
     return out
+end
+
+local function objectivesOf(t)
+    local out = {}
+    for _, child in ipairs(type(t.g) == "table" and t.g or {}) do
+        local ct = type(child) == "table" and rawget(child, "kind") == "CreateQuestObjective" and child.t
+        if ct then
+            local o = { n = child.id, npc = numbers(ct.crs) or {}, item = {}, obj = {}, points = pointsOf(ct) }
+            for _, p in ipairs(type(ct.providers) == "table" and ct.providers or {}) do
+                local into = type(p) == "table" and type(p[2]) == "number" and ({ n = o.npc, i = o.item, o = o.obj })[p[1]]
+                if into then into[#into + 1] = p[2] end
+            end
+            if #o.points > 0 then out[#out + 1] = o end
+        end
+    end
+    return #out > 0 and out or nil
 end
 
 local function normalize(id, t, ctx)
@@ -84,6 +103,7 @@ local function normalize(id, t, ctx)
     q.removedIn = type(ctx.rwp) == "number" and ctx.rwp or nil
     q.phase = type(ctx.phase) == "number" and ctx.phase or nil
     q.daily = t.isDaily and true or nil
+    q.objectives = objectivesOf(t)
     return q
 end
 
@@ -152,6 +172,7 @@ local function join(q, d, note)
         q.givers, q.objects, q.points = d.givers, d.objects, d.points
         note.filled[#note.filled + 1] = "givers"
     end
+    if d.objectives and not q.objectives then q.objectives = d.objectives end
     if not sameGivers then return end
     for _, p in ipairs(d.points) do
         local known = false
