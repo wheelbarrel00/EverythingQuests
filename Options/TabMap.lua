@@ -326,7 +326,7 @@ local function nameplateCard(self, content, stack, w)
     local placeGet, placeSet = npLayoutSetting("npIconPlacement")
     dependent(self:CreateRadioGroup(content, L["Position"], NP_PLACEMENT, placeGet, placeSet, nil, nil,
         L["Position"],
-        L["Where the quest icon + count sits relative to the enemy nameplate. Move it closer to the health bar to taste."]))
+        L["Where the quest icon and its count sit around the nameplate. The X and Y offsets below move them from there."]))
 
     local function pick(key, label, options, tooltip)
         dependent(self:CreateDropdown(content, label, options,
@@ -358,7 +358,7 @@ local function nameplateCard(self, content, stack, w)
         { value = "ring",  label = L["Gold ring"], tip = L["A gold ring around the icon on an elite or boss."] },
         { value = "boss",  label = L["Boss skull"], tip = L["The kill icon becomes a boss skull, and any other icon gets the gold ring."] },
         { value = "none",  label = L["None"], tip = L["Elites and bosses look like any other quest mob."] },
-    }, L["Marks a quest mob that is an elite or a boss. Inside a dungeon, raid or other instance only mobs the game reports as bosses are marked, since nearly every mob there is elite."])
+    }, L["Marks a quest mob that is an elite or a boss. Inside a dungeon, raid or other instance only bosses are marked, since nearly every mob there is elite."])
 
     local preview = self:CreateTextRow(content, L["Preview"], "")
     local strip = CreateFrame("Frame", nil, preview)

@@ -141,7 +141,7 @@ local function autoCard(self, content, stack, deps)
     end, acceptOn)
 
     local turnInGet = box("autoTurnInQuests", L["Auto-turn-in quests"], false, function()
-        return tip(L["Skips reward-choice screens."], pauseHint(QA))
+        return tip(L["Hands in finished quests for you. A quest that offers a choice of rewards is left for you to pick."], pauseHint(QA))
     end)
     box("autoTurnInSkipRepeatable", L["Skip repeatable turn-ins"], true, function()
         return tip(L["Leaves repeatable, daily and weekly quests for you to hand in yourself, so a stack of items, such as cloth for reputation, is not handed in for you one quest after another."])

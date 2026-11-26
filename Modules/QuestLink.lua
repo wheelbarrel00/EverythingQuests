@@ -149,22 +149,32 @@ function QL:Link(questID)
     return hyperlink(questID, A.QuestLevel and A:QuestLevel(questID), title)
 end
 
+-- The ChatEdit_ names are aliases the game defines only while its loadDeprecationFallbacks setting is on
+local function chatCall(name, old)
+    local util = _G["ChatFrameUtil"]
+    local fn = type(util) == "table" and util[name]
+    if type(fn) == "function" then return fn end
+    fn = _G[old]
+    return type(fn) == "function" and fn or nil
+end
+
 function QL:Share(questID)
-    local active = _G["ChatEdit_GetActiveWindow"]
-    local box = type(active) == "function" and active()
+    local active = chatCall("GetActiveWindow", "ChatEdit_GetActiveWindow")
+    local box = active and active()
     if not box then return false end
 
     local text = self:TextFor(questID)
     if not text then return false end
 
-    if ChatEdit_InsertLink and ChatEdit_InsertLink(text) then return true end
+    local insert = chatCall("InsertLink", "ChatEdit_InsertLink")
+    if insert and insert(text) then return true end
     if box.Insert then box:Insert(text) return true end
     return false
 end
 
 function QL:ChatBoxOpen()
-    local active = _G["ChatEdit_GetActiveWindow"]
-    return (type(active) == "function" and active()) and true or false
+    local active = chatCall("GetActiveWindow", "ChatEdit_GetActiveWindow")
+    return (active and active()) and true or false
 end
 
 function QL:WantsShare()

@@ -1,8 +1,7 @@
 local _, ns = ...
 
--- Answers the two questions the Quest Browser asks of EQ's own Classic tables: which quests match
--- what was typed, and everything known about one of them. Nothing here draws, so it can be driven
--- offline against the real shipped data.
+-- Answers the Quest Browser from EQ's own Classic tables: what matches a search, all about one quest, and every quest by
+-- zone. Nothing here draws, so it runs offline against the shipped data.
 local QB = ns:RegisterSubsystem("QuestBrowserData", {})
 
 local function avail()
@@ -504,4 +503,158 @@ function QB:Waypoint(record)
     local turn = nearest(record.turnIn)
     if turn then return "turnin", turn.mapID, turn.x, turn.y end
     return nil
+end
+
+-- Quests by zone. A key is a zone's map id, DUNGEON_KEY or BATTLEGROUND_KEY plus an area id, or a heading's name
+QB.DUNGEON_KEY = 10000000
+QB.BATTLEGROUND_KEY = 20000000
+
+-- Shut as the data stands, or until a later step or branch in the log is dropped, so left out of a zone's count
+local CLOSED = {
+    ["race or class"] = true, ["above level range"] = true, ["not in the game"] = true, ["event not running"] = true,
+    ["not released"] = true, ["later step done"] = true, ["took another branch"] = true, ["follow-up taken"] = true,
+}
+-- Shut by a choice the character made, so the quests it would have led to read as another branch, not as never open
+local CHOICE = { ["later step done"] = true, ["took another branch"] = true, ["follow-up taken"] = true }
+-- Shut for now, so the quests behind it say why rather than never. In an any-of list a choice outranks these, and these outrank locked
+local CARRIED = { ["not released"] = true, ["reputation"] = true }
+local SHUT_RANK = { ["locked"] = 1, ["not released"] = 2, ["reputation"] = 2, ["took another branch"] = 3 }
+
+-- TBC's Battlegrounds heading in the quest log, its sort -25
+local BATTLEGROUND_SORT = -25
+
+-- Where most of the quest's start points are, the lowest map on a tie
+local function startMap(D, questID)
+    local byMap = D.start[questID]
+    if not byMap then return nil end
+    local best, most
+    for mapID, list in pairs(byMap) do
+        local n = #list
+        if not most or n > most or (n == most and mapID < best) then best, most = mapID, n end
+    end
+    return best
+end
+
+local function groupOf(A, questID)
+    local classes = A:ClassMask(questID)
+    if classes and classes > 0 then return "class" end
+    local cat = ns.CLASSIC_QUEST_CATEGORY and ns.CLASSIC_QUEST_CATEGORY[questID] or 0
+    if math.floor(cat / 16) % 2 == 1 then return "profession" end
+    local H = ns.CLASSIC_QUEST_HOLIDAY
+    if H and H.event and H.event[questID] then return "event" end
+    return nil
+end
+
+-- The log's zone or dungeon, Battlegrounds, the quest's group, Other for any other heading, else where it starts
+function QB:ZoneOf(questID)
+    local A = avail()
+    local D = A and A.Data and A:Data()
+    if not (D and questID and D.gates[questID]) then return nil end
+    local v = ns.CLASSIC_QUEST_ZONE and ns.CLASSIC_QUEST_ZONE[questID]
+    if v and v > 0 then return v end
+    if v == BATTLEGROUND_SORT then return "battleground" end
+    local group = groupOf(A, questID)
+    if group then return group end
+    if v then return "other" end
+    return startMap(D, questID) or "other"
+end
+
+-- A quest's own status. Explain names only the first gate that fails, so a choice that shut it is asked after
+local function ownStatus(A, questID)
+    if A:InLog(questID) then return "log" end
+    local ok, reason = A:Explain(questID, true)
+    if ok == true then return "available" end
+    if reason == "completed" then return "done" end
+    if CLOSED[reason] then return "closed", reason end
+    local gone = A:RuledOut(questID)
+    if gone then return "closed", gone end
+    if reason == "reputation" and A.RepTooHigh and A:RepTooHigh(questID) then return "closed", reason end
+    return "notYet", reason
+end
+
+-- Kept for one build only, as a branch in the log can be dropped
+local _status, _reason, _visiting = {}, {}, {}
+
+-- A quest whose every way in is shut is shut too, as the Forever Chain Guide reads it
+local function statusOf(A, D, questID)
+    local s = _status[questID]
+    if s then return s, _reason[questID], false end
+    if _visiting[questID] then return "notYet", nil, true end
+    local reason
+    s, reason = ownStatus(A, questID)
+    local guessed = false
+    if s == "notYet" then
+        _visiting[questID] = true
+        local function shut(q)
+            -- A way in already done is never what shuts a quest, even a repeatable that now reads closed
+            if A:IsCompleted(q) then return nil end
+            local qs, qr, g = statusOf(A, D, q)
+            guessed = guessed or g
+            if qs ~= "closed" then return nil end
+            if CHOICE[qr] then return "took another branch" end
+            return CARRIED[qr] and qr or "locked"
+        end
+        local by
+        local pre = D.pre[questID]
+        if pre then
+            by = #pre > 0 and "locked" or nil
+            for i = 1, #pre do
+                local r = shut(pre[i])
+                if not r then by = nil break end
+                if SHUT_RANK[r] > SHUT_RANK[by] then by = r end
+            end
+        else
+            local preAll = D.preAll[questID]
+            for i = 1, preAll and #preAll or 0 do
+                by = shut(preAll[i])
+                if by then break end
+            end
+        end
+        local parent = D.parent[questID]
+        if not by and parent then by = shut(parent) end
+        _visiting[questID] = nil
+        if by then s, reason = "closed", by end
+    end
+    -- A quest met again inside its own loop reads open, so an open answer resting on that is not kept
+    if s == "closed" or not guessed then _status[questID], _reason[questID] = s, reason end
+    return s, reason, guessed and s ~= "closed"
+end
+
+-- Every quest under its key with this character's status, counting what is not closed, repeatable or daily
+function QB:ZoneIndex()
+    local A = avail()
+    local D = A and A.Data and A:Data()
+    if not D then return nil end
+    wipe(_status)
+    wipe(_reason)
+    wipe(_visiting)
+    local index = {}
+    for questID, stored in pairs(D.names) do
+        local key = self:ZoneOf(questID)
+        -- Your class's heading lists only the quests this character can take
+        if key and not (key == "class" and A:CanEverTake(questID) == false) then
+            local status, reason = statusOf(A, D, questID)
+            local e = index[key]
+            if not e then
+                e = { key = key, quests = {}, done = 0, total = 0 }
+                index[key] = e
+            end
+            local level = questLevelOf(A, questID)
+            local repeatable = A:IsRepeatable(questID) or (D.daily and D.daily[questID]) ~= nil
+            e.quests[#e.quests + 1] = { id = questID, status = status, reason = reason, level = level,
+                                        sortName = stored, repeatable = repeatable or nil }
+            if status ~= "closed" then
+                if level > 0 then
+                    if not e.minLevel or level < e.minLevel then e.minLevel = level end
+                    if not e.maxLevel or level > e.maxLevel then e.maxLevel = level end
+                end
+                if not repeatable then
+                    e.total = e.total + 1
+                    if status == "done" then e.done = e.done + 1 end
+                end
+            end
+        end
+    end
+    for _, e in pairs(index) do table.sort(e.quests, sortRows) end
+    return index
 end

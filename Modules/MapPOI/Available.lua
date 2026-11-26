@@ -867,6 +867,12 @@ function M:RepGate(questID, which)
     return math.floor(v / 1e6), v % 1e6
 end
 
+-- Above a quest's highest standing, which the Quest Browser's Zones page reads as shut while the standing holds
+function M:RepTooHigh(questID)
+    local D = data()
+    return (D and questID and repFails(D.maxRep[questID], false)) == true
+end
+
 -- The SAME gate the map pass asks, for one quest, so the browser and the map cannot disagree
 function M:Explain(questID, unfiltered)
     local D = data()

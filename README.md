@@ -32,7 +32,7 @@ Everything Quests replaces Blizzard's quest tracking and builds on the rest of i
 4. A standalone **Chain Guide** window for browsing quest chains: Midnight's on retail, and on WoW Forever every chain your character can take
 5. An account-wide **Quest History** log with a backfill of past completions, on every version Everything Quests runs on
 6. Branded **Quest POI** overlays on zone maps, and on Classic, objective spawn markers on both the world map and the minimap
-7. A **Quest Browser** on Classic, for looking up almost any quest in the game before you accept it, plus **shareable quest links** in chat on every flavor
+7. A **Quest Browser** on Classic, for looking up almost any quest in the game before you accept it and counting the quests you have done in each zone, plus **shareable quest links** in chat on every flavor
 8. **Quest progress on game tooltips** — a bag item names the quest that wants it, how many are still missing, and which group members still need it too
 9. **Coordinate readouts** on the world map and under the minimap, for the cursor and for your own position
 10. Optional **auto-accept / auto-turn-in** for quest dialogs, with rules for which quests they leave to you and a key of your choice to pause them
@@ -123,7 +123,7 @@ If the tracker is missing, check that EQ Objective Tracker is enabled in your Ad
 ## Features
 
 ### Nameplate Quest Icons
-The mobs and NPCs your quests need show an icon right on their nameplate, along with the remaining count or percent: your kill icon on mobs to kill (a green skull, a red skull badge or crossed swords), your loot icon on mobs that drop a quest item (EQ's logo, an orange sack badge or a backpack), the quest's own item icon for use-item objectives, and a chat bubble on friendly NPCs your quests need, whatever language your game is in. Elites and bosses get the marker you pick: a gold crown by default, a gold ring, a boss skull, or none. Inside an instance only bosses are marked.
+The mobs and NPCs your quests need show an icon right on their nameplate, along with the remaining count or percent: your kill icon on mobs to kill (a green skull, a red skull badge or crossed swords), your loot icon on mobs that drop a quest item (EQ's logo, an orange sack badge or a backpack), the quest's own item icon for use-item objectives, and a chat bubble on friendly NPCs your quests need, whatever language your game is in. Elites and bosses get the marker you pick: a gold crown by default, a gold ring, a boss skull, or none. Inside an instance only bosses are marked. Classic Era and Burning Crusade Classic report most dungeon bosses as ordinary elites, so there Everything Quests knows them from its own list, made from the game's encounter list, AllTheThings and a few names of its own. Inside a dungeon or raid WoW Forever does not tell addons which mob a quest needs, so no quest icons show on nameplates there.
 
 - **Detection on retail** — Two-source join: an `activeQuests` cache built from `C_QuestLog.GetQuestObjectives` (objectives keyed by display text -> `{value, type, isPercent, itemTexture}`, where `value` is the *remaining* amount) joined to each nameplate via a `C_TooltipInfo.GetUnit` line-type scan (`QuestTitle` + `QuestObjective` lines matched against the cache, with matched objectives de-duplicated by entry so a party-mate's identical line can't double-count one of yours). WoW Forever's client has the same tooltip API, so it takes this route too
 - **Detection on Classic Era and TBC** — the tooltip route does not exist there, so the creature ID is read from the unit GUID and matched against a generated `questID -> creatures` table, inverted at runtime over the quest log only
@@ -215,10 +215,11 @@ Classic only (Classic Era, Burning Crusade Classic and WoW Forever). A search-an
 - **Who to talk to** — the Starts and Turn in rows name the giver and the finisher. A row is merged per map while a map pin is merged per coordinate, so a row covering several different people names all of them rather than picking one
 - **The window** — in the same style as the options window since v2.2.0, the quest list in the side panel and the quest you pick in cards on the right. It resizes and maximizes, remembers its size and closes with Escape. In the list, quests you can pick up now (by the same rules and filters as the map's gold markers) and quests in your log stand out, the others are dimmed, and quests you have done carry a check, and the title bar names your zone while "This zone only" is ticked
 - **Get Directions** — opens the map and points you at the quest: for one in your log at the nearest place of an objective you still need, or at the hand-in once it is ready, with the arrow then following the quest (a quest in your log whose next place is unknown gets no Get Directions); otherwise where it starts or is handed in, on your own map when it can be
+- **Quests by Zone** — Zones at the top of the side panel shows a menu of continents, then Dungeon and raid quests, Battlegrounds and Other (your class's quests, profession and world event quests, and a few more such as fishing and cooking quests), and under it the picked entry's zones by level, each with how many of its quests your character has done and a check once that is all of them. A zone's page shows its levels and a bar, then its quests in groups: in your quest log, available to you, not yet (with what each still needs), completed, and not for you. A click opens a quest's page, with Back to the zone. A quest is filed under the zone the game's quest log puts it under, and one the log files under a place with no map of its own, such as a starting area, under the zone where it starts; on WoW Forever, quests new to it are filed where they start, apart from class and profession quests under Other and its battleground quests under Battlegrounds. The count leaves out quests your character can never take, quests a choice you made has closed (the other branch and what follows it), repeatable quests and dailies
 - **Entry points** — its own tab in `/eqs`, `/eqs quests [text]`, a Toggle Quest Browser key, or right-clicking a gold available-quest marker
 - **Hide from the map** — a box on a quest's page takes its gold marker off your world map and minimap for that character, and "Hidden by you" in the menu above the list shows every quest you hid. Hiding is the map gate's last rule and applies only to the map's own answer, so NPC tooltips and the browser's other lists still show the quest
 - **Coverage is not total.** It reads the `names`/`gates` tables (3,849 Era / 5,652 TBC) while the coordinate tables cover more, so 337 Era and 517 TBC quests EQ pins on the map are not in the browser. WoW Forever's tables are the Era set plus 1,358 Forever quests, from AllTheThings and from playing Forever, with a larger gap (532 quests)
-- `/eqsprobe questbrowser` reports the data, a live query, the player's zone, one full decoded record, and whether the browser and the map pins agree
+- `/eqsprobe questbrowser` reports the data, a live query, the player's zone and how the Zones page counts it, one full decoded record, and whether the browser and the map pins agree
 
 ### Shareable Quest Links
 Shift-click a quest marker on the map, a row or a detail line in the Quest Browser, or a Chain Guide node with a chat box open (retail has no Quest Browser, and Classic Era and TBC no Chain Guide), and the quest drops into chat as `[[18] The Defias Brotherhood (155)]`. On Classic, a reader running Everything Quests sees a colored, clickable link that opens their Quest Browser on that quest.
@@ -423,10 +424,10 @@ EverythingQuests/
 │   ├── QuestChains/                  # Hand-authored Midnight chain data
 │   ├── QuestCoords_*.lua             # Generated: questID -> single waypoint
 │   ├── QuestSpawns_*.lua             # Generated: questID -> every objective location
-│   ├── QuestNPCs_*.lua               # Generated: questID -> creatures that advance it
+│   ├── QuestNPCs_*.lua               # Generated: questID -> creatures that advance it, and on Classic Era and TBC the dungeon boss list
 │   ├── QuestTurnIn_*.lua             # Generated: questID -> every hand-in location
 │   ├── QuestAvailable_*.lua          # Generated: where a quest starts, plus its gates
-│   ├── QuestCategory_*.lua           # Generated: dungeon / repeatable / class / profession
+│   ├── QuestCategory_*.lua           # Generated: dungeon / repeatable / class / profession, and the quest log zone each quest is filed under
 │   ├── QuestHolidays_*.lua           # Generated: questID -> its world event
 │   ├── SkillNames_*.lua              # Generated: skill names in every client
 │   │                                 #   language, for the profession gate

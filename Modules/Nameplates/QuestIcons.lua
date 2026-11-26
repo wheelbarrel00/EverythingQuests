@@ -386,6 +386,13 @@ local function choices()
     return KILL_ICONS[g.npKillIcon] or KILL_ICONS.skull, LOOT_ICONS[g.npLootIcon] or LOOT_ICONS.logo, look
 end
 
+-- Era and TBC report most dungeon bosses as plain elites, so their data ships a list
+local function dungeonBoss(unit)
+    local bosses = ns.CLASSIC_DUNGEON_BOSSES
+    local id = bosses and creatureIDFromUnit(unit)
+    return id ~= nil and bosses[id] == true
+end
+
 -- Elites and bosses outside instances, bosses only inside, where nearly every mob is elite
 local function eliteMarked(unit, hostile)
     if not (hostile and unit and UnitClassification) then return false end
@@ -396,10 +403,10 @@ local function eliteMarked(unit, hostile)
         local boss = UnitIsBossMob(unit)
         if ok(boss) and boss == true then return true end
     end
-    if c ~= "elite" and c ~= "rareelite" then return false end
     local inside = IsInInstance and IsInInstance()
     if not ok(inside) then return false end
-    return not inside
+    if inside then return dungeonBoss(unit) end
+    return c == "elite" or c == "rareelite"
 end
 
 local function setRound(ic, round)
@@ -634,8 +641,9 @@ function QI:DescribeUnit(unit)
     local f = plate and plate.EQQuestIcons
     local _, _, look = choices()
     local function show(v) return ok(v) and tostring(v) or "secret" end
-    return ("classification=%s bossMob=%s inInstance=%s attackable=%s look=%s marked=%s anchor=%s rival=%s"):format(
-        show(c), UnitIsBossMob and show(boss) or "absent", show(inside), show(hostile), look,
+    return ("classification=%s bossMob=%s dungeonBoss=%s inInstance=%s attackable=%s look=%s marked=%s anchor=%s rival=%s"):format(
+        show(c), UnitIsBossMob and show(boss) or "absent",
+        ns.CLASSIC_DUNGEON_BOSSES and tostring(dungeonBoss(unit)) or "no list", show(inside), show(hostile), look,
         tostring(look ~= "none" and eliteMarked(unit, hostile)),
         (isShown(f) and f.anchorName) or "no icons shown",
         tostring(rivalAddon()))

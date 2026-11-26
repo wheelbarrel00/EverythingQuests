@@ -1,4 +1,4 @@
--- Reads the quests in one of AllTheThings' compiled databases (MIT licensed): db/Camelot for WoW Forever, db/Vanilla and db/TBC for breadcrumbs.
+-- Reads the quests and encounters in one of AllTheThings' compiled databases (MIT licensed): db/Camelot for WoW Forever, db/Vanilla and db/TBC for Era and TBC.
 
 local function readAll(path)
     local f = assert(io.open(path, "rb"), "cannot open " .. path)
@@ -221,7 +221,7 @@ return function(dir)
         h.fn(h.hidden and hidden or categories)
     end
 
-    local quests, duplicates, notes = {}, 0, {}
+    local quests, duplicates, notes, encounters = {}, 0, {}, {}
     local function walk(node, ctx)
         if type(node) ~= "table" or node == inert then return end
         local kind = rawget(node, "kind")
@@ -245,6 +245,11 @@ return function(dir)
                 quests[node.id] = q
             end
         end
+        if kind == "CreateEncounter" and type(node.id) == "number" then
+            local npcs = numbers(t.crs) or {}
+            if type(t.npcID) == "number" then table.insert(npcs, 1, t.npcID) end
+            encounters[#encounters + 1] = { id = node.id, inst = ctx.inst, npcs = npcs, u = ctx.u }
+        end
         if type(t.g) == "table" then for _, child in ipairs(t.g) do walk(child, ctx) end end
         for _, child in ipairs(t) do walk(child, ctx) end
     end
@@ -261,5 +266,5 @@ return function(dir)
     local merged = {}
     for _, note in pairs(notes) do merged[#merged + 1] = note end
     table.sort(merged, function(a, b) return a.id < b.id end)
-    return { quests = quests, files = #files, duplicates = duplicates, merged = merged }
+    return { quests = quests, files = #files, duplicates = duplicates, merged = merged, encounters = encounters }
 end

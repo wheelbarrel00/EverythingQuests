@@ -4,7 +4,8 @@
 --     mode      objective | turnin | both | spawns | npcs | available | category | srcnames
 --                 (default both: one point per quest, objective with turn-in as fallback)
 --                 (spawns: EVERY objective location, clustered - a different table, see below)
---                 (npcs: which creatures advance each quest - no coordinates, for nameplates)
+--                 (npcs: which creatures advance each quest - no coordinates, for nameplates - and,
+--                  from dungeonBosses.lua, which Era and TBC need, the dungeon, raid and world bosses)
 --                 (available: where a quest can be PICKED UP, plus every gate that decides
 --                  whether it can be, for quests that are not in the log yet)
 --                 (turnin: where each quest is HANDED IN, clustered per map. The both mode's
@@ -22,7 +23,7 @@
 -- so they are loadstring'd rather than parsed.
 --
 -- objective and both emit one waypoint per quest as ns.CLASSIC_QUEST_COORDS. Every other mode
--- emits a table under its own global name, so those can ship beside it.
+-- emits its tables under their own global names, so those can ship beside it.
 --
 -- Packed is the default because a per-row {m=,x=,y=} table measured 1063 KB resident against
 -- 192 KB packed, and it round-trips exactly. Do not tidy it back to a table.
@@ -94,6 +95,13 @@ local Q_NEXTINCHAIN, Q_SPECIALFLAGS, Q_PARENT = 22, 24, 25
 local Q_FLAGS, DAILY_FLAG, PARTY_ACCEPT_FLAG = 23, 4096, 2
 -- The dump sets no PvP flag, so a battleground quest is known by its battleground's areas or TBC's Battlegrounds sort, -25
 local BATTLEGROUND_AREAS = { [2597] = true, [2839] = true, [3277] = true, [3358] = true, [3820] = true, [-25] = true }
+-- The quest log files a battleground's quests under the battleground, and 2839 is a second Alterac Valley
+local BATTLEGROUND_KEY = 20000000
+local BATTLEGROUND_ZONES = { [2597] = 2597, [2839] = 2597, [3277] = 3277, [3358] = 3358, [3820] = 3820 }
+-- Log headings the entrance list leaves out or names otherwise, each folded into one area id, named as the log names its quests
+local INSTANCE_HEADINGS = { [19] = 1977, [25] = 25, [1417] = 1417, [1477] = 1417, [1941] = 1941, [2300] = 1941, [2562] = 3457,
+                            [3535] = 3535, [3545] = 3535, [3688] = 3688, [3917] = 3688, [3840] = 3840, [3842] = 3845,
+                            [3905] = 3905, [4095] = 4131 }
 -- PvP quests filed elsewhere: battleground quests under the capitals and Ashenvale, Forever's Darkspear Islands, TBC's world PvP
 local PVP_QUESTS = {}
 for _, id in ipairs({ 7863, 7864, 7865, 7866, 7867, 7868, 8367, 8371, 8385, 8388, 98887, 98889, 98891, 98893, 98895, 98897,
@@ -1336,12 +1344,48 @@ if mode == "npcs" then
         end
     end
     parts[#parts + 1] = "}\n"
+
+    -- dungeonBosses.lua, from build_bosses.lua. WoW Forever's folder has none, as its GUIDs are secret inside a dungeon
+    local bosses, nBosses = {}, 0
+    do
+        local path = dir .. "/dungeonBosses.lua"
+        local f = io.open(path, "rb")
+        local forever = io.open(dir .. "/foreverQuestDB.lua", "rb")
+        if forever then forever:close() end
+        assert(f or forever, "no dungeonBosses.lua in " .. dir .. " - run tools/build_bosses.lua first")
+        if f then
+            f:close()
+            local bossIds = {}
+            for id in pairs(assert(loadfile(path))()) do
+                assert(type(id) == "number" and id > 0 and id < 10000000, "bad creature id in " .. path)
+                assert(npcs[id], ("boss %d is not in the creature dump - rebuild dungeonBosses.lua"):format(id))
+                bossIds[#bossIds + 1] = id
+                bosses[id] = true
+            end
+            table.sort(bossIds)
+            nBosses = #bossIds
+            parts[#parts + 1] = "\n-- Dungeon, raid and world bosses by creature id. Inside an instance the game reports most of them as plain elites.\n"
+            parts[#parts + 1] = "ns.CLASSIC_DUNGEON_BOSSES = {\n"
+            for i = 1, #bossIds, 10 do
+                local row = {}
+                for j = i, math.min(i + 9, #bossIds) do row[#row + 1] = ("[%d]=true,"):format(bossIds[j]) end
+                parts[#parts + 1] = "\t" .. table.concat(row) .. "\n"
+            end
+            parts[#parts + 1] = "}\n"
+        end
+    end
     local text = table.concat(parts)
 
     do
         local probe = {}
         assert(loadstring(text))("EQ", probe)
         local got = assert(probe.CLASSIC_QUEST_NPCS, "emitted file did not define the table")
+        local gotBosses, seenBosses = probe.CLASSIC_DUNGEON_BOSSES or {}, 0
+        for id in pairs(gotBosses) do
+            assert(bosses[id], "boss changed on reload: " .. tostring(id))
+            seenBosses = seenBosses + 1
+        end
+        assert(seenBosses == nBosses, "boss count changed on reload")
         local seen = 0
         for qid, list in pairs(expect) do
             local gl = assert(got[qid], "quest missing after reload: " .. qid)
@@ -1367,8 +1411,8 @@ if mode == "npcs" then
     local nDistinct = 0
     for _ in pairs(distinct) do nDistinct = nDistinct + 1 end
     io.write(text)
-    io.stderr:write(("-- mode=npcs | quests=%d rows=%d distinct npcs=%d bytes=%d\n")
-        :format(sQuests, emitted, nDistinct, #text))
+    io.stderr:write(("-- mode=npcs | quests=%d rows=%d distinct npcs=%d bosses=%d bytes=%d\n")
+        :format(sQuests, emitted, nDistinct, nBosses, #text))
     return
 end
 
@@ -2311,11 +2355,59 @@ if mode == "category" then
         end
     end
     parts[#parts + 1] = "}\n"
+
+    -- A dungeon's alternative area is filed under the area its entrance is keyed by, so it gets one name
+    local primaryOf = {}
+    if entrances then
+        for areaId, row in pairs(entrances) do
+            local alt = row[1]
+            if alt and alt ~= false then primaryOf[alt] = areaId end
+        end
+    end
+    local zoneExpect, zoneCounts = {}, { zone = 0, instance = 0, battleground = 0, heading = 0 }
+    parts[#parts + 1] = "\n-- [questID] = where the game's quest log files the quest: a zone's map id, 1e7 plus the area id of a dungeon,\n"
+    parts[#parts + 1] = "-- a raid or a complex of them such as Blackrock Mountain, 2e7 plus a battleground's area id, or the log's own\n"
+    parts[#parts + 1] = "-- heading as a negative number (a class, a profession, an event and the like, -25 being Battlegrounds, which\n"
+    parts[#parts + 1] = "-- also takes a PvP quest with no heading). A quest under no heading, under an area with no map of its own (a\n"
+    parts[#parts + 1] = "-- starting area) or under a WoW Forever instance is left out.\n"
+    parts[#parts + 1] = "ns.CLASSIC_QUEST_ZONE = {\n"
+    for i = 1, #ids do
+        local id = ids[i]
+        local zone = tonumber(quests[id][Q_ZONEORSORT])
+        local v
+        if zone and BATTLEGROUND_ZONES[zone] then
+            v, zoneCounts.battleground = BATTLEGROUND_KEY + BATTLEGROUND_ZONES[zone], zoneCounts.battleground + 1
+        elseif zone and zone < 0 then
+            v, zoneCounts.heading = zone, zoneCounts.heading + 1
+        elseif zone and INSTANCE_HEADINGS[zone] then
+            v, zoneCounts.instance = 10000000 + INSTANCE_HEADINGS[zone], zoneCounts.instance + 1
+        elseif zone and zone > 0 and instanceArea[zone] and zone < 9000000 then
+            v, zoneCounts.instance = 10000000 + (primaryOf[zone] or zone), zoneCounts.instance + 1
+        elseif zone and zone > 0 and not instanceArea[zone] and tonumber(area2ui[zone]) then
+            v, zoneCounts.zone = tonumber(area2ui[zone]), zoneCounts.zone + 1
+        elseif not zone and PVP_QUESTS[id] then
+            v, zoneCounts.heading = -25, zoneCounts.heading + 1
+        end
+        if v then
+            zoneExpect[id] = v
+            parts[#parts + 1] = ("\t[%d]=%d,\n"):format(id, v)
+        end
+    end
+    parts[#parts + 1] = "}\n"
     local text = table.concat(parts)
 
     do
         local probe = {}
         assert(loadstring(text))("EQ", probe)
+        local gotZones = assert(probe.CLASSIC_QUEST_ZONE, "emitted file did not define the zone table")
+        local seenZones = 0
+        for qid, v in pairs(gotZones) do
+            assert(zoneExpect[qid] == v, ("quest %d zone changed on reload"):format(qid))
+            seenZones = seenZones + 1
+        end
+        for qid in pairs(zoneExpect) do assert(gotZones[qid], "quest lost its zone on reload: " .. qid) end
+        io.stderr:write(("-- zone: %d quest(s) under a zone, %d under an instance, %d under a battleground, %d under a heading of the log's own\n")
+            :format(zoneCounts.zone, zoneCounts.instance, zoneCounts.battleground, zoneCounts.heading))
         local got = assert(probe.CLASSIC_QUEST_CATEGORY, "emitted file did not define the table")
         local seen = 0
         for qid, mask in pairs(expect) do

@@ -38,6 +38,7 @@ local function countAndPack(...)
 end
 
 local function val(v)
+    if _G.issecretvalue and _G.issecretvalue(v) then return "secret" end
     if type(v) == "string" and #v > 40 then return ("%q..(%d)"):format(v:sub(1, 40), #v) end
     return ("%s(%s)"):format(tostring(v), type(v))
 end
@@ -1953,7 +1954,7 @@ function Probe:Tooltip()
         line("no target. Target a quest mob and run /eqsprobe tooltip again.")
         return
     end
-    line("target: %s", tostring(type(unitName) == "function" and unitName("target") or "?"))
+    line("target: %s", val(type(unitName) == "function" and unitName("target") or "?"))
 
     local modern = resolve("C_TooltipInfo.GetUnit")
     if type(modern) ~= "function" then
@@ -1970,7 +1971,7 @@ function Probe:Tooltip()
             line("C_TooltipInfo.GetUnit: %d line(s)", #lines)
             for i = 1, math.min(#lines, 12) do
                 local l = lines[i]
-                line("  [%d] type=%s %s", i, tostring(l and l.type), val(l and l.leftText))
+                line("  [%d] type=%s %s", i, val(l and l.type), val(l and l.leftText))
             end
         end
     end
@@ -2726,6 +2727,29 @@ function Probe:QuestBrowser()
         line("  the capitals carry the largest start counts in the whole table.")
     else
         line("  no map for the player")
+    end
+
+    line("3b. quests by zone, as the Zones page counts them:")
+    if QBD.ZoneIndex then
+        local clock = _G["debugprofilestop"]
+        local t0 = clock and clock()
+        local index = QBD:ZoneIndex()
+        local ms = t0 and (clock() - t0)
+        local headings, total = 0, 0
+        for _, e in pairs(index) do headings, total = headings + 1, total + #e.quests end
+        line("  %d heading(s) over %d quest(s), built in %s ms", headings, total, ms and ("%.1f"):format(ms) or "?")
+        local here = mapID and index[mapID]
+        if here then
+            local n = { log = 0, available = 0, notYet = 0, done = 0, closed = 0 }
+            for _, q in ipairs(here.quests) do n[q.status] = (n[q.status] or 0) + 1 end
+            line("  this map: %d of %d done, levels %s to %s | in log %d, available %d, not yet %d, done %d, closed %d",
+                 here.done, here.total, tostring(here.minLevel), tostring(here.maxLevel),
+                 n.log, n.available, n.notYet, n.done, n.closed)
+        else
+            line("  this map has no heading: a cave's or building's map files under its zone, a dungeon's quests under the dungeon, or nothing is filed here")
+        end
+    else
+        line("  QuestBrowserData:ZoneIndex ABSENT")
     end
 
     line("4. one full record, so every decode is exercised at once:")

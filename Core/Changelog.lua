@@ -2,6 +2,28 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.21.0", date = "2026-11-26",
+        sections = {
+            { head = "New Features", items = {
+                { "Quests by Zone. The Quest Browser has a Zones page. Pick Zones at the top of its side panel to see a continent's zones, ordered by level, each with how many of its quests your character has done, and a check on a zone you have finished. Dungeons and raids share a menu entry, battlegrounds have one of their own, and Other holds your class's quests, profession quests, world event quests and a few more under headings of their own, such as fishing and cooking quests. Pick a zone to see its quests in groups: in your quest log, available to you, not yet (with what each still needs), completed, and not for you. A click on a quest opens its page, and Back returns to the zone. A quest is filed under the zone the game's quest log puts it under, and a quest the log files under a place with no map of its own, such as a starting area, under the zone where it starts. The count is only of the quests your character can still take or has taken: it leaves out quests closed to your character, such as another race's or class's, and the other branch of a choice you made with the quests that follow it, as well as repeatable quests and dailies.", classic = true },
+                { "Quests by Zone on WoW Forever. The quests new to WoW Forever carry no quest log heading in Everything Quests' data, so they are filed under the zone where they start, except class and profession quests, which are listed under Other, and its Darkspear Islands battleground quests, which are filed under Battlegrounds.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Improvements", items = {
+                "Clearer option tooltips. The nameplate Position tooltip no longer calls it the enemy nameplate, since the icons also show on friendly NPCs. The Elite and boss marker tooltip no longer says that inside an instance only the mobs the game reports as bosses are marked, since on Classic Era and Burning Crusade Classic Everything Quests now knows the dungeon bosses itself. The Auto-turn-in tooltip now says what it does: it hands in finished quests for you and leaves a quest with a choice of rewards for you to pick.",
+            } },
+            { head = "Bug Fixes", items = {
+                { "Dungeon bosses marked. On Classic Era and Burning Crusade Classic, the elite and boss marker on nameplate quest icons now marks dungeon bosses. These versions report most of them as ordinary elites, so Everything Quests now carries its own list of them, from the game's own encounter list, AllTheThings and a few names of its own.", classic = true, without = "ChainGuide" },
+                "Quest links in chat. Shift-clicking a quest into chat did nothing when the game was set not to load its older chat functions, which it says it will remove. It now uses the game's current ones, and the older ones only where those are missing.",
+                { "/eqsprobe tooltip inside a dungeon. On WoW Forever, /eqsprobe tooltip no longer stops with an error when you target a mob inside a dungeon.", classic = true, sub = "ChainGuide" },
+            } },
+            { head = "Known Issues", items = {
+                { "Some zones on the Zones page stay short of 100%. A few quests wait on an earlier quest the Quest Browser has no page for, so they stay under Not yet until you happen to do that quest, which the zone does not list. A few others can be taken only while another quest is in your log, so they stay under Not yet once that quest is handed in.", classic = true },
+                { "No nameplate quest icons inside dungeons on WoW Forever. Inside a dungeon or raid, WoW Forever does not tell addons which mob a quest needs, so Everything Quests shows no quest icons on nameplates there.", classic = true, sub = "ChainGuide" },
+                { "Two counts for a zone on WoW Forever. EQ Objective Tracker's zone progress bar counts a zone's quest chains and the quests that start there, while the Quest Browser's Zones page counts the quests the quest log files under the zone, so the two can show different numbers.", classic = true, sub = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.20.0", date = "2026-11-25",
         sections = {
             { head = "New Features", items = {
