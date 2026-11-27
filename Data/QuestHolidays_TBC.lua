@@ -1,6 +1,6 @@
 local _, ns = ...
 
--- Which world event each quest belongs to, for the quests EQ can pin. Generated.
+-- Which world event each quest belongs to, for the quests EQ can pin.
 -- Without this the map pins every holiday quest all year: nothing in the base gate data
 -- identifies a holiday, and the flag that looked like it did marks exploration quests.
 --

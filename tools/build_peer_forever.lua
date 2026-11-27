@@ -1,11 +1,13 @@
 -- Writes peerForeverRows.lua into the WoW Forever source folder for build_questcoords.lua: a peer quest database's Forever
 -- player traces and hand fixes, as operations the generator lays over the Forever rows after the map conversion, since they
--- were read on Forever. The peer's layer built from Wowhead is never read, nor its fixes for one faction only.
+-- were read on Forever. Of the peer's layer built from Wowhead only the reputation each quest rewards is taken, and of its
+-- fixes none for one faction only.
 --
---   lua5.1 tools/build_peer_forever.lua <Forever source folder> <peer database folder>
+--   lua5.1 tools/build_peer_forever.lua <Forever source folder> <peer database folder> <WoW Forever's Faction table, as CSV>
 
-local srcDir, peerDir = ...
-assert(srcDir and peerDir, "usage: lua5.1 tools/build_peer_forever.lua <Forever source folder> <peer database folder>")
+local srcDir, peerDir, factionCsv = ...
+assert(srcDir and peerDir and factionCsv,
+    "usage: lua5.1 tools/build_peer_forever.lua <Forever source folder> <peer database folder> <WoW Forever's Faction table, as CSV>")
 
 local function readAll(path)
     local f = assert(io.open(path, "rb"), "cannot open " .. path)
@@ -33,6 +35,41 @@ local function ser(v)
     local parts = {}
     for _, k in ipairs(sortedKeys(v)) do parts[#parts + 1] = ("[%s]=%s"):format(ser(k), ser(v[k])) end
     return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function csvRows(text)
+    local rows, row, field, quoted, i = {}, {}, {}, false, 1
+    while i <= #text do
+        local c = text:sub(i, i)
+        if quoted then
+            if c == '"' and text:sub(i + 1, i + 1) == '"' then field[#field + 1] = '"'; i = i + 1
+            elseif c == '"' then quoted = false
+            else field[#field + 1] = c end
+        elseif c == '"' then quoted = true
+        elseif c == "," then row[#row + 1] = table.concat(field); field = {}
+        elseif c == "\n" then row[#row + 1] = table.concat(field); field = {}; rows[#rows + 1] = row; row = {}
+        elseif c ~= "\r" then field[#field + 1] = c end
+        i = i + 1
+    end
+    if #field > 0 or #row > 0 then row[#row + 1] = table.concat(field); rows[#rows + 1] = row end
+    return rows
+end
+
+-- A faction with a share to its parent passes part of every gain to the parent and the parent's other factions
+local sharing = {}
+do
+    local rows = csvRows(readAll(factionCsv))
+    local col = {}
+    for i, name in ipairs(rows[1] or {}) do col[name] = i end
+    assert(col.ID and col.ParentFactionID and col.ParentFactionMod_1, factionCsv .. " has no ID, ParentFactionID or ParentFactionMod_1 column")
+    local n = 0
+    for r = 2, #rows do
+        local id, parent = tonumber(rows[r][col.ID]), tonumber(rows[r][col.ParentFactionID])
+        local share = tonumber(rows[r][col.ParentFactionMod_1])
+        if id then n = n + 1; if parent and parent ~= 0 and share and share > 0 then sharing[id] = true end end
+    end
+    assert(n > 100 and sharing[72] and sharing[369] and not sharing[529] and not sharing[890],
+        factionCsv .. " does not read as the Faction table: Stormwind and Gadgetzan pass a share, the Argent Dawn and the Silverwing Sentinels none")
 end
 
 local function run(path, env, ...)
@@ -159,11 +196,12 @@ local function fold(mask)
     return low == 255 and 0 or low
 end
 
--- The fields EQ reads, where the dump keeps them, a name only where EQ has none. The zone stays the converter's, for its dungeon flags.
+-- The fields EQ reads, a name only where EQ has none, never the zone (the converter's dungeon flags)
 local FIELDS = {
     quest = { name = "fill", startedBy = 2, finishedBy = 3, requiredLevel = 4, questLevel = 5, requiredRaces = 6, requiredClasses = 7,
               triggerEnd = 9, objectives = 10, preQuestGroup = 12, preQuestSingle = 13, exclusiveTo = 16,
-              requiredSkill = 18, requiredMinRep = 19, requiredMaxRep = 20, nextQuestInChain = 22, specialFlags = 24, parentQuest = 25 },
+              requiredSkill = 18, requiredMinRep = 19, requiredMaxRep = 20, nextQuestInChain = 22, specialFlags = 24, parentQuest = 25,
+              reputationReward = 26 },
     npc = { name = "fill", spawns = 7, friendlyToFaction = 13 },
     object = { name = "fill", spawns = 4 },
     item = { name = "fill", npcDrops = 2, objectDrops = 3, vendors = 14 },
@@ -178,8 +216,11 @@ for entity, fields in pairs(FIELDS) do
     end
 end
 
+-- Reputation comes from the Wowhead layer and the hand fixes, as the traces also log the share the game passes to related factions
+local REWARD = { [26] = true }
 local LAYERS = {
-    { "traces/foreverQuestTraces.lua", "ForeverQuestTraces", "quest" },
+    { "generated/foreverBaseQuest.lua", "ForeverBaseQuest", "quest", only = REWARD },
+    { "traces/foreverQuestTraces.lua", "ForeverQuestTraces", "quest", without = REWARD, oneFaction = true },
     { "traces/foreverQuestRelationTraces.lua", "ForeverQuestRelationTraces", "quest" },
     { "traces/foreverNpcTraces.lua", "ForeverNpcTraces", "npc" },
     { "traces/foreverObjectTraces.lua", "ForeverObjectTraces", "object" },
@@ -207,10 +248,12 @@ local function unverified(path, entity)
     return skip
 end
 
--- Fix lines a review found copied from the Alliance quest beside them, its race and next step, so they are not taken either
-local WRONG = { ["foreverQuestFixes.lua"] = { [99199] = { "requiredRaces", "nextQuestInChain" } } }
+-- Fix lines a review found wrong: 99199's race and next step, copied from the Alliance quest beside it, and two rewards copied from traces, shares and all
+local WRONG = { ["foreverQuestFixes.lua"] = { [99199] = { "requiredRaces", "nextQuestInChain" },
+                                              [87288] = { "reputationReward" }, [93963] = { "reputationReward" } } }
 
 local guesses, wrongs = 0, 0
+local traceReward = {}
 for _, layer in ipairs(LAYERS) do
     -- Icon hints the peer's objective rows carry, which EQ does not read
     local hints = setmetatable({}, { __index = function(_, k) return k end })
@@ -230,11 +273,13 @@ for _, layer in ipairs(LAYERS) do
             local op, field = "set", key
             if key >= 1000 then op, field = "add", key - 1000 elseif key <= 0 then op, field = "remove", key + 1000 end
             local name = byIndex[entity][field]
+            if layer.oneFaction and field == 26 and op == "set" and type(value) == "table" and #value == 1 then traceReward[id] = value end
+            local taken = not (layer.only and not layer.only[field] or layer.without and layer.without[field])
             if name and wrong[id] and wrong[id][key] then
                 wrongs = wrongs + 1
             elseif name and skip[id] and skip[id][key] then
                 guesses = guesses + 1
-            elseif name then
+            elseif name and taken then
                 if FIELDS[entity][name] == "fill" then op = "fill" end
                 if field == 7 and entity == "npc" or field == 4 and entity == "object" then value = places(value) end
                 if field == 9 and entity == "quest" and type(value) == "table" then value = { value[1], places(value[2]) } end
@@ -249,6 +294,19 @@ for _, layer in ipairs(LAYERS) do
     counts[#counts + 1] = ("%s %d"):format(layer[2], n)
 end
 
+-- A quest the other layers give no reputation takes a trace naming one faction that passes no share, which can only be its own reward
+local fromTraces = 0
+for id, value in pairs(traceReward) do
+    local list = out.quests[id] or {}
+    local given = sharing[value[1][1]]
+    for _, o in ipairs(list) do if o[1] == 26 then given = true end end
+    if not given then
+        list[#list + 1] = { 26, "set", value }
+        out.quests[id] = list
+        fromTraces = fromTraces + 1
+    end
+end
+
 local parts = { "-- Generated by tools/build_peer_forever.lua: a peer quest database's WoW Forever traces and hand fixes, each\n",
     "-- { field, set | fill | add | remove, value } in the order applied, in Forever's map space.\nreturn {\n" }
 for _, name in ipairs({ "quests", "npcs", "objects", "items" }) do
@@ -257,7 +315,7 @@ for _, name in ipairs({ "quests", "npcs", "objects", "items" }) do
     parts[#parts + 1] = "},\n"
 end
 parts[#parts + 1] = "}\n"
-assert(wrongs == 2, "a fix line found wrong by review is gone or moved, so read WRONG again")
+assert(wrongs == 4, "a fix line found wrong by review is gone or moved, so read WRONG again")
 local path = srcDir .. "/peerForeverRows.lua"
 local f = assert(io.open(path, "wb"), "cannot write " .. path)
 f:write(table.concat(parts))
@@ -265,5 +323,6 @@ f:close()
 assert(loadfile(path), path .. " does not load back")
 io.stderr:write("-- peer Forever operations: " .. table.concat(counts, ", ") .. "\n")
 io.stderr:write(("-- peer Forever fixes marked unverified, not taken: %d, found wrong by review, not taken: %d\n"):format(guesses, wrongs))
+io.stderr:write(("-- peer Forever reputation from a trace naming one faction that passes no share, for a quest the other layers give none: %d\n"):format(fromTraces))
 io.stderr:write(("-- peer Forever places: %d area(s) placed through their map, %d left out\n"):format(moved, dropped))
 io.stderr:write("-- peer Forever rows written to " .. path .. "\n")

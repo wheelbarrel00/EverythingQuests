@@ -2,7 +2,7 @@
 ## Title: Everything Quests
 ## Notes: Quest markers on the world map and minimap, quest icons on nameplates, the Quest Browser, Quest History, auto-accept and auto-turn-in, and the /eqs options window.
 ## Author: Wheelbarrel00
-## Version: 2.21.0
+## Version: 2.22.0
 ## Dependencies: EQObjectiveTracker
 ## SavedVariables: EverythingQuestsDB, EverythingQuestsChainCache, EverythingQuestsHistory, EverythingQuestsHistoryBackups
 ## SavedVariablesPerCharacter: EverythingQuestsCharDB
@@ -235,6 +235,7 @@ Data\QuestHolidays_Classic.lua
 
 # Skill names in every client language, from the client's SkillLine table. Read at RUNTIME.
 Data\SkillNames_Classic.lua
+Data\FactionNames_Classic.lua
 
 # Reads ns.Util.color at FILE SCOPE and opens the options window, so it follows both.
 Modules\WhatsNew.lua

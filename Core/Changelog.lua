@@ -2,6 +2,29 @@ local _, ns = ...
 
 ns.Changelog = {
     {
+        version = "2.22.0", date = "2026-11-27",
+        sections = {
+            { head = "New Features", items = {
+                { "Reputation rewards in the Quest Browser. A quest's page has a Reputation card listing the reputation the quest gives, as the quest data states it, before bonuses such as Diplomacy. On Burning Crusade Classic it also shows the reputation you lose with the Aldor or the Scryers when a quest gives it to the other. A quest that names factions of both sides, such as the Alliance and the Horde, shows only the ones its takers can earn, your own side's when both sides can take it. On WoW Forever 694 of the 1,358 quests new to it have the card too, from QuestieDB's WoW Forever data, and 22 quests from the original game show what WoW Forever gives instead, most of them Warsong Gulch and Arathi Basin quests.", classic = true },
+                { "More from the same quest giver. At the end of a quest's page, a card titled More from and the giver's name lists the other quests that giver offers or takes in on the same map, each with its level where the data has one, a check when you have done it, and whether that giver starts it, takes it in or both. When someone else takes the quest in, they get a list of their own. Click a quest to open its page. Quests your character can never take, quests that are not in the game or not released on your version, and givers who only talk to the other faction are left out.", classic = true },
+                { "Get Directions and Show on Map in the tracker. On Classic Era and Burning Crusade Classic, EQ Objective Tracker's right-click menu on a quest has Get Directions, which points TomTom's arrow at the nearest objective you still need, moves it on as you finish them and to the hand-in once the quest is ready, and opens the world map on that zone (without TomTom, or when TomTom cannot set the waypoint, it says where in chat), and Show on Map, which opens the world map there and makes the quest's map markers pulse for a few seconds.", classic = true, without = "ChainGuide" },
+            } },
+            { head = "Improvements", items = {
+                "The settings window stays where you drag it. The Everything Quests settings window now opens where you last dragged it, after a reload or on another character too. Reset all settings puts it back at the left edge.",
+            } },
+            { head = "Bug Fixes", items = {
+                { "The Dungeon and raid quests filter hid battleground quests. Ticking Dungeon and raid quests on the Map tab also hid battleground quests. It now hides the quests the game's quest log files under a dungeon or raid, as the Quest Browser's Zones page does, which also catches some it missed: Blackrock Mountain quests such as Overmaster Pyron, and on Burning Crusade Classic quests for Zul'Gurub, the Caverns of Time, Karazhan, Hellfire Citadel, Auchindoun and more. The Quest Browser's Dungeon or raid tag and Quest History's quest type follow the same rule.", classic = true },
+                { "World event quests marked all year. On Classic Era and WoW Forever, eight world event quests were marked as available all year: Mistwalker the Elder for the Lunar Festival, one of the Great-father Winter is Here! quests for the Feast of Winter Veil, and the six quests to steal a capital city's flame for the Midsummer Fire Festival. They are now marked only while their event runs. On Classic Era and WoW Forever, the twelve Children's Week quests that follow the first now count as Children's Week quests too, so the Quest Browser tags them as event quests and the map marks them only while Children's Week runs.", classic = true },
+                { "WoW Forever quest markers on faraway maps. On WoW Forever, some quests new to it ask for an item from the original game and put objective markers wherever that item comes from anywhere in the world. They now mark only the zones where the quest is given or handed in, as Wild Eyes now marks only Silverpine Forest. Restocking the Larders, the first of the three dwarf shaman Call of Fire quests in Loch Modan, Keeping the Light On and one of the two Harvesting the Harvesters quests now mark where their item really comes from, and quests reviewed by hand whose item is a world drop or something crafted, such as most Craftsman's Writs and the Mageweave cloth donations, no longer get markers for it. 31 quests changed.", classic = true, sub = "ChainGuide" },
+                { "The zone progress bar on WoW Forever. EQ Objective Tracker's zone progress bar still leaves battleground quests out, the Darkspear Islands quests now too, and the Chain Guide and Quest Browser now give the reason as \"a battleground quest\". Four quests the quest log files under Blackrock Mountain, Disharmony of Flame, Overmaster Pyron and the two Bodley's Unfortunate Fate quests, now count as dungeon quests and leave the bars they were counted on.", classic = true, sub = "ChainGuide" },
+                { "Letting go of a focused quest took down other arrows. On Classic Era, Burning Crusade Classic and WoW Forever, when you unfocused a quest in EQ Objective Tracker or handed it in, any TomTom arrow Everything Quests had set went too, even one from Get Directions or the Quest Browser for another quest. Now only the arrow for the quest you let go of is taken down.", classic = true },
+            } },
+            { head = "Known Issues", items = {
+                { "Some WoW Forever quests still mark faraway places. A quest new to WoW Forever whose item from the original game comes from nowhere in the zones where the quest is given or handed in keeps every place that item comes from.", classic = true, sub = "ChainGuide" },
+            } },
+        },
+    },
+    {
         version = "2.21.0", date = "2026-11-26",
         sections = {
             { head = "New Features", items = {

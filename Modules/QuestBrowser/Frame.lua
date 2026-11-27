@@ -121,7 +121,11 @@ local ROW_TIPS = {
     place = function() return L["Click to open the map here and set a waypoint"] end,
     quest = function() return L["Click to open this quest"] end,
     chain = function() return L["Find this quest in EQ's Chain Guide"] end,
+    rep   = function() return L["The reputation this quest gives, as the quest data lists it and before bonuses such as Diplomacy. Other related factions can gain or lose some too."] end,
+    repLoss = function() return L["Worked out from the gain, as the Aldor and the Scryers each lose a tenth more than the other gains."] end,
 }
+-- Rows a click does nothing on, so they take no highlight
+local STILL = { text = true, rep = true, repLoss = true }
 
 local function rowClick(self)
     if self._zoneQuestID then
@@ -149,7 +153,7 @@ end
 local function makeRow(ctx, content, kind)
     local r = CreateFrame("Button", nil, content)
     r:SetHeight(ROW_H)
-    if kind ~= "text" then
+    if not STILL[kind] then
         local hl = r:CreateTexture(nil, "HIGHLIGHT")
         hl:SetAllPoints()
         hl:SetColorTexture(ctx:Color("hover"))
@@ -507,6 +511,35 @@ local function refRows(ctx, card, list)
     return y
 end
 
+-- Signed rather than colored, as History's deltas are, so the card adds no color of its own
+local function repRows(ctx, card, list)
+    local y, prev = 0, nil
+    for _, e in ipairs(list) do
+        local r = placeRow(ctx, card, e.derived and "repLoss" or "rep", prev, y)
+        r.text:SetText(e.name or (L["faction %d"]):format(e.faction))
+        r.value:SetText(("%+d"):format(e.amount))
+        y, prev = y + ROW_H, r
+    end
+    return y
+end
+
+-- What else one NPC offers and takes in, the right column saying which
+local function moreRows(ctx, card, list)
+    local y, prev = 0, nil
+    for _, q in ipairs(list) do
+        local r = placeRow(ctx, card, q.known and "quest" or "text", prev, y)
+        if q.done then withIcon(ctx, r, ctx:Texture("check"), "muted") end
+        r.text:SetText(q.level > 0 and ("[%d] %s"):format(q.level, q.name) or q.name)
+        if q.known then r._questID = q.id else r.text:SetTextColor(ctx:Color("muted")) end
+        local does = {}
+        if q.starts then does[#does + 1] = L["Starts"] end
+        if q.ends then does[#does + 1] = L["Turn in"] end
+        r.value:SetText(table.concat(does, SEP))
+        y, prev = y + ROW_H, r
+    end
+    return y
+end
+
 local function statusOf(record, available, reason)
     if record.failed then return L["Failed, so you can take it again."], GOSSIP_AVAILABLE end
     if available then return L["You can pick this up now."], GOSSIP_AVAILABLE end
@@ -680,6 +713,7 @@ function QB:RenderDetails()
         reqs[#reqs + 1] = (L["Only below %s with %s"]):format(record.maxRep.standing or tostring(record.maxRep.value), who)
     end
     if #reqs > 0 then group(ctx, L["Requirements"], function(card) return textRows(ctx, card, reqs) end) end
+    if record.rep then group(ctx, L["Reputation"], function(card) return repRows(ctx, card, record.rep) end) end
 
     if record.starts then group(ctx, L["Starts"], function(card) return placeRows(ctx, card, record.starts, record.name) end) end
     if record.objectives then group(ctx, L["Objectives"], function(card) return placeRows(ctx, card, record.objectives, record.name) end) end
@@ -711,6 +745,10 @@ function QB:RenderDetails()
             r._chainID, r._chainQuest = chainID, record.id
             return ROW_H
         end)
+    end
+    -- Last, as a busy quest giver's lists run long
+    for _, g in ipairs(record.moreFrom or {}) do
+        group(ctx, (L["More from %s"]):format(g.name), function(card) return moreRows(ctx, card, g.rows) end)
     end
 
     f._area:SetContentSize(_width, _y + PAD_BOTTOM)
@@ -1079,8 +1117,6 @@ function QB:Select(questID)
     if self.frame then self.frame._area:ScrollTo(0, 0) end
 end
 
--- Both effects on one click, because a browser row is asking "where is this" and the answer is
--- worth having on the map and on the arrow at the same time.
 local function showMap(mapID)
     local wm = _G.WorldMapFrame
     if wm and wm.SetMapID then
@@ -1089,19 +1125,25 @@ local function showMap(mapID)
     end
 end
 
--- questID only for a quest in your log, whose arrow then follows its objectives
+-- A browser row asks where, so the answer goes on the arrow and the map at once. questID only for a quest in your log, whose arrow then follows it
 function QB:GoTo(mapID, x, y, title, questID)
     local Arrow = ns:GetSubsystem("QuestArrow")
     if Arrow and Arrow.Set then Arrow:Set(mapID, x, y, title, questID) end
+    self:ShowMap(mapID)
+end
+
+-- after runs once the map is open, which in combat is when combat ends
+function QB:ShowMap(mapID, after)
     -- Held until combat ends, as the Chain Guide's is: Forever's map pins call the protected SetPassThroughButtons as they appear
     if InCombatLockdown() then
         local Events = ns:GetSubsystem("Events")
         if Events and Events.RunWhenOutOfCombat then
-            Events:RunWhenOutOfCombat("eq.questbrowser.map", function() showMap(mapID) end)
+            Events:RunWhenOutOfCombat("eq.questbrowser.map", function() showMap(mapID); if after then after() end end)
         end
         return
     end
     showMap(mapID)
+    if after then after() end
 end
 
 -- Where you pick the quest up, or its turn-in, or a quest in your log's own next step

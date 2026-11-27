@@ -12,6 +12,7 @@ local EQ_ORDER    = 20
 
 -- Lands between Focus (30) and Open in Map & Quest Log (40).
 local DIRECTIONS_ORDER = 35
+local SHOW_MAP_ORDER = 36
 -- Lands between Open in Map & Quest Log (40) and Pop Out Quest Details (50).
 local CHAIN_MENU_ORDER = 45
 
@@ -157,14 +158,17 @@ function Bridge:ApplyFocusArrow()
         onFocus = function(providerID, entryID)
             local Arrow = ns:GetSubsystem("QuestArrow")
             if not Arrow or providerID ~= "quests" then return end
+            local last = Bridge._focused
+            Bridge._focused = entryID
             -- Ahead of the clear below, so with the box off no follow or clear takes down an arrow EQ holds
             if not Bridge:FocusArrowOn() then
                 -- TomTom restores this character's EQ waypoints from an earlier session, a follow saved before the box went off among them
                 Arrow:ClearLeftovers()
                 return
             end
+            -- The focus's own arrow, or any arrow for the quest just let go, so Get Directions for another quest stays
             if not entryID then
-                Arrow:Clear()
+                if Arrow:Follows(last) then Arrow:Clear() else Arrow:ClearFollowed() end
                 return
             end
             -- An arrow already held for this quest stays. A quest nothing can place yet stays followed with no waypoint, so its arrow comes once a spot is known
@@ -294,6 +298,48 @@ function Bridge:ApplyDistanceSource()
     if self._distance then D:Watch(function() A:DistanceChanged() end) end
 end
 
+local function say(text) print("|cffEBB706EQ|r: " .. text) end
+
+-- The nearest objective still needed, or the hand-in once the quest is ready, as the arrow places it
+local function questPlace(questID)
+    local Arrow = ns:GetSubsystem("QuestArrow")
+    local mapID, x, y, title
+    if Arrow and Arrow.PointFor then mapID, x, y, title = Arrow:PointFor(questID) end
+    title = title or (ns.Util and ns.Util.QuestTitle and ns.Util.QuestTitle(questID, true)) or tostring(questID)
+    if not mapID then
+        say((L["No place is known yet for the next step of %s."]):format(title))
+        return nil
+    end
+    return mapID, x, y, title, Arrow
+end
+
+local function zoneName(mapID)
+    local info = C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(mapID)
+    return info and info.name or tostring(mapID)
+end
+
+-- On Era and TBC, where the Chain Guide's Get Directions does not load: the arrow, or the place in chat without TomTom, and the map
+function Bridge:Directions(questID)
+    local mapID, x, y, title, Arrow = questPlace(questID)
+    if not mapID then return end
+    -- Where TomTom is missing or refuses the waypoint, the place is said instead
+    if not (Arrow:Available() and Arrow:Set(mapID, x, y, title, questID)) then
+        say((L["Next step for %1$s: %2$s in %3$s."]):format(title, ("%.1f, %.1f"):format(x * 100, y * 100), zoneName(mapID)))
+    end
+    local QB = ns:GetSubsystem("QuestBrowser")
+    if QB and QB.ShowMap then QB:ShowMap(mapID) end
+end
+
+-- The map at the quest's next place with its markers lit, and no arrow
+function Bridge:ShowOnMap(questID)
+    local mapID = questPlace(questID)
+    if not mapID then return end
+    local QB = ns:GetSubsystem("QuestBrowser")
+    if QB and QB.ShowMap then
+        QB:ShowMap(mapID, function() if ns.QuestPinFlash then ns.QuestPinFlash(questID) end end)
+    end
+end
+
 -- Whether the player turned EQOT's zone bar on, so no quest says it is left out of a bar that is not there
 function Bridge:ZoneBarShown()
     local A = api()
@@ -317,6 +363,22 @@ function Bridge:OnEnable()
                 local WP = ns:GetSubsystem("ChainGuideWaypoint")
                 if WP and WP.GoTo then WP:GoTo(questID) end
             end,
+        })
+    -- Era and TBC: on retail and WoW Forever the tracker's own Open in Map & Quest Log already opens the map on the quest
+    elseif ns.HAS_CLASSIC_SPAWNS and ns:GetSubsystem("QuestBrowser") then
+        A:AddMenuItem({
+            id         = "eq-directions",
+            providerID = "quests",
+            label      = L["Get Directions"],
+            order      = DIRECTIONS_ORDER,
+            onClick    = function(_, questID) Bridge:Directions(questID) end,
+        })
+        A:AddMenuItem({
+            id         = "eq-showmap",
+            providerID = "quests",
+            label      = L["Show on Map"],
+            order      = SHOW_MAP_ORDER,
+            onClick    = function(_, questID) Bridge:ShowOnMap(questID) end,
         })
     end
     self:ApplyChainMenu()

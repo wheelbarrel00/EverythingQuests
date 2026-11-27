@@ -20,8 +20,10 @@ local EQ_TAB_ICONS = {
 -- Left edge, because EQ Objective Tracker's options window is the same size and centers
 local LEFT_GAP = 16
 
--- Where a drag left the window, kept for the session alone, so a reload opens it at the left edge again
-local dragged
+local function globalDB()
+    local DB = ns:GetSubsystem("DB")
+    return DB and DB.db and DB.db.global
+end
 
 -- The library keeps a position as an offset from the screen's center in UIParent's units
 local function leftEdgeOffset()
@@ -34,7 +36,7 @@ end
 local ui = EUI:NewContext({
     id      = "EQ",
     title   = "Everything Quests",
-    version = ns.VERSION or "2.21.0",
+    version = ns.VERSION or "2.22.0",
     accent  = EUI.tokens.accents.EQ.accent,
     L       = L,
     tooltip = ns.Util.PinTooltip,
@@ -66,10 +68,15 @@ local ui = EUI:NewContext({
     end,
     -- Passing the pair is what lets the window hang partly off the left, right and bottom edges
     getWindowPosition = function()
-        if dragged then return dragged[1], dragged[2] end
+        local g = globalDB()
+        local p = g and g.optionsWindowPos
+        if type(p) == "table" and type(p.x) == "number" and type(p.y) == "number" then return p.x, p.y end
         return leftEdgeOffset()
     end,
-    setWindowPosition = function(x, y) dragged = { x, y } end,
+    setWindowPosition = function(x, y)
+        local g = globalDB()
+        if g then g.optionsWindowPos = { x = x, y = y } end
+    end,
 })
 Options.ui = ui
 

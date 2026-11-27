@@ -310,6 +310,41 @@ local function startFadeTicker()
     end)
 end
 
+-- Show on Map lights one quest's markers for a few seconds by pulsing their icons, which needs no art of its own
+local FLASH_SECONDS, FLASH_SCALE, FLASH_STEP = 3, 1.6, 0.3
+local _flashQuest, _flashUntil, _flashTimer
+
+local function stopFlash(pin)
+    if pin._eqFlash and pin._eqFlash:IsPlaying() then pin._eqFlash:Stop() end
+end
+
+local function startFlash(pin)
+    if not (_flashQuest and pin.questID == _flashQuest and not pin.avail and GetTime() < _flashUntil) then return end
+    local ag = pin._eqFlash
+    if not ag then
+        ag = pin.icon:CreateAnimationGroup()
+        local grow = ag:CreateAnimation("Scale")
+        grow:SetScale(FLASH_SCALE, FLASH_SCALE)
+        grow:SetDuration(FLASH_STEP)
+        ag:SetLooping("BOUNCE")
+        pin._eqFlash = ag
+    end
+    if not ag:IsPlaying() then ag:Play() end
+end
+
+function ns.QuestPinFlash(questID)
+    _flashQuest, _flashUntil = questID, GetTime() + FLASH_SECONDS
+    for pin in pairs(_live) do
+        stopFlash(pin)
+        startFlash(pin)
+    end
+    if _flashTimer then _flashTimer:Cancel() end
+    _flashTimer = C_Timer.NewTimer(FLASH_SECONDS, function()
+        _flashTimer, _flashQuest = nil, nil
+        for pin in pairs(_live) do stopFlash(pin) end
+    end)
+end
+
 function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask, avail, srcID)
     self.questID    = questID
     self.isComplete = isComplete
@@ -351,6 +386,8 @@ function Pin:OnAcquired(questID, x, y, isComplete, mapID, kind, objMask, avail, 
     unfade(self)
     _live[self] = true
     startFadeTicker()
+    stopFlash(self)
+    startFlash(self)
 
     -- AcquirePin does not auto-Show
     self:Show()
@@ -362,6 +399,7 @@ function Pin:OnReleased()
     self.mapX, self.mapY, self.mapID = nil, nil, nil
     _live[self] = nil
     unfade(self)
+    stopFlash(self)
     self.icon:SetTexture(nil)
     self.numberText:SetText("")
 end

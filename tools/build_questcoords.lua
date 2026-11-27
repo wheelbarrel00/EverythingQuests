@@ -235,6 +235,10 @@ local function applyMapConversion()
 end
 if mapFix then applyMapConversion() end
 
+-- The items the data held before WoW Forever's rows and traces, so an Era item a quest new to Forever reuses is known as one
+local eraItems = {}
+for itemID in pairs(items) do eraItems[itemID] = true end
+
 -- A supplement in the same directory as its base flavor, written by build_forever_supplement.lua.
 -- Its rows replace or add whole rows, so WoW Forever runs the Era data plus what its client added.
 local OVERLAYS = { forever = "classic" }
@@ -549,10 +553,8 @@ end
 -- Nil everywhere else, including turninPoints, which keeps the coordinate modes byte identical.
 local npcSink
 
--- objIdx is the position within its own type bucket, or a mob dropping one of four quest items
--- claims all four.
-local function collectNpc(out, id, kind, objIdx)
-    kind = kind or KIND_SLAY
+-- objIdx is the slot within its own type, so a mob dropping one of four quest items claims only its own
+local function sinkNpc(id, kind, objIdx)
     if npcSink and type(id) == "number" and id > 0 and objIdx then
         local byIdx = npcSink[id]
         if not byIdx then byIdx = {}; npcSink[id] = byIdx end
@@ -566,6 +568,11 @@ local function collectNpc(out, id, kind, objIdx)
             if not prev or kind < prev then byIdx[i] = kind end
         end
     end
+end
+
+local function collectNpc(out, id, kind, objIdx)
+    kind = kind or KIND_SLAY
+    sinkNpc(id, kind, objIdx)
     collect(out, npcs[id], NPC_SPAWNS, kind, objIdx)
 end
 
@@ -610,6 +617,132 @@ local function collectItem(out, id, objIdx)
         end
         npcSink = saved
     end
+end
+
+-- Quests new to Forever whose Era item's far sources a review finds right after all, kept whole (none so far)
+local FAR_ITEM_KEEP = {}
+-- From the 2.22.0 data review, per new quest and item objective: none where no source sits where the quest sends you, objects for nodes only, creatures for the only ones that drop it, or Forever sources the item's list lacks
+local FAR_ITEM_FIX = {
+    [90854] = { [1] = { item = 15564, none = true } },
+    [91564] = { [1] = { item = 10561, none = true } },
+    [92109] = { [3] = { item = 765, objects = true } },
+    -- The collector and the peer's Wowhead-built layer both have Galestriders dropping it on Zephras Isle
+    [92553] = { [2] = { item = 5469, npc = { 251661 } } },
+    -- By Wowhead's drops the modulator comes from the harvest golems, not the Defias and murlocs the item's list adds, and the scope from the parts boxes
+    [92911] = { [2] = { item = 4363, creatures = { [36] = true, [114] = true, [115] = true, [480] = true, [573] = true } },
+                [3] = { item = 4405, objects = true } },
+    [94213] = { [2] = { item = 3385, none = true } },
+    [94230] = { [2] = { item = 4384, none = true } },
+    [94233] = { [2] = { item = 6712, none = true } },
+    [94258] = { [2] = { item = 4623, none = true } },
+    [94260] = { [2] = { item = 10592, none = true } },
+    [94265] = { [2] = { item = 9061, none = true } },
+    [94267] = { [2] = { item = 9144, none = true } },
+    [94269] = { [2] = { item = 9060, none = true } },
+    [94316] = { [2] = { item = 9224, none = true } },
+    [94434] = { [1] = { item = 2589, none = true } },
+    -- The peer's Wowhead-built layer alone names these Loch Modan sources and 95613's seller, taken by the author's call
+    [94466] = { [1] = { item = 5026, npc = { 1174 } }, [2] = { item = 6652, npc = { 1166 } } },
+    [94502] = { [1] = { item = 7812, none = true } },
+    [95162] = { [1] = { item = 769, none = true } },
+    [95613] = { [1] = { item = 17028, vendor = { 272437 } } },
+    [96081] = { [1] = { item = 4338, none = true } },
+    [97168] = { [2] = { item = 18335, none = true } },
+    [97184] = { [2] = { item = 18335, none = true } },
+    [99193] = { [1] = { item = 4338, none = true } },
+    [99198] = { [1] = { item = 4338, none = true } },
+}
+local farCut = { quests = {}, kept = 0, dropped = 0, lines = {}, fixed = {} }
+
+-- Where a quest new to Forever is given and handed in, the maps its reused Era item is held to when a source is there
+local function ownMaps(q, id)
+    local pts = {}
+    for _, field in ipairs({ Q_STARTEDBY, Q_FINISHEDBY }) do
+        local by = q[field]
+        if type(by) == "table" then
+            for _, s in ipairs(type(by[1]) == "table" and by[1] or {}) do collect(pts, npcs[s], NPC_SPAWNS, KIND_SLAY) end
+            for _, s in ipairs(type(by[2]) == "table" and by[2] or {}) do collect(pts, objects[s], OBJ_SPAWNS, KIND_OBJECT) end
+        end
+    end
+    local maps, any = {}, false
+    for _, p in ipairs(pts) do
+        local ui = area2ui[p.a]
+        if ui then maps[ui], any = true, true end
+    end
+    for _, e in ipairs(ownStarts and ownStarts[id] or {}) do
+        local ui = area2ui[e[1]]
+        if ui then maps[ui], any = true, true end
+    end
+    return any and maps or nil
+end
+
+-- An Era item's sources, held to the quest's own maps when any is there, else false
+local function collectItemNear(out, id, objIdx, maps, questID, fix)
+    local it = items[id]
+    if not it then return false end
+    local groups = {}
+    local function add(isNpc, src)
+        local pts = {}
+        collect(pts, (isNpc and npcs or objects)[src], isNpc and NPC_SPAWNS or OBJ_SPAWNS, KIND_LOOT, objIdx)
+        groups[#groups + 1] = { npc = isNpc, id = src, pts = pts }
+    end
+    local objectsOnly, only = fix and fix.objects, fix and fix.creatures
+    if not objectsOnly then
+        for _, s in ipairs(type(it[I_NPCDROPS]) == "table" and it[I_NPCDROPS] or {}) do
+            if not only or only[s] then add(true, s) end
+        end
+    end
+    if not only then
+        for _, s in ipairs(type(it[I_OBJDROPS]) == "table" and it[I_OBJDROPS] or {}) do add(false, s) end
+    end
+    if not (objectsOnly or only) then
+        for _, s in ipairs(type(it[I_VENDORS]) == "table" and it[I_VENDORS] or {}) do
+            local vf = npcs[s] and npcs[s][N_FACTION]
+            if not (questFaction and (vf == "A" or vf == "H") and vf ~= questFaction) then add(true, s) end
+        end
+    end
+    for _, s in ipairs(fix and fix.npc or {}) do add(true, s) end
+    for _, s in ipairs(fix and fix.vendor or {}) do add(true, s) end
+    local nearNpcs = 0
+    for _, g in ipairs(groups) do
+        for _, p in ipairs(g.pts) do
+            if maps[area2ui[p.a]] then g.near = true end
+        end
+        if g.near and g.npc then nearNpcs = nearNpcs + 1 end
+    end
+    local kept, dropped, far = 0, 0, {}
+    for _, g in ipairs(groups) do
+        if g.near then
+            if g.npc and nearNpcs <= MAX_ITEM_SOURCES then sinkNpc(g.id, KIND_LOOT, objIdx) end
+        end
+        for _, p in ipairs(g.pts) do
+            if maps[area2ui[p.a]] then
+                out[#out + 1] = p
+                kept = kept + 1
+            else
+                dropped = dropped + 1
+                if area2ui[p.a] then far[area2ui[p.a]] = true end
+            end
+        end
+    end
+    if kept == 0 then
+        if dropped > 0 and mode == "spawns" and not fix then
+            local n = 0
+            for _ in pairs(far) do n = n + 1 end
+            farCut.lines[#farCut.lines + 1] = ("-- forever item left whole, no source on its quest's maps: quest %d objective %d item %d, %d point(s) on %d map(s)\n")
+                :format(questID, objIdx + 1, id, dropped, n)
+        end
+        return false
+    end
+    if dropped > 0 and mode == "spawns" then
+        local n = 0
+        for _ in pairs(far) do n = n + 1 end
+        farCut.quests[questID] = true
+        farCut.kept, farCut.dropped = farCut.kept + kept, farCut.dropped + dropped
+        farCut.lines[#farCut.lines + 1] = ("-- forever item held to its quest's maps: quest %d objective %d item %d keeps %d point(s), drops %d on %d other map(s)\n")
+            :format(questID, objIdx + 1, id, kept, dropped, n)
+    end
+    return true
 end
 
 -- Deterministic so a rerun is byte identical. Snaps to a real spawn because a raw centroid can
@@ -864,7 +997,26 @@ local function objectivePoints(q, id)
         end
     end
     if type(o[3]) == "table" then
-        for i = 1, #o[3] do local e = o[3][i]; if type(e) == "table" and e[1] then collectItem(pts, e[1], i - 1) end end
+        local new = id and overlaid[quests] and overlaid[quests][id]
+        local maps = new and not FAR_ITEM_KEEP[id] and ownMaps(q, id)
+        for i = 1, #o[3] do
+            local e = o[3][i]
+            if type(e) == "table" and e[1] then
+                local fix = new and FAR_ITEM_FIX[id] and FAR_ITEM_FIX[id][i]
+                if fix and fix.item ~= e[1] then fix = nil end
+                if fix then
+                    farCut.fixed[id * 100 + i] = true
+                    -- A reviewed objective takes its sources as the review says, held to the quest's maps, and gets no markers where nothing is near
+                    local held = not fix.none and maps and collectItemNear(pts, e[1], i - 1, maps, id, fix)
+                    if mode == "spawns" and not held then
+                        farCut.lines[#farCut.lines + 1] = ("-- forever item by review: quest %d objective %d item %d gets no markers\n")
+                            :format(id, i, e[1])
+                    end
+                elseif not (maps and eraItems[e[1]] and collectItemNear(pts, e[1], i - 1, maps, id)) then
+                    collectItem(pts, e[1], i - 1)
+                end
+            end
+        end
     end
     if type(o[5]) == "table" then
         for i = 1, #o[5] do
@@ -1209,6 +1361,25 @@ if mode == "spawns" then
         assert(seen == emitted, "point count changed on reload")
         assert(worst <= 0.0001, "coordinate drift on reload: " .. worst)
         io.stderr:write(("-- verified %d point(s) by reload, max drift %.6f\n"):format(seen, worst))
+        for _, l in ipairs(farCut.lines) do io.stderr:write(l) end
+        local nq = 0
+        for _ in pairs(farCut.quests) do nq = nq + 1 end
+        if nq > 0 then
+            io.stderr:write(("-- forever items held to their quests' maps: %d quest(s), %d point(s) kept, %d dropped\n")
+                :format(nq, farCut.kept, farCut.dropped))
+        end
+        if overlaid[quests] then
+            local stale = {}
+            for qid, objs in pairs(FAR_ITEM_FIX) do
+                for i in pairs(objs) do
+                    if not farCut.fixed[qid * 100 + i] then stale[#stale + 1] = ("%d objective %d"):format(qid, i) end
+                end
+            end
+            table.sort(stale)
+            for _, s in ipairs(stale) do
+                io.stderr:write(("-- forever item review fix not applied, the quest is not new to Forever or holds another item there: quest %s\n"):format(s))
+            end
+        end
     end
 
     -- Shipped as one long string, so login scans a single token and the constructor is parsed by
@@ -1624,6 +1795,17 @@ if mode == "available" then
     end
     table.sort(acceptIds)
 
+    -- The reputation each quest gives as the dump states it, { factionID, amount, ... }, before any bonus or the game's own Aldor and Scryer loss
+    local Q_REPREWARD, rep = 26, {}
+    for id, q in pairs(quests) do
+        local flat = {}
+        for _, p in ipairs(type(q[Q_REPREWARD]) == "table" and q[Q_REPREWARD] or {}) do
+            local f, v = type(p) == "table" and tonumber(p[1]), type(p) == "table" and tonumber(p[2])
+            if f and f > 0 and v and v ~= 0 then flat[#flat + 1] = f; flat[#flat + 1] = v end
+        end
+        if #flat > 0 then rep[id] = flat end
+    end
+
     -- breadcrumbs.lua, from build_breadcrumbs.lua: a breadcrumb is no gate itself, as AllTheThings counts none missing, and one of its follow-ups taken closes it.
     local leads, crumbsPath = {}, dir .. "/breadcrumbs.lua"
     local crumbsFile, crumbs = io.open(crumbsPath, "rb"), nil
@@ -1735,6 +1917,7 @@ if mode == "available" then
     end
     table.insert(parts, #parts - 1, "-- accept [questID] = 1 offered to the whole group as one player takes it, such as an escort,\n")
     table.insert(parts, #parts - 1, "--        2 a PvP quest, a battleground's or a world PvP quest, 3 both\n")
+    table.insert(parts, #parts - 1, "-- rep    [questID] = { factionID, amount, ... }  the reputation it gives, as the data states it\n")
 
     local expect = {}
     for i = 1, #sortedIds do
@@ -1830,6 +2013,7 @@ if mode == "available" then
     end
     parts[#parts + 1] = "},\naccept = {\n"
     for i = 1, #acceptIds do parts[#parts + 1] = ("\t[%d]=%.0f,\n"):format(acceptIds[i], accept[acceptIds[i]]) end
+    emitList("rep", rep)
     parts[#parts + 1] = "},\n}\n"
 
     local text = table.concat(parts)
@@ -1917,6 +2101,7 @@ if mode == "available" then
         checkList("preAll", preAll)
         checkList("excl", excl)
         if crumbs then checkList("leads", leads) else assert(got.leads == nil, "leads emitted with no breadcrumbs file") end
+        checkList("rep", rep)
         for i = 1, #sortedIds do
             local id = sortedIds[i]
             assert((got.maxLevel and got.maxLevel[id]) == maxLevel[id], ("quest %d level cap changed on reload"):format(id))
@@ -1970,6 +2155,12 @@ if mode == "available" then
             if v >= 2 then pvp = pvp + 1 end
         end
         io.stderr:write(("-- accept flags: %d offered to the whole group, %d PvP\n"):format(group, pvp))
+        local repQuests, repPairs = 0, 0
+        for i = 1, #sortedIds do
+            local v = rep[sortedIds[i]]
+            if v then repQuests, repPairs = repQuests + 1, repPairs + #v / 2 end
+        end
+        io.stderr:write(("-- reputation rewards: %d quest(s), %d faction amount(s)\n"):format(repQuests, repPairs))
     end
     if capsFile then
         io.stderr:write(("-- level caps: %d quest(s), of %d in the caps file\n"):format(countTbl(maxLevel), capsListed))
@@ -2319,7 +2510,8 @@ if mode == "category" then
         local mask = 0
 
         local zone = tonumber(q[Q_ZONEORSORT])
-        if zone and zone > 0 and instanceArea[zone] then
+        -- Filed under a dungeon or raid as the quest log files it, Forever's own instances too, and never under a battleground
+        if zone and zone > 0 and not BATTLEGROUND_ZONES[zone] and (instanceArea[zone] or INSTANCE_HEADINGS[zone]) then
             mask = mask + CAT_INSTANCE
             counts.instance = counts.instance + 1
         end

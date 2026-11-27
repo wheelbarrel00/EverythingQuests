@@ -5,6 +5,11 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.22.0", sections = {
+        { "Reputation and more from the quest giver", "A quest's page in the Quest Browser now shows the reputation it gives, and lists the other quests its quest giver offers or takes in, so you can see what else to pick up or hand in there.", classic = true },
+        { "Get Directions and Show on Map", "Right-click a quest in EQ Objective Tracker for Get Directions, which points TomTom's arrow at the nearest objective you still need, or the hand-in, and opens the map there, or Show on Map, which opens the map and makes the quest's markers pulse.", classic = true, without = "ChainGuide" },
+        { "The settings window stays put", "The settings window now opens where you last dragged it." },
+    } },
     { version = "2.21.0", sections = {
         { "Quests by Zone", "The Quest Browser has a new Zones page. Pick Zones at the top of its side panel to see how many quests you have done in each zone, then pick a zone to see what is left, what is not open yet and why.", classic = true },
     } },

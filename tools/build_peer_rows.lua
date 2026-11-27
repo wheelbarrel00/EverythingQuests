@@ -57,7 +57,7 @@ end
 local ENTITIES = {
     { "quests", "QuestDB.lua", "questData = [[", { [2] = true, [3] = true, [4] = true, [5] = true, [6] = true, [7] = true,
         [9] = true, [10] = true, [12] = true, [13] = true, [16] = true, [17] = true, [18] = true, [19] = true, [20] = true,
-        [22] = true, [24] = true, [25] = true } },
+        [22] = true, [24] = true, [25] = true, [26] = true } },
     { "npcs", "NpcDB.lua", "npcData = [[", { [7] = true, [13] = false } },
     { "objects", "ObjectDB.lua", "objectData = [[", { [4] = true } },
     { "items", "ItemDB.lua", "itemData = [[", { [2] = true, [3] = true, [14] = true } },
@@ -92,16 +92,17 @@ local function keep(name, f, v)
     return v
 end
 
--- Peer values a review found wrong, so the dump's stays, or a function trims the peer's. Each one is reported when it no longer differs.
+-- Peer values a review found wrong, so the dump's stays, or a function trims or replaces the peer's. Each one is reported when it no longer differs.
 local function arathiOnly(v) return type(v) == "table" and { v[1], { [45] = v[2] and v[2][45] } } or v end
 local HOLD = {
     -- 6622 Triage for the Horde is done at Hammerfall, and the peer gives it 6624's Theramore spot
     -- 8121 and 8122 are held in Arathi Basin, and the peer adds Horde battlemasters in three other zones
     -- 8871, 8872, 8874 and 8875 lose their emissary in the peer's, which hides them
     -- 3375 Replacement Phial would wait for 2201, the quest the phial is used for
+    -- 9123 gives the Argent Dawn 200, as the peer's own correction file and Wowhead have it, not its database's 1000
     quests = { [6622] = { [9] = true }, [8121] = { [9] = arathiOnly }, [8122] = { [9] = arathiOnly },
                [8871] = { [2] = true }, [8872] = { [2] = true }, [8874] = { [2] = true }, [8875] = { [2] = true },
-               [3375] = { [13] = true } },
+               [3375] = { [13] = true }, [9123] = { [26] = function() return { { 529, 200 } } end } },
     -- Lieutenant Nevell stands in Dun Morogh, and the peer files his spot under Ironforge
     npcs = { [16484] = { [7] = true } },
     objects = {},

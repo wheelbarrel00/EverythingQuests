@@ -130,6 +130,11 @@ function Arrow:Holds(questID)
     return questID ~= nil and _uid ~= nil and _questID == questID
 end
 
+-- Whether the slot is for this quest, its waypoint showing or still waiting for a spot
+function Arrow:Follows(questID)
+    return questID ~= nil and _questID == questID
+end
+
 function Arrow:Followed()
     return _uid ~= nil and _followed == true
 end

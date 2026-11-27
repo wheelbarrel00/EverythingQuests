@@ -760,6 +760,8 @@ end
 
 -- Instance, repeatable and profession quests are not a zone's to finish. Bits 4 (explored or scripted) and 8 (class) count
 local CAT_INSTANCE, CAT_REPEATABLE, CAT_PROFESSION = 1, 2, 16
+-- Battleground quests, keyed at 2e7 plus their area or under the log's Battlegrounds heading, stay off the bar
+local BATTLEGROUND_KEY, BATTLEGROUNDS_HEADING = 20000000, -25
 
 -- The data's ended code for a world event, which on Forever's Era data is only ever the Ahn'Qiraj war effort
 local ENDED_EVENT = 2
@@ -810,8 +812,10 @@ local function zoneReason(A, D, questID)
     local ended = A:Ended(questID)
     if ended then return ended == ENDED_EVENT and "warEffort" or "ended" end
     local mask = ns.CLASSIC_QUEST_CATEGORY and ns.CLASSIC_QUEST_CATEGORY[questID]
+    local zone = ns.CLASSIC_QUEST_ZONE and ns.CLASSIC_QUEST_ZONE[questID]
+    if mask and hasCategory(mask, CAT_INSTANCE) then return "instance" end
+    if zone and (zone >= BATTLEGROUND_KEY or zone == BATTLEGROUNDS_HEADING) then return "battleground" end
     if mask then
-        if hasCategory(mask, CAT_INSTANCE) then return "instance" end
         if hasCategory(mask, CAT_REPEATABLE) then return "repeatable" end
         if hasCategory(mask, CAT_PROFESSION) then return "profession" end
     end
@@ -889,6 +893,7 @@ local function zoneNotices()
         local L = ns.L
         _notices = {
             instance   = L["Not counted on the zone progress bar: a dungeon or raid quest."],
+            battleground = L["Not counted on the zone progress bar: a battleground quest."],
             repeatable = L["Not counted on the zone progress bar: a repeatable quest."],
             profession = L["Not counted on the zone progress bar: a profession quest."],
             holiday    = L["Not counted on the zone progress bar: a holiday quest."],

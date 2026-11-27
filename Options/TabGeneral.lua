@@ -494,10 +494,11 @@ Options:RegisterTab({
                     local DB = ns:GetSubsystem("DB")
                     if DB and DB.db then
                         if DB.db.ResetProfile then DB.db:ResetProfile() end
-                        -- ResetProfile clears only the profile scope, so this tab's global and character settings are reset by hand
+                        -- ResetProfile clears only the profile scope, so the global and character values are reset by hand
                         local g = DB.db.global
                         if g then
                             g.optionsWindowScale = DB.defaults.global.optionsWindowScale
+                            g.optionsWindowPos   = nil
                             g.whatsNewMode       = DB.defaults.global.whatsNewMode
                             g.whatsNewModeBeforeOff = nil
                         end

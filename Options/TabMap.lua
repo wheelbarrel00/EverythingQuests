@@ -185,7 +185,7 @@ local function categoryCard(self, content, stack)
         card:Add(mapBox(self, content, key, false, label, tooltip, rebuildAvailable))
     end
     category("hideDungeonQuests", L["Dungeon and raid quests"],
-        L["Leaves out quests that are sorted into a dungeon or a raid. Most are picked up inside the instance or from a quest giver at its door, so they clutter the outdoor map without helping you while you are questing in the world."])
+        L["Leaves out quests that are sorted into a dungeon or a raid. Most are finished inside the instance, so they clutter the outdoor map without helping you while you are questing in the world."])
     category("hideRepeatableQuests", L["Repeatable quests"],
         L["Leaves out the quests you can hand in over and over, usually a turn-in for reputation or a common trade good. They never stop being offered, so they stay on the map forever once you can see them."])
     category("hideProfessionQuests", L["Profession quests"],

@@ -88,8 +88,8 @@ local function maskNames(mask, namer, count, out)
 end
 
 local FACTION_RACES = {
-    { label = "FACTION_ALLIANCE", races = { 1, 3, 4, 7, 11 } },
-    { label = "FACTION_HORDE",    races = { 2, 5, 6, 8, 9, 10 } },
+    { label = "FACTION_ALLIANCE", side = "Alliance", races = { 1, 3, 4, 7, 11 } },
+    { label = "FACTION_HORDE",    side = "Horde",    races = { 2, 5, 6, 8, 9, 10 } },
 }
 
 local _factionData, _factionMasks
@@ -183,11 +183,57 @@ local function factionName(factionID)
             return info.name
         end
     end
-    return nil
+    -- WoW Forever names no faction outside the character's own reputation list, such as the other side's capitals
+    local shipped = ns.FACTION_NAMES
+    local own = shipped and (shipped[GetLocale and GetLocale() or "enUS"] or shipped.enUS)
+    return own and own[factionID] or nil
 end
 
--- 4 is the event bit, deliberately not taken: it is built from the same flag as
--- IsExplorationOrScripted and names escorts rather than holidays.
+-- The Aldor and the Scryers: the game takes a tenth more from the other than a quest gives one, which the data leaves out
+local OPPOSED = { [932] = 934, [934] = 932 }
+-- Without the shipped sides, only the two faction headers are told apart
+local HEADER = { [469] = "Alliance", [67] = "Horde" }
+
+-- The side a quest is for, when every race it lets take it is of one side
+local function questSide(A, questID)
+    local mask = A and A.RaceMask and A:RaceMask(questID)
+    if not mask or mask == 0 then return nil end
+    for f = 1, #FACTION_RACES do
+        local races, whole = FACTION_RACES[f].races, 0
+        for k = 1, #races do whole = whole + 2 ^ (races[k] - 1) end
+        if containsMask(whole, mask) then return FACTION_RACES[f].side end
+    end
+end
+
+local function repRewards(A, D, questID)
+    local flat = D.rep and D.rep[questID]
+    if not flat then return nil end
+    local out, has, seen = {}, {}, {}
+    local sides = ns.FACTION_SIDE or HEADER
+    for i = 1, #flat - 1, 2 do
+        has[flat[i]] = true
+        if sides[flat[i]] then seen[sides[flat[i]]] = true end
+    end
+    -- A quest for one side gives that side's factions, and a quest naming both sides' gives you your own side's
+    local side = questSide(A, questID)
+    if not side and seen.Alliance and seen.Horde then side = UnitFactionGroup and UnitFactionGroup("player") end
+    if side ~= "Alliance" and side ~= "Horde" then side = nil end
+    for i = 1, #flat - 1, 2 do
+        if not (side and sides[flat[i]] and sides[flat[i]] ~= side) then
+            out[#out + 1] = { faction = flat[i], amount = flat[i + 1] }
+        end
+    end
+    for i = 1, #flat - 1, 2 do
+        local other = OPPOSED[flat[i]]
+        if other and not has[other] and flat[i + 1] > 0 then
+            out[#out + 1] = { faction = other, amount = -math.floor(flat[i + 1] * 1.1), derived = true }
+        end
+    end
+    for _, e in ipairs(out) do e.name = factionName(e.faction) end
+    return #out > 0 and out or nil
+end
+
+-- Bit 4 is not read: it is the exploration flag and marks escorts, not holidays, which the holiday table knows
 local CAT_INSTANCE, CAT_REPEATABLE, CAT_CLASS, CAT_PROFESSION = 1, 2, 8, 16
 
 local function hasCat(mask, bit)
@@ -361,6 +407,104 @@ local function questRefs(ids, A, out)
     return out
 end
 
+-- [kind * 1e9 + id] = { [questID] = { [mapID] = true } } for each creature (1) and object (2) that offers or takes in a quest, built the first time a page asks
+local _offers, _takes
+
+local function sourceKey(v)
+    local kind, src = math.floor(v / 1e8) % 10, math.floor(v / 1e9)
+    if src > 0 and (kind == 1 or kind == 2) then return kind * 1e9 + src, kind, src end
+    return nil
+end
+
+local function bySource(tbl)
+    local out = {}
+    for questID, byMap in pairs(tbl or {}) do
+        for mapID, list in pairs(byMap) do
+            for i = 1, #list do
+                local key = sourceKey(list[i])
+                if key then
+                    local set = out[key]
+                    if not set then set = {}; out[key] = set end
+                    local maps = set[questID]
+                    if not maps then maps = {}; set[questID] = maps end
+                    maps[mapID] = true
+                end
+            end
+        end
+    end
+    return out
+end
+
+-- Not in the game, or not released on this version, so no use listing beside the quests an NPC really has
+local NOT_HERE = { [1] = true, [4] = true }
+
+local function byLevel(a, b)
+    if a.level ~= b.level then return a.level < b.level end
+    if a.name ~= b.name then return a.name < b.name end
+    return a.id < b.id
+end
+
+local function meets(a, b)
+    for m in pairs(a) do if b[m] then return true end end
+    return false
+end
+
+-- One list per giver or taker by name, each other quest once, on a map where this quest meets that same NPC, as one id can stand in every capital
+local function moreFrom(A, D, questID)
+    if not _offers then _offers, _takes = bySource(D.start), bySource(ns.CLASSIC_QUEST_TURNIN) end
+    local groups, byName = {}, {}
+    local function addSources(byMap, place)
+        for mapID, list in pairs(byMap or {}) do
+            for i = 1, #list do
+                local key, kind, src = sourceKey(list[i])
+                local name = key and ns.Compat.SourceName(kind, src)
+                if name and not A:HostileGiver(kind, src) then
+                    local g = byName[name]
+                    if not g then
+                        g = { name = name, place = place, keys = {} }
+                        byName[name] = g
+                        groups[#groups + 1] = g
+                    end
+                    g.keys[key] = g.keys[key] or {}
+                    g.keys[key][mapID] = true
+                end
+            end
+        end
+    end
+    addSources(D.start[questID], 1)
+    addSources(ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID], 2)
+    table.sort(groups, function(a, b)
+        if a.place ~= b.place then return a.place < b.place end
+        return a.name < b.name
+    end)
+    local out = {}
+    for _, g in ipairs(groups) do
+        local rows, seen = {}, {}
+        for key, here in pairs(g.keys) do
+            for field, index in pairs({ starts = _offers, ends = _takes }) do
+                for q, maps in pairs(index[key] or {}) do
+                    -- Only a quest with a page of its own, as a row's click opens it
+                    if q ~= questID and D.gates[q] and meets(maps, here) and A:CanEverTake(q) ~= false
+                       and not NOT_HERE[A:Ended(q) or 0] then
+                        local row = seen[q]
+                        if not row then
+                            row = { id = q, name = A:Title(q), level = A:QuestLevel(q) or 0, done = A:IsCompleted(q), known = true }
+                            seen[q] = row
+                            rows[#rows + 1] = row
+                        end
+                        row[field] = true
+                    end
+                end
+            end
+        end
+        if #rows > 0 then
+            table.sort(rows, byLevel)
+            out[#out + 1] = { name = g.name, rows = rows }
+        end
+    end
+    return #out > 0 and out or nil
+end
+
 function QB:Record(questID)
     local A = avail()
     local D = A and A.Data and A:Data()
@@ -386,8 +530,6 @@ function QB:Record(questID)
     local cats = ns.CLASSIC_QUEST_CATEGORY and ns.CLASSIC_QUEST_CATEGORY[questID]
     r.isInstance   = hasCat(cats, CAT_INSTANCE)
     r.isRepeatable = hasCat(cats, CAT_REPEATABLE) or A:IsRepeatable(questID)
-    -- NOT CAT_EVENT, which is built from the same flag as IsExplorationOrScripted and so
-    -- names escorts rather than holidays. The holiday table is what actually knows.
     local hol = ns.CLASSIC_QUEST_HOLIDAY
     r.isEvent      = (hol and hol.event and hol.event[questID]) ~= nil
     r.isClassQuest = hasCat(cats, CAT_CLASS)
@@ -395,8 +537,7 @@ function QB:Record(questID)
 
     local starts = {}
     if A:StartsFor(questID, starts) > 0 then
-        -- Merged to one row per map. A giver standing next to another is two points and one place
-        -- as far as a reader is concerned.
+        -- One row per map, since two givers side by side are two points but one place to a reader
         local byMap, order = {}, {}
         for i = 1, #starts do
             local s = starts[i]
@@ -409,11 +550,7 @@ function QB:Record(questID)
             elseif s.kind < slot.kind then
                 slot.kind, slot.x, slot.y = s.kind, s.x, s.y
             end
-            -- EVERY distinct giver on this map, because a row is merged per MAP while a map pin
-            -- is merged per COORDINATE. 25 Classic and 36 TBC rows cover more than one person -
-            -- quest 109 in Elwynn is offered by three - and naming only the first states
-            -- something false about the other locations. Each name was resolved against its own
-            -- point's kind in StartsFor, so accumulating them here cannot cross the id spaces.
+            -- Every distinct giver on the map, since a row merges per map while a pin merges per coordinate
             if s.name and not slot.seen[s.name] then
                 slot.seen[s.name] = true
                 slot.names[#slot.names + 1] = s.name
@@ -432,9 +569,10 @@ function QB:Record(questID)
     local spawns = ns.Compat and ns.Compat.ClassicSpawns and ns.Compat.ClassicSpawns()
     r.objectives = pointList(spawns and spawns[questID], {}, false)
     r.turnIn     = pointList(ns.CLASSIC_QUEST_TURNIN and ns.CLASSIC_QUEST_TURNIN[questID], {}, true)
+    r.moreFrom   = moreFrom(A, D, questID)
+    r.rep        = repRewards(A, D, questID)
 
-    -- preQuestSingle is ANY of, and is consulted INSTEAD of preQuestGroup rather than alongside
-    -- it, which is the semantic the availability gate already follows.
+    -- pre is any-of and read instead of preAll, as the availability gate reads it
     if D.pre[questID] then
         r.pre, r.preMode = questRefs(D.pre[questID], A, {}), "any"
     elseif D.preAll[questID] then
