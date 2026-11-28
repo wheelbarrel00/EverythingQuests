@@ -215,7 +215,8 @@ local function besideRows(content)
     return beside
 end
 
--- Every shown card and row of each built page, and the controls of each strip and footer.
+-- Every shown card and row of each built page with the settings a tab anchored beside a row, and the
+-- controls of each strip and footer.
 local function gather(ctx)
     local found = {}
     local function add(t, text, path, scroll, flash)

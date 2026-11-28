@@ -124,16 +124,26 @@ function Bridge:OpenTrackerOptions()
     return false
 end
 
--- Era and TBC have no game arrow beside EQ's, and on retail a focus never sets one
+-- EQOT's focus module follows super-track on WoW Forever since 1.27.0 and on retail since 2.25.0, so an older EQOT on retail announces nothing
+local function followsSuperTrack()
+    local T = eqot()
+    local Focus = T and T.GetModule and T:GetModule("Focus")
+    return Focus and Focus.FollowsSuperTrack and Focus:FollowsSuperTrack() and true or false
+end
+
+-- Era and TBC have no super-track for EQOT to follow, and no game arrow beside EQ's
 function Bridge:FocusArrowOffered()
-    return (ns.HAS_CLASSIC_SPAWNS and C_SuperTrack and self._focusArrow) and true or false
+    return (self._focusArrow and followsSuperTrack()) and true or false
 end
 
 function Bridge:FocusArrowOn()
     -- Where no box shows, a saved false could never be ticked back, so it is not read
     if not self:FocusArrowOffered() then return true end
     local DB = ns:GetSubsystem("DB")
-    return not DB or DB.db.profile.general.focusArrow ~= false
+    local on = DB and DB.db.profile.general.focusArrow
+    -- Unset, it stays on for WoW Forever, as it shipped, and is off for retail, where it is new
+    if on == nil then return ns.HAS_CLASSIC_SPAWNS and true or false end
+    return on ~= false
 end
 
 -- Off takes down only an arrow the focus placed. On runs the listener on the quest focused now, and does nothing with none focused
@@ -146,7 +156,7 @@ function Bridge:ApplyFocusArrowSetting()
     if A and A.GetFocus then self._focusArrow.onFocus(A:GetFocus()) end
 end
 
--- EQOT announces the focused row without coordinates, and EQ owns the quest data, so EQ places the arrow.
+-- EQOT announces the focused row without coordinates, so EQ places the arrow, from its own data or the game's
 function Bridge:ApplyFocusArrow()
     local A = api()
     if not (A and A.AddFocusListener) then return end
@@ -154,10 +164,10 @@ function Bridge:ApplyFocusArrow()
 
     local listener = {
         id      = "eq-quest-arrow",
-        -- Only the quests provider's entry ids are quest ids.
+        -- Only these providers' entry ids are quest ids, World Quests' wherever super-track is followed
         onFocus = function(providerID, entryID)
             local Arrow = ns:GetSubsystem("QuestArrow")
-            if not Arrow or providerID ~= "quests" then return end
+            if not Arrow or (providerID ~= "quests" and providerID ~= "worldquests") then return end
             local last = Bridge._focused
             Bridge._focused = entryID
             -- Ahead of the clear below, so with the box off no follow or clear takes down an arrow EQ holds
@@ -318,14 +328,12 @@ local function zoneName(mapID)
     return info and info.name or tostring(mapID)
 end
 
--- On Era and TBC, where the Chain Guide's Get Directions does not load: the arrow, or the place in chat without TomTom, and the map
+-- On Era and TBC, where the Chain Guide's Get Directions does not load: the arrow, else the place in chat and the map
 function Bridge:Directions(questID)
     local mapID, x, y, title, Arrow = questPlace(questID)
     if not mapID then return end
-    -- Where TomTom is missing or refuses the waypoint, the place is said instead
-    if not (Arrow:Available() and Arrow:Set(mapID, x, y, title, questID)) then
-        say((L["Next step for %1$s: %2$s in %3$s."]):format(title, ("%.1f, %.1f"):format(x * 100, y * 100), zoneName(mapID)))
-    end
+    if Arrow:Available() and Arrow:Set(mapID, x, y, title, questID) then return end
+    say((L["Next step for %1$s: %2$s in %3$s."]):format(title, ("%.1f, %.1f"):format(x * 100, y * 100), zoneName(mapID)))
     local QB = ns:GetSubsystem("QuestBrowser")
     if QB and QB.ShowMap then QB:ShowMap(mapID) end
 end

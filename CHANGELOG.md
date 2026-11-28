@@ -5,6 +5,19 @@ All notable changes to Everything Quests will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - 2026-11-27
+
+On retail TomTom's arrow can follow the quest or world quest you follow, and Get Directions, the Chain Guide and the Quest Browser no longer open the world map when they set an arrow.
+
+### New Features
+
+- **TomTom's arrow can follow the quest you follow.** On retail, tick TomTom arrow for the focused quest in the Tracker section of the General tab (it starts off), and TomTom's arrow points at the quest or world quest you follow, however you follow it: from EQ Objective Tracker, the world map, the game's quest log, or the game following a quest as you accept it. The arrow moves along the game's own route as you finish objectives, is not taken down by Everything Quests when a world quest or bonus objective leaves your quest log as you leave its area, and goes when you hand the quest in or stop following it. Needs EQ Objective Tracker 2.25.0 or later, which the box waits for, and TomTom. Requested by Lokir and Tyrial.
+
+### Improvements
+
+- **Directions no longer open the world map when they set an arrow.** Get Directions on EQ Objective Tracker's right-click menu on every version of the game, the Chain Guide's Continue button and quest cards on retail and WoW Forever, and the Quest Browser's Get Directions and places on Classic Era, Burning Crusade Classic and WoW Forever now set TomTom's arrow and leave the world map closed. The map still opens when no arrow can be set: without TomTom, or when TomTom turns the waypoint down, and on retail and WoW Forever, Get Directions and the Chain Guide also open it on your own zone when no position is known. On Classic Era and Burning Crusade Classic, Show on Map still opens it.
+- **One TomTom arrow from Everything Quests on retail.** Get Directions and the Chain Guide on retail added a new TomTom waypoint at every click and left the older ones behind. Each now replaces the last arrow Everything Quests set, as on the other versions of the game, and an arrow for a quest in your log moves on as you finish objectives. Waypoints Everything Quests left from earlier sessions are removed the next time it sets or clears its arrow, or when the quest you follow changes.
+
 ## [2.22.0] - 2026-11-27
 
 The Quest Browser on Classic Era, Burning Crusade Classic and WoW Forever shows the reputation a quest gives and what else its quest giver offers, EQ Objective Tracker's right-click menu on Classic Era and Burning Crusade Classic gets Get Directions and Show on Map, the settings window stays where you drag it, and quest data fixes for dungeon and battleground quests, world events and WoW Forever's objective markers.

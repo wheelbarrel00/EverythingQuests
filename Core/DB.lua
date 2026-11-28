@@ -29,7 +29,7 @@ DB.defaults = {
             npEliteLook     = "crown",
             questTooltips   = true,
             npcQuestTooltips = true,
-            focusArrow      = true,
+            -- focusArrow has no default here: unset, Bridge:FocusArrowOn reads it on for WoW Forever and off for retail
             warnSkippedBreadcrumbs = true,
         },
         announce = {

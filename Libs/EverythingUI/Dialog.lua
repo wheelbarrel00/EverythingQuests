@@ -231,9 +231,6 @@ function Context:ShowDialog(opts)
         edit:SetMaxLetters(opts.maxLetters or 0)
         edit:SetText(opts.editBoxText or "")
         edit:SetCursorPosition(0)
-        edit:SetFocus()
-        -- After SetFocus, which clears any selection of its own.
-        if opts.highlightEditBox or opts.readOnly then edit:HighlightText() end
     else
         edit:Hide()
     end
@@ -241,6 +238,13 @@ function Context:ShowDialog(opts)
     layout(f)
     f:Show()
     f:Raise()
+    -- Focused only once the dialog is on screen: focused before Show, the field never held the
+    -- keyboard (measured 2026-11-26).
+    if opts.hasEditBox then
+        edit:SetFocus()
+        -- After SetFocus, which clears any selection of its own.
+        if opts.highlightEditBox or opts.readOnly then edit:HighlightText() end
+    end
     -- Text measured while a tab was built has come out short of the text as drawn, so the dialog
     -- is sized again a frame later, once it is on screen.
     C_Timer.After(0, function() if f:IsShown() then layout(f) end end)

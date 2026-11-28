@@ -147,26 +147,31 @@ end
 
 -- Each line spans the block from its indent, so it wraps at the block's width, and the next line
 -- starts under the height its text measures now.
+local function placeLine(block, line, y)
+    local x = line.indent + (line.bullet and BULLET_INDENT or 0)
+    if line.bullet then
+        line.bullet:ClearAllPoints()
+        line.bullet:SetPoint("TOPLEFT", block, "TOPLEFT", line.indent, -y)
+    end
+    line.fs:ClearAllPoints()
+    -- Anchored across the block before its height is read: a wrapping string reports its
+    -- wrapped height only once it has a width.
+    line.fs:SetPoint("TOPLEFT", block, "TOPLEFT", x, -y)
+    line.fs:SetPoint("TOPRIGHT", block, "TOPRIGHT", 0, -y)
+    local h = line.fs:GetStringHeight()
+    -- `<= 0` as well as nil, because 0 is truthy and a string not laid out yet would put the
+    -- next line on top of it.
+    if not h or h <= 0 then h = line.size end
+    return y + h
+end
+
 local function measureBlock(block)
     local y = 0
     for i, line in ipairs(block._lines) do
         if i > 1 then y = y + (line.gap or TEXT_GAP) end
-        local x = line.indent + (line.bullet and BULLET_INDENT or 0)
-        if line.bullet then
-            line.bullet:ClearAllPoints()
-            line.bullet:SetPoint("TOPLEFT", block, "TOPLEFT", line.indent, -y)
-        end
-        line.fs:ClearAllPoints()
-        -- Anchored across the block before its height is read: a wrapping string reports its
-        -- wrapped height only once it has a width.
-        line.fs:SetPoint("TOPLEFT", block, "TOPLEFT", x, -y)
-        line.fs:SetPoint("TOPRIGHT", block, "TOPRIGHT", 0, -y)
-        local h = line.fs:GetStringHeight()
-        -- `<= 0` as well as nil, because 0 is truthy and a string not laid out yet would put the
-        -- next line on top of it.
-        if not h or h <= 0 then h = line.size end
-        y = y + h
+        y = placeLine(block, line, y)
     end
+    block._height = y
     block:SetHeight(math.max(1, y))
     return y
 end
@@ -197,7 +202,13 @@ local function addLine(block, text, style, opts)
         line.bullet:SetText(opts.bullet)
     end
     block._lines[#block._lines + 1] = line
-    measureBlock(block)
+    -- Only the new line is read: a whole block measured per line cost the square of its lines, and the
+    -- host measures the block again once it is on screen.
+    local y = block._height or 0
+    if #block._lines > 1 then y = y + (line.gap or TEXT_GAP) end
+    y = placeLine(block, line, y)
+    block._height = y
+    block:SetHeight(math.max(1, y))
     return fs
 end
 

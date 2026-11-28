@@ -37,8 +37,9 @@ local function classColor()
     if c then return c.r, c.g, c.b end
 end
 
--- These outlive a picker that has closed unless something clears them, and a stale cancel would
--- revert an already committed color the next time the options window hides over an open picker.
+-- The Class button, the watcher and the stored callbacks outlive a picker that has closed unless something
+-- clears them, and a stale cancel would revert an already committed color the next time the options window
+-- hides over an open picker.
 local function detach()
     if state.classButton then state.classButton:Hide() end
     if state.watcher then state.watcher:Hide() end
@@ -247,14 +248,14 @@ function Context:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
     openWith(r, g, b, a)
 end
 
--- The picker hands back what its controls hold, which can sit a step off the color it was seeded with.
+-- A pick within this of the class color in every channel counts as the class color and keeps Class.
 local CLASS_NEAR = 0.01
 local function nearClass(nr, ng, nb, kr, kg, kb)
     return math.abs(nr - kr) < CLASS_NEAR and math.abs(ng - kg) < CLASS_NEAR and math.abs(nb - kb) < CLASS_NEAR
 end
 
 -- A labelled row: the label on the left and the swatch at the right end, where a slider's value
--- ends. Its own width fits label, Clear and swatch, so a tab can hang it at the right end of a
+-- ends. Its own width fits label, Clear, swatch and any Class toggle, so a tab can hang it at the right end of a
 -- checkbox's row as that box's color.
 -- followClass adds a Class toggle that stores class = true in the color. The host draws the class
 -- color for such a color, so it is offered only where the host's readers honor it.

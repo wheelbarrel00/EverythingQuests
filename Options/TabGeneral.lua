@@ -350,7 +350,9 @@ local function trackerCard(self, content, stack, deps)
         local function hasTomTom() return Arrow and Arrow:Available() end
         -- Read on each hover, since another addon can take TomTom's place or give it back after the window is built
         local function arrowTip()
-            local tip = L["Points your TomTom arrow at the focused quest each time it changes, including a quest the game focuses as you accept it. Untick to leave that to the game's own arrow: quests are still focused, and Get Directions, the Quest Browser, the Chain Guide and a tracked chain still set a TomTom arrow."]
+            local tip = ns.HAS_CLASSIC_SPAWNS
+                and L["Points your TomTom arrow at the focused quest each time it changes, including a quest the game focuses as you accept it. Untick to leave that to the game's own arrow: quests are still focused, and Get Directions, the Quest Browser, the Chain Guide and a tracked chain still set a TomTom arrow."]
+                or L["Points your TomTom arrow at the quest or world quest you follow each time that changes, including a quest the game follows as you accept it, and moves it on as you finish objectives. Off by default, as the game's own arrow already shows the quest you follow. Get Directions, the Chain Guide and a tracked chain set a TomTom arrow either way."]
             if not hasTomTom() then
                 return tip .. " " .. L["Requires TomTom addon."]
             elseif Arrow:StandIn() then
@@ -359,9 +361,9 @@ local function trackerCard(self, content, stack, deps)
             return tip
         end
         local arrowLabel = L["TomTom arrow for the focused quest"]
-        local arrowGet, arrowSet = generalSetting("focusArrow")
+        local _, arrowSet = generalSetting("focusArrow")
         local arrow = self:CreateCheckbox(content, arrowLabel,
-            function() return arrowGet() ~= false end,
+            function() return Bridge:FocusArrowOn() end,
             function(value)
                 arrowSet(value)
                 Bridge:ApplyFocusArrowSetting()

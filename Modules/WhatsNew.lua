@@ -5,6 +5,10 @@ local WN = ns:RegisterSubsystem("WhatsNew", {})
 
 -- One entry per feature release and none for a patch, in English as the changelog is: each section a heading and its paragraph.
 local RELEASES = {
+    { version = "2.23.0", sections = {
+        { "A TomTom arrow for the quest you follow", "Tick TomTom arrow for the focused quest in the General tab, and TomTom's arrow points at the quest or world quest you follow and moves along the game's route as you finish objectives. It needs EQ Objective Tracker 2.25.0 or later and TomTom.", retail = true },
+        { "Directions that leave the map closed", "Get Directions no longer opens the world map when it sets TomTom's arrow. The map opens only when no arrow can be set." },
+    } },
     { version = "2.22.0", sections = {
         { "Reputation and more from the quest giver", "A quest's page in the Quest Browser now shows the reputation it gives, and lists the other quests its quest giver offers or takes in, so you can see what else to pick up or hand in there.", classic = true },
         { "Get Directions and Show on Map", "Right-click a quest in EQ Objective Tracker for Get Directions, which points TomTom's arrow at the nearest objective you still need, or the hand-in, and opens the map there, or Show on Map, which opens the map and makes the quest's markers pulse.", classic = true, without = "ChainGuide" },

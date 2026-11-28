@@ -118,7 +118,7 @@ local function acquire(kind, make)
 end
 
 local ROW_TIPS = {
-    place = function() return L["Click to open the map here and set a waypoint"] end,
+    place = function() return L["Click to set a TomTom waypoint here, or to open the map here without TomTom"] end,
     quest = function() return L["Click to open this quest"] end,
     chain = function() return L["Find this quest in EQ's Chain Guide"] end,
     rep   = function() return L["The reputation this quest gives, as the quest data lists it and before bonuses such as Diplomacy. Other related factions can gain or lose some too."] end,
@@ -1125,10 +1125,10 @@ local function showMap(mapID)
     end
 end
 
--- A browser row asks where, so the answer goes on the arrow and the map at once. questID only for a quest in your log, whose arrow then follows it
+-- The arrow, else the map. questID only for a quest in your log, whose arrow then follows it
 function QB:GoTo(mapID, x, y, title, questID)
     local Arrow = ns:GetSubsystem("QuestArrow")
-    if Arrow and Arrow.Set then Arrow:Set(mapID, x, y, title, questID) end
+    if Arrow and Arrow:Available() and Arrow:Set(mapID, x, y, title, questID) then return end
     self:ShowMap(mapID)
 end
 

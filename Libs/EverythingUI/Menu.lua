@@ -193,59 +193,75 @@ local function layout(m)
     m:SetWidth(math.min(MAX_WIDTH, math.max(MIN_WIDTH, widest + PAD * 2 + 2)))
 end
 
--- A context menu at the cursor. items is a list of { kind, text, danger, checked, onClick }: kind is
--- nil for an item, "title", "divider" or "check". An item with no onClick only closes the menu. A
--- check item ticks in place, hands onClick its new state and leaves the menu open.
-function Context:ShowMenu(items, owner)
+-- Raised at the caller of ShowMenu or RefreshMenu, naming the one that was called.
+local function check(items, who)
     if type(items) ~= "table" or #items == 0 then
-        error("EverythingUI: ShowMenu needs a list of items", 2)
-    end
-    if owner ~= nil and not (type(owner) == "table" and type(owner.IsVisible) == "function") then
-        error("EverythingUI: ShowMenu's owner must be a frame", 2)
+        error(("EverythingUI: %s needs a list of items"):format(who), 3)
     end
     for i = 1, #items do
         local item = items[i]
         if type(item) ~= "table" then
-            error(("EverythingUI: ShowMenu item %d is not a table"):format(i), 2)
+            error(("EverythingUI: %s item %d is not a table"):format(who, i), 3)
         end
         for key, v in pairs(item) do
             if ITEM_FIELDS[key] ~= type(v) then
-                error(("EverythingUI: ShowMenu item %d has a bad or unknown field %s"):format(i, tostring(key)), 2)
+                error(("EverythingUI: %s item %d has a bad or unknown field %s"):format(who, i, tostring(key)), 3)
             end
         end
         if item.kind and not KINDS[item.kind] then
-            error(("EverythingUI: ShowMenu item %d has an unknown kind %s"):format(i, item.kind), 2)
+            error(("EverythingUI: %s item %d has an unknown kind %s"):format(who, i, item.kind), 3)
         end
         if item.kind ~= "divider" and not item.text then
-            error(("EverythingUI: ShowMenu item %d needs text"):format(i), 2)
+            error(("EverythingUI: %s item %d needs text"):format(who, i), 3)
         end
         if item.checked ~= nil and item.kind ~= "check" then
-            error(("EverythingUI: ShowMenu item %d has checked but is not a check item"):format(i), 2)
+            error(("EverythingUI: %s item %d has checked but is not a check item"):format(who, i), 3)
         end
     end
+end
 
-    local m = menu(self)
+-- Counted per fill, so an action that opened or refreshed the menu keeps it up (click).
+local function fill(ctx, m, items)
     m.gen = m.gen + 1
-    m.owner = owner
     for i = 1, #items do
         local b = m.rows[i]
         if not b then
-            b = newRow(self, m)
+            b = newRow(ctx, m)
             m.rows[i] = b
         end
-        paint(self, b, items[i])
+        paint(ctx, b, items[i])
         b:Show()
     end
     for i = #items + 1, #m.rows do m.rows[i]:Hide() end
     m.count = #items
-
-    -- At UIParent's scale, as Blizzard's menu opens, whatever the scale of the frame clicked.
-    -- Re-snapped on every open, because the UI scale can change between two.
-    kit.SnapLines(m.edges)
+    -- Re-snapped on every fill, because the UI scale can change between two.
     for i = 1, #items do
         kit.SnapLines({ m.rows[i].line })
         if m.rows[i].box then kit.SnapLines(m.rows[i].box.edges) end
     end
+end
+
+-- Text measured while a tab was built has come out short of the text as drawn, so the menu is
+-- sized again a frame later, once it is on screen.
+local function layoutSoon(m)
+    C_Timer.After(0, function() if m:IsShown() then layout(m) end end)
+end
+
+-- A context menu at the cursor. items is a list of { kind, text, danger, checked, onClick }: kind is
+-- nil for an item, "title", "divider" or "check". An item with no onClick only closes the menu. A
+-- check item ticks in place, hands onClick its new state and leaves the menu open.
+function Context:ShowMenu(items, owner)
+    check(items, "ShowMenu")
+    if owner ~= nil and not (type(owner) == "table" and type(owner.IsVisible) == "function") then
+        error("EverythingUI: ShowMenu's owner must be a frame", 2)
+    end
+
+    local m = menu(self)
+    fill(self, m, items)
+    m.owner = owner
+
+    -- At UIParent's scale, as Blizzard's menu opens, whatever the scale of the frame clicked.
+    kit.SnapLines(m.edges)
     layout(m)
     local x, y = GetCursorPosition()
     local scale = UIParent:GetEffectiveScale()
@@ -257,7 +273,17 @@ function Context:ShowMenu(items, owner)
     if tip then tip:Hide() end
     m:Show()
     m:Raise()
-    -- Text measured while a tab was built has come out short of the text as drawn, so the menu is
-    -- sized again a frame later, once it is on screen.
-    C_Timer.After(0, function() if m:IsShown() then layout(m) end end)
+    layoutSoon(m)
+end
+
+-- Repaints the open menu from a new list where it stands, keeping its owner, for a row whose action
+-- changes what the other rows show. With no menu shown it does nothing and answers false.
+function Context:RefreshMenu(items)
+    check(items, "RefreshMenu")
+    local m = lib.shared.menu
+    if not (m and m:IsShown()) then return false end
+    fill(self, m, items)
+    layout(m)
+    layoutSoon(m)
+    return true
 end

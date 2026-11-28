@@ -146,18 +146,14 @@ function W:Resolve(questID, chain)
     return nil
 end
 
-function W:SetWaypoint(mapID, x, y, title, questID)
-    if classicSource() then
-        -- The one arrow slot the map pins and the tracker focus already share, so a click here retargets it
-        local Arrow = ns:GetSubsystem("QuestArrow")
-        if Arrow and Arrow:Available() and Arrow:Set(mapID, x, y, title, questID) then return true end
-    elseif TomTom and TomTom.AddWaypoint then
-        TomTom:AddWaypoint(mapID, x, y, { title = title, from = "Everything Quests" })
-        return true
-    end
+-- noMap for a caller that opens no map when the arrow cannot be set
+function W:SetWaypoint(mapID, x, y, title, questID, noMap)
+    -- The one arrow slot the map pins and the tracker focus share, so a click here retargets it
+    local Arrow = ns:GetSubsystem("QuestArrow")
+    if Arrow and Arrow:Available() and Arrow:Set(mapID, x, y, title, questID) then return true end
     -- Never write Blizzard's user waypoint here - SetUserWaypoint and SetSuperTrackedUserWaypoint seed sticky taint into shared super-track state that the AreaPOI tooltip and quest data provider read later
-    print(("|cffEBB706EQ|r: |cffffffff%s|r is at |cff66ccff%.1f, %.1f|r — opening the map there."):format(
-        title or "Quest", (x or 0) * 100, (y or 0) * 100))
+    print(("|cffEBB706EQ|r: |cffffffff%s|r is at |cff66ccff%.1f, %.1f|r%s"):format(
+        title or "Quest", (x or 0) * 100, (y or 0) * 100, noMap and "." or " — opening the map there."))
     return false
 end
 
@@ -232,14 +228,10 @@ function W:_goToInLog(questID, title)
         end
     end
     local wm, wx, wy = liveWaypoint(questID)
-    -- No TomTom test here. SetWaypoint already branches on it and prints the coordinates when it
-    -- is absent, and gating on TomTom first made that message unreachable from this path while
-    -- the not-in-log path printed it - the same click said different things about the same quest.
+    -- The map opens only where no arrow could be set, as the feedback for a click that set none
     if wm and wx and wy then
-        self:SetWaypoint(wm, wx, wy, title, questID)
+        if self:SetWaypoint(wm, wx, wy, title, questID) then return true end
     else
-        -- Silence read as a dead button. The client returning no position is a normal answer, not
-        -- a failure, and saying so beats a click that appears to do nothing.
         local why = classicSource() and "no position is known for its next objective"
                     or "the game has not given a position for its next objective"
         print(("|cffEBB706EQ|r: |cffffffff%s|r is super-tracked and the map is open, but %s, so there is no arrow to set."):format(
@@ -252,8 +244,7 @@ end
 function W:_goToGiver(questID, chain, title)
     local mapID, x, y = self:Resolve(questID, chain)
     if mapID and x and y then
-        self:SetWaypoint(mapID, x, y, title)
-        openMap(mapID)
+        if not self:SetWaypoint(mapID, x, y, title) then openMap(mapID) end
         return true
     end
     return false
@@ -409,18 +400,19 @@ function W:AdvanceWaypoint(chain)
     local step = nextActionableStep(chain)
     if not (step and step.id) then return nil end
     local id = step.id
+    local Arrow = ns:GetSubsystem("QuestArrow")
     if inLog(id) then
         if C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
             local cur = C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID()
             if cur ~= id then C_SuperTrack.SetSuperTrackedQuestID(id) end
         end
-        if TomTom and TomTom.AddWaypoint then
+        if Arrow and Arrow:Available() then
             local wm, wx, wy = liveWaypoint(id)
-            if wm and wx and wy then self:SetWaypoint(wm, wx, wy, titleOf(id), id) end
+            if wm and wx and wy then self:SetWaypoint(wm, wx, wy, titleOf(id), id, true) end
         end
-    elseif TomTom and TomTom.AddWaypoint then
+    elseif Arrow and Arrow:Available() then
         local m, x, y = self:Resolve(id, chain)
-        if m and x and y then self:SetWaypoint(m, x, y, titleOf(id)) end
+        if m and x and y then self:SetWaypoint(m, x, y, titleOf(id), nil, true) end
     end
     return step
 end

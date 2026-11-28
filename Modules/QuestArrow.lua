@@ -1,6 +1,6 @@
 local _, ns = ...
 
--- One TomTom slot for every EQ arrow but retail's Chain Guide, so a new one replaces the last instead of leaving two
+-- One TomTom slot for every EQ arrow, so a new one replaces the last instead of leaving two
 local Arrow = ns:RegisterSubsystem("QuestArrow", {})
 
 -- _questID is the quest the slot follows, kept with no waypoint showing until a spot is known
@@ -14,6 +14,11 @@ local function tomtom()
     return (T and T.AddWaypoint) and T or nil
 end
 
+-- Retail ships none of the Classic quest tables, so there PointFor and Retarget read the game's own answers
+local function retail()
+    return not (ns.CLASSIC_QUEST_COORDS or ns.CLASSIC_QUEST_TURNIN)
+end
+
 function Arrow:Available()
     return tomtom() ~= nil
 end
@@ -24,9 +29,9 @@ function Arrow:StandIn()
     return (tomtom() and loaded and not loaded("TomTom")) and true or false
 end
 
--- TomTom brings saved waypoints back at login, when EQ no longer holds their handle. Retail's Chain Guide adds its own under the same tag
+-- TomTom brings saved waypoints back at login, when EQ no longer holds their handle
 local function removeLeftovers(T)
-    local all = ns.HAS_CLASSIC_SPAWNS and type(T.waypoints) == "table" and T.waypoints
+    local all = type(T.waypoints) == "table" and T.waypoints
     if not all then return end
     local stale = {}
     for _, byKey in pairs(all) do
@@ -103,9 +108,11 @@ function Arrow:Set(mapID, x, y, title, questID, followed)
         from  = FROM,
         crazy = true,
     })
-    if not ok then
+    -- TomTom raises when it cannot take a waypoint, and Shortest Path Forever standing in for it answers nil
+    if not (ok and uid) then
         _m, _x, _y = nil, nil, nil
-        if questID and questID == _questID then remember(questID) end
+        -- An arrow asked for elsewhere ends the old follow, whose waypoint is already down
+        if questID and questID == _questID then remember(questID) else _questID, _followed = nil, false end
         return false
     end
     _uid, _questID, _title, _followed = uid, questID, title, followed == true
@@ -114,9 +121,8 @@ function Arrow:Set(mapID, x, y, title, questID, followed)
     return true
 end
 
--- Off retail, nothing to point at yet, so the waypoint goes and the slot keeps the quest, for its arrow to come once a spot is known
+-- Nothing to point at yet, so the waypoint goes and the slot keeps the quest, for its arrow to come once a spot is known
 function Arrow:Follow(questID, followed)
-    if not ns.HAS_CLASSIC_SPAWNS then return self:Clear() end
     local T = tomtom()
     if not T then return end
     takeDown(T)
@@ -165,7 +171,7 @@ local function mapRow(mapID, questID)
     end
 end
 
--- The quest's own zone is kept off retail, whose guide reads what it always did. Forever gave Tirisfal's row from Orgrimmar (2026-11-05)
+-- The quest's own zone is kept off retail, and was measured on WoW Forever: Tirisfal's row from Orgrimmar (2026-11-05)
 function Arrow:GamePoint(questID)
     if not questID then return nil end
     if C_QuestLog and C_QuestLog.GetNextWaypoint then
@@ -179,6 +185,19 @@ function Arrow:GamePoint(questID)
     if own and own ~= 0 and own ~= here then
         x, y = mapRow(own, questID)
         if x then return own, x, y end
+    end
+    return nil
+end
+
+-- Retail has no Classic tables, so the game answers: its next waypoint, the quest's row on your map, else a world quest's own spot
+local function retailPoint(self, questID)
+    local m, x, y = self:GamePoint(questID)
+    if m then return m, x, y end
+    local T = C_TaskQuest
+    local zone = T and T.GetQuestZoneID and T.GetQuestZoneID(questID)
+    if zone and zone ~= 0 and T.GetQuestLocation then
+        x, y = T.GetQuestLocation(questID, zone)
+        if x and y and (x ~= 0 or y ~= 0) then return zone, x, y end
     end
     return nil
 end
@@ -306,9 +325,10 @@ end
 -- Chain Guide pins and the Quest Browser ask on every redraw, so an answer stands for a second while the quest's state and your map hold
 local _memo = {}
 
--- The nearest open objective or hand-in, else Forever's own marker, else the stored point when nothing left can be placed
+-- On retail the game's own answer. Elsewhere the nearest open objective or hand-in, else Forever's own marker, else the stored point when nothing left can be placed
 function Arrow:PointFor(questID)
-    if not (questID and (ns.CLASSIC_QUEST_COORDS or ns.CLASSIC_QUEST_TURNIN)) then return nil end
+    if not questID then return nil end
+    if retail() then return retailPoint(self, questID) end
     local q = cached(questID)
     local sig = q and stateOf(q)
     local here, now = playerMap(), GetTime and GetTime()
@@ -322,7 +342,7 @@ function Arrow:PointFor(questID)
     return hit.m, hit.x, hit.y, q and q.title
 end
 
--- Without TomTom nothing is read, as on Forever PointFor asks the game's map rows for an arrow that could not be drawn
+-- Without TomTom nothing is read, as PointFor asks the game's map rows for an arrow that could not be drawn
 function Arrow:PointAtQuest(questID)
     if not tomtom() then return false end
     local mapID, x, y, title = self:PointFor(questID)
@@ -330,10 +350,20 @@ function Arrow:PointAtQuest(questID)
     return self:Set(mapID, x, y, title or (ns.Util and ns.Util.QuestTitle(questID, true)), questID, true)
 end
 
+-- Retail's route moves without an objective finishing, so the game's answer is compared with the spot last set, and a spot TomTom took down stays down until the answer moves
+local function retargetRetail(self, questID)
+    local m, x, y = retailPoint(self, questID)
+    -- No answer for a moment, around a loading screen, leaves the arrow where it is
+    if not m then return end
+    if _x and m == _m and near(x, _x) and near(y, _y) then return end
+    self:Set(m, x, y, _title or (ns.Util and ns.Util.QuestTitle and ns.Util.QuestTitle(questID, true)), questID, _followed)
+end
+
 -- A followed quest is read again when an objective or the quest changes state, keeping a spot that still serves it
 function Arrow:Retarget()
     local questID = _questID
     if not questID then return end
+    if retail() then return retargetRetail(self, questID) end
     -- A quest missing from the log does not end a follow, as the log can miss one for a moment around a loading screen
     local q = cached(questID)
     if not q then return end
@@ -359,17 +389,31 @@ end
 -- How long after a loading screen a step back in the followed quest is taken for a stale read
 local SETTLE = 10
 
--- Retail never sets this slot, so it registers nothing
+local function isTask(questID)
+    local log = C_QuestLog
+    return log and ((log.IsWorldQuest and log.IsWorldQuest(questID)) or (log.IsQuestTask and log.IsQuestTask(questID)))
+end
+
 function Arrow:OnEnable()
-    if not ns.HAS_CLASSIC_SPAWNS then return end
     local Events = ns:GetSubsystem("Events")
     if not (Events and Events.On and Events.Debounce) then return end
     local function retarget() Arrow:Retarget() end
     local function soon()
         if _questID and tomtom() then Events:Debounce("QuestArrow", 0.3, retarget) end
     end
-    local function gone(_, questID)
-        if questID ~= nil and questID == _questID then Arrow:Clear() end
+    local function gone(event, questID)
+        if questID == nil or questID ~= _questID then return end
+        -- A world quest or bonus objective leaves the log as you leave its area, so that removal is not taken as its end
+        if event == "QUEST_REMOVED" and isTask(questID) then return end
+        Arrow:Clear()
+    end
+    if retail() then
+        Events:On("QUEST_LOG_UPDATE", soon)
+        Events:On("QUEST_POI_UPDATE", soon)
+        Events:On("SUPER_TRACKING_PATH_UPDATED", soon)
+        Events:On("QUEST_REMOVED", gone)
+        Events:On("QUEST_TURNED_IN", gone)
+        return
     end
     local function settling()
         _settling = (GetTime and GetTime() or 0) + SETTLE
